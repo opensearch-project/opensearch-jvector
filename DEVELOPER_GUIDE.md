@@ -130,6 +130,29 @@ For Mac M series machines use
 ```
 ./gradlew build -PcustomDistributionUrl="<Full path to .tar.gz file file you noted above>"
 ```
+
+If you want to build the plugin to later use with a different plugin such as neural-search, you can build the plugin with the following command:
+
+```shell
+# Build the plugin
+./gradlew build
+
+# Install the plugin locally to your local maven repository
+PLUGIN_VERSION="3.0.0.0-alpha1-SNAPSHOT"
+LOCAL_DISTRIBUTION_DIR="build/distributions"
+# Install the plugin jar files
+mvn install:install-file \
+  -Dfile=${LOCAL_DISTRIBUTION_DIR}/opensearch-jvector-${PLUGIN_VERSION}.jar \
+  -DpomFile=build/distributions/opensearch-jvector-${PLUGIN_VERSION}.pom \
+  -Dsources=build/distributions/opensearch-jvector-${PLUGIN_VERSION}-sources.jar
+# Install the plugin zip file
+mvn install:install-file \
+  -Dfile=${LOCAL_DISTRIBUTION_DIR}/opensearch-jvector-${PLUGIN_VERSION}.zip \
+  -DgroupId=org.opensearch.plugin \
+  -DartifactId=opensearch-jvector \
+  -Dversion=${PLUGIN_VERSION} \
+  -Dpackaging=zip
+```
 ## Run OpenSearch k-NN
 
 ### Run Single-node Cluster Locally

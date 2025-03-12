@@ -51,7 +51,8 @@ to OpenSearch vector search engines.
 For example: We have compared with the default Lucene HNSW graph implementation and noticed a significantly increasing latency benefits
 even from as small as 10,000 vectors datasets but exponentially increasing with the dataset size and further increasing by several order of magnitude 
 with the decrease in the Operating System File System cache (as is expected in RAM constrained environments)
-**Sample JMH engine outputs**
+
+### JMH engine benchmark outputs
 _Important note: JMH numbers are qualitative and relative and should not be treated as "globally consistent". 
 Or in other words, the numbers below only illustrate the relative ratio of performance difference and while they may vary across systems, the ratios should remain constant._
 
@@ -126,6 +127,10 @@ When we are moving to a RAM constrained environment we are expecting to see a si
 For example if Lucene is doing 100x the number of disk reads compared to JVector, and the disk is 100x slower than RAM, then we can expect JVector to be 10,000x faster than Lucene in this scenario.
 
 
+### OpenSearch-Benchmark output on single node for sift-128-euclidean-L2
+![throughput.png](throughput.png)
+![latency.png](latency.png)
+![recall.png](recall.png)
 
 ## Credits and Acknowledgments
 

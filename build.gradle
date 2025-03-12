@@ -422,6 +422,15 @@ task integTestRemote(type: RestIntegTestTask) {
 
 run {
     useCluster project.testClusters.integTest
+
+    // Set JVM arguments for memory
+    testClusters.integTest.nodes.each { node ->
+        node.jvmArgs(
+                '-Xms2g',  // Initial heap size
+                '-Xmx2g'   // Maximum heap size
+        )
+    }
+
     doFirst {
         // There seems to be an issue when running multi node run or integ tasks with unicast_hosts
         // not being written, the waitForAllConditions ensures it's written
