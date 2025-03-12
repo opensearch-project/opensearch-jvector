@@ -38,6 +38,7 @@ import java.util.Set;
 @Log4j2
 public class JVectorReader extends KnnVectorsReader {
     private static final VectorTypeSupport VECTOR_TYPE_SUPPORT = VectorizationProvider.getInstance().getVectorTypeSupport();
+    private static final int DEFAULT_OVER_QUERY_FACTOR = 5; // We will query 5x more than topKFor reranking
 
     private final FieldInfos fieldInfos;
     private final String indexDataFileName;
@@ -125,7 +126,7 @@ public class JVectorReader extends KnnVectorsReader {
             ssp = SearchScoreProvider.exact(q, fieldEntryMap.get(field).similarityFunction, index.getView());
         }
         io.github.jbellis.jvector.util.Bits compatibleBits = doc -> acceptDocs == null || acceptDocs.get(doc);
-        final var sr = fieldEntryMap.get(field).graphSearcher.search(ssp, knnCollector.k(), compatibleBits);
+        final var sr = fieldEntryMap.get(field).graphSearcher.search(ssp, knnCollector.k(), knnCollector.k() * DEFAULT_OVER_QUERY_FACTOR, 0.0f, 0.0f, compatibleBits);
         for (SearchResult.NodeScore ns : sr.getNodes()) {
             knnCollector.collect(ns.node, ns.score);
         }
