@@ -1,0 +1,6 @@
+rootProject.name = 'opensearch-jvector-plugin'
+
+include ":qa"
+include ":qa:rolling-upgrade"
+include ":qa:restart-upgrade"
+include ":benchmark-jmh"

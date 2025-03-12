@@ -1,0 +1,2 @@
+OpenSearch jVector Plugin
+Copyright OpenSearch Contributors

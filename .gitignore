@@ -1,0 +1,26 @@
+# Ignore Gradle project-specific cache directory
+.gradle
+
+# Ignore Gradle build output directory
+build
+
+# Ignore Intellij
+.idea
+
+# Ignore Visual Studio Code workspace files
+.vscode
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/*.code-snippets
+
+# Ignore built files
+bin
+lib
+
+# Ignore directories where downloaded datasets are stored
+fvec
+hdf5
+
+.DS_store

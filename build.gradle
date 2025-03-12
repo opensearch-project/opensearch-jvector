@@ -1,0 +1,464 @@
+/*
+ *  Copyright OpenSearch Contributors
+ *  SPDX-License-Identifier: Apache-2.0
+ */
+
+
+import org.gradle.internal.jvm.Jvm
+import org.opensearch.gradle.test.RestIntegTestTask
+import org.opensearch.gradle.testclusters.OpenSearchCluster
+import org.apache.tools.ant.taskdefs.condition.Os
+import java.nio.file.Paths
+import java.util.concurrent.Callable
+
+/**** This entire section is boiler plate of OpenSearch plugin files. ****/
+buildscript {
+    ext {
+        // build.version_qualifier parameter applies to knn plugin artifacts only. OpenSearch version must be set
+        // explicitly as 'opensearch.version' property, for instance opensearch.version=2.0.0-rc1-SNAPSHOT
+        opensearch_version = System.getProperty("opensearch.version", "3.0.0-alpha1-SNAPSHOT")
+        version_qualifier = System.getProperty("build.version_qualifier", "alpha1")
+        opensearch_group = "org.opensearch"
+        isSnapshot = "true" == System.getProperty("build.snapshot", "true")
+
+        version_tokens = opensearch_version.tokenize('-')
+        opensearch_build = version_tokens[0] + '.0'
+        plugin_no_snapshot = opensearch_build
+        if (version_qualifier) {
+            opensearch_build += "-${version_qualifier}"
+            plugin_no_snapshot += "-${version_qualifier}"
+        }
+        if (isSnapshot) {
+            opensearch_build += "-SNAPSHOT"
+        }
+        opensearch_no_snapshot = opensearch_build.replace("-SNAPSHOT","")
+    }
+
+    // This isn't applying from repositories.gradle so repeating git diff it here
+    repositories {
+        mavenLocal()
+        maven { url "https://aws.oss.sonatype.org/content/repositories/snapshots" }
+        mavenCentral()
+        maven { url "https://plugins.gradle.org/m2/" }
+    }
+
+    dependencies {
+        classpath "${opensearch_group}.gradle:build-tools:${opensearch_version}"
+        configurations.all {
+            resolutionStrategy {
+                force("org.eclipse.platform:org.eclipse.core.runtime:4.29.0") // CVE for < 4.29
+                force("org.eclipse.platform:org.eclipse.core.resources:4.20.0") // CVE for < 4.20
+            }
+        }
+    }
+}
+
+plugins {
+    id 'java-library'
+    id 'java-test-fixtures'
+    id 'idea'
+    id "com.diffplug.spotless" version "6.25.0" apply false
+    id 'io.freefair.lombok' version '8.4'
+    id "de.undercouch.download" version "5.3.0"
+    id "me.champeau.jmh" version "0.7.1"
+}
+
+apply from: 'gradle/formatting.gradle'
+apply plugin: 'opensearch.opensearchplugin'
+apply plugin: 'opensearch.rest-test'
+apply plugin: 'opensearch.pluginzip'
+apply plugin: 'opensearch.repositories'
+
+def opensearch_tmp_dir = rootProject.file('build/private/opensearch_tmp').absoluteFile
+opensearch_tmp_dir.mkdirs()
+
+ext {
+    projectSubstitutions = [:]
+
+    configureSecurityPlugin = { OpenSearchCluster cluster ->
+        configurations.zipArchive.asFileTree.each {
+            cluster.plugin(provider(new Callable<RegularFile>() {
+                @Override
+                RegularFile call() throws Exception {
+                    return new RegularFile() {
+                        @Override
+                        File getAsFile() {
+                            return it
+                        }
+                    }
+                }
+            }))
+        }
+
+        cluster.getNodes().forEach { node ->
+            var creds = node.getCredentials()
+            if (creds.isEmpty()) {
+                creds.add(Map.of('username', 'admin', 'password', 'admin'))
+            } else {
+                creds.get(0).putAll(Map.of('username', 'admin', 'password', 'admin'))
+            }
+        }
+
+        // Config below including files are copied from security demo configuration
+        ['esnode.pem', 'esnode-key.pem', 'root-ca.pem'].forEach { file ->
+            File local = Paths.get(opensearch_tmp_dir.absolutePath, file).toFile()
+            download.run {
+                src "https://raw.githubusercontent.com/opensearch-project/security/main/bwc-test/src/test/resources/security/" + file
+                dest local
+                overwrite false
+            }
+            cluster.extraConfigFile(file, local)
+        }
+
+        // This configuration is copied from the security plugins demo install:
+        // https://github.com/opensearch-project/security/blob/2.11.1.0/tools/install_demo_configuration.sh#L365-L388
+        cluster.setting("plugins.security.ssl.transport.pemcert_filepath", "esnode.pem")
+        cluster.setting("plugins.security.ssl.transport.pemkey_filepath", "esnode-key.pem")
+        cluster.setting("plugins.security.ssl.transport.pemtrustedcas_filepath", "root-ca.pem")
+        cluster.setting("plugins.security.ssl.transport.enforce_hostname_verification", "false")
+        cluster.setting("plugins.security.ssl.http.enabled", "true")
+        cluster.setting("plugins.security.ssl.http.pemcert_filepath", "esnode.pem")
+        cluster.setting("plugins.security.ssl.http.pemkey_filepath", "esnode-key.pem")
+        cluster.setting("plugins.security.ssl.http.pemtrustedcas_filepath", "root-ca.pem")
+        cluster.setting("plugins.security.allow_unsafe_democertificates", "true")
+        cluster.setting("plugins.security.allow_default_init_securityindex", "true")
+        cluster.setting("plugins.security.unsupported.inject_user.enabled", "true")
+
+        cluster.setting("plugins.security.authcz.admin_dn", "\n- CN=kirk,OU=client,O=client,L=test, C=de")
+        cluster.setting('plugins.security.restapi.roles_enabled', '["all_access", "security_rest_api_access"]')
+        cluster.setting('plugins.security.system_indices.enabled', "true")
+        cluster.setting('plugins.security.system_indices.indices', '[' +
+                '".plugins-ml-config", ' +
+                '".plugins-ml-connector", ' +
+                '".plugins-ml-model-group", ' +
+                '".plugins-ml-model", ".plugins-ml-task", ' +
+                '".plugins-ml-conversation-meta", ' +
+                '".plugins-ml-conversation-interactions", ' +
+                '".opendistro-alerting-config", ' +
+                '".opendistro-alerting-alert*", ' +
+                '".opendistro-anomaly-results*", ' +
+                '".opendistro-anomaly-detector*", ' +
+                '".opendistro-anomaly-checkpoints", ' +
+                '".opendistro-anomaly-detection-state", ' +
+                '".opendistro-reports-*", ' +
+                '".opensearch-notifications-*", ' +
+                '".opensearch-notebooks", ' +
+                '".opensearch-observability", ' +
+                '".ql-datasources", ' +
+                '".opendistro-asynchronous-search-response*", ' +
+                '".replication-metadata-store", ' +
+                '".opensearch-knn-models", ' +
+                '".geospatial-ip2geo-data*"' +
+                ']'
+        )
+        cluster.setSecure(true)
+    }
+    propertyKeys = [
+            breaker: [
+                    useRealMemory: 'tests.opensearch.indices.breaker.total.use_real_memory'
+            ]
+    ]
+}
+
+def getBreakerSetting() {
+    return System.getProperty(propertyKeys.breaker.useRealMemory, 'true')
+}
+
+allprojects {
+    group = 'org.opensearch.knn'
+    version = opensearch_version.tokenize('-')[0] + '.0'
+    if (version_qualifier) {
+        version += "-${version_qualifier}"
+    }
+    if (isSnapshot) {
+        version += "-SNAPSHOT"
+    }
+    apply from: rootProject.file('build-tools/repositories.gradle').absoluteFile
+    plugins.withId('java') {
+        sourceCompatibility = targetCompatibility = "21"
+    }
+
+    afterEvaluate {
+        project.dependencyLicenses.enabled = false
+        project.thirdPartyAudit.enabled = false
+        project.loggerUsageCheck.enabled = false
+        project.forbiddenApis.ignoreFailures = true
+        project.forbiddenPatterns {
+            setEnabled(false)
+        }
+        project.testingConventions.enabled = false
+        project.validateNebulaPom.enabled = false
+        project.licenseFile = rootProject.file('LICENSE.txt')
+        project.noticeFile = rootProject.file('NOTICE.txt')
+        project.forbiddenApis.ignoreFailures = true
+    }
+}
+
+configurations {
+    zipArchive
+}
+
+publishing {
+    repositories {
+        maven {
+            name = "Snapshots"
+            url = "https://aws.oss.sonatype.org/content/repositories/snapshots"
+            credentials {
+                username "$System.env.SONATYPE_USERNAME"
+                password "$System.env.SONATYPE_PASSWORD"
+            }
+        }
+    }
+    publications {
+        pluginZip(MavenPublication) { publication ->
+            pom {
+                name = "opensearch-jvector"
+                description = "OpenSearch jVector plugin"
+                groupId = "org.opensearch.plugin"
+                licenses {
+                    license {
+                        name = "The Apache License, Version 2.0"
+                        url = "http://www.apache.org/licenses/LICENSE-2.0.txt"
+                    }
+                }
+                developers {
+                    developer {
+                        name = "OpenSearch"
+                        url = "https://github.com/opensearch-project/opensearch-jvector-plugin"
+                    }
+                }
+            }
+        }
+    }
+}
+
+/*** Setting up lombok in compiler args ***/
+compileJava {
+    options.compilerArgs.addAll(["-processor", 'lombok.launch.AnnotationProcessorHider$AnnotationProcessor'])
+}
+compileTestJava {
+    options.compilerArgs.addAll(["-processor", 'lombok.launch.AnnotationProcessorHider$AnnotationProcessor'])
+}
+compileTestFixturesJava {
+    options.compilerArgs.addAll(["-processor", 'lombok.launch.AnnotationProcessorHider$AnnotationProcessor'])
+}
+
+/*** End of lombok setup ***/
+
+def usingRemoteCluster = System.properties.containsKey('tests.rest.cluster') || System.properties.containsKey('tests.cluster')
+def usingMultiNode = project.properties.containsKey('numNodes')
+// Only apply jacoco test coverage if we are running a local single node cluster
+if (!usingRemoteCluster) {
+    if (!usingMultiNode) {
+        apply from: 'build-tools/jvectorplugin-coverage.gradle'
+    }
+}
+
+check.dependsOn spotlessCheck
+check.dependsOn jacocoTestReport
+
+
+opensearchplugin {
+    name 'opensearch-jvector'
+    // zip file name and plugin name in ${opensearch.plugin.name} read by OpenSearch when plugin loading
+    description 'OpenSearch jVector plugin'
+    classname 'org.opensearch.knn.plugin.JVectorKNNPlugin'
+    extendedPlugins = ['lang-painless']
+    licenseFile = rootProject.file('LICENSE.txt')
+    noticeFile = rootProject.file('NOTICE.txt')
+}
+
+tasks.named("integTest").configure {
+    it.dependsOn(project.tasks.named("bundlePlugin"))
+}
+
+task release(type: Copy, group: 'build') {
+    dependsOn project.tasks.build
+    from(zipTree(project.tasks.bundlePlugin.outputs.files.getSingleFile()))
+    into "build/plugins/opensearch-jvector"
+    includeEmptyDirs = false
+    eachFile { it.path = it.path - "opensearch/" }
+}
+
+/*** End of plugin boiler plate code ***/
+
+
+//****************************************************************************/
+// Dependencies
+//****************************************************************************/
+dependencies {
+    api "org.opensearch:opensearch:${opensearch_version}"
+    compileOnly "org.opensearch.plugin:opensearch-scripting-painless-spi:${versions.opensearch}"
+    api group: 'com.google.guava', name: 'failureaccess', version:'1.0.1'
+    api group: 'com.google.guava', name: 'guava', version:'32.1.3-jre'
+    api group: 'commons-lang', name: 'commons-lang', version: '2.6'
+    testFixturesImplementation "org.opensearch.test:framework:${opensearch_version}"
+    testImplementation group: 'net.bytebuddy', name: 'byte-buddy', version: '1.15.10'
+    testImplementation group: 'org.objenesis', name: 'objenesis', version: '3.3'
+    testImplementation group: 'net.bytebuddy', name: 'byte-buddy-agent', version: '1.15.4'
+    // json-path 2.9.0 depends on slf4j 2.0.11, which conflicts with the version used by OpenSearch core.
+    // Excluding slf4j here since json-path is only used for testing, and logging failures in this context are acceptable.
+    testFixturesImplementation('com.jayway.jsonpath:json-path:2.9.0') {
+        exclude group: 'org.slf4j', module: 'slf4j-api'
+    }
+    testFixturesImplementation "org.opensearch:common-utils:${version}"
+    implementation 'com.github.oshi:oshi-core:6.4.13'
+
+    implementation 'io.github.jbellis:jvector:4.0.0-beta.1'
+    implementation 'org.agrona:agrona:1.20.0'
+
+    api "net.java.dev.jna:jna:5.13.0"
+    api "net.java.dev.jna:jna-platform:5.13.0"
+    // OpenSearch core is using slf4j 1.7.36. Therefore, we cannot change the version here.
+    implementation 'org.slf4j:slf4j-api:1.7.36'
+
+    zipArchive group: 'org.opensearch.plugin', name:'opensearch-security', version: "${opensearch_build}"
+}
+
+test {
+    systemProperty 'tests.security.manager', 'false'
+    systemProperty 'log4j.configurationFile', "$rootDir/src/test/resources/log4j2.properties"
+
+    //this change enables mockito-inline that supports mocking of static classes/calls
+    systemProperty "jdk.attach.allowAttachSelf", true
+}
+
+def _numNodes = findProperty('numNodes') as Integer ?: 1
+integTest {
+    systemProperty 'tests.security.manager', 'false'
+    println "Project root directory: ${project.rootDir}"
+    systemProperty "java.security.policy", "file://${project.rootDir}/src/main/plugin-metadata/plugin-security.policy"
+    systemProperty 'log4j.configurationFile', "${project.rootDir}/src/test/resources/log4j2.properties"
+    testLogging.showStandardStreams = true
+    systemProperty 'tests.output', 'true'
+    systemProperty 'java.io.tmpdir', opensearch_tmp_dir.absolutePath
+    // allows integration test classes to access test resource from project root path
+    systemProperty('project.root', project.rootDir.absolutePath)
+
+    var is_https = System.getProperty("https")
+    var user = System.getProperty("user")
+    var password = System.getProperty("password")
+
+    if (System.getProperty("security.enabled") != null) {
+        // If security is enabled, set is_https/user/password defaults
+        is_https = is_https == null ? "true" : is_https
+        user = user == null ? "admin" : user
+        password = password == null ? "admin" : password
+    }
+
+    systemProperty("https", is_https)
+    systemProperty("user", user)
+    systemProperty("password", password)
+    systemProperty("test.exhaustive", System.getProperty("test.exhaustive"))
+
+    doFirst {
+        // Tell the test JVM if the cluster JVM is running under a debugger so that tests can
+        // use longer timeouts for requests.
+        def isDebuggingCluster = getDebug() || System.getProperty("test.debug") != null
+        systemProperty 'cluster.debug', isDebuggingCluster
+        // Set number of nodes system property to be used in tests
+        systemProperty 'cluster.number_of_nodes', "${_numNodes}"
+        // There seems to be an issue when running multi node run or integ tasks with unicast_hosts
+        // not being written, the waitForAllConditions ensures it's written
+        getClusters().forEach { cluster ->
+            cluster.waitForAllConditions()
+        }
+    }
+
+    // The -Ddebug.es option makes the cluster debuggable; this makes the tests debuggable
+    if (System.getProperty("test.debug") != null) {
+        jvmArgs '-agentlib:jdwp=transport=dt_socket,server=n,suspend=y,address=8000'
+    }
+    systemProperty propertyKeys.breaker.useRealMemory, getBreakerSetting()
+}
+
+testClusters.integTest {
+    testDistribution = "ARCHIVE"
+    systemProperty "java.security.policy", "file://${project.rootDir}/src/main/plugin-metadata/plugin-security.policy"
+    systemProperty 'log4j.configurationFile', "${project.rootDir}/src/test/resources/log4j2.properties"
+    // Optionally install security
+    if (System.getProperty("security.enabled") != null) {
+        configureSecurityPlugin(testClusters.integTest)
+    }
+
+    plugin(project.tasks.bundlePlugin.archiveFile)
+
+    // Cluster shrink exception thrown if we try to set numberOfNodes to 1, so only apply if > 1
+    if (_numNodes > 1) numberOfNodes = _numNodes
+    // When running integration tests it doesn't forward the --debug-jvm to the cluster anymore
+    // i.e. we have to use a custom property to flag when we want to debug opensearch JVM
+    // since we also support multi node integration tests we increase debugPort per node
+    if (System.getProperty("cluster.debug") != null) {
+        def debugPort = 5005
+        nodes.forEach { node ->
+            node.jvmArgs("-agentlib:jdwp=transport=dt_socket,server=n,suspend=y,address=${debugPort}")
+            debugPort += 1
+        }
+    }
+    systemProperty propertyKeys.breaker.useRealMemory, getBreakerSetting()
+}
+
+task integTestRemote(type: RestIntegTestTask) {
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+
+    systemProperty "https", System.getProperty("https")
+    systemProperty "user", System.getProperty("user")
+    systemProperty "password", System.getProperty("password")
+
+    systemProperty 'cluster.number_of_nodes', "${_numNodes}"
+
+    systemProperty 'tests.security.manager', 'false'
+    systemProperty("test.exhaustive", System.getProperty("test.exhaustive"))
+
+    systemProperty 'tests.output', 'true'
+    // Run tests with remote cluster only if rest case is defined
+    if (System.getProperty("tests.rest.cluster") != null) {
+        filter {
+            includeTestsMatching "org.opensearch.knn.*IT"
+        }
+    }
+}
+
+run {
+    useCluster project.testClusters.integTest
+    doFirst {
+        // There seems to be an issue when running multi node run or integ tasks with unicast_hosts
+        // not being written, the waitForAllConditions ensures it's written
+        getClusters().forEach { cluster ->
+            cluster.waitForAllConditions()
+        }
+    }
+}
+
+// updateVersion: Task to auto increment to the next development iteration
+task updateVersion {
+    onlyIf { System.getProperty('newVersion') }
+    doLast {
+        ext.newVersion = System.getProperty('newVersion')
+        println "Setting version to ${newVersion}."
+        // String tokenization to support -SNAPSHOT
+        // Include the required files that needs to be updated with new Version
+        ant.replaceregexp(match: opensearch_version.tokenize('-')[0], replace: newVersion.tokenize('-')[0], flags:'g', byline:true) {
+            fileset(dir: projectDir) {
+                // Include the required files that needs to be updated with new Version
+                include(name: ".github/workflows/backwards_compatibility_tests_workflow.yml")
+            }
+        }
+        ant.replaceregexp(file:'build.gradle', match: '"opensearch.version", "\\d.*"', replace: '"opensearch.version", "' + newVersion.tokenize('-')[0] + '-SNAPSHOT"', flags:'g', byline:true)
+
+        ext.os_version_without_snapshot = opensearch_version.tokenize('-')[0]
+        ext.os_version_major = os_version_without_snapshot.tokenize('.')[0]
+        ext.os_version_minor = os_version_without_snapshot.tokenize('.')[1]
+        ext.os_version_patch = os_version_without_snapshot.tokenize('.')[2]
+        // This condition will check if the BWC workflow is already updated or not and will run next steps if not updated
+        if (!fileTree(".github/workflows/backwards_compatibility_tests_workflow.yml").getSingleFile().text.contains(os_version_without_snapshot)) {
+            // Extract the oldBWCVersion from the existing OpenSearch Version (oldBWCVersion = major . (minor-1) . patch)
+            ext.oldBWCVersion = os_version_major + '.' + Integer.toString(Integer.valueOf(os_version_minor) - 1) + '.' + os_version_patch
+            // Include the current OpenSearch Version before version bump to the bwc_version matrix
+            ant.replaceregexp(file:".github/workflows/backwards_compatibility_tests_workflow.yml", match: oldBWCVersion, replace: oldBWCVersion + '", "' + opensearch_version.tokenize('-')[0], flags:'g', byline:true)
+        }
+    }
+}
+
+
