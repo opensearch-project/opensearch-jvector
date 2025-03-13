@@ -126,7 +126,14 @@ public class JVectorReader extends KnnVectorsReader {
             ssp = SearchScoreProvider.exact(q, fieldEntryMap.get(field).similarityFunction, index.getView());
         }
         io.github.jbellis.jvector.util.Bits compatibleBits = doc -> acceptDocs == null || acceptDocs.get(doc);
-        final var sr = fieldEntryMap.get(field).graphSearcher.search(ssp, knnCollector.k(), knnCollector.k() * DEFAULT_OVER_QUERY_FACTOR, 0.0f, 0.0f, compatibleBits);
+        final var sr = fieldEntryMap.get(field).graphSearcher.search(
+            ssp,
+            knnCollector.k(),
+            knnCollector.k() * DEFAULT_OVER_QUERY_FACTOR,
+            0.0f,
+            0.0f,
+            compatibleBits
+        );
         for (SearchResult.NodeScore ns : sr.getNodes()) {
             knnCollector.collect(ns.node, ns.score);
         }
