@@ -32,7 +32,7 @@ public enum KNNEngine implements KNNLibrary {
     private static final Set<KNNEngine> ENGINES_SUPPORTING_FILTERS = ImmutableSet.of(KNNEngine.LUCENE);
     public static final Set<KNNEngine> ENGINES_SUPPORTING_RADIAL_SEARCH = ImmutableSet.of(KNNEngine.LUCENE);
 
-    private static Map<KNNEngine, Integer> MAX_DIMENSIONS_BY_ENGINE = Map.of(KNNEngine.LUCENE, 16_000, KNNEngine.JVECTOR, 16_000);
+    private static final Map<KNNEngine, Integer> MAX_DIMENSIONS_BY_ENGINE = Map.of(KNNEngine.LUCENE, 16_000, KNNEngine.JVECTOR, 16_000);
 
     /**
      * Constructor for KNNEngine

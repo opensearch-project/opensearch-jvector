@@ -74,7 +74,7 @@ public class KNNJVectorTests extends LuceneTestCase {
                 final IndexSearcher searcher = newSearcher(reader);
                 KnnFloatVectorQuery knnFloatVectorQuery = new KnnFloatVectorQuery("test_field", target, k, filterQuery);
                 TopDocs topDocs = searcher.search(knnFloatVectorQuery, k);
-                assertEquals(k, topDocs.totalHits.value());
+                assertEquals(k, topDocs.totalHits.value);
                 assertEquals(9, topDocs.scoreDocs[0].doc);
                 Assert.assertEquals(
                     VectorSimilarityFunction.EUCLIDEAN.compare(target, new float[] { 0.0f, 1.0f / 10.0f }),
@@ -139,7 +139,7 @@ public class KNNJVectorTests extends LuceneTestCase {
                 final IndexSearcher searcher = newSearcher(reader);
                 KnnFloatVectorQuery knnFloatVectorQuery = new KnnFloatVectorQuery("test_field", target, k, filterQuery);
                 TopDocs topDocs = searcher.search(knnFloatVectorQuery, k);
-                assertEquals(k, topDocs.totalHits.value());
+                assertEquals(k, topDocs.totalHits.value);
                 assertEquals(9, topDocs.scoreDocs[0].doc);
                 Assert.assertEquals(
                     VectorSimilarityFunction.EUCLIDEAN.compare(target, new float[] { 0.0f, 1.0f / 10.0f }),
@@ -208,7 +208,7 @@ public class KNNJVectorTests extends LuceneTestCase {
                 final IndexSearcher searcher = newSearcher(reader);
                 KnnFloatVectorQuery knnFloatVectorQuery = new KnnFloatVectorQuery("test_field", target, k, filterQuery);
                 TopDocs topDocs = searcher.search(knnFloatVectorQuery, k);
-                assertEquals(k, topDocs.totalHits.value());
+                assertEquals(k, topDocs.totalHits.value);
                 Document doc = reader.storedFields().document(topDocs.scoreDocs[0].doc);
                 assertEquals("10", doc.get("my_doc_id"));
                 Assert.assertEquals(
@@ -281,7 +281,7 @@ public class KNNJVectorTests extends LuceneTestCase {
                 final IndexSearcher searcher = newSearcher(reader);
                 KnnFloatVectorQuery knnFloatVectorQuery = new KnnFloatVectorQuery("test_field", target, k, filterQuery);
                 TopDocs topDocs = searcher.search(knnFloatVectorQuery, k);
-                assertEquals(k, topDocs.totalHits.value());
+                assertEquals(k, topDocs.totalHits.value);
                 Document doc = reader.storedFields().document(topDocs.scoreDocs[0].doc);
                 assertEquals("10", doc.get("my_doc_id"));
                 Assert.assertEquals(
@@ -354,7 +354,7 @@ public class KNNJVectorTests extends LuceneTestCase {
                 final IndexSearcher searcher = newSearcher(reader);
                 KnnFloatVectorQuery knnFloatVectorQuery = new KnnFloatVectorQuery("test_field", target, k, filterQuery);
                 TopDocs topDocs = searcher.search(knnFloatVectorQuery, k);
-                assertEquals(k, topDocs.totalHits.value());
+                assertEquals(k, topDocs.totalHits.value);
                 assertEquals(9, topDocs.scoreDocs[0].doc);
                 Assert.assertEquals(
                     VectorSimilarityFunction.EUCLIDEAN.compare(target, new float[] { 0.0f, 1.0f / 10.0f }),
@@ -424,7 +424,7 @@ public class KNNJVectorTests extends LuceneTestCase {
                 final IndexSearcher searcher = newSearcher(reader);
                 KnnFloatVectorQuery knnFloatVectorQuery = new KnnFloatVectorQuery("test_field", target, k, filterQuery);
                 TopDocs topDocs = searcher.search(knnFloatVectorQuery, k);
-                assertEquals(k, topDocs.totalHits.value());
+                assertEquals(k, topDocs.totalHits.value);
                 assertEquals(0, topDocs.scoreDocs[0].doc);
                 Assert.assertEquals(
                     VectorSimilarityFunction.COSINE.compare(target, new float[] { 2.0f, 2.0f }),
@@ -506,7 +506,7 @@ public class KNNJVectorTests extends LuceneTestCase {
                 TopDocs topDocs = searcher.search(knnFloatVectorQuery, k);
 
                 log.info("Validating filtered KNN results");
-                assertEquals(k, topDocs.totalHits.value());
+                assertEquals(k, topDocs.totalHits.value);
                 assertEquals(9, topDocs.scoreDocs[0].doc);
                 Assert.assertEquals(
                     VectorSimilarityFunction.EUCLIDEAN.compare(target, new float[] { 0.0f, 1.0f / 10.0f }),
@@ -604,7 +604,7 @@ public class KNNJVectorTests extends LuceneTestCase {
                 final IndexSearcher searcher = newSearcher(reader);
                 KnnFloatVectorQuery knnFloatVectorQuery = new KnnFloatVectorQuery("test_field", target, k, filterQuery);
                 TopDocs topDocs = searcher.search(knnFloatVectorQuery, k);
-                assertEquals(k, topDocs.totalHits.value());
+                assertEquals(k, topDocs.totalHits.value);
                 float expectedMinScoreInTopK = VectorSimilarityFunction.EUCLIDEAN.compare(
                     target,
                     new float[] { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, k }
@@ -700,7 +700,7 @@ public class KNNJVectorTests extends LuceneTestCase {
                 final IndexSearcher searcher = newSearcher(reader);
                 KnnFloatVectorQuery knnFloatVectorQuery = new KnnFloatVectorQuery("test_field", target, k, filterQuery);
                 TopDocs topDocs = searcher.search(knnFloatVectorQuery, k);
-                assertEquals(k, topDocs.totalHits.value());
+                assertEquals(k, topDocs.totalHits.value);
                 float expectedMinScoreInTopK = VectorSimilarityFunction.EUCLIDEAN.compare(
                     target,
                     new float[] { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, k }
@@ -797,7 +797,7 @@ public class KNNJVectorTests extends LuceneTestCase {
                 final IndexSearcher searcher = newSearcher(reader);
                 KnnFloatVectorQuery knnFloatVectorQuery = new KnnFloatVectorQuery("test_field", target, k, filterQuery);
                 TopDocs topDocs = searcher.search(knnFloatVectorQuery, k);
-                assertEquals(k, topDocs.totalHits.value());
+                assertEquals(k, topDocs.totalHits.value);
                 float expectedMinScoreInTopK = VectorSimilarityFunction.EUCLIDEAN.compare(
                     target,
                     new float[] { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, k }
@@ -895,7 +895,7 @@ public class KNNJVectorTests extends LuceneTestCase {
                 final IndexSearcher searcher = newSearcher(reader);
                 KnnFloatVectorQuery knnFloatVectorQuery = new KnnFloatVectorQuery("test_field", target, k, filterQuery);
                 TopDocs topDocs = searcher.search(knnFloatVectorQuery, k);
-                assertEquals(k, topDocs.totalHits.value());
+                assertEquals(k, topDocs.totalHits.value);
                 float expectedMinScoreInTopK = VectorSimilarityFunction.EUCLIDEAN.compare(
                     target,
                     new float[] { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, k }

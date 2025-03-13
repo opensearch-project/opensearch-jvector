@@ -5,11 +5,11 @@
 
 package org.opensearch.knn.index.codec.jvector;
 
+import org.apache.lucene.backward_codecs.lucene99.Lucene99Codec;
 import org.apache.lucene.codecs.Codec;
 import org.apache.lucene.codecs.CompoundFormat;
 import org.apache.lucene.codecs.FilterCodec;
 import org.apache.lucene.codecs.KnnVectorsFormat;
-import org.apache.lucene.codecs.lucene101.Lucene101Codec;
 
 public class JVectorCodec extends FilterCodec {
 
@@ -17,11 +17,11 @@ public class JVectorCodec extends FilterCodec {
     private int minBatchSizeForQuantization;
 
     public JVectorCodec() {
-        this(CODEC_NAME, new Lucene101Codec(), JVectorFormat.DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION);
+        this(CODEC_NAME, new Lucene99Codec(), JVectorFormat.DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION);
     }
 
     public JVectorCodec(int minBatchSizeForQuantization) {
-        this(CODEC_NAME, new Lucene101Codec(), minBatchSizeForQuantization);
+        this(CODEC_NAME, new Lucene99Codec(), minBatchSizeForQuantization);
     }
 
     public JVectorCodec(String codecName, Codec delegate, int minBatchSizeForQuantization) {

@@ -5,9 +5,8 @@
 
 package org.opensearch.knn.index.query;
 
-import org.apache.lucene.search.DocIdSetIterator;
-import org.apache.lucene.search.Scorer;
-import org.apache.lucene.search.Weight;
+import org.apache.lucene.index.LeafReaderContext;
+import org.apache.lucene.search.*;
 
 import java.io.IOException;
 import java.util.Map;
@@ -28,7 +27,7 @@ public class KNNScorer extends Scorer {
     private final float boost;
 
     public KNNScorer(Weight weight, DocIdSetIterator docIdsIter, Map<Integer, Float> scores, float boost) {
-        super();
+        super(weight);
         this.docIdsIter = docIdsIter;
         this.scores = scores;
         this.boost = boost;
@@ -66,7 +65,19 @@ public class KNNScorer extends Scorer {
         return EMPTY_SCORER_INSTANCE;
     }
 
-    private static final Scorer EMPTY_SCORER_INSTANCE = new Scorer() {
+    public static final Weight EMPTY_WEIGHT = new ConstantScoreWeight(new MatchNoDocsQuery(), 0f) {
+        @Override
+        public boolean isCacheable(LeafReaderContext ctx) {
+            return false;
+        }
+
+        @Override
+        public Scorer scorer(LeafReaderContext context) {
+            return null;
+        }
+    };
+
+    private static final Scorer EMPTY_SCORER_INSTANCE = new Scorer(EMPTY_WEIGHT) {
         private final DocIdSetIterator docIdsIter = DocIdSetIterator.empty();
 
         @Override

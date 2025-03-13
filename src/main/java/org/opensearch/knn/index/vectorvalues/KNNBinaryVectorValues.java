@@ -9,7 +9,6 @@ import lombok.ToString;
 import org.apache.lucene.codecs.KnnFieldVectorsWriter;
 import org.apache.lucene.index.BinaryDocValues;
 import org.apache.lucene.index.ByteVectorValues;
-import org.apache.lucene.index.KnnVectorValues;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -35,7 +34,7 @@ public class KNNBinaryVectorValues extends KNNVectorValues<byte[]> {
     @Override
     public byte[] conditionalCloneVector() throws IOException {
         byte[] vector = getVector();
-        if (vectorValuesIterator.getDocIdSetIterator() instanceof KnnVectorValues.DocIndexIterator) {
+        if (vectorValuesIterator.getDocIdSetIterator() instanceof ByteVectorValues) {
             return Arrays.copyOf(vector, vector.length);
         }
         return vector;

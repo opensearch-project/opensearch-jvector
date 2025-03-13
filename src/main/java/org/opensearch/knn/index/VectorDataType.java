@@ -105,7 +105,7 @@ public enum VectorDataType {
      * @param binaryValue Binary Value
      * @return float vector deserialized from binary value
      */
-    public abstract float[] getVectorFromBytesRef(BytesRef binaryValue);
+    public abstract <T> T getVectorFromBytesRef(BytesRef binaryValue);
 
     /**
      * Validates if given VectorDataType is in the list of supported data types.
