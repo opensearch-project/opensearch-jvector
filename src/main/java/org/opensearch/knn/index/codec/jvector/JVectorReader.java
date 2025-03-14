@@ -57,7 +57,7 @@ public class JVectorReader extends KnnVectorsReader {
         this.directory = state.directory;
         this.directoryBasePath = resolveDirectoryPath(directory);
         boolean success = false;
-        try (ChecksumIndexInput meta = state.directory.openChecksumInput(metaFileName, state.context)) {
+        try (ChecksumIndexInput meta = state.directory.openChecksumInput(metaFileName)) {
             CodecUtil.checkIndexHeader(
                 meta,
                 JVectorFormat.META_CODEC_NAME,
@@ -161,15 +161,6 @@ public class JVectorReader extends KnnVectorsReader {
         }
     }
 
-    @Override
-    public long ramBytesUsed() {
-        long ramBytesUsed = 0;
-        for (FieldEntry fieldEntry : fieldEntryMap.values()) {
-            ramBytesUsed += fieldEntry.index.ramBytesUsed();
-        }
-        return ramBytesUsed;
-    }
-
     class FieldEntry {
         private final FieldInfo fieldInfo;
         private final VectorEncoding vectorEncoding;
@@ -263,7 +254,7 @@ public class JVectorReader extends KnnVectorsReader {
             }
 
             // Check the footer
-            try (ChecksumIndexInput indexInput = directory.openChecksumInput(originalIndexFileName, state.context)) {
+            try (ChecksumIndexInput indexInput = directory.openChecksumInput(originalIndexFileName)) {
                 // If there are pq codebooks and vectors, then the footer is at the end of the pq codebooks and vectors
                 if (pqCodebooksAndVectorsOffset > 0) {
                     indexInput.seek(pqCodebooksAndVectorsOffset + pqCodebooksAndVectorsLength);

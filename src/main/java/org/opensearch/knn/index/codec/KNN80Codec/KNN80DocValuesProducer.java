@@ -50,6 +50,18 @@ public class KNN80DocValuesProducer extends DocValuesProducer {
         return delegate.getSortedSet(field);
     }
 
+    /**
+     * @param fieldInfo
+     * @return Returns a DocValuesSkipper for this field. The returned instance need not be thread-safe:
+     * it will only be used by a single thread.
+     * The return value is undefined if FieldInfo. docValuesSkipIndexType() returns DocValuesSkipIndexType. NONE.
+     * @throws IOException
+     */
+    @Override
+    public DocValuesSkipper getSkipper(FieldInfo fieldInfo) throws IOException {
+        return delegate.getSkipper(fieldInfo);
+    }
+
     @Override
     public void checkIntegrity() throws IOException {
         delegate.checkIntegrity();

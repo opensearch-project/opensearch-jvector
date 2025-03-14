@@ -4,8 +4,8 @@
  */
 package org.opensearch.knn.index.codec.jvector;
 
-import org.apache.lucene.backward_codecs.lucene99.Lucene99Codec;
 import org.apache.lucene.codecs.Codec;
+import org.apache.lucene.codecs.lucene101.Lucene101Codec;
 import org.apache.lucene.index.VectorSimilarityFunction;
 import org.apache.lucene.search.TopDocs;
 
@@ -23,7 +23,7 @@ public class BenchmarkCommon {
         return switch (codecType) {
             case JVECTOR_NOT_QUANTIZED -> new JVectorCodec(Integer.MAX_VALUE);
             case JVECTOR_QUANTIZED -> new JVectorCodec(DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION);
-            case LUCENE101 -> new Lucene99Codec();
+            case LUCENE101 -> new Lucene101Codec();
             default -> throw new IllegalStateException("Unexpected codec type: " + codecType);
         };
     }

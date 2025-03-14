@@ -9,7 +9,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import lombok.SneakyThrows;
 import org.apache.commons.lang.math.RandomUtils;
-import org.apache.http.util.EntityUtils;
+import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.lucene.util.VectorUtil;
 import org.junit.After;
 import org.junit.Assert;

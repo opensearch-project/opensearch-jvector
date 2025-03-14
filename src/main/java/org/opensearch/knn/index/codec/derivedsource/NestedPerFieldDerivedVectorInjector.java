@@ -29,7 +29,7 @@ import static org.apache.lucene.search.DocIdSetIterator.NO_MORE_DOCS;
 
 @Log4j2
 @AllArgsConstructor
-public class NestedPerFieldDerivedVectorInjector extends AbstractPerFieldDerivedVectorInjector {
+public class NestedPerFieldDerivedVectorInjector implements PerFieldDerivedVectorInjector {
 
     private final FieldInfo childFieldInfo;
     private final DerivedSourceReaders derivedSourceReaders;
@@ -116,7 +116,7 @@ public class NestedPerFieldDerivedVectorInjector extends AbstractPerFieldDerived
                 reconstructedSource.add(position, new HashMap<>());
                 positions.add(position, docId);
             }
-            reconstructedSource.get(position).put(childFieldName, formatVector(childFieldInfo, vectorValues));
+            reconstructedSource.get(position).put(childFieldName, vectorValues.conditionalCloneVector());
             offsetPositionsIndex = position + 1;
         }
         sourceAsMap.put(parentFieldName, reconstructedSource);
@@ -137,7 +137,7 @@ public class NestedPerFieldDerivedVectorInjector extends AbstractPerFieldDerived
             String field = fields[i];
             currentMap = (Map<String, Object>) currentMap.computeIfAbsent(field, k -> new HashMap<>());
         }
-        currentMap.put(fields[fields.length - 1], formatVector(childFieldInfo, vectorValues));
+        currentMap.put(fields[fields.length - 1], vectorValues.getVector());
     }
 
     /**
@@ -215,16 +215,16 @@ public class NestedPerFieldDerivedVectorInjector extends AbstractPerFieldDerived
         } else if (fieldInfo.getVectorDimension() != 0 && derivedSourceReaders.getKnnVectorsReader() != null) { // the field indexes vectors
             switch (fieldInfo.getVectorEncoding()) {
                 case FLOAT32:
-                    iterator = derivedSourceReaders.getKnnVectorsReader().getFloatVectorValues(fieldInfo.name);
+                    iterator = derivedSourceReaders.getKnnVectorsReader().getFloatVectorValues(fieldInfo.name).iterator();
                     break;
                 case BYTE:
-                    iterator = derivedSourceReaders.getKnnVectorsReader().getByteVectorValues(fieldInfo.name);
+                    iterator = derivedSourceReaders.getKnnVectorsReader().getByteVectorValues(fieldInfo.name).iterator();
                     break;
             }
         } else if (fieldInfo.getDocValuesType() != DocValuesType.NONE && derivedSourceReaders.getDocValuesProducer() != null) { // the field
-            // indexes
-            // doc
-            // values
+                                                                                                                                // indexes
+                                                                                                                                // doc
+                                                                                                                                // values
             switch (fieldInfo.getDocValuesType()) {
                 case NUMERIC:
                     iterator = derivedSourceReaders.getDocValuesProducer().getNumeric(fieldInfo);

@@ -5,39 +5,33 @@
 
 package org.opensearch.knn;
 
-import org.apache.http.Header;
-import org.apache.http.HttpHost;
-import org.apache.http.auth.AuthScope;
-import org.apache.http.auth.UsernamePasswordCredentials;
-import org.apache.http.client.CredentialsProvider;
-import org.apache.http.conn.ssl.NoopHostnameVerifier;
-import org.apache.http.impl.client.BasicCredentialsProvider;
-import org.apache.http.message.BasicHeader;
-import org.apache.http.ssl.SSLContextBuilder;
-import org.junit.After;
-import org.opensearch.client.Request;
-import org.opensearch.client.Response;
+import java.io.IOException;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+
+import org.apache.hc.client5.http.impl.nio.PoolingAsyncClientConnectionManager;
+import org.apache.hc.client5.http.impl.nio.PoolingAsyncClientConnectionManagerBuilder;
+import org.apache.hc.client5.http.ssl.ClientTlsStrategyBuilder;
+import org.apache.hc.client5.http.ssl.NoopHostnameVerifier;
+import org.apache.hc.core5.http.Header;
+import org.apache.hc.core5.http.HttpHost;
+import org.apache.hc.client5.http.auth.AuthScope;
+import org.apache.hc.client5.http.auth.UsernamePasswordCredentials;
+import org.apache.hc.client5.http.impl.auth.BasicCredentialsProvider;
+import org.apache.hc.core5.http.message.BasicHeader;
+import org.apache.hc.core5.http.nio.ssl.TlsStrategy;
+import org.apache.hc.core5.reactor.ssl.TlsDetails;
+import org.apache.hc.core5.ssl.SSLContextBuilder;
+import org.apache.hc.core5.util.Timeout;
 import org.opensearch.client.RestClient;
 import org.opensearch.client.RestClientBuilder;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.common.unit.TimeValue;
 import org.opensearch.common.util.concurrent.ThreadContext;
-import org.opensearch.core.xcontent.DeprecationHandler;
-import org.opensearch.core.xcontent.MediaType;
-import org.opensearch.core.xcontent.NamedXContentRegistry;
-import org.opensearch.core.xcontent.XContentParser;
 import org.opensearch.test.rest.OpenSearchRestTestCase;
 
-import java.io.IOException;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-import java.util.stream.Collectors;
-
 import static org.opensearch.knn.TestUtils.KNN_BWC_PREFIX;
-import static org.opensearch.knn.TestUtils.OPENDISTRO_SECURITY;
 import static org.opensearch.knn.TestUtils.ML_PLUGIN_SYSTEM_INDEX_PREFIX;
 import static org.opensearch.knn.TestUtils.OPENSEARCH_SYSTEM_INDEX_PREFIX;
 import static org.opensearch.knn.TestUtils.SECURITY_AUDITLOG_PREFIX;
@@ -85,13 +79,20 @@ public abstract class ODFERestTestCase extends OpenSearchRestTestCase {
                 .orElseThrow(() -> new RuntimeException("user name is missing"));
             String password = Optional.ofNullable(System.getProperty("password"))
                 .orElseThrow(() -> new RuntimeException("password is missing"));
-            CredentialsProvider credentialsProvider = new BasicCredentialsProvider();
-            credentialsProvider.setCredentials(AuthScope.ANY, new UsernamePasswordCredentials(userName, password));
+            BasicCredentialsProvider credentialsProvider = new BasicCredentialsProvider();
+            final AuthScope anyScope = new AuthScope(null, -1);
+            credentialsProvider.setCredentials(anyScope, new UsernamePasswordCredentials(userName, password.toCharArray()));
             try {
-                return httpClientBuilder.setDefaultCredentialsProvider(credentialsProvider)
-                    // disable the certificate since our testing cluster just uses the default security configuration
-                    .setSSLHostnameVerifier(NoopHostnameVerifier.INSTANCE)
-                    .setSSLContext(SSLContextBuilder.create().loadTrustMaterial(null, (chains, authType) -> true).build());
+                final TlsStrategy tlsStrategy = ClientTlsStrategyBuilder.create()
+                    .setHostnameVerifier(NoopHostnameVerifier.INSTANCE)
+                    .setSslContext(SSLContextBuilder.create().loadTrustMaterial(null, (chains, authType) -> true).build())
+                    // See https://issues.apache.org/jira/browse/HTTPCLIENT-2219
+                    .setTlsDetailsFactory(sslEngine -> new TlsDetails(sslEngine.getSession(), sslEngine.getApplicationProtocol()))
+                    .build();
+                final PoolingAsyncClientConnectionManager connectionManager = PoolingAsyncClientConnectionManagerBuilder.create()
+                    .setTlsStrategy(tlsStrategy)
+                    .build();
+                return httpClientBuilder.setDefaultCredentialsProvider(credentialsProvider).setConnectionManager(connectionManager);
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -108,7 +109,9 @@ public abstract class ODFERestTestCase extends OpenSearchRestTestCase {
             socketTimeoutString == null ? "60s" : socketTimeoutString,
             CLIENT_SOCKET_TIMEOUT
         );
-        builder.setRequestConfigCallback(conf -> conf.setSocketTimeout(Math.toIntExact(socketTimeout.getMillis())));
+        builder.setRequestConfigCallback(
+            conf -> conf.setResponseTimeout(Timeout.ofMilliseconds(Math.toIntExact(socketTimeout.getMillis())))
+        );
         if (settings.hasValue(CLIENT_PATH_PREFIX)) {
             builder.setPathPrefix(settings.get(CLIENT_PATH_PREFIX));
         }
@@ -120,41 +123,5 @@ public abstract class ODFERestTestCase extends OpenSearchRestTestCase {
     @Override
     protected boolean preserveIndicesUponCompletion() {
         return true;
-    }
-
-    @SuppressWarnings("unchecked")
-    @After
-    protected void wipeAllODFEIndices() throws Exception {
-        Response response = adminClient().performRequest(new Request("GET", "/_cat/indices?format=json&expand_wildcards=all"));
-        MediaType xContentType = MediaType.fromMediaType(response.getEntity().getContentType().getValue());
-        try (
-            XContentParser parser = xContentType.xContent()
-                .createParser(
-                    NamedXContentRegistry.EMPTY,
-                    DeprecationHandler.THROW_UNSUPPORTED_OPERATION,
-                    response.getEntity().getContent()
-                )
-        ) {
-            XContentParser.Token token = parser.nextToken();
-            List<Map<String, Object>> parserList = null;
-            if (token == XContentParser.Token.START_ARRAY) {
-                parserList = parser.listOrderedMap().stream().map(obj -> (Map<String, Object>) obj).collect(Collectors.toList());
-            } else {
-                parserList = Collections.singletonList(parser.mapOrdered());
-            }
-
-            for (Map<String, Object> index : parserList) {
-                final String indexName = (String) index.get("index");
-                if (!skipDeleteIndex(indexName)) {
-                    adminClient().performRequest(new Request("DELETE", "/" + indexName));
-                }
-            }
-        }
-    }
-
-    private boolean skipDeleteIndex(String indexName) {
-        return indexName == null
-            || OPENDISTRO_SECURITY.equals(indexName)
-            || IMMUTABLE_INDEX_PREFIXES.stream().anyMatch(indexName::startsWith);
     }
 }

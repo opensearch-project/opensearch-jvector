@@ -43,8 +43,8 @@ public class JVectorCompoundFormat extends CompoundFormat {
     }
 
     @Override
-    public CompoundDirectory getCompoundReader(Directory dir, SegmentInfo si, IOContext context) throws IOException {
-        return new JVectorCompoundReader(delegate.getCompoundReader(dir, si, context), dir, si);
+    public CompoundDirectory getCompoundReader(Directory dir, SegmentInfo si) throws IOException {
+        return new JVectorCompoundReader(delegate.getCompoundReader(dir, si), dir, si);
     }
 
     @Override
@@ -117,7 +117,7 @@ public class JVectorCompoundFormat extends CompoundFormat {
 
         private Map<String, FileEntry> readEntries(byte[] segmentID, Directory dir, String entriesFileName) throws IOException {
             Map<String, FileEntry> mapping = null;
-            try (ChecksumIndexInput entriesStream = dir.openChecksumInput(entriesFileName, IOContext.READONCE)) {
+            try (ChecksumIndexInput entriesStream = dir.openChecksumInput(entriesFileName)) {
                 Throwable priorE = null;
                 try {
                     version = CodecUtil.checkIndexHeader(

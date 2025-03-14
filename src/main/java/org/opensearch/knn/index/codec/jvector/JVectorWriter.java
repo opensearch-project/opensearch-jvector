@@ -137,9 +137,10 @@ public class JVectorWriter extends KnnVectorsWriter {
             switch (fieldInfo.getVectorEncoding()) {
                 case BYTE:
                     var byteWriter = (FieldWriter<byte[]>) addField(fieldInfo);
-                    var iterator = MergedVectorValues.mergeByteVectorValues(fieldInfo, mergeState);
+                    ByteVectorValues mergedBytes = MergedVectorValues.mergeByteVectorValues(fieldInfo, mergeState);
+                    var iterator = mergedBytes.iterator();
                     for (int doc = iterator.nextDoc(); doc != DocIdSetIterator.NO_MORE_DOCS; doc = iterator.nextDoc()) {
-                        byteWriter.addValue(doc, iterator.vectorValue());
+                        byteWriter.addValue(doc, mergedBytes.vectorValue(doc));
                     }
                     writeField(byteWriter);
                     break;
@@ -147,16 +148,17 @@ public class JVectorWriter extends KnnVectorsWriter {
                     var floatVectorFieldWriter = (FieldWriter<float[]>) addField(fieldInfo);
                     int baseDocId = 0;
                     for (int i = 0; i < mergeState.knnVectorsReaders.length; i++) {
-                        var iteartor = mergeState.knnVectorsReaders[i].getFloatVectorValues(fieldInfo.name);
+                        FloatVectorValues floatVectorValues = mergeState.knnVectorsReaders[i].getFloatVectorValues(fieldInfo.name);
+                        var iteartor = floatVectorValues.iterator();
                         var floatVectors = new ArrayList<float[]>();
                         for (int doc = iteartor.nextDoc(); doc != DocIdSetIterator.NO_MORE_DOCS; doc = iteartor.nextDoc()) {
-                            floatVectors.add(iteartor.vectorValue());
+                            floatVectors.add(floatVectorValues.vectorValue(doc));
                         }
                         for (int doc = 0; doc < floatVectors.size(); doc++) {
                             floatVectorFieldWriter.addValue(baseDocId + doc, floatVectors.get(doc));
                         }
 
-                        baseDocId += iteartor.size();
+                        baseDocId += floatVectorValues.size();
                     }
                     writeField(floatVectorFieldWriter);
                     break;

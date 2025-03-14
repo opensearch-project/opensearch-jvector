@@ -13,8 +13,8 @@ import com.google.common.primitives.Ints;
 import com.jayway.jsonpath.JsonPath;
 import lombok.SneakyThrows;
 import lombok.extern.log4j.Log4j2;
-import org.apache.http.client.utils.URIBuilder;
-import org.apache.http.util.EntityUtils;
+import org.apache.hc.core5.http.io.entity.EntityUtils;
+import org.apache.hc.core5.net.URIBuilder;
 import org.opensearch.Version;
 import org.opensearch.core.common.bytes.BytesReference;
 import org.opensearch.common.xcontent.XContentHelper;
@@ -1930,7 +1930,7 @@ public class KNNRestTestCase extends ODFERestTestCase {
 
     protected void refreshAllNonSystemIndices() throws Exception {
         Response response = adminClient().performRequest(new Request("GET", "/_cat/indices?format=json&expand_wildcards=all"));
-        MediaType mediaType = MediaType.fromMediaType(response.getEntity().getContentType().getValue());
+        MediaType mediaType = MediaType.fromMediaType(response.getEntity().getContentType());
         try (
             XContentParser parser = mediaType.xContent()
                 .createParser(
