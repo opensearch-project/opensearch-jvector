@@ -250,6 +250,20 @@ In case remote cluster is secured it's possible to pass username and password wi
 ./gradlew :integTestRemote -Dtests.rest.cluster=localhost:9200 -Dtests.cluster=localhost:9200 -Dtests.clustername="integTest-0" -Dhttps=true -Duser=admin -Dpassword=<admin-password>
 ```
 
+### Install jVector KNN within your existing OpenSearch cluster installation
+The jvector plugin can be downloaded from [here](https://aws.oss.sonatype.org/content/repositories/snapshots/org/opensearch/plugin/opensearch-jvector-plugin/3.0.0.0-alpha1-SNAPSHOT/)
+```bash
+# Go into the OpenSearch directory
+cd opensearch
+# First remove the KNN plugin
+bin/opensearch-plugins remove opensearch-knn-plugin
+# Then install the jVector plugin
+curl -O https://aws.oss.sonatype.org/content/repositories/snapshots/org/opensearch/plugin/opensearch-jvector-plugin/3.0.0.0-alpha1-SNAPSHOT/opensearch-jvector-plugin-3.0.0.0-alpha1-SNAPSHOT.zip opensearch-jvector-plugin.zip
+bin/opensearch-plugins install opensearch-jvector-plugin.zip
+# Start OpenSearch
+./bin/opensearch
+```
+
 ### Debugging
 
 Sometimes it is useful to attach a debugger to either the OpenSearch cluster or the integration test runner to see what's going on. For running unit tests, hit **Debug** from the IDE's gutter to debug the tests. For the OpenSearch cluster, first, make sure that the debugger is listening on port `5005`. Then, to debug the cluster code, run:
