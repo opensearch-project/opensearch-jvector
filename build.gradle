@@ -16,10 +16,10 @@ buildscript {
     ext {
         // build.version_qualifier parameter applies to knn plugin artifacts only. OpenSearch version must be set
         // explicitly as 'opensearch.version' property, for instance opensearch.version=2.0.0-rc1-SNAPSHOT
-        opensearch_version = System.getProperty("opensearch.version", "2.20.0-SNAPSHOT")
+        opensearch_version = System.getProperty("opensearch.version", "2.18.0")
         version_qualifier = System.getProperty("build.version_qualifier", "")
         opensearch_group = "org.opensearch"
-        isSnapshot = "true" == System.getProperty("build.snapshot", "true")
+        isSnapshot = "true" == System.getProperty("build.snapshot", "false")
 
         version_tokens = opensearch_version.tokenize('-')
         opensearch_build = version_tokens[0] + '.0'
@@ -303,7 +303,6 @@ dependencies {
         exclude group: 'net.minidev', module: 'json-smart'
     }
     // Explicitly include a safe version of json-smart for test fixtures
-    testFixturesImplementation group: 'net.minidev', name: 'json-smart', version: "${versions.json_smart}"
     testFixturesImplementation "org.opensearch:common-utils:${version}"
     implementation 'com.github.oshi:oshi-core:6.4.13'
 

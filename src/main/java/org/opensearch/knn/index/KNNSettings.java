@@ -42,7 +42,6 @@ import static org.opensearch.common.settings.Setting.Property.Dynamic;
 import static org.opensearch.common.settings.Setting.Property.IndexScope;
 import static org.opensearch.common.settings.Setting.Property.NodeScope;
 import static org.opensearch.common.settings.Setting.Property.Final;
-import static org.opensearch.common.settings.Setting.Property.UnmodifiableOnRestore;
 import static org.opensearch.common.unit.MemorySizeValue.parseBytesSizeValueOrHeapRatio;
 import static org.opensearch.core.common.unit.ByteSizeValue.parseBytesSizeValue;
 import static org.opensearch.knn.common.featureflags.KNNFeatureFlags.getFeatureFlags;
@@ -272,8 +271,7 @@ public class KNNSettings {
         KNN_DERIVED_SOURCE_ENABLED,
         false,
         IndexScope,
-        Final,
-        UnmodifiableOnRestore
+        Final
     );
 
     /**
