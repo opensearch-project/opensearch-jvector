@@ -25,4 +25,4 @@ jobs:
       - uses: ncipollo/release-action@v1
         with:
           github_token: ${{ steps.github_app_token.outputs.token }}
-          bodyFile: release-notes/opensearch-knn.release-notes-${{steps.tag.outputs.tag}}.md
+          bodyFile: release-notes/opensearch-jvector-knn.release-notes-${{steps.tag.outputs.tag}}.md
