@@ -208,6 +208,10 @@ publishing {
                 password "$System.env.SONATYPE_PASSWORD"
             }
         }
+        maven {
+            name = "localRepo"
+            url = "${rootProject.buildDir}/repository"
+        }
     }
     publications {
         pluginZip(MavenPublication) { publication ->
@@ -215,18 +219,24 @@ publishing {
                 name = "opensearch-jvector"
                 description = "OpenSearch jVector plugin"
                 groupId = "org.opensearch.plugin"
-                licenses {
-                    license {
-                        name = "The Apache License, Version 2.0"
-                        url = "http://www.apache.org/licenses/LICENSE-2.0.txt"
-                    }
-                }
-                developers {
-                    developer {
-                        name = "OpenSearch"
-                        url = "https://github.com/opensearch-project/opensearch-jvector-plugin"
-                    }
-                }
+            }
+        }
+        all {
+            pom {
+                name = "opensearch-jvector"
+                description = "OpenSearch jVector plugin"
+            }
+            pom.withXml { XmlProvider xml ->
+                Node node = xml.asNode()
+                node.appendNode('inceptionYear', '2021')
+
+                Node license = node.appendNode('licenses').appendNode('license')
+                license.appendNode('name',  "The Apache License, Version 2.0")
+                license.appendNode('url', "http://www.apache.org/licenses/LICENSE-2.0.txt")
+
+                Node developer = node.appendNode('developers').appendNode('developer')
+                developer.appendNode('name', 'OpenSearch')
+                developer.appendNode('url', 'https://github.com/opensearch-project/opensearch-jvector')
             }
         }
     }
@@ -262,7 +272,7 @@ opensearchplugin {
     name 'opensearch-jvector'
     // zip file name and plugin name in ${opensearch.plugin.name} read by OpenSearch when plugin loading
     description 'OpenSearch jVector plugin'
-    classname 'org.opensearch.knn.plugin.JVectorKNNPlugin'
+    classname 'org.opensearch.plugin.JVectorKNNPlugin'
     extendedPlugins = ['lang-painless']
     licenseFile = rootProject.file('LICENSE.txt')
     noticeFile = rootProject.file('NOTICE.txt')
