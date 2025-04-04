@@ -272,7 +272,7 @@ opensearchplugin {
     name 'opensearch-jvector'
     // zip file name and plugin name in ${opensearch.plugin.name} read by OpenSearch when plugin loading
     description 'OpenSearch jVector plugin'
-    classname 'org.opensearch.plugin.knn.JVectorKNNPlugin'
+    classname 'org.opensearch.knn.plugin.JVectorKNNPlugin'
     extendedPlugins = ['lang-painless']
     licenseFile = rootProject.file('LICENSE.txt')
     noticeFile = rootProject.file('NOTICE.txt')
