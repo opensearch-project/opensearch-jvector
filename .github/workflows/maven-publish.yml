@@ -11,7 +11,7 @@ on:
 jobs:
   build-and-publish-snapshots:
     runs-on: ubuntu-latest
-
+    if: github.repository == 'opensearch-project/opensearch-jvector'
     permissions:
       id-token: write
       contents: write
@@ -21,8 +21,8 @@ jobs:
         with:
           distribution: temurin # Temurin is a distribution of adoptium
           java-version: 21
-      - uses: actions/checkout@v3
-      - uses: aws-actions/configure-aws-credentials@v1
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.PUBLISH_SNAPSHOTS_ROLE }}
           aws-region: us-east-1

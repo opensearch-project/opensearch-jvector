@@ -1,0 +1,52 @@
+name: Release drafter
+
+# Push events to every tag not containing "/"
+#
+# Publish the commons JAR to Maven Local, and create 'artifacts.tar.gz'
+# using build dir and adding the contents of repository
+#
+on:
+  push:
+    tags:
+      - "*"
+
+jobs:
+  draft-a-release:
+    name: Draft a release
+    runs-on: ubuntu-latest
+    if: github.repository == 'opensearch-project/opensearch-jvector'
+    permissions: write-all
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - id: get_data
+        run: |
+          echo "approvers=$(cat .github/CODEOWNERS | grep @ | tr -d '*\n ' | sed 's/@/,/g' | sed 's/,//1')" >> $GITHUB_OUTPUT
+          echo "version=$(./gradlew -Dbuild.snapshot=false properties | grep -E '^version:' | awk '{print $2}')" >> $GITHUB_OUTPUT
+      - uses: trstringer/manual-approval@v1
+        with:
+          secret: ${{ github.TOKEN }}
+          approvers: ${{ steps.get_data.outputs.approvers }}
+          minimum-approvals: 2
+          issue-title: 'Release OpenSearch jVector ${{ steps.get_data.outputs.version }}'
+          issue-body: "Please approve or deny the release of OpenSearch jVector **TAG**: ${{ github.ref_name }}  **COMMIT**: ${{ github.sha }} **VERSION** : ${{ steps.get_data.outputs.version }} "
+          exclude-workflow-initiator-as-approver: true
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: 21
+          distribution: 'temurin'
+          cache: gradle
+      - name: Build with Gradle
+        run: |
+          ./gradlew --no-daemon -Dbuild.snapshot=false publishNebulaPublicationToLocalRepoRepository
+          ./gradlew --no-daemon -Dbuild.snapshot=false publishPluginZipPublicationToLocalRepoRepository
+          tar -C build -cvf artifacts.tar.gz repository
+      - name: Draft a release
+        uses: softprops/action-gh-release@v1
+        with:
+          draft: true
+          generate_release_notes: true
+          files: |
+            artifacts.tar.gz
+
