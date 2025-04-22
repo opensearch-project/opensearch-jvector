@@ -29,7 +29,6 @@ import org.opensearch.knn.index.KNNVectorSimilarityFunction;
 import org.opensearch.knn.index.SpaceType;
 import org.opensearch.knn.index.VectorDataType;
 import org.opensearch.knn.index.query.KNNQueryBuilder;
-import org.opensearch.test.OpenSearchIntegTestCase;
 
 import java.io.IOException;
 import java.util.*;
@@ -42,7 +41,6 @@ import static org.opensearch.index.engine.EngineConfig.INDEX_USE_COMPOUND_FILE;
 import static org.opensearch.knn.common.KNNConstants.DISK_ANN;
 import static org.opensearch.knn.common.KNNConstants.VECTOR_DATA_TYPE_FIELD;
 
-@OpenSearchIntegTestCase.ClusterScope(numDataNodes = 1)
 public class JVectorEngineIT extends KNNRestTestCase {
 
     private static final int DIMENSION = 3;
