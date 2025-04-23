@@ -16,7 +16,6 @@ import org.opensearch.common.lucene.index.OpenSearchLeafReader;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.core.rest.RestStatus;
 import org.opensearch.core.xcontent.MediaTypeRegistry;
-import org.opensearch.core.xcontent.XContentBuilder;
 import org.opensearch.index.engine.Engine;
 import org.opensearch.knn.common.KNNConstants;
 import org.opensearch.knn.index.SpaceType;
@@ -32,9 +31,11 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
-import static org.opensearch.common.xcontent.XContentFactory.jsonBuilder;
+import static org.opensearch.knn.KNNRestTestCase.FIELD_NAME;
+import static org.opensearch.knn.KNNRestTestCase.INDEX_NAME;
 import static org.opensearch.knn.common.KNNConstants.*;
-import static org.opensearch.knn.index.KNNSettings.KNN_INDEX;
+import static org.opensearch.knn.index.engine.CommonTestUtils.DOC_ID;
+import static org.opensearch.knn.index.engine.CommonTestUtils.PROPERTIES_FIELD_NAME;
 
 /**
  * Internal integration tests for k-NN
@@ -64,7 +65,7 @@ public class InternalKNNEngineTests extends OpenSearchIntegTestCase {
      */
     public void testJVectorEngineCreatesJVectorFormat() throws Exception {
         // Create an index with JVector engine specified in the mapping
-        createKnnIndexMappingWithJVectorEngine(DIMENSION, SpaceType.L2, VectorDataType.FLOAT);
+        createKnnIndexMappingWithJVectorEngine(CommonTestUtils.DIMENSION, SpaceType.L2, VectorDataType.FLOAT);
 
         // Add a document with a vector
         Float[] vector = new Float[] { 1.0f, 2.0f, 3.0f };
@@ -89,43 +90,10 @@ public class InternalKNNEngineTests extends OpenSearchIntegTestCase {
         assertTrue("JVector engine should be confirmed through mapping and index format verification", jvectorEngineConfirmed);
     }
 
-    private static final int DIMENSION = 3;
-    private static final String DOC_ID = "doc1";
-    private static final int EF_CONSTRUCTION = 128;
-    private static final int M = 16;
-
-    private static final String DIMENSION_FIELD_NAME = "dimension";
-    private static final String KNN_VECTOR_TYPE = "knn_vector";
-    private static final String PROPERTIES_FIELD_NAME = "properties";
-    private static final String TYPE_FIELD_NAME = "type";
-
-    public static final String FIELD_NAME = "test_field";
-
-    public static final String INDEX_NAME = "test_index";
-
     private void createKnnIndexMappingWithJVectorEngine(int dimension, SpaceType spaceType, VectorDataType vectorDataType)
         throws Exception {
-        XContentBuilder builder = jsonBuilder().startObject()
-            .startObject(PROPERTIES_FIELD_NAME)
-            .startObject(FIELD_NAME)
-            .field(TYPE_FIELD_NAME, KNN_VECTOR_TYPE)
-            .field(DIMENSION_FIELD_NAME, dimension)
-            .field(VECTOR_DATA_TYPE_FIELD, vectorDataType)
-            .startObject(KNNConstants.KNN_METHOD)
-            .field(KNNConstants.NAME, DISK_ANN)
-            .field(KNNConstants.METHOD_PARAMETER_SPACE_TYPE, spaceType.getValue())
-            .field(KNNConstants.KNN_ENGINE, KNNEngine.JVECTOR.getName())
-            .startObject(KNNConstants.PARAMETERS)
-            .field(KNNConstants.METHOD_PARAMETER_M, M)
-            .field(KNNConstants.METHOD_PARAMETER_EF_CONSTRUCTION, EF_CONSTRUCTION)
-            .endObject()
-            .endObject()
-            .endObject()
-            .endObject()
-            .endObject();
-
-        String mapping = builder.toString();
-        Settings indexSettings = getDefaultIndexSettings();
+        String mapping = CommonTestUtils.createIndexMapping(dimension, spaceType, vectorDataType);
+        Settings indexSettings = CommonTestUtils.getDefaultIndexSettings();
         // indexSettings = Settings.builder().put(indexSettings).put(INDEX_USE_COMPOUND_FILE.getKey(), false).build();
         createKnnIndex(INDEX_NAME, indexSettings, mapping);
     }
@@ -148,10 +116,6 @@ public class InternalKNNEngineTests extends OpenSearchIntegTestCase {
         request.setJsonEntity(mapping);
         Response response = getRestClient().performRequest(request);
         assertEquals(request.getEndpoint() + ": failed", RestStatus.OK, RestStatus.fromCode(response.getStatusLine().getStatusCode()));
-    }
-
-    protected Settings getDefaultIndexSettings() {
-        return Settings.builder().put("number_of_shards", 1).put("number_of_replicas", 0).put(KNN_INDEX, true).build();
     }
 
     /**
