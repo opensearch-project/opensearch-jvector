@@ -75,19 +75,10 @@ public class InternalKNNEngineTests extends OpenSearchIntegTestCase {
         refresh(INDEX_NAME);
         forceMerge(1);
 
-        // Verify the index mapping has JVector engine specified
-        Map<String, Object> indexMapping = getIndexMappingAsMap(INDEX_NAME);
-        Map<String, Object> properties = (Map<String, Object>) indexMapping.get(PROPERTIES_FIELD_NAME);
-        Map<String, Object> fieldMapping = (Map<String, Object>) properties.get(FIELD_NAME);
-        Map<String, Object> methodMapping = (Map<String, Object>) fieldMapping.get(KNNConstants.KNN_METHOD);
-
-        // Verify the engine is set to JVector
-        assertEquals(KNNEngine.JVECTOR.getName(), methodMapping.get(KNN_ENGINE));
-
         // Verify the index mapping has JVector engine specified and the JVector engine is being used
         // This checks both the mapping configuration and verifies search functionality
-        boolean jvectorEngineConfirmed = verifyJVectorEngineIsUsed();
-        assertTrue("JVector engine should be confirmed through mapping and index format verification", jvectorEngineConfirmed);
+        verifyJVectorEngineIsUsed();
+        logger.info("JVector engine should be confirmed through mapping and index format verification");
     }
 
     private void createKnnIndexMappingWithJVectorEngine(int dimension, SpaceType spaceType, VectorDataType vectorDataType)
@@ -125,7 +116,7 @@ public class InternalKNNEngineTests extends OpenSearchIntegTestCase {
      *
      * @return true if JVector engine is confirmed to be in use, false otherwise
      */
-    private boolean verifyJVectorEngineIsUsed() throws Exception {
+    private void verifyJVectorEngineIsUsed() throws Exception {
         // We'll verify the JVector engine is being used by checking:
         // 1. The mapping has a JVector engine specified
         // 2. The files in the index are readable by the JVector codec
@@ -135,6 +126,9 @@ public class InternalKNNEngineTests extends OpenSearchIntegTestCase {
         Map<String, Object> properties = (Map<String, Object>) indexMapping.get(PROPERTIES_FIELD_NAME);
         Map<String, Object> fieldMapping = (Map<String, Object>) properties.get(FIELD_NAME);
         Map<String, Object> methodMapping = (Map<String, Object>) fieldMapping.get(KNNConstants.KNN_METHOD);
+
+        // Verify the engine is set to JVector
+        assertEquals(KNNEngine.JVECTOR.getName(), methodMapping.get(KNN_ENGINE));
 
         boolean jvectorEngineInMapping = KNNEngine.JVECTOR.getName().equals(methodMapping.get(KNN_ENGINE));
         logger.info("JVector engine specified in mapping: {}", jvectorEngineInMapping);
@@ -150,9 +144,6 @@ public class InternalKNNEngineTests extends OpenSearchIntegTestCase {
                 assertTrue("JVector codec should be used", perFieldReader instanceof org.opensearch.knn.index.codec.jvector.JVectorReader);
             });
         }
-
-        // If both the mapping specifies JVector engine and the index stats show JVector files, then we can confirm JVector is being used
-        return jvectorEngineInMapping;
     }
 
     /**
