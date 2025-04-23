@@ -5,7 +5,7 @@
 
 package org.opensearch.knn.index.codec.jvector;
 
-import com.carrotsearch.randomizedtesting.annotations.ThreadLeakScope;
+import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters;
 import lombok.extern.log4j.Log4j2;
 import org.apache.lucene.document.*;
 import org.apache.lucene.index.*;
@@ -18,6 +18,7 @@ import org.apache.lucene.tests.index.RandomIndexWriter;
 import org.apache.lucene.tests.util.LuceneTestCase;
 import org.junit.Assert;
 import org.junit.Test;
+import org.opensearch.knn.index.ThreadLeakFiltersForTests;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -30,7 +31,7 @@ import static org.opensearch.knn.index.codec.jvector.JVectorFormat.DEFAULT_MINIM
 // Currently {@link IndexGraphBuilder} is using the default ForkJoinPool.commonPool() which is not being shutdown.
 // Ignore thread leaks until we remove the ForkJoinPool.commonPool() usage from IndexGraphBuilder
 // TODO: Wire the execution thread pool to {@link IndexGraphBuilder} to avoid the failure of the UT due to leaked thread pool warning.
-@ThreadLeakScope(ThreadLeakScope.Scope.NONE)
+@ThreadLeakFilters(defaultFilters = true, filters = { ThreadLeakFiltersForTests.class })
 @LuceneTestCase.SuppressSysoutChecks(bugUrl = "")
 @Log4j2
 public class KNNJVectorTests extends LuceneTestCase {
