@@ -305,6 +305,8 @@ dependencies {
     testFixturesImplementation "org.opensearch.test:framework:${opensearch_version}"
     // Add the high-level client dependency
     testImplementation "org.opensearch.client:opensearch-rest-high-level-client:${opensearch_version}"
+    // Add netty dependency so we can use it within internal test clusters (not just external ones)
+    testImplementation "org.opensearch.plugin:transport-netty4-client:${opensearch_version}"
 
     // json-path 2.9.0 depends on slf4j 2.0.11, which conflicts with the version used by OpenSearch core.
     // Excluding slf4j here since json-path is only used for testing, and logging failures in this context are acceptable.
@@ -320,8 +322,6 @@ dependencies {
     implementation 'io.github.jbellis:jvector:4.0.0-beta.1'
     implementation 'org.agrona:agrona:1.20.0'
 
-    api "net.java.dev.jna:jna:5.13.0"
-    api "net.java.dev.jna:jna-platform:5.13.0"
     // OpenSearch core is using slf4j 1.7.36. Therefore, we cannot change the version here.
     implementation 'org.slf4j:slf4j-api:1.7.36'
 
@@ -330,6 +330,7 @@ dependencies {
 
 test {
     systemProperty 'tests.security.manager', 'false'
+    systemProperty 'opensearch.set.netty.runtime.available.processors', 'false'
     systemProperty 'log4j.configurationFile', "$rootDir/src/test/resources/log4j2.properties"
 
     //this change enables mockito-inline that supports mocking of static classes/calls
