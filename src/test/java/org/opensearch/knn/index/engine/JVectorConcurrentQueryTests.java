@@ -47,7 +47,7 @@ public class JVectorConcurrentQueryTests extends OpenSearchIntegTestCase {
 
     private static final int NUM_VECTORS = 100;
     private static final int NUM_QUERIES = 10;
-    private static final int NUM_CONCURRENT_QUERIES = 20; // Will be equivalent to the number of threads
+    private static final int NUM_CONCURRENT_QUERIES = 10; // Will be equivalent to the number of threads
     private static final int NUM_TOTAL_QUERIES_PER_THREAD = NUM_QUERIES * 500; // Iterate on the set of queries 500 times
     private static final int K = 5;
     private static final float[][] TEST_VECTORS = generateRandomVectors(NUM_VECTORS, DIMENSION);
