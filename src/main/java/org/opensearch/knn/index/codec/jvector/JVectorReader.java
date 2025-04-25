@@ -126,17 +126,20 @@ public class JVectorReader extends KnnVectorsReader {
             ssp = SearchScoreProvider.exact(q, fieldEntryMap.get(field).similarityFunction, index.getView());
         }
         io.github.jbellis.jvector.util.Bits compatibleBits = doc -> acceptDocs == null || acceptDocs.get(doc);
-        final var sr = fieldEntryMap.get(field).graphSearcher.search(
-            ssp,
-            knnCollector.k(),
-            knnCollector.k() * DEFAULT_OVER_QUERY_FACTOR,
-            0.0f,
-            0.0f,
-            compatibleBits
-        );
-        for (SearchResult.NodeScore ns : sr.getNodes()) {
-            knnCollector.collect(ns.node, ns.score);
+        try (var graphSearcher = new GraphSearcher(index)) {
+            final var sr = graphSearcher.search(
+                ssp,
+                knnCollector.k(),
+                knnCollector.k() * DEFAULT_OVER_QUERY_FACTOR,
+                0.0f,
+                0.0f,
+                compatibleBits
+            );
+            for (SearchResult.NodeScore ns : sr.getNodes()) {
+                knnCollector.collect(ns.node, ns.score);
+            }
         }
+
     }
 
     @Override
@@ -147,7 +150,6 @@ public class JVectorReader extends KnnVectorsReader {
     @Override
     public void close() throws IOException {
         for (FieldEntry fieldEntry : fieldEntryMap.values()) {
-            IOUtils.close(fieldEntry.graphSearcher);
             IOUtils.close(fieldEntry.readerSupplier::close);
         }
     }
@@ -181,7 +183,6 @@ public class JVectorReader extends KnnVectorsReader {
         private final long pqCodebooksAndVectorsOffset;
         private final ReaderSupplier readerSupplier;
         private final OnDiskGraphIndex index;
-        private final GraphSearcher graphSearcher;
         private final PQVectors pqVectors; // The product quantized vectors with their codebooks
 
         public FieldEntry(FieldInfo fieldInfo, JVectorWriter.VectorIndexFieldMetadata vectorIndexFieldMetadata) throws IOException {
@@ -242,7 +243,6 @@ public class JVectorReader extends KnnVectorsReader {
             // Load the graph index
             this.readerSupplier = ReaderSupplierFactory.open(indexFilePath);
             this.index = OnDiskGraphIndex.load(readerSupplier, sliceOffset + vectorIndexOffset);
-            this.graphSearcher = new GraphSearcher(index);
             // If quantized load the compressed product quantized vectors with their codebooks
             if (pqCodebooksAndVectorsLength > 0) {
                 log.debug(
