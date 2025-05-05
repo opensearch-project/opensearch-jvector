@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Features
 * upgrade to opensearch 3.0.0-SNAPSHOT and remove Java SecurityManager
 ### Enhancements
+* Upgrade to java 22 so that we can use Foreign Memory API and MemorySegmentReader
 ### Bug Fixes
 * Fix CVE-2024-57699 by updating json-path dependencies.
 * Fix concurrency issue [#50](https://github.com/opensearch-project/opensearch-jvector/issues/50)

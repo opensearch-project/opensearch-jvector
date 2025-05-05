@@ -126,8 +126,6 @@ public class KNNRestTestCase extends ODFERestTestCase {
 
     @AfterClass
     public static void dumpCoverage() throws IOException, MalformedObjectNameException {
-        // Hack to avoid security manager checks on this static method
-        System.setSecurityManager(null);
         // jacoco.dir is set in esplugin-coverage.gradle, if it doesn't exist we don't
         // want to collect coverage so we can return early
         String jacocoBuildPath = System.getProperty("jacoco.dir");

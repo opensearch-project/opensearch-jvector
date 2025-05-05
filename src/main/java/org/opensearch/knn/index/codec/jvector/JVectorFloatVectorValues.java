@@ -50,7 +50,7 @@ public class JVectorFloatVectorValues extends FloatVectorValues {
     public DocIndexIterator iterator() {
         return new DocIndexIterator() {
             private int docId = -1;
-            private final NodesIterator nodesIterator = onDiskGraphIndex.getNodes();
+            private final NodesIterator nodesIterator = onDiskGraphIndex.getNodes(0);
 
             @Override
             public long cost() {

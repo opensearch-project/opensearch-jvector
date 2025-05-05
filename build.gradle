@@ -17,7 +17,7 @@ buildscript {
         // build.version_qualifier parameter applies to knn plugin artifacts only. OpenSearch version must be set
         // explicitly as 'opensearch.version' property, for instance opensearch.version=2.0.0-rc1-SNAPSHOT
         opensearch_version = System.getProperty("opensearch.version", "3.0.0-SNAPSHOT")
-        version_qualifier = System.getProperty("build.version_qualifier", "alpha1")
+        version_qualifier = System.getProperty("build.version_qualifier", "")
         opensearch_group = "org.opensearch"
         isSnapshot = "true" == System.getProperty("build.snapshot", "true")
 
@@ -58,7 +58,7 @@ plugins {
     id 'java-test-fixtures'
     id 'idea'
     id "com.diffplug.spotless" version "6.25.0" apply false
-    id 'io.freefair.lombok' version '8.4'
+    id 'io.freefair.lombok' version '8.13.1'
     id "de.undercouch.download" version "5.3.0"
     id "me.champeau.jmh" version "0.7.1"
 }
@@ -164,6 +164,7 @@ def getBreakerSetting() {
     return System.getProperty(propertyKeys.breaker.useRealMemory, 'true')
 }
 
+
 allprojects {
     group = 'org.opensearch.knn'
     version = opensearch_version.tokenize('-')[0] + '.0'
@@ -175,7 +176,7 @@ allprojects {
     }
     apply from: rootProject.file('build-tools/repositories.gradle').absoluteFile
     plugins.withId('java') {
-        sourceCompatibility = targetCompatibility = "21"
+        sourceCompatibility = targetCompatibility = java_release_version
     }
 
     afterEvaluate {
@@ -248,12 +249,15 @@ publishing {
 /*** Setting up lombok in compiler args ***/
 compileJava {
     options.compilerArgs.addAll(["-processor", 'lombok.launch.AnnotationProcessorHider$AnnotationProcessor'])
+    options.release = java_release_version.toInteger()
 }
 compileTestJava {
     options.compilerArgs.addAll(["-processor", 'lombok.launch.AnnotationProcessorHider$AnnotationProcessor'])
+    options.release = java_release_version.toInteger()
 }
 compileTestFixturesJava {
     options.compilerArgs.addAll(["-processor", 'lombok.launch.AnnotationProcessorHider$AnnotationProcessor'])
+    options.release = java_release_version.toInteger()
 }
 
 /*** End of lombok setup ***/
@@ -322,7 +326,8 @@ dependencies {
     testFixturesImplementation "org.opensearch:common-utils:${version}"
     implementation 'com.github.oshi:oshi-core:6.4.13'
 
-    implementation 'io.github.jbellis:jvector:4.0.0-beta.1'
+    implementation "io.github.jbellis:jvector:${jvector_version}"
+    //api "io.github.jbellis:jvector-native:${jvector_version}"
     implementation 'org.agrona:agrona:1.20.0'
 
     // OpenSearch core is using slf4j 1.7.36. Therefore, we cannot change the version here.
@@ -335,6 +340,18 @@ test {
     systemProperty 'tests.security.manager', 'false'
     systemProperty 'opensearch.set.netty.runtime.available.processors', 'false'
     systemProperty 'log4j.configurationFile', "$rootDir/src/test/resources/log4j2.properties"
+
+    // Enable preview features for Foreign Memory API
+    jvmArgs = [
+            '--add-modules', 'jdk.incubator.vector',
+            '--add-opens', 'java.base/java.nio=ALL-UNNAMED',
+            '--add-opens', 'java.base/sun.nio.ch=ALL-UNNAMED',
+            '-Djdk.incubator.foreign.restricted=permit',
+            '--enable-native-access=ALL-UNNAMED',
+            '-Dio.netty.tryReflectionSetAccessible=true',
+            '--enable-preview'
+    ]
+
 
     //this change enables mockito-inline that supports mocking of static classes/calls
     systemProperty "jdk.attach.allowAttachSelf", true
@@ -486,5 +503,4 @@ task updateVersion {
         }
     }
 }
-
 

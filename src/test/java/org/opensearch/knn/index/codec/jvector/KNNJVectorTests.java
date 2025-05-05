@@ -15,6 +15,7 @@ import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.store.FSLockFactory;
 import org.apache.lucene.store.NIOFSDirectory;
 import org.apache.lucene.tests.index.RandomIndexWriter;
+import org.apache.lucene.tests.mockfile.FixedFSProvider;
 import org.apache.lucene.tests.util.LuceneTestCase;
 import org.junit.Assert;
 import org.junit.Test;
@@ -35,6 +36,11 @@ import static org.opensearch.knn.index.codec.jvector.JVectorFormat.DEFAULT_MINIM
 @LuceneTestCase.SuppressSysoutChecks(bugUrl = "")
 @Log4j2
 public class KNNJVectorTests extends LuceneTestCase {
+    static {
+        System.setProperty("io.netty.tryReflectionSetAccessible", "true");
+        // This enables the new memory mapping API
+        System.setProperty("jdk.incubator.foreign.restricted", "permit");
+    }
 
     /**
      * Test to verify that the JVector codec is able to successfully search for the nearest neighbours
@@ -53,7 +59,9 @@ public class KNNJVectorTests extends LuceneTestCase {
         indexWriterConfig.setUseCompoundFile(false);
         indexWriterConfig.setCodec(new JVectorCodec());
         indexWriterConfig.setMergePolicy(new ForceMergesOnlyMergePolicy());
-        final Path indexPath = createTempDir();
+        final Path luceneWrappedIndexPath = createTempDir();
+        // switch to {@link FixedFSProvider} to avoid the failure of the UT due to the {@link FileChannel#map(...)} function
+        final Path indexPath = new FixedFSProvider(luceneWrappedIndexPath.getFileSystem()).wrapPath(luceneWrappedIndexPath);
         log.info("Index path: {}", indexPath);
         try (Directory dir = newFSDirectory(indexPath); RandomIndexWriter w = new RandomIndexWriter(random(), dir, indexWriterConfig)) {
             final float[] target = new float[] { 0.0f, 0.0f };
@@ -116,7 +124,9 @@ public class KNNJVectorTests extends LuceneTestCase {
         indexWriterConfig.setUseCompoundFile(false);
         indexWriterConfig.setCodec(new JVectorCodec());
         indexWriterConfig.setMergePolicy(new ForceMergesOnlyMergePolicy(false));
-        final Path indexPath = createTempDir();
+        final Path luceneWrappedIndexPath = createTempDir();
+        // switch to {@link FixedFSProvider} to avoid the failure of the UT due to the {@link FileChannel#map(...)} function
+        final Path indexPath = new FixedFSProvider(luceneWrappedIndexPath.getFileSystem()).wrapPath(luceneWrappedIndexPath);
         log.info("Index path: {}", indexPath);
         try (
             FSDirectory dir = new NIOFSDirectory(indexPath, FSLockFactory.getDefault());
@@ -182,7 +192,9 @@ public class KNNJVectorTests extends LuceneTestCase {
         indexWriterConfig.setCodec(new JVectorCodec());
         indexWriterConfig.setMergePolicy(new ForceMergesOnlyMergePolicy());
         indexWriterConfig.setMergeScheduler(new SerialMergeScheduler());
-        final Path indexPath = createTempDir();
+        final Path luceneWrappedIndexPath = createTempDir();
+        // switch to {@link FixedFSProvider} to avoid the failure of the UT due to the {@link FileChannel#map(...)} function
+        final Path indexPath = new FixedFSProvider(luceneWrappedIndexPath.getFileSystem()).wrapPath(luceneWrappedIndexPath);
         log.info("Index path: {}", indexPath);
         try (
             FSDirectory dir = new NIOFSDirectory(indexPath, FSLockFactory.getDefault());
@@ -254,7 +266,9 @@ public class KNNJVectorTests extends LuceneTestCase {
         indexWriterConfig.setCodec(new JVectorCodec());
         indexWriterConfig.setMergePolicy(new ForceMergesOnlyMergePolicy());
         indexWriterConfig.setMergeScheduler(new SerialMergeScheduler());
-        final Path indexPath = createTempDir();
+        final Path luceneWrappedIndexPath = createTempDir();
+        // switch to {@link FixedFSProvider} to avoid the failure of the UT due to the {@link FileChannel#map(...)} function
+        final Path indexPath = new FixedFSProvider(luceneWrappedIndexPath.getFileSystem()).wrapPath(luceneWrappedIndexPath);
         log.info("Index path: {}", indexPath);
         try (
             FSDirectory dir = new NIOFSDirectory(indexPath, FSLockFactory.getDefault());
@@ -329,7 +343,9 @@ public class KNNJVectorTests extends LuceneTestCase {
         indexWriterConfig.setCodec(new JVectorCodec());
         indexWriterConfig.setMergePolicy(new ForceMergesOnlyMergePolicy(true));
         indexWriterConfig.setMergeScheduler(new SerialMergeScheduler());
-        final Path indexPath = createTempDir();
+        final Path luceneWrappedIndexPath = createTempDir();
+        // switch to {@link FixedFSProvider} to avoid the failure of the UT due to the {@link FileChannel#map(...)} function
+        final Path indexPath = new FixedFSProvider(luceneWrappedIndexPath.getFileSystem()).wrapPath(luceneWrappedIndexPath);
         log.info("Index path: {}", indexPath);
         try (
             FSDirectory dir = new NIOFSDirectory(indexPath, FSLockFactory.getDefault());
@@ -399,7 +415,9 @@ public class KNNJVectorTests extends LuceneTestCase {
         indexWriterConfig.setCodec(new JVectorCodec());
         indexWriterConfig.setMergePolicy(new ForceMergesOnlyMergePolicy(true));
         indexWriterConfig.setMergeScheduler(new SerialMergeScheduler());
-        final Path indexPath = createTempDir();
+        final Path luceneWrappedIndexPath = createTempDir();
+        // switch to {@link FixedFSProvider} to avoid the failure of the UT due to the {@link FileChannel#map(...)} function
+        final Path indexPath = new FixedFSProvider(luceneWrappedIndexPath.getFileSystem()).wrapPath(luceneWrappedIndexPath);
         log.info("Index path: {}", indexPath);
         try (
             FSDirectory dir = new NIOFSDirectory(indexPath, FSLockFactory.getDefault());
@@ -462,7 +480,9 @@ public class KNNJVectorTests extends LuceneTestCase {
         indexWriterConfig.setUseCompoundFile(false);
         indexWriterConfig.setCodec(new JVectorCodec());
         indexWriterConfig.setMergePolicy(new ForceMergesOnlyMergePolicy());
-        final Path indexPath = createTempDir();
+        final Path luceneWrappedIndexPath = createTempDir();
+        // switch to {@link FixedFSProvider} to avoid the failure of the UT due to the {@link FileChannel#map(...)} function
+        final Path indexPath = new FixedFSProvider(luceneWrappedIndexPath.getFileSystem()).wrapPath(luceneWrappedIndexPath);
         log.info("Index path: {}", indexPath);
         try (Directory dir = newFSDirectory(indexPath); RandomIndexWriter w = new RandomIndexWriter(random(), dir, indexWriterConfig)) {
             final byte[] source = new byte[] { (byte) 0, (byte) 0 };
@@ -485,7 +505,9 @@ public class KNNJVectorTests extends LuceneTestCase {
         indexWriterConfig.setUseCompoundFile(false);
         indexWriterConfig.setCodec(new JVectorCodec());
         indexWriterConfig.setMergePolicy(new ForceMergesOnlyMergePolicy());
-        final Path indexPath = createTempDir();
+        final Path luceneWrappedIndexPath = createTempDir();
+        // switch to {@link FixedFSProvider} to avoid the failure of the UT due to the {@link FileChannel#map(...)} function
+        final Path indexPath = new FixedFSProvider(luceneWrappedIndexPath.getFileSystem()).wrapPath(luceneWrappedIndexPath);
         log.info("Index path: {}", indexPath);
         try (Directory dir = newFSDirectory(indexPath); RandomIndexWriter w = new RandomIndexWriter(random(), dir, indexWriterConfig)) {
             final float[] target = new float[] { 0.0f, 0.0f };
@@ -548,7 +570,9 @@ public class KNNJVectorTests extends LuceneTestCase {
         indexWriterConfig.setMaxBufferedDocs(10000); // force flush every 10000 docs, this way we make sure that we only have a single
                                                      // segment for a totalNumberOfDocs < 1000
         indexWriterConfig.setRAMPerThreadHardLimitMB(1000); // 1000MB per thread, this way we make sure that no premature flush will occur
-        final Path indexPath = createTempDir();
+        final Path luceneWrappedIndexPath = createTempDir();
+        // switch to {@link FixedFSProvider} to avoid the failure of the UT due to the {@link FileChannel#map(...)} function
+        final Path indexPath = new FixedFSProvider(luceneWrappedIndexPath.getFileSystem()).wrapPath(luceneWrappedIndexPath);
         log.info("Index path: {}", indexPath);
         try (
             FSDirectory dir = new NIOFSDirectory(indexPath, FSLockFactory.getDefault());
@@ -641,7 +665,9 @@ public class KNNJVectorTests extends LuceneTestCase {
         indexWriterConfig.setMaxBufferedDocs(10000); // force flush every 10000 docs, this way we make sure that we only have a single
         // segment for a totalNumberOfDocs < 1000
         indexWriterConfig.setRAMPerThreadHardLimitMB(1000); // 1000MB per thread, this way we make sure that no premature flush will occur
-        final Path indexPath = createTempDir();
+        final Path luceneWrappedIndexPath = createTempDir();
+        // switch to {@link FixedFSProvider} to avoid the failure of the UT due to the {@link FileChannel#map(...)} function
+        final Path indexPath = new FixedFSProvider(luceneWrappedIndexPath.getFileSystem()).wrapPath(luceneWrappedIndexPath);
         log.info("Index path: {}", indexPath);
         try (
             FSDirectory dir = new NIOFSDirectory(indexPath, FSLockFactory.getDefault());
@@ -738,7 +764,9 @@ public class KNNJVectorTests extends LuceneTestCase {
         indexWriterConfig.setMaxBufferedDocs(10000); // force flush every 10000 docs, this way we make sure that we only have a single
         // segment for a totalNumberOfDocs < 1000
         indexWriterConfig.setRAMPerThreadHardLimitMB(1000); // 1000MB per thread, this way we make sure that no premature flush will occur
-        final Path indexPath = createTempDir();
+        final Path luceneWrappedIndexPath = createTempDir();
+        // switch to {@link FixedFSProvider} to avoid the failure of the UT due to the {@link FileChannel#map(...)} function
+        final Path indexPath = new FixedFSProvider(luceneWrappedIndexPath.getFileSystem()).wrapPath(luceneWrappedIndexPath);
         log.info("Index path: {}", indexPath);
         try (
             FSDirectory dir = new NIOFSDirectory(indexPath, FSLockFactory.getDefault());
@@ -836,7 +864,9 @@ public class KNNJVectorTests extends LuceneTestCase {
         indexWriterConfig.setMaxBufferedDocs(10000); // force flush every 10000 docs, this way we make sure that we only have a single
         // segment for a totalNumberOfDocs < 1000
         indexWriterConfig.setRAMPerThreadHardLimitMB(1000); // 1000MB per thread, this way we make sure that no premature flush will occur
-        final Path indexPath = createTempDir();
+        final Path luceneWrappedIndexPath = createTempDir();
+        // switch to {@link FixedFSProvider} to avoid the failure of the UT due to the {@link FileChannel#map(...)} function
+        final Path indexPath = new FixedFSProvider(luceneWrappedIndexPath.getFileSystem()).wrapPath(luceneWrappedIndexPath);
         log.info("Index path: {}", indexPath);
         try (
             FSDirectory dir = new NIOFSDirectory(indexPath, FSLockFactory.getDefault());
