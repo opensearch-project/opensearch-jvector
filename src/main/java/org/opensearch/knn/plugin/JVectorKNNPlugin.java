@@ -61,10 +61,6 @@ import org.opensearch.threadpool.FixedExecutorBuilder;
 import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.watcher.ResourceWatcherService;
 
-import java.security.AccessController;
-import java.security.AllPermission;
-import java.security.Permission;
-import java.security.PrivilegedAction;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -123,21 +119,6 @@ public class JVectorKNNPlugin extends Plugin
 
     public JVectorKNNPlugin() {
         super();
-        /*
-         * Work around to avoid security manager checks
-         */
-        AccessController.doPrivileged((PrivilegedAction<Object>) () -> {
-            System.setSecurityManager(new SecurityManager() {
-
-                @Override
-                public void checkPermission(Permission perm) {
-                    if (perm instanceof AllPermission) {
-                        throw new SecurityException();
-                    }
-                }
-            });
-            return null;
-        });
     }
 
     @Override

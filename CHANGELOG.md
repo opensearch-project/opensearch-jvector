@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased 3.0](https://github.com/opensearch-project/k-NN/compare/2.x...HEAD)
 ### Features
+* upgrade to opensearch 3.0.0-SNAPSHOT and remove Java SecurityManager
 ### Enhancements
 ### Bug Fixes
 * Fix CVE-2024-57699 by updating json-path dependencies.
