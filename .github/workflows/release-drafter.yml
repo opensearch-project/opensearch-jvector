@@ -41,7 +41,7 @@ jobs:
         run: |
           ./gradlew --no-daemon -Dbuild.snapshot=false publishNebulaPublicationToLocalRepoRepository
           ./gradlew --no-daemon -Dbuild.snapshot=false publishPluginZipPublicationToLocalRepoRepository
-          tar -C build -cvf artifacts.tar.gz repository
+          tar -C build -czvf artifacts.tar.gz repository
       - name: Draft a release
         uses: softprops/action-gh-release@v1
         with:
