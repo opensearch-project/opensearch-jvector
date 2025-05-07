@@ -24,7 +24,7 @@ import org.apache.lucene.store.*;
 import org.apache.lucene.util.Bits;
 import org.apache.lucene.util.IOUtils;
 import io.github.jbellis.jvector.vector.VectorSimilarityFunction;
-import io.github.jbellis.jvector.disk.ReaderSupplierFactory;
+import io.github.jbellis.jvector.disk.MemorySegmentReader;
 import org.opensearch.knn.index.codec.KNN80Codec.KNN80CompoundDirectory;
 
 import java.io.IOException;
@@ -232,7 +232,7 @@ public class JVectorReader extends KnnVectorsReader {
             }
 
             // Load the graph index
-            this.readerSupplier = ReaderSupplierFactory.open(indexFilePath);
+            this.readerSupplier = new MemorySegmentReader.Supplier(indexFilePath);
             this.index = OnDiskGraphIndex.load(readerSupplier, sliceOffset + vectorIndexOffset);
             // If quantized load the compressed product quantized vectors with their codebooks
             if (pqCodebooksAndVectorsLength > 0) {
