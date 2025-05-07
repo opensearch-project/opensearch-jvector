@@ -15,6 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * Add localrepo / license / scm / developer / description / url for maven central
 * Add jenkinsfile and release drafter action for maven central release
 * Add missing description for jvector jar publishing
+* Use z flag for tar during release, so the archive is compressed
 ### Documentation
 ### Maintenance
 ### Refactoring
