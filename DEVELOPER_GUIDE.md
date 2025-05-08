@@ -42,7 +42,7 @@ git clone https://github.com/[your username]/OpenSearch.git
 #### JDK 21+
 
 OpenSearch builds using Java 21 at a minimum with 21+ recommended. For this plugin you must have a JDK 21+ installed with the environment variable 
-`JAVA_HOME` referencing the path to Java home for your JDK 22 installation, e.g. `JAVA_HOME=/usr/lib/jvm/jdk-21`.
+`JAVA_HOME` referencing the path to Java home for your JDK 21 installation, e.g. `JAVA_HOME=/usr/lib/jvm/jdk-21`.
 
 One easy way to get Java 22 on *nix is to use [sdkman](https://sdkman.io/).
 
