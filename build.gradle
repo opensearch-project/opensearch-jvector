@@ -167,7 +167,7 @@ def getBreakerSetting() {
 
 allprojects {
     group = 'org.opensearch.knn'
-    version = opensearch_version.tokenize('-')[0] + '.0'
+    version = opensearch_version.tokenize('-')[0] + '.1'
     if (version_qualifier) {
         version += "-${version_qualifier}"
     }
@@ -323,7 +323,7 @@ dependencies {
     }
     // Explicitly include a safe version of json-smart for test fixtures
     testFixturesImplementation group: 'net.minidev', name: 'json-smart', version: "${versions.json_smart}"
-    testFixturesImplementation "org.opensearch:common-utils:${version}"
+    testFixturesImplementation "org.opensearch:common-utils:${opensearch_build}"
     implementation 'com.github.oshi:oshi-core:6.4.13'
 
     implementation "io.github.jbellis:jvector:${jvector_version}"
