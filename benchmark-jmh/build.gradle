@@ -115,6 +115,6 @@ jmh {
 
 // Ensure Java compatibility matches the main project
 java {
-    sourceCompatibility = JavaVersion.VERSION_22
-    targetCompatibility = JavaVersion.VERSION_22
+    sourceCompatibility = java_release_version.toInteger()
+    targetCompatibility = java_release_version.toInteger()
 }
