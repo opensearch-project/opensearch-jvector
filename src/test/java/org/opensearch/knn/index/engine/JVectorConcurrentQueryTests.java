@@ -7,11 +7,9 @@ package org.opensearch.knn.index.engine;
 import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters;
 import com.google.common.primitives.Floats;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
-import org.junit.BeforeClass;
 import org.junit.Test;
 import org.opensearch.client.Request;
 import org.opensearch.client.Response;
-import org.opensearch.common.io.PathUtilsForTesting;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.common.xcontent.XContentFactory;
 import org.opensearch.core.rest.RestStatus;
@@ -30,7 +28,6 @@ import org.opensearch.test.OpenSearchIntegTestCase;
 import org.opensearch.transport.Netty4ModulePlugin;
 
 import java.io.IOException;
-import java.nio.file.FileSystems;
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -47,13 +44,6 @@ import static org.opensearch.knn.index.engine.CommonTestUtils.DIMENSION;
 @OpenSearchIntegTestCase.ClusterScope(scope = OpenSearchIntegTestCase.Scope.TEST, numDataNodes = 1)
 @ThreadLeakFilters(defaultFilters = true, filters = { ThreadLeakFiltersForTests.class })
 public class JVectorConcurrentQueryTests extends OpenSearchIntegTestCase {
-
-    @BeforeClass
-    public static void setFileSystemOverride() throws Exception {
-        // Override the default file system to use the fixed file system provider to avoid the failure of the UT due to the {@link
-        // java.nio.channels.FileChannel#map(...)} function
-        PathUtilsForTesting.installMock(FileSystems.getDefault());
-    }
 
     private static final int NUM_VECTORS = 100;
     private static final int NUM_QUERIES = 10;

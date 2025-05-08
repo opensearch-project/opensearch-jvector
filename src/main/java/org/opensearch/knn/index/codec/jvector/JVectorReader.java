@@ -24,7 +24,6 @@ import org.apache.lucene.store.*;
 import org.apache.lucene.util.Bits;
 import org.apache.lucene.util.IOUtils;
 import io.github.jbellis.jvector.vector.VectorSimilarityFunction;
-import io.github.jbellis.jvector.disk.MemorySegmentReader;
 import org.opensearch.knn.index.codec.KNN80Codec.KNN80CompoundDirectory;
 
 import java.io.IOException;
@@ -33,7 +32,6 @@ import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 @Log4j2
 public class JVectorReader extends KnnVectorsReader {
@@ -41,9 +39,7 @@ public class JVectorReader extends KnnVectorsReader {
     private static final int DEFAULT_OVER_QUERY_FACTOR = 5; // We will query 5x more than topKFor reranking
 
     private final FieldInfos fieldInfos;
-    private final String indexDataFileName;
     private final String baseDataFileName;
-    private final Path directoryBasePath;
     // Maps field name to field entries
     private final Map<String, FieldEntry> fieldEntryMap = new HashMap<>(1);
     private final Directory directory;
@@ -55,7 +51,6 @@ public class JVectorReader extends KnnVectorsReader {
         this.baseDataFileName = state.segmentInfo.name + "_" + state.segmentSuffix;
         String metaFileName = IndexFileNames.segmentFileName(state.segmentInfo.name, state.segmentSuffix, JVectorFormat.META_EXTENSION);
         this.directory = state.directory;
-        this.directoryBasePath = resolveDirectoryPath(directory);
         boolean success = false;
         try (ChecksumIndexInput meta = state.directory.openChecksumInput(metaFileName)) {
             CodecUtil.checkIndexHeader(
@@ -66,15 +61,8 @@ public class JVectorReader extends KnnVectorsReader {
                 state.segmentInfo.getId(),
                 state.segmentSuffix
             );
-            Set<String> filenames = state.segmentInfo.files();
             readFields(meta);
             CodecUtil.checkFooter(meta);
-
-            this.indexDataFileName = IndexFileNames.segmentFileName(
-                state.segmentInfo.name,
-                state.segmentSuffix,
-                JVectorFormat.VECTOR_INDEX_EXTENSION
-            );
 
             success = true;
         } finally {
@@ -187,40 +175,11 @@ public class JVectorReader extends KnnVectorsReader {
             this.pqCodebooksAndVectorsLength = vectorIndexFieldMetadata.getPqCodebooksAndVectorsLength();
             this.pqCodebooksAndVectorsOffset = vectorIndexFieldMetadata.getPqCodebooksAndVectorsOffset();
             this.dimension = vectorIndexFieldMetadata.getVectorDimension();
-            // TODO: do not depend on the actual nio.Path switch to file name only!
-            final Path expectedIndexFilePath = JVectorFormat.getVectorIndexPath(directoryBasePath, baseDataFileName, fieldInfo.name);
-            final String originalIndexFileName = expectedIndexFilePath.getFileName().toString();
-            final Path indexFilePath;
-            final long sliceOffset;
-            if (state.segmentInfo.getUseCompoundFile()) {
-                if (directory instanceof JVectorCompoundFormat.JVectorCompoundReader) {
-                    JVectorCompoundFormat.JVectorCompoundReader jVectorCompoundReader =
-                        (JVectorCompoundFormat.JVectorCompoundReader) directory;
-                    sliceOffset = jVectorCompoundReader.getOffsetInCompoundFile(originalIndexFileName);
-                    indexFilePath = jVectorCompoundReader.getCompoundFilePath();
-                } else if (directory instanceof KNN80CompoundDirectory) {
-                    KNN80CompoundDirectory knn80CompoundDirectory = (KNN80CompoundDirectory) directory;
-                    JVectorCompoundFormat.JVectorCompoundReader jVectorCompoundReader = new JVectorCompoundFormat.JVectorCompoundReader(
-                        knn80CompoundDirectory.getDelegate(),
-                        knn80CompoundDirectory.getDir(),
-                        state.segmentInfo
-                    );
-                    sliceOffset = jVectorCompoundReader.getOffsetInCompoundFile(originalIndexFileName);
-                    indexFilePath = jVectorCompoundReader.getCompoundFilePath();
-                } else {
-                    throw new IllegalArgumentException(
-                        "directory must be JVectorCompoundFormat or KNN80CompoundDirectory but instead had type: "
-                            + directory.getClass().getName()
-                    );
-                }
 
-            } else {
-                sliceOffset = 0;
-                indexFilePath = expectedIndexFilePath;
-            }
+            final String vectorIndexFieldFileName = baseDataFileName + "_" + fieldInfo.name + "." + JVectorFormat.VECTOR_INDEX_EXTENSION;
 
             // Check the header
-            try (IndexInput indexInput = directory.openInput(originalIndexFileName, state.context)) {
+            try (IndexInput indexInput = directory.openInput(vectorIndexFieldFileName, state.context)) {
                 CodecUtil.checkIndexHeader(
                     indexInput,
                     JVectorFormat.VECTOR_INDEX_CODEC_NAME,
@@ -232,8 +191,8 @@ public class JVectorReader extends KnnVectorsReader {
             }
 
             // Load the graph index
-            this.readerSupplier = new MemorySegmentReader.Supplier(indexFilePath);
-            this.index = OnDiskGraphIndex.load(readerSupplier, sliceOffset + vectorIndexOffset);
+            this.readerSupplier = new JVectorRandomAccessReader.Supplier(directory, vectorIndexFieldFileName, state.context);
+            this.index = OnDiskGraphIndex.load(readerSupplier, vectorIndexOffset);
             // If quantized load the compressed product quantized vectors with their codebooks
             if (pqCodebooksAndVectorsLength > 0) {
                 log.debug(
@@ -246,7 +205,7 @@ public class JVectorReader extends KnnVectorsReader {
                     throw new IllegalArgumentException("pqCodebooksAndVectorsOffset must be greater than vectorIndexOffset");
                 }
                 try (final var randomAccessReader = readerSupplier.get()) {
-                    randomAccessReader.seek(sliceOffset + pqCodebooksAndVectorsOffset);
+                    randomAccessReader.seek(pqCodebooksAndVectorsOffset);
                     this.pqVectors = PQVectors.load(randomAccessReader);
                 }
             } else {
@@ -254,7 +213,7 @@ public class JVectorReader extends KnnVectorsReader {
             }
 
             // Check the footer
-            try (ChecksumIndexInput indexInput = directory.openChecksumInput(originalIndexFileName)) {
+            try (ChecksumIndexInput indexInput = directory.openChecksumInput(vectorIndexFieldFileName)) {
                 // If there are pq codebooks and vectors, then the footer is at the end of the pq codebooks and vectors
                 if (pqCodebooksAndVectorsOffset > 0) {
                     indexInput.seek(pqCodebooksAndVectorsOffset + pqCodebooksAndVectorsLength);
@@ -327,8 +286,6 @@ public class JVectorReader extends KnnVectorsReader {
             log.info("unwrapping dir of type: {} to find path", dirType);
             if (dir instanceof FilterDirectory) {
                 dir = ((FilterDirectory) dir).getDelegate();
-            } else if (dir instanceof JVectorCompoundFormat.JVectorCompoundReader) {
-                return ((JVectorCompoundFormat.JVectorCompoundReader) dir).getDirectoryBasePath();
             } else if (dir instanceof KNN80CompoundDirectory) {
                 dir = ((KNN80CompoundDirectory) dir).getDir();
             } else {

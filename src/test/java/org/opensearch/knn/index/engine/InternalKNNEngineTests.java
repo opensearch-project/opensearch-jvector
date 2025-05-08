@@ -9,11 +9,9 @@ import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.lucene.codecs.perfield.PerFieldKnnVectorsFormat;
 import org.apache.lucene.index.SegmentReader;
-import org.junit.BeforeClass;
 import org.opensearch.client.Request;
 import org.opensearch.client.Response;
 import org.opensearch.cluster.routing.ShardRouting;
-import org.opensearch.common.io.PathUtilsForTesting;
 import org.opensearch.common.lucene.index.OpenSearchLeafReader;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.core.rest.RestStatus;
@@ -29,7 +27,6 @@ import org.opensearch.test.OpenSearchIntegTestCase;
 import org.opensearch.transport.Netty4ModulePlugin;
 
 import java.io.IOException;
-import java.nio.file.FileSystems;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -49,13 +46,6 @@ import static org.opensearch.knn.index.engine.CommonTestUtils.PROPERTIES_FIELD_N
 @OpenSearchIntegTestCase.ClusterScope(scope = OpenSearchIntegTestCase.Scope.TEST, numDataNodes = 1)
 @ThreadLeakFilters(defaultFilters = true, filters = { ThreadLeakFiltersForTests.class })
 public class InternalKNNEngineTests extends OpenSearchIntegTestCase {
-
-    @BeforeClass
-    public static void setFileSystemOverride() throws Exception {
-        // Override the default file system to use the fixed file system provider to avoid the failure of the UT due to the {@link
-        // java.nio.channels.FileChannel#map(...)} function
-        PathUtilsForTesting.installMock(FileSystems.getDefault());
-    }
 
     /** ** Enable the http client *** */
     @Override
