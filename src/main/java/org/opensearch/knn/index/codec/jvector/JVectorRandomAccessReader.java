@@ -13,6 +13,7 @@ import org.apache.lucene.store.IOContext;
 import org.apache.lucene.store.IndexInput;
 import org.apache.lucene.util.IOUtils;
 
+import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -21,7 +22,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 @Log4j2
 public class JVectorRandomAccessReader implements RandomAccessReader {
-    private final byte[] buffer = new byte[Long.BYTES];
+    private final byte[] internalBuffer = new byte[Long.BYTES];
     private final IndexInput indexInputDelegate;
     private volatile boolean closed = false;
 
@@ -41,9 +42,9 @@ public class JVectorRandomAccessReader implements RandomAccessReader {
 
     @Override
     public int readInt() throws IOException {
-        indexInputDelegate.readBytes(buffer, 0, Integer.BYTES);
+        indexInputDelegate.readBytes(internalBuffer, 0, Integer.BYTES);
         // Replace ByteArray.getInt with ByteBuffer implementation
-        return ByteBuffer.wrap(buffer, 0, Integer.BYTES).order(ByteOrder.BIG_ENDIAN).getInt();
+        return ByteBuffer.wrap(internalBuffer, 0, Integer.BYTES).order(ByteOrder.BIG_ENDIAN).getInt();
     }
 
     @Override
@@ -53,8 +54,8 @@ public class JVectorRandomAccessReader implements RandomAccessReader {
 
     @Override
     public long readLong() throws IOException {
-        indexInputDelegate.readBytes(buffer, 0, Long.BYTES);
-        return ByteBuffer.wrap(buffer, 0, Long.BYTES).order(ByteOrder.BIG_ENDIAN).getLong();
+        indexInputDelegate.readBytes(internalBuffer, 0, Long.BYTES);
+        return ByteBuffer.wrap(internalBuffer, 0, Long.BYTES).order(ByteOrder.BIG_ENDIAN).getLong();
     }
 
     @Override
@@ -64,7 +65,28 @@ public class JVectorRandomAccessReader implements RandomAccessReader {
 
     @Override
     public void readFully(ByteBuffer buffer) throws IOException {
-        indexInputDelegate.readBytes(buffer.array(), buffer.arrayOffset(), buffer.remaining());
+        // validate that the requested bytes actually exist ----
+        long remainingInFile = indexInputDelegate.length() - indexInputDelegate.getFilePointer();
+        if (buffer.remaining() > remainingInFile) {
+            throw new EOFException(
+                    "Requested " + buffer.remaining() + " bytes but only " + remainingInFile + " available");
+        }
+
+        // Heap buffers with a backing array can be filled in one call ----
+        if (buffer.hasArray()) {
+            int off   = buffer.arrayOffset() + buffer.position();
+            int len   = buffer.remaining();
+            indexInputDelegate.readBytes(buffer.array(), off, len);
+            buffer.position(buffer.limit());           // advance fully
+            return;
+        }
+
+        // Direct / non-array buffers: copy in reasonable chunks ----
+        while (buffer.hasRemaining()) {
+            final int bytesToRead = Math.min(buffer.remaining(), Long.BYTES);
+            indexInputDelegate.readBytes(this.internalBuffer, 0, bytesToRead);
+            buffer.put(this.internalBuffer, 0, bytesToRead);
+        }
     }
 
     @Override

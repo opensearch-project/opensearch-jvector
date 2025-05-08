@@ -139,7 +139,6 @@ public class JVectorReader extends KnnVectorsReader {
     public void close() throws IOException {
         for (FieldEntry fieldEntry : fieldEntryMap.values()) {
             IOUtils.close(fieldEntry.readerSupplier::close);
-            // IOUtils.close(fieldEntry.index::close);
         }
     }
 
