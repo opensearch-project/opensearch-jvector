@@ -15,6 +15,16 @@
     </Appenders>
 
     <Loggers>
+        <!-- Set SLF4J logger to debug -->
+        <Logger name="org.slf4j" level="debug" additivity="false">
+            <AppenderRef ref="Console"/>
+        </Logger>
+
+        <!-- Set jvector logger to debug -->
+        <Logger name="io.github.jbellis.jvector" level="debug" additivity="false">
+            <AppenderRef ref="Console"/>
+        </Logger>
+
         <Root level="debug">
             <AppenderRef ref="Console"/>
         </Root>

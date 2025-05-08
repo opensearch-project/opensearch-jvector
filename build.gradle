@@ -332,6 +332,10 @@ dependencies {
 
     // OpenSearch core is using slf4j 1.7.36. Therefore, we cannot change the version here.
     implementation 'org.slf4j:slf4j-api:1.7.36'
+    // Add this line to provide the SLF4J to Log4j2 binding for 1.7.x
+    //implementation "org.apache.logging.log4j:log4j-slf4j-impl:${versions.log4j}"
+    // Add this line for SLF4J 2.x compatibility
+    implementation "org.apache.logging.log4j:log4j-slf4j2-impl:${versions.log4j}"
 
     zipArchive group: 'org.opensearch.plugin', name:'opensearch-security', version: "${opensearch_build}"
 }

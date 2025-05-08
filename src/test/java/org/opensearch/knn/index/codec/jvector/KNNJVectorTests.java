@@ -36,12 +36,6 @@ import static org.opensearch.knn.index.codec.jvector.JVectorFormat.DEFAULT_MINIM
 @LuceneTestCase.SuppressSysoutChecks(bugUrl = "")
 @Log4j2
 public class KNNJVectorTests extends LuceneTestCase {
-    static {
-        System.setProperty("io.netty.tryReflectionSetAccessible", "true");
-        // This enables the new memory mapping API
-        System.setProperty("jdk.incubator.foreign.restricted", "permit");
-    }
-
     /**
      * Test to verify that the JVector codec is able to successfully search for the nearest neighbours
      * in the index.
@@ -59,9 +53,7 @@ public class KNNJVectorTests extends LuceneTestCase {
         indexWriterConfig.setUseCompoundFile(false);
         indexWriterConfig.setCodec(new JVectorCodec());
         indexWriterConfig.setMergePolicy(new ForceMergesOnlyMergePolicy());
-        final Path luceneWrappedIndexPath = createTempDir();
-        // switch to {@link FixedFSProvider} to avoid the failure of the UT due to the {@link FileChannel#map(...)} function
-        final Path indexPath = new FixedFSProvider(luceneWrappedIndexPath.getFileSystem()).wrapPath(luceneWrappedIndexPath);
+        final Path indexPath = createTempDir();
         log.info("Index path: {}", indexPath);
         try (Directory dir = newFSDirectory(indexPath); RandomIndexWriter w = new RandomIndexWriter(random(), dir, indexWriterConfig)) {
             final float[] target = new float[] { 0.0f, 0.0f };

@@ -1,0 +1,119 @@
+package org.opensearch.knn.index.codec.jvector;
+
+import io.github.jbellis.jvector.disk.RandomAccessReader;
+import io.github.jbellis.jvector.disk.ReaderSupplier;
+import lombok.extern.log4j.Log4j2;
+import org.apache.lucene.store.Directory;
+import org.apache.lucene.store.IOContext;
+import org.apache.lucene.store.IndexInput;
+import org.apache.lucene.util.IOUtils;
+
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.util.concurrent.ConcurrentHashMap;
+
+@Log4j2
+public class JVectorRandomAccessReader implements RandomAccessReader {
+    private final byte[] buffer = new byte[Long.BYTES];
+    private final IndexInput indexInputDelegate;
+
+    public JVectorRandomAccessReader(IndexInput indexInputDelegate) {
+        this.indexInputDelegate = indexInputDelegate;
+    }
+
+    @Override
+    public void seek(long offset) throws IOException {
+        indexInputDelegate.seek(offset);
+    }
+
+    @Override
+    public long getPosition() throws IOException {
+        return indexInputDelegate.getFilePointer();
+    }
+
+    @Override
+    public int readInt() throws IOException {
+        indexInputDelegate.readBytes(buffer, 0, Integer.BYTES);
+        // Replace ByteArray.getInt with ByteBuffer implementation
+        return ByteBuffer.wrap(buffer, 0, Integer.BYTES).order(ByteOrder.BIG_ENDIAN).getInt();
+    }
+
+    @Override
+    public float readFloat() throws IOException {
+        return Float.intBitsToFloat(readInt());
+    }
+
+    @Override
+    public long readLong() throws IOException {
+        indexInputDelegate.readBytes(buffer, 0, Long.BYTES);
+        return ByteBuffer.wrap(buffer, 0, Long.BYTES).order(ByteOrder.BIG_ENDIAN).getLong();
+    }
+
+    @Override
+    public void readFully(byte[] bytes) throws IOException {
+        indexInputDelegate.readBytes(bytes, 0, bytes.length);
+    }
+
+    @Override
+    public void readFully(ByteBuffer buffer) throws IOException {
+        indexInputDelegate.readBytes(buffer.array(), buffer.arrayOffset(), buffer.remaining());
+    }
+
+    @Override
+    public void readFully(long[] vector) throws IOException {
+        for (int i = 0; i < vector.length; i++) {
+            vector[i] = readLong();
+        }
+    }
+
+    @Override
+    public void read(int[] ints, int offset, int count) throws IOException {
+        for (int i = 0; i < count; i++) {
+            ints[offset + i] = readInt();
+        }
+    }
+
+    @Override
+    public void read(float[] floats, int offset, int count) throws IOException {
+        // Note that we are not using the readFloats method from IndexInput because it does not support the endianess correctly as is written by the jvector writer
+        for (int i = 0; i < count; i++) {
+            floats[offset + i] = readFloat();
+        }
+    }
+
+    @Override
+    public void close() throws IOException {
+        log.info("Attempting to close JVectorRandomAccessReader for file {}", indexInputDelegate);
+        boolean success = false;
+        try {
+            indexInputDelegate.close();
+            success = true;
+            log.info("Successfully closed JVectorRandomAccessReader for file {}", indexInputDelegate);
+        } catch (Exception e) {
+            log.error("Error closing JVectorRandomAccessReader for file {}", indexInputDelegate, e);
+        } finally {
+            if (!success) {
+                IOUtils.closeWhileHandlingException(this::close);
+                log.info("Closed JVectorRandomAccessReader after handling exception for file {}", indexInputDelegate);
+            }
+        }
+    }
+
+    public static class Supplier implements ReaderSupplier {
+        private final Directory directory;
+        private final String fileName;
+        private final IOContext context;
+
+        public Supplier(Directory directory, String fileName, IOContext context) {
+            this.directory = directory;
+            this.fileName = fileName;
+            this.context = context;
+        }
+
+        @Override
+        public RandomAccessReader get() throws IOException {
+            return new JVectorRandomAccessReader(directory.openInput(fileName, context));
+        }
+    }
+}
