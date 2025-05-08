@@ -287,8 +287,6 @@ public class JVectorReader extends KnnVectorsReader {
             log.info("unwrapping dir of type: {} to find path", dirType);
             if (dir instanceof FilterDirectory) {
                 dir = ((FilterDirectory) dir).getDelegate();
-            } else if (dir instanceof JVectorCompoundFormat.JVectorCompoundReader) {
-                return ((JVectorCompoundFormat.JVectorCompoundReader) dir).getDirectoryBasePath();
             } else if (dir instanceof KNN80CompoundDirectory) {
                 dir = ((KNN80CompoundDirectory) dir).getDir();
             } else {
