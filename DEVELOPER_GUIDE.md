@@ -39,18 +39,18 @@ git clone https://github.com/[your username]/OpenSearch.git
 
 ### Install Prerequisites
 
-#### JDK 22+
+#### JDK 21+
 
-OpenSearch builds using Java 21 at a minimum with 22+ recommended. For this plugin you must have a JDK 22+ installed with the environment variable 
-`JAVA_HOME` referencing the path to Java home for your JDK 22 installation, e.g. `JAVA_HOME=/usr/lib/jvm/jdk-22`.
+OpenSearch builds using Java 21 at a minimum with 21+ recommended. For this plugin you must have a JDK 21+ installed with the environment variable 
+`JAVA_HOME` referencing the path to Java home for your JDK 22 installation, e.g. `JAVA_HOME=/usr/lib/jvm/jdk-21`.
 
 One easy way to get Java 22 on *nix is to use [sdkman](https://sdkman.io/).
 
 ```bash
 curl -s "https://get.sdkman.io" | bash
 source ~/.sdkman/bin/sdkman-init.sh
-sdk install java 22.0.2-open
-sdk use java 22.0.2-open
+sdk install java 21.0.2-open
+sdk use java 21.0.2-open
 ```
 Next, obtain a minimum distribution tarball of the jVector k-NN version you want to build:
 
@@ -113,10 +113,10 @@ Please follow these formatting guidelines:
 OpenSearch k-NN uses a [Gradle](https://docs.gradle.org/6.6.1/userguide/userguide.html) wrapper for its build. 
 Run `gradlew` on Unix systems.
 
-Tests use `JAVA22_HOME` environment variable, make sure to add it in the export path else the tests might fail. 
+Tests use `JAVA21_HOME` environment variable, make sure to add it in the export path else the tests might fail. 
 e.g 
 ```
-echo "export JAVA22_HOME=<JDK22 path>" >> ~/.zshrc
+echo "export JAVA21_HOME=<JDK21 path>" >> ~/.zshrc
 source ~/.zshrc
 ```
 
