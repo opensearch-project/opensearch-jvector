@@ -1,3 +1,8 @@
+/*
+ * Copyright OpenSearch Contributors
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 package org.opensearch.knn.index.codec.jvector;
 
 import org.apache.lucene.store.IndexInput;
@@ -24,13 +29,19 @@ public class JVectorRandomAccessReaderTests {
         public void close() {/* nothing to close */}
 
         @Override
-        public long length() { return data.length; }
+        public long length() {
+            return data.length;
+        }
 
         @Override
-        public long getFilePointer() { return pos; }
+        public long getFilePointer() {
+            return pos;
+        }
 
         @Override
-        public void seek(long newPos) { this.pos = newPos; }
+        public void seek(long newPos) {
+            this.pos = newPos;
+        }
 
         @Override
         public byte readByte() throws EOFException {
@@ -79,10 +90,10 @@ public class JVectorRandomAccessReaderTests {
     @Test
     public void readFully_fillsHeapBuffer() throws IOException {
         byte[] src = new byte[32];
-        for (int i = 0; i < src.length; i++) src[i] = (byte) i;
+        for (int i = 0; i < src.length; i++)
+            src[i] = (byte) i;
 
-        JVectorRandomAccessReader reader =
-                new JVectorRandomAccessReader(new ByteArrayIndexInput(src));
+        JVectorRandomAccessReader reader = new JVectorRandomAccessReader(new ByteArrayIndexInput(src));
 
         // Create a heap buffer with non-zero position to exercise offset math
         ByteBuffer dst = ByteBuffer.allocate(16);
@@ -91,7 +102,7 @@ public class JVectorRandomAccessReaderTests {
 
         reader.readFully(dst);
 
-        Assert.assertFalse( "Buffer should be full", dst.hasRemaining());
+        Assert.assertFalse("Buffer should be full", dst.hasRemaining());
         Assert.assertEquals("Exactly 12 bytes expected", 12, dst.position() - 4);
 
         // Validate contents 0..11 from source array
@@ -102,7 +113,6 @@ public class JVectorRandomAccessReaderTests {
         System.arraycopy(src, 0, expected, 4, 12);
         Assert.assertArrayEquals(expected, actual);
     }
-
 
     /**
      * Tests the behavior of the {@code readFully(ByteBuffer)} method in the
@@ -118,10 +128,10 @@ public class JVectorRandomAccessReaderTests {
     @Test
     public void readFully_fillsDirectBuffer() throws IOException {
         byte[] src = new byte[64];
-        for (int i = 0; i < src.length; i++) src[i] = (byte) (i * 2);
+        for (int i = 0; i < src.length; i++)
+            src[i] = (byte) (i * 2);
 
-        JVectorRandomAccessReader reader =
-                new JVectorRandomAccessReader(new ByteArrayIndexInput(src));
+        JVectorRandomAccessReader reader = new JVectorRandomAccessReader(new ByteArrayIndexInput(src));
 
         ByteBuffer dst = ByteBuffer.allocateDirect(40);   // triggers chunk-copy path
         reader.readFully(dst);
@@ -139,11 +149,9 @@ public class JVectorRandomAccessReaderTests {
     @Test
     public void readFully_throwsEOFException_whenInsufficientData() {
         byte[] src = new byte[8];
-        JVectorRandomAccessReader reader =
-                new JVectorRandomAccessReader(new ByteArrayIndexInput(src));
+        JVectorRandomAccessReader reader = new JVectorRandomAccessReader(new ByteArrayIndexInput(src));
 
         ByteBuffer dst = ByteBuffer.allocate(16);
         Assert.assertThrows(EOFException.class, () -> reader.readFully(dst));
     }
 }
-

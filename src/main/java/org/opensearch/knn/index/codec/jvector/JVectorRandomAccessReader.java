@@ -68,14 +68,13 @@ public class JVectorRandomAccessReader implements RandomAccessReader {
         // validate that the requested bytes actually exist ----
         long remainingInFile = indexInputDelegate.length() - indexInputDelegate.getFilePointer();
         if (buffer.remaining() > remainingInFile) {
-            throw new EOFException(
-                    "Requested " + buffer.remaining() + " bytes but only " + remainingInFile + " available");
+            throw new EOFException("Requested " + buffer.remaining() + " bytes but only " + remainingInFile + " available");
         }
 
         // Heap buffers with a backing array can be filled in one call ----
         if (buffer.hasArray()) {
-            int off   = buffer.arrayOffset() + buffer.position();
-            int len   = buffer.remaining();
+            int off = buffer.arrayOffset() + buffer.position();
+            int len = buffer.remaining();
             indexInputDelegate.readBytes(buffer.array(), off, len);
             buffer.position(buffer.limit());           // advance fully
             return;
