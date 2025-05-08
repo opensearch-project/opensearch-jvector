@@ -1,3 +1,8 @@
+/*
+ * Copyright OpenSearch Contributors
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 package org.opensearch.knn.index.codec.jvector;
 
 import io.github.jbellis.jvector.disk.RandomAccessReader;
@@ -12,11 +17,13 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Log4j2
 public class JVectorRandomAccessReader implements RandomAccessReader {
     private final byte[] buffer = new byte[Long.BYTES];
     private final IndexInput indexInputDelegate;
+    private volatile boolean closed = false;
 
     public JVectorRandomAccessReader(IndexInput indexInputDelegate) {
         this.indexInputDelegate = indexInputDelegate;
@@ -76,7 +83,8 @@ public class JVectorRandomAccessReader implements RandomAccessReader {
 
     @Override
     public void read(float[] floats, int offset, int count) throws IOException {
-        // Note that we are not using the readFloats method from IndexInput because it does not support the endianess correctly as is written by the jvector writer
+        // Note that we are not using the readFloats method from IndexInput because it does not support the endianess correctly as is
+        // written by the jvector writer
         for (int i = 0; i < count; i++) {
             floats[offset + i] = readFloat();
         }
@@ -86,17 +94,22 @@ public class JVectorRandomAccessReader implements RandomAccessReader {
     public void close() throws IOException {
         log.info("Attempting to close JVectorRandomAccessReader for file {}", indexInputDelegate);
         boolean success = false;
-        try {
-            indexInputDelegate.close();
-            success = true;
-            log.info("Successfully closed JVectorRandomAccessReader for file {}", indexInputDelegate);
-        } catch (Exception e) {
-            log.error("Error closing JVectorRandomAccessReader for file {}", indexInputDelegate, e);
-        } finally {
-            if (!success) {
-                IOUtils.closeWhileHandlingException(this::close);
-                log.info("Closed JVectorRandomAccessReader after handling exception for file {}", indexInputDelegate);
+        if (!closed) {
+            try {
+                indexInputDelegate.close();
+                log.info("Successfully closed JVectorRandomAccessReader for file {}", indexInputDelegate);
+                success = true;
+            } catch (Exception e) {
+                log.error("Error closing JVectorRandomAccessReader for file {}", indexInputDelegate, e);
+            } finally {
+                if (!closed && !success) {
+                    IOUtils.closeWhileHandlingException(this::close);
+                    log.info("Closed JVectorRandomAccessReader after handling exception for file {}", indexInputDelegate);
+                }
+                closed = true;
             }
+        } else {
+            log.info("JVectorRandomAccessReader already closed for file {}", indexInputDelegate);
         }
     }
 
@@ -104,6 +117,8 @@ public class JVectorRandomAccessReader implements RandomAccessReader {
         private final Directory directory;
         private final String fileName;
         private final IOContext context;
+        private final AtomicInteger readerCount = new AtomicInteger(0);
+        private final ConcurrentHashMap<Integer, RandomAccessReader> readers = new ConcurrentHashMap<>();
 
         public Supplier(Directory directory, String fileName, IOContext context) {
             this.directory = directory;
@@ -113,7 +128,18 @@ public class JVectorRandomAccessReader implements RandomAccessReader {
 
         @Override
         public RandomAccessReader get() throws IOException {
-            return new JVectorRandomAccessReader(directory.openInput(fileName, context));
+            synchronized (directory) {
+                var reader = new JVectorRandomAccessReader(directory.openInput(fileName, context));
+                readers.put(readerCount.getAndIncrement(), reader);
+                return reader;
+            }
+        }
+
+        @Override
+        public void close() throws IOException {
+            for (RandomAccessReader reader : readers.values()) {
+                IOUtils.close(reader::close);
+            }
         }
     }
 }

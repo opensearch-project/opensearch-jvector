@@ -32,7 +32,6 @@ import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 @Log4j2
 public class JVectorReader extends KnnVectorsReader {
@@ -40,7 +39,6 @@ public class JVectorReader extends KnnVectorsReader {
     private static final int DEFAULT_OVER_QUERY_FACTOR = 5; // We will query 5x more than topKFor reranking
 
     private final FieldInfos fieldInfos;
-    private final String indexDataFileName;
     private final String baseDataFileName;
     // Maps field name to field entries
     private final Map<String, FieldEntry> fieldEntryMap = new HashMap<>(1);
@@ -63,15 +61,8 @@ public class JVectorReader extends KnnVectorsReader {
                 state.segmentInfo.getId(),
                 state.segmentSuffix
             );
-            Set<String> filenames = state.segmentInfo.files();
             readFields(meta);
             CodecUtil.checkFooter(meta);
-
-            this.indexDataFileName = IndexFileNames.segmentFileName(
-                state.segmentInfo.name,
-                state.segmentSuffix,
-                JVectorFormat.VECTOR_INDEX_EXTENSION
-            );
 
             success = true;
         } finally {
@@ -148,7 +139,7 @@ public class JVectorReader extends KnnVectorsReader {
     public void close() throws IOException {
         for (FieldEntry fieldEntry : fieldEntryMap.values()) {
             IOUtils.close(fieldEntry.readerSupplier::close);
-            IOUtils.close(fieldEntry.index::close);
+            // IOUtils.close(fieldEntry.index::close);
         }
     }
 
