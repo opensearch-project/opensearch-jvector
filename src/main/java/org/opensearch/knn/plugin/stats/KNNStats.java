@@ -102,6 +102,18 @@ public class KNNStats {
                 StatNames.MAX_DISTANCE_QUERY_WITH_FILTER_REQUESTS.getName(),
                 new KNNStat<>(false, new KNNCounterSupplier(KNNCounter.MAX_DISTANCE_QUERY_WITH_FILTER_REQUESTS))
             );
+
+        // K-NN search stats
+        builder.put(
+            StatNames.KNN_QUERY_VISITED_NODES.getName(),
+            new KNNStat<>(false, new KNNCounterSupplier(KNNCounter.KNN_QUERY_VISITED_NODES))
+        ).put(
+            StatNames.KNN_QUERY_EXPANDED_NODES.getName(),
+            new KNNStat<>(false, new KNNCounterSupplier(KNNCounter.KNN_QUERY_EXPANDED_NODES))
+        ).put(
+            StatNames.KNN_QUERY_EXPANDED_BASE_LAYER_NODES.getName(),
+            new KNNStat<>(false, new KNNCounterSupplier(KNNCounter.KNN_QUERY_EXPANDED_BASE_LAYER_NODES))
+        );
     }
 
     private void addEngineStats(ImmutableMap.Builder<String, KNNStat<?>> builder) {
