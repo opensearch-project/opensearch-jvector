@@ -25,6 +25,7 @@ import org.apache.lucene.util.Bits;
 import org.apache.lucene.util.IOUtils;
 import io.github.jbellis.jvector.vector.VectorSimilarityFunction;
 import org.opensearch.knn.index.codec.KNN80Codec.KNN80CompoundDirectory;
+import org.opensearch.knn.plugin.stats.KNNCounter;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -115,7 +116,7 @@ public class JVectorReader extends KnnVectorsReader {
         }
         io.github.jbellis.jvector.util.Bits compatibleBits = doc -> acceptDocs == null || acceptDocs.get(doc);
         try (var graphSearcher = new GraphSearcher(index)) {
-            final var sr = graphSearcher.search(
+            final var searchResults = graphSearcher.search(
                 ssp,
                 knnCollector.k(),
                 knnCollector.k() * DEFAULT_OVER_QUERY_FACTOR,
@@ -123,9 +124,18 @@ public class JVectorReader extends KnnVectorsReader {
                 0.0f,
                 compatibleBits
             );
-            for (SearchResult.NodeScore ns : sr.getNodes()) {
+            for (SearchResult.NodeScore ns : searchResults.getNodes()) {
                 knnCollector.collect(ns.node, ns.score);
             }
+            // Collect the below metrics about the search and somehow wire this back to {@link @KNNStats}
+            final int visitedNodesCount = searchResults.getVisitedCount();
+            final int expandedCount = searchResults.getExpandedCount();
+            final int expandedBaseLayerCount = searchResults.getExpandedCountBaseLayer();
+
+            KNNCounter.KNN_QUERY_VISITED_NODES.add(visitedNodesCount);
+            KNNCounter.KNN_QUERY_EXPANDED_NODES.add(expandedCount);
+            KNNCounter.KNN_QUERY_EXPANDED_BASE_LAYER_NODES.add(expandedBaseLayerCount);
+
         }
 
     }

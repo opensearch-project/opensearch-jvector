@@ -1046,11 +1046,14 @@ public class KNNRestTestCase extends ODFERestTestCase {
      * Parse KNN Cluster stats from response
      */
     protected Map<String, Object> parseClusterStatsResponse(String responseBody) throws IOException {
-        Map<String, Object> responseMap = createParser(MediaTypeRegistry.getDefaultMediaType().xContent(), responseBody).map();
-        responseMap.remove("cluster_name");
-        responseMap.remove("_nodes");
-        responseMap.remove("nodes");
-        return responseMap;
+        try (XContentParser parser = createParser(MediaTypeRegistry.getDefaultMediaType().xContent(), responseBody)) {
+            Map<String, Object> responseMap = parser.map();
+            responseMap.remove("cluster_name");
+            responseMap.remove("_nodes");
+            responseMap.remove("nodes");
+            return responseMap;
+        }
+
     }
 
     /**

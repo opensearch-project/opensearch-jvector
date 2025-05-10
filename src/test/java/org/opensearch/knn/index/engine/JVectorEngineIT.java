@@ -28,6 +28,7 @@ import org.opensearch.knn.common.KNNConstants;
 import org.opensearch.knn.index.SpaceType;
 import org.opensearch.knn.index.VectorDataType;
 import org.opensearch.knn.index.query.KNNQueryBuilder;
+import org.opensearch.knn.plugin.stats.StatNames;
 
 import java.io.IOException;
 import java.util.*;
@@ -459,6 +460,81 @@ public class JVectorEngineIT extends KNNRestTestCase {
             final BulkResponse bulkResponse = highLevelClient.bulk(bulkRequest, RequestOptions.DEFAULT);
         }
 
+    }
+
+    /**
+     * Verify that the jVector-specific KNN stats counters
+     * (visited, expanded, expanded-base-layer nodes) are present
+     * and increase after a KNN search is executed.
+     */
+    public void testJVectorSearchStatsIncrement() throws Exception {
+        /* ---------------------------------------------------
+         * 1.  Create index and docs
+         * --------------------------------------------------- */
+        int dimension = 128;
+        int vectorsCount = 100;
+        createKnnIndexMappingWithJVectorEngine(dimension, SpaceType.L2, VectorDataType.FLOAT);
+
+        for (int j = 0; j < vectorsCount; j++) {
+            addKnnDoc(INDEX_NAME, Integer.toString(j + 1), FIELD_NAME, randomFloatVector(dimension));
+        }
+        refreshIndex(INDEX_NAME);
+
+        /* ---------------------------------------------------
+         * 2.  Read initial stats
+         * --------------------------------------------------- */
+        List<String> metrics = List.of(
+            StatNames.KNN_QUERY_VISITED_NODES.getName(),
+            StatNames.KNN_QUERY_EXPANDED_NODES.getName(),
+            StatNames.KNN_QUERY_EXPANDED_BASE_LAYER_NODES.getName()
+        );
+
+        var parsedBefore = parseNodeStatsResponse(EntityUtils.toString(getKnnStats(Collections.emptyList(), metrics).getEntity()));
+        assertNotNull(parsedBefore);
+        assertEquals(1, parsedBefore.size());
+        Map<String, Object> before = parsedBefore.get(0);
+        assertNotNull(before);
+
+        /* ---------------------------------------------------
+         * 3.  Execute a KNN query
+         * --------------------------------------------------- */
+        final float[] searchVector = randomFloatVector(dimension);
+        int k = 5;
+        var response = searchKNNIndex(INDEX_NAME, new KNNQueryBuilder(FIELD_NAME, searchVector, k), k);
+        final String responseBody = EntityUtils.toString(response.getEntity());
+        final List<KNNResult> knnResults = parseSearchResponse(responseBody, FIELD_NAME);
+        assertNotNull(knnResults);
+        assertEquals(k, knnResults.size());
+
+        /* ---------------------------------------------------
+         * 4.  Read stats again and assert they have increased
+         * --------------------------------------------------- */
+        var parsedAfter = parseNodeStatsResponse(EntityUtils.toString(getKnnStats(Collections.emptyList(), metrics).getEntity()));
+        assertNotNull(parsedAfter);
+        assertEquals(1, parsedAfter.size());
+        Map<String, Object> after = parsedAfter.get(0);
+
+        assertNotNull(after);
+
+        assertTrue(
+            "Visited-nodes counter did not increase",
+            ((Number) after.get(StatNames.KNN_QUERY_VISITED_NODES.getName())).longValue() > ((Number) before.get(
+                StatNames.KNN_QUERY_VISITED_NODES.getName()
+            )).longValue()
+        );
+
+        assertTrue(
+            "Expanded-nodes counter did not increase",
+            ((Number) after.get(StatNames.KNN_QUERY_EXPANDED_NODES.getName())).longValue() > ((Number) before.get(
+                StatNames.KNN_QUERY_EXPANDED_NODES.getName()
+            )).longValue()
+        );
+        assertTrue(
+            "Expanded-base-layer counter did not increase",
+            ((Number) after.get(StatNames.KNN_QUERY_EXPANDED_BASE_LAYER_NODES.getName())).longValue() > ((Number) before.get(
+                StatNames.KNN_QUERY_EXPANDED_BASE_LAYER_NODES.getName()
+            )).longValue()
+        );
     }
 
     private Map<String, float[]> generateDocVectors(int dimension, int totalDocuments) {
