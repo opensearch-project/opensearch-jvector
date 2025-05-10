@@ -484,13 +484,12 @@ public class JVectorEngineIT extends KNNRestTestCase {
          * 2.  Read initial stats
          * --------------------------------------------------- */
         List<String> metrics = List.of(
-                StatNames.KNN_QUERY_VISITED_NODES.getName(),
-                StatNames.KNN_QUERY_EXPANDED_NODES.getName(),
-                StatNames.KNN_QUERY_EXPANDED_BASE_LAYER_NODES.getName()
+            StatNames.KNN_QUERY_VISITED_NODES.getName(),
+            StatNames.KNN_QUERY_EXPANDED_NODES.getName(),
+            StatNames.KNN_QUERY_EXPANDED_BASE_LAYER_NODES.getName()
         );
 
-        var parsedBefore = parseNodeStatsResponse(
-                EntityUtils.toString(getKnnStats(Collections.emptyList(), metrics).getEntity()));
+        var parsedBefore = parseNodeStatsResponse(EntityUtils.toString(getKnnStats(Collections.emptyList(), metrics).getEntity()));
         assertNotNull(parsedBefore);
         assertEquals(1, parsedBefore.size());
         Map<String, Object> before = parsedBefore.get(0);
@@ -510,8 +509,7 @@ public class JVectorEngineIT extends KNNRestTestCase {
         /* ---------------------------------------------------
          * 4.  Read stats again and assert they have increased
          * --------------------------------------------------- */
-        var parsedAfter = parseNodeStatsResponse(
-                EntityUtils.toString(getKnnStats(Collections.emptyList(), metrics).getEntity()));
+        var parsedAfter = parseNodeStatsResponse(EntityUtils.toString(getKnnStats(Collections.emptyList(), metrics).getEntity()));
         assertNotNull(parsedAfter);
         assertEquals(1, parsedAfter.size());
         Map<String, Object> after = parsedAfter.get(0);
@@ -519,20 +517,23 @@ public class JVectorEngineIT extends KNNRestTestCase {
         assertNotNull(after);
 
         assertTrue(
-                "Visited-nodes counter did not increase",
-                ((Number) after.get(StatNames.KNN_QUERY_VISITED_NODES.getName())).longValue() >
-                        ((Number) before.get(StatNames.KNN_QUERY_VISITED_NODES.getName())).longValue()
+            "Visited-nodes counter did not increase",
+            ((Number) after.get(StatNames.KNN_QUERY_VISITED_NODES.getName())).longValue() > ((Number) before.get(
+                StatNames.KNN_QUERY_VISITED_NODES.getName()
+            )).longValue()
         );
 
         assertTrue(
-                "Expanded-nodes counter did not increase",
-                ((Number) after.get(StatNames.KNN_QUERY_EXPANDED_NODES.getName())).longValue() >
-                        ((Number) before.get(StatNames.KNN_QUERY_EXPANDED_NODES.getName())).longValue()
+            "Expanded-nodes counter did not increase",
+            ((Number) after.get(StatNames.KNN_QUERY_EXPANDED_NODES.getName())).longValue() > ((Number) before.get(
+                StatNames.KNN_QUERY_EXPANDED_NODES.getName()
+            )).longValue()
         );
         assertTrue(
-                "Expanded-base-layer counter did not increase",
-                ((Number) after.get(StatNames.KNN_QUERY_EXPANDED_BASE_LAYER_NODES.getName())).longValue() >
-                        ((Number) before.get(StatNames.KNN_QUERY_EXPANDED_BASE_LAYER_NODES.getName())).longValue()
+            "Expanded-base-layer counter did not increase",
+            ((Number) after.get(StatNames.KNN_QUERY_EXPANDED_BASE_LAYER_NODES.getName())).longValue() > ((Number) before.get(
+                StatNames.KNN_QUERY_EXPANDED_BASE_LAYER_NODES.getName()
+            )).longValue()
         );
     }
 

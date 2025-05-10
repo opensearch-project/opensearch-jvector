@@ -77,7 +77,6 @@ public enum KNNCounter {
         count.set(value);
     }
 
-
     /**
      * Adds the specified delta to the current value of the counter.
      *
