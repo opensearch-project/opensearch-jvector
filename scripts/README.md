@@ -11,7 +11,36 @@ This directory contains scripts for testing OpenSearch JVector functionality, pa
 
 ### Setup
 
-1. Install the required Python dependencies:
+#### Using a Virtual Environment (Recommended)
+
+It's recommended to use a virtual environment to avoid conflicts with other Python packages:
+
+1. Create a virtual environment:
+   ```bash
+   # Using venv (Python 3.3+)
+   python -m venv .venv
+   
+   # Activate the virtual environment
+   # On Windows:
+   .venv\Scripts\activate
+   # On macOS/Linux:
+   source .venv/bin/activate
+   ```
+
+2. Install the required Python dependencies:
+   ```bash
+   pip install --upgrade pip
+   pip install -r requirements.txt
+   ```
+
+3. When you're done, you can deactivate the virtual environment:
+   ```bash
+   deactivate
+   ```
+
+#### Direct Installation
+
+If you prefer not to use a virtual environment:
 
 ```bash
 pip install -r requirements.txt
@@ -60,3 +89,30 @@ python create_and_test_large_index.py --dimension 1024 --num-vectors 5000000 --b
 - The default settings (3M vectors with 768 dimensions) should create an index exceeding 2GB after force merge
 - Adjust the parameters based on your available system resources
 - The script requires sufficient memory and disk space to handle large indices
+
+#### JVector Search Statistics
+
+The script collects and reports JVector-specific search statistics:
+
+- `knn_query_visited_nodes`: Number of nodes visited during graph search
+- `knn_query_expanded_nodes`: Number of nodes expanded during graph search
+- `knn_query_expanded_base_layer_nodes`: Number of base layer nodes expanded
+
+For each search iteration, the script:
+1. Performs a kNN search
+2. Collects the JVector stats
+3. Reports the incremental changes for each metric
+
+After all searches are complete, the script provides:
+- Initial stats (before any searches)
+- Final stats (after all searches)
+- Total differences between initial and final stats
+- Average values per search
+
+This detailed reporting helps in understanding the search behavior and performance characteristics of the JVector engine on a per-query basis.
+
+You can control the number of test searches with the `--num-searches` parameter:
+
+```bash
+python create_and_test_large_index.py --num-searches 10
+```
