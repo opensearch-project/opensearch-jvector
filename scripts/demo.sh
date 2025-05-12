@@ -55,3 +55,8 @@ curl -X GET "localhost:9200/jvector-index/_search?pretty" -H 'Content-Type: appl
     }
   }
 }'
+
+
+
+# 4. Get JVector stats after query
+curl -X GET "localhost:9200/_plugins/_knn/stats?pretty&stat=knn_query_visited_nodes,knn_query_expanded_nodes,knn_query_expanded_base_layer_nodes" -H 'Content-Type: application/json'

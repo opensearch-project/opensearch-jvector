@@ -26,10 +26,13 @@ public enum KNNCounter {
     MIN_SCORE_QUERY_REQUESTS("min_score_query_requests"),
     MIN_SCORE_QUERY_WITH_FILTER_REQUESTS("min_score_query_with_filter_requests"),
     MAX_DISTANCE_QUERY_REQUESTS("max_distance_query_requests"),
-    MAX_DISTANCE_QUERY_WITH_FILTER_REQUESTS("max_distance_query_with_filter_requests");
+    MAX_DISTANCE_QUERY_WITH_FILTER_REQUESTS("max_distance_query_with_filter_requests"),
+    KNN_QUERY_VISITED_NODES("knn_query_visited_nodes"),
+    KNN_QUERY_EXPANDED_NODES("knn_query_expanded_nodes"),
+    KNN_QUERY_EXPANDED_BASE_LAYER_NODES("knn_query_expanded_base_layer_nodes");
 
-    private String name;
-    private AtomicLong count;
+    private final String name;
+    private final AtomicLong count;
 
     /**
      * Constructor
@@ -72,5 +75,14 @@ public enum KNNCounter {
      */
     public void set(long value) {
         count.set(value);
+    }
+
+    /**
+     * Adds the specified delta to the current value of the counter.
+     *
+     * @param delta the value to add to the counter
+     */
+    public void add(long delta) {
+        count.addAndGet(delta);
     }
 }
