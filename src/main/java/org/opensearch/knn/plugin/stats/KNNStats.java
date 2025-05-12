@@ -109,6 +109,10 @@ public class KNNStats {
             new KNNStat<>(false, new KNNCounterSupplier(KNNCounter.KNN_QUERY_VISITED_NODES))
         )
             .put(
+                StatNames.KNN_QUERY_RERANKED_COUNT.getName(),
+                new KNNStat<>(false, new KNNCounterSupplier(KNNCounter.KNN_QUERY_RERANKED_COUNT))
+            )
+            .put(
                 StatNames.KNN_QUERY_EXPANDED_NODES.getName(),
                 new KNNStat<>(false, new KNNCounterSupplier(KNNCounter.KNN_QUERY_EXPANDED_NODES))
             )

@@ -52,7 +52,8 @@ public class JVectorRandomAccessReader implements RandomAccessReader {
         return Float.intBitsToFloat(readInt());
     }
 
-    @Override
+    // TODO: bring back to override when upgrading jVector again
+    // @Override
     public long readLong() throws IOException {
         indexInputDelegate.readBytes(internalBuffer, 0, Long.BYTES);
         return ByteBuffer.wrap(internalBuffer, 0, Long.BYTES).order(ByteOrder.BIG_ENDIAN).getLong();
