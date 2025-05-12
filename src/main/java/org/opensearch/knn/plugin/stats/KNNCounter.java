@@ -28,6 +28,7 @@ public enum KNNCounter {
     MAX_DISTANCE_QUERY_REQUESTS("max_distance_query_requests"),
     MAX_DISTANCE_QUERY_WITH_FILTER_REQUESTS("max_distance_query_with_filter_requests"),
     KNN_QUERY_VISITED_NODES("knn_query_visited_nodes"),
+    KNN_QUERY_RERANKED_COUNT("knn_query_reranked_count"),
     KNN_QUERY_EXPANDED_NODES("knn_query_expanded_nodes"),
     KNN_QUERY_EXPANDED_BASE_LAYER_NODES("knn_query_expanded_base_layer_nodes");
 

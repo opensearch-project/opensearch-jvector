@@ -472,19 +472,21 @@ public class JVectorEngineIT extends KNNRestTestCase {
          * 1.  Create index and docs
          * --------------------------------------------------- */
         int dimension = 128;
-        int vectorsCount = 100;
+        int vectorsCount = 1050; // we create 1050 docs to have PQ and re-rank kick in
         createKnnIndexMappingWithJVectorEngine(dimension, SpaceType.L2, VectorDataType.FLOAT);
 
         for (int j = 0; j < vectorsCount; j++) {
             addKnnDoc(INDEX_NAME, Integer.toString(j + 1), FIELD_NAME, randomFloatVector(dimension));
         }
-        refreshIndex(INDEX_NAME);
+        flushIndex(INDEX_NAME);
+        forceMergeKnnIndex(INDEX_NAME);
 
         /* ---------------------------------------------------
          * 2.  Read initial stats
          * --------------------------------------------------- */
         List<String> metrics = List.of(
             StatNames.KNN_QUERY_VISITED_NODES.getName(),
+            StatNames.KNN_QUERY_RERANKED_COUNT.getName(),
             StatNames.KNN_QUERY_EXPANDED_NODES.getName(),
             StatNames.KNN_QUERY_EXPANDED_BASE_LAYER_NODES.getName()
         );
@@ -524,14 +526,23 @@ public class JVectorEngineIT extends KNNRestTestCase {
         );
 
         assertTrue(
+            "Reranked counter did not increase",
+            ((Number) after.get(StatNames.KNN_QUERY_RERANKED_COUNT.getName())).longValue() > ((Number) before.get(
+                StatNames.KNN_QUERY_RERANKED_COUNT.getName()
+            )).longValue()
+        );
+
+        // TODO: bring back to increment when we re-introduce levels in jVector
+        assertTrue(
             "Expanded-nodes counter did not increase",
-            ((Number) after.get(StatNames.KNN_QUERY_EXPANDED_NODES.getName())).longValue() > ((Number) before.get(
+            ((Number) after.get(StatNames.KNN_QUERY_EXPANDED_NODES.getName())).longValue() == ((Number) before.get(
                 StatNames.KNN_QUERY_EXPANDED_NODES.getName()
             )).longValue()
         );
+        // TODO: bring back to increment when we re-introduce levels in jVector
         assertTrue(
             "Expanded-base-layer counter did not increase",
-            ((Number) after.get(StatNames.KNN_QUERY_EXPANDED_BASE_LAYER_NODES.getName())).longValue() > ((Number) before.get(
+            ((Number) after.get(StatNames.KNN_QUERY_EXPANDED_BASE_LAYER_NODES.getName())).longValue() == ((Number) before.get(
                 StatNames.KNN_QUERY_EXPANDED_BASE_LAYER_NODES.getName()
             )).longValue()
         );
