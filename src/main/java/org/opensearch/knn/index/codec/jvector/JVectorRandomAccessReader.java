@@ -115,7 +115,10 @@ public class JVectorRandomAccessReader implements RandomAccessReader {
 
     @Override
     public void close() throws IOException {
+        log.debug("Closing JVectorRandomAccessReader for file: {}", indexInputDelegate);
         this.closed = true;
+        indexInputDelegate.close();
+        log.debug("Closed JVectorRandomAccessReader for file: {}", indexInputDelegate);
     }
 
     public static class Supplier implements ReaderSupplier {
@@ -135,13 +138,10 @@ public class JVectorRandomAccessReader implements RandomAccessReader {
         @Override
         public RandomAccessReader get() throws IOException {
             synchronized (directory) {
-                IndexInput input = currentInput.get();
-                if (currentInput.get() != null) {
-                    input = input.clone();
-                } else {
+                if (currentInput.get() == null) {
                     currentInput.set(directory.openInput(fileName, context));
-                    input = currentInput.get().clone();
                 }
+                IndexInput input = currentInput.get().clone();
 
                 var reader = new JVectorRandomAccessReader(input);
                 int readerId = readerCount.getAndIncrement();
@@ -153,7 +153,7 @@ public class JVectorRandomAccessReader implements RandomAccessReader {
 
         @Override
         public void close() throws IOException {
-            // Close all cached inputs
+            // Close source of all cloned inputs
             var input = currentInput.get();
             if (input != null) {
                 IOUtils.closeWhileHandlingException(input);

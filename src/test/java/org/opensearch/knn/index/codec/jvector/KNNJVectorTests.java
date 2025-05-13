@@ -22,6 +22,9 @@ import org.opensearch.knn.index.ThreadLeakFiltersForTests;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.opensearch.knn.index.codec.jvector.JVectorFormat.DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION;
 
@@ -313,7 +316,7 @@ public class KNNJVectorTests extends LuceneTestCase {
     }
 
     @Test
-    public void testLuceneKnnIndex_multipleMerges_with_ordering_check() throws IOException {
+    public void testLuceneKnnIndex_multipleMerges_with_ordering_check() throws IOException, InterruptedException {
         final int numDocs = 10000;
         final String floatVectorField = "vec";
         final String expectedDocIdField = "expectedDocId";
@@ -363,6 +366,51 @@ public class KNNJVectorTests extends LuceneTestCase {
                     float[] query = new float[] { docId, 0 };
                     TopDocs td = searcher.search(new KnnFloatVectorQuery("vec", query, k), k);
                     assertEquals(k, td.scoreDocs.length);
+                }
+
+                // (c) search with the same vector and this time add concurrency to make sure we are still not exhausting the file handles
+                int numThreads = 10; // Number of concurrent search threads
+                int queriesPerThread = 100; // Number of searches per thread
+                ExecutorService executor = Executors.newFixedThreadPool(numThreads);
+                CountDownLatch latch = new CountDownLatch(numThreads);
+                AtomicBoolean failureDetected = new AtomicBoolean(false);
+                AtomicInteger totalQueries = new AtomicInteger(0);
+
+                try {
+                    for (int t = 0; t < numThreads; t++) {
+                        executor.submit(() -> {
+                            try {
+                                ThreadLocalRandom random = ThreadLocalRandom.current();
+                                for (int i = 0; i < queriesPerThread && !failureDetected.get(); i++) {
+                                    // Choose a random docId to search for
+                                    int randomDocId = random.nextInt(reader.maxDoc());
+                                    float[] query = new float[] { randomDocId, 0 };
+                                    try {
+                                        TopDocs td = searcher.search(new KnnFloatVectorQuery("vec", query, k), k);
+                                        assertEquals("Search should return correct number of results", k, td.scoreDocs.length);
+                                        assertEquals("Search should return the correct document", randomDocId, td.scoreDocs[0].doc);
+                                        totalQueries.incrementAndGet();
+                                    } catch (Exception e) {
+                                        failureDetected.set(true);
+                                        fail("Exception during concurrent search: " + e.getMessage());
+                                    }
+                                }
+                            } finally {
+                                latch.countDown();
+                            }
+                        });
+                    }
+
+                    // Wait for all threads to complete or for a failure
+                    boolean completed = latch.await(30, TimeUnit.SECONDS);
+                    assertTrue("Test timed out while waiting for concurrent searches", completed);
+                    assertFalse("Test encountered failures during concurrent searches", failureDetected.get());
+
+                    // Log the number of successful queries
+                    log.info("Successfully completed {} concurrent kNN search queries", totalQueries.get());
+
+                } finally {
+                    executor.shutdownNow();
                 }
             }
         }
