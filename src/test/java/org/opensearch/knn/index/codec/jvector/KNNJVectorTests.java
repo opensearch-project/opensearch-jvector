@@ -312,6 +312,63 @@ public class KNNJVectorTests extends LuceneTestCase {
         }
     }
 
+    @Test
+    public void testLuceneKnnIndex_multipleMerges_with_ordering_check() throws IOException {
+        final int numDocs = 10000;
+        final String floatVectorField = "vec";
+        final String expectedDocIdField = "expectedDocId";
+        final Path indexPath = createTempDir();
+        try (Directory dir = newFSDirectory(indexPath)) {
+            IndexWriterConfig cfg = newIndexWriterConfig();
+            cfg.setCodec(new JVectorCodec());
+            cfg.setUseCompoundFile(false);
+            cfg.setMergePolicy(new ForceMergesOnlyMergePolicy(false));
+            cfg.setMergeScheduler(new SerialMergeScheduler());
+
+            try (IndexWriter w = new IndexWriter(dir, cfg)) {
+                /* ---------- 1. index documents, create many tiny segments ---------- */
+                for (int i = 0; i < numDocs; i++) {
+                    Document doc = new Document();
+                    // vector whose first component encodes the future (segment-local) docID
+                    doc.add(new KnnFloatVectorField(floatVectorField, new float[] { i, 0 }, VectorSimilarityFunction.EUCLIDEAN));
+                    doc.add(new StoredField(expectedDocIdField, i));
+                    w.addDocument(doc);
+                }
+                w.commit();
+
+                /* ---------- 2. run several merge cycles ---------- */
+                w.forceMerge(5);  // partial merge
+                w.forceMerge(3);  // another partial merge
+                w.forceMerge(1);  // final full merge
+            }
+
+            /* ---------- 3. open reader and assert the invariant ---------- */
+            try (DirectoryReader reader = DirectoryReader.open(dir)) {
+                assertEquals("we merged down to exactly one segment", 1, reader.leaves().size());
+
+                // (a) iterate through vectors directly
+                for (LeafReaderContext context : reader.leaves()) {
+                    FloatVectorValues vectorValues = context.reader().getFloatVectorValues("vec");
+                    for (int docId = 0; docId < context.reader().maxDoc(); docId++) {
+                        int actualDocId = context.docBase + docId;
+                        float[] vectorValue = vectorValues.vectorValue(docId);
+                        assertEquals("vector[0] should encode docId", (float) actualDocId, vectorValue[0], 0.0f);
+                    }
+                }
+
+                // (b) search with the same vector and confirm we are not exhausting the file handles with each search
+                IndexSearcher searcher = newSearcher(reader);
+                final int k = 1;
+                for (int docId = 0; docId < reader.maxDoc(); docId++) {
+                    float[] query = new float[] { docId, 0 };
+                    TopDocs td = searcher.search(new KnnFloatVectorQuery("vec", query, k), k);
+                    assertEquals(k, td.scoreDocs.length);
+                }
+            }
+        }
+
+    }
+
     /**
      * Test to verify that the Lucene codec is able to successfully search for the nearest neighbours
      * in the index.
@@ -324,7 +381,7 @@ public class KNNJVectorTests extends LuceneTestCase {
      */
     @Test
     public void testLuceneKnnIndex_mergeEnabled_withCompoundFile() throws IOException {
-        int k = 3; // The number of nearest neighbours to gather
+        int k = 3; // The number of nearest neighbors to gather
         int totalNumberOfDocs = 10;
         IndexWriterConfig indexWriterConfig = LuceneTestCase.newIndexWriterConfig();
         // TODO: re-enable this after fixing the compound file augmentation for JVector

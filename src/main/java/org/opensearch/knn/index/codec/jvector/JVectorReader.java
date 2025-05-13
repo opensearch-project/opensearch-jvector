@@ -101,48 +101,49 @@ public class JVectorReader extends KnnVectorsReader {
         VectorFloat<?> q = VECTOR_TYPE_SUPPORT.createFloatVector(target);
         final SearchScoreProvider ssp;
 
-        if (fieldEntryMap.get(field).pqVectors != null) { // Quantized, use the precomputed score function
-            final PQVectors pqVectors = fieldEntryMap.get(field).pqVectors;
-            // SearchScoreProvider that does a first pass with the loaded-in-memory PQVectors,
-            // then reranks with the exact vectors that are stored on disk in the index
-            ScoreFunction.ApproximateScoreFunction asf = pqVectors.precomputedScoreFunctionFor(
-                q,
-                fieldEntryMap.get(field).similarityFunction
-            );
-            ScoreFunction.ExactScoreFunction reranker = index.getView().rerankerFor(q, fieldEntryMap.get(field).similarityFunction);
-            ssp = new SearchScoreProvider(asf, reranker);
-        } else { // Not quantized, used typical searcher
-            ssp = SearchScoreProvider.exact(q, fieldEntryMap.get(field).similarityFunction, index.getView());
-        }
-        io.github.jbellis.jvector.util.Bits compatibleBits = doc -> acceptDocs == null || acceptDocs.get(doc);
-        try (var graphSearcher = new GraphSearcher(index)) {
-            final var searchResults = graphSearcher.search(
-                ssp,
-                knnCollector.k(),
-                knnCollector.k() * DEFAULT_OVER_QUERY_FACTOR,
-                0.0f,
-                0.0f,
-                compatibleBits
-            );
-            for (SearchResult.NodeScore ns : searchResults.getNodes()) {
-                knnCollector.collect(ns.node, ns.score);
+        try (var view = index.getView()) {
+            if (fieldEntryMap.get(field).pqVectors != null) { // Quantized, use the precomputed score function
+                final PQVectors pqVectors = fieldEntryMap.get(field).pqVectors;
+                // SearchScoreProvider that does a first pass with the loaded-in-memory PQVectors,
+                // then reranks with the exact vectors that are stored on disk in the index
+                ScoreFunction.ApproximateScoreFunction asf = pqVectors.precomputedScoreFunctionFor(
+                    q,
+                    fieldEntryMap.get(field).similarityFunction
+                );
+                ScoreFunction.ExactScoreFunction reranker = view.rerankerFor(q, fieldEntryMap.get(field).similarityFunction);
+                ssp = new SearchScoreProvider(asf, reranker);
+            } else { // Not quantized, used typical searcher
+                ssp = SearchScoreProvider.exact(q, fieldEntryMap.get(field).similarityFunction, view);
             }
-            // Collect the below metrics about the search and somehow wire this back to {@link @KNNStats}
-            final int visitedNodesCount = searchResults.getVisitedCount();
-            final int rerankedCount = searchResults.getRerankedCount();
+            io.github.jbellis.jvector.util.Bits compatibleBits = doc -> acceptDocs == null || acceptDocs.get(doc);
+            try (var graphSearcher = new GraphSearcher(index)) {
+                final var searchResults = graphSearcher.search(
+                    ssp,
+                    knnCollector.k(),
+                    knnCollector.k() * DEFAULT_OVER_QUERY_FACTOR,
+                    0.0f,
+                    0.0f,
+                    compatibleBits
+                );
+                for (SearchResult.NodeScore ns : searchResults.getNodes()) {
+                    knnCollector.collect(ns.node, ns.score);
+                }
+                // Collect the below metrics about the search and somehow wire this back to {@link @KNNStats}
+                final int visitedNodesCount = searchResults.getVisitedCount();
+                final int rerankedCount = searchResults.getRerankedCount();
 
-            // TODO: bring back when we re-introduce levels in jVector
-            // final int expandedCount = searchResults.getExpandedCount();
-            // final int expandedBaseLayerCount = searchResults.getExpandedCountBaseLayer();
+                // TODO: bring back when we re-introduce levels in jVector
+                // final int expandedCount = searchResults.getExpandedCount();
+                // final int expandedBaseLayerCount = searchResults.getExpandedCountBaseLayer();
 
-            KNNCounter.KNN_QUERY_VISITED_NODES.add(visitedNodesCount);
-            KNNCounter.KNN_QUERY_RERANKED_COUNT.add(rerankedCount);
-            // TODO: bring back when we re-introduce levels in jVector
-            // KNNCounter.KNN_QUERY_EXPANDED_NODES.add(expandedCount);
-            // KNNCounter.KNN_QUERY_EXPANDED_BASE_LAYER_NODES.add(expandedBaseLayerCount);
+                KNNCounter.KNN_QUERY_VISITED_NODES.add(visitedNodesCount);
+                KNNCounter.KNN_QUERY_RERANKED_COUNT.add(rerankedCount);
+                // TODO: bring back when we re-introduce levels in jVector
+                // KNNCounter.KNN_QUERY_EXPANDED_NODES.add(expandedCount);
+                // KNNCounter.KNN_QUERY_EXPANDED_BASE_LAYER_NODES.add(expandedBaseLayerCount);
 
+            }
         }
-
     }
 
     @Override
