@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * Fix CVE-2024-57699 by updating json-path dependencies.
 * Fix concurrency issue [#50](https://github.com/opensearch-project/opensearch-jvector/issues/50)
 * Fix the limitation of the 2 GB segment with backwards compatibility to JDK21 and move default build to 21 target
+* Fix file handle leak during queries
 ### Infrastructure
 * Add localrepo / license / scm / developer / description / url for maven central
 * Add jenkinsfile and release drafter action for maven central release
