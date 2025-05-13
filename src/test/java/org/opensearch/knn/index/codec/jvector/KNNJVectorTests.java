@@ -370,6 +370,72 @@ public class KNNJVectorTests extends LuceneTestCase {
     }
 
     /**
+     * Test to verify that a document which has been deleted is no longer
+     * returned in a k-NN search.  The index uses the JVector codec and is
+     * kept in multiple segments to ensure we also cover the case where the
+     * deleted document still physically resides in the segment as a dead
+     * (non-live) record.
+     */
+    @Test
+    public void testJVectorKnnIndex_deletedDocs() throws IOException {
+        final int k = 3;
+        final Path indexPath = createTempDir();
+        final IndexWriterConfig iwc = newIndexWriterConfig();
+        // JVector codec requires compound files to be disabled at the moment
+        iwc.setUseCompoundFile(false);
+        iwc.setCodec(new JVectorCodec());
+        iwc.setMergePolicy(new ForceMergesOnlyMergePolicy(false));
+
+        try (FSDirectory dir = new NIOFSDirectory(indexPath, FSLockFactory.getDefault()); IndexWriter writer = new IndexWriter(dir, iwc)) {
+            /* ---------------------------
+             * 1.  Index three simple docs
+             * --------------------------- */
+            float[][] vectors = {
+                { 0.0f, 0.2f }, // doc "1" – nearest to target
+                { 0.0f, 0.4f }, // doc "2"
+                { 0.0f, 0.6f }  // doc "3"
+            };
+
+            for (int i = 0; i < vectors.length; i++) {
+                Document doc = new Document();
+                doc.add(new StringField("docId", Integer.toString(i + 1), Field.Store.YES));
+                doc.add(new KnnFloatVectorField("test_field", vectors[i], VectorSimilarityFunction.EUCLIDEAN));
+                writer.addDocument(doc);
+                writer.commit(); // keep every doc in its own segment
+            }
+
+            /* --------------------
+             * 2.  Delete doc "1"
+             * -------------------- */
+            writer.deleteDocuments(new Term("docId", "1"));
+            writer.commit(); // commit the delete but keep segments as-is
+
+            /* ----------------------------------------
+             * 3.  Search – the deleted doc must be gone
+             * ---------------------------------------- */
+            try (IndexReader reader = DirectoryReader.open(writer)) {
+                assertEquals("All documents except the deleted one should be live", 2, reader.numDocs());
+
+                IndexSearcher searcher = newSearcher(reader);
+                float[] target = { 0.0f, 0.0f }; // closest to doc "1", which is deleted
+
+                TopDocs results = searcher.search(new KnnFloatVectorQuery("test_field", target, k), k);
+
+                // We expect only 2 hits because one document was deleted
+                assertEquals(2, results.totalHits.value());
+
+                // Retrieve the first returned document and verify that it is *not* "1"
+                Document document = reader.storedFields().document(results.scoreDocs[0].doc);
+                String docId = document.get("docId");
+                assertNotEquals("1", docId);
+
+                // The first hit should now be the former 2nd-nearest neighbour – "2"
+                assertEquals("2", docId);
+            }
+        }
+    }
+
+    /**
      * Test to verify that the Lucene codec is able to successfully search for the nearest neighbours
      * in the index.
      * Single field is used to store the vectors.
