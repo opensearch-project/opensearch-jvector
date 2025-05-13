@@ -472,7 +472,7 @@ public class JVectorEngineIT extends KNNRestTestCase {
          * 1.  Create index and docs
          * --------------------------------------------------- */
         int dimension = 128;
-        int vectorsCount = 1050; // we create 1050 docs to have PQ and re-rank kick in
+        int vectorsCount = 2050; // we create 2050 docs to have PQ and re-rank kick in
         createKnnIndexMappingWithJVectorEngine(dimension, SpaceType.L2, VectorDataType.FLOAT);
 
         for (int j = 0; j < vectorsCount; j++) {
@@ -546,6 +546,53 @@ public class JVectorEngineIT extends KNNRestTestCase {
                 StatNames.KNN_QUERY_EXPANDED_BASE_LAYER_NODES.getName()
             )).longValue()
         );
+    }
+
+    /**
+     * Verify that once a document has been deleted, it is no longer returned
+     * by a k-NN search that previously matched it.
+     */
+    public void testSearchAfterDeleteDoc() throws Exception {
+        int dimension = 2;
+        createKnnIndexMappingWithJVectorEngine(dimension, SpaceType.L2, VectorDataType.FLOAT);
+
+        // ----------------------------
+        // 1. Index three simple docs
+        // ----------------------------
+        Map<String, float[]> docs = Map.of(
+            "1",
+            new float[] { 0.0f, 0.2f },
+            "2",
+            new float[] { 0.0f, 0.4f },
+            "3",
+            new float[] { 0.0f, 0.6f }
+        );
+
+        for (Map.Entry<String, float[]> entry : docs.entrySet()) {
+            addKnnDoc(INDEX_NAME, entry.getKey(), FIELD_NAME, entry.getValue());
+        }
+        refreshAllIndices();
+
+        float[] target = { 0.0f, 0.0f };
+
+        // Ensure the nearest neighbor is doc "1"
+        List<float[]> searchResults = queryResults(target, 1);
+        assertEquals(1, searchResults.size());
+        assertArrayEquals(docs.get("1"), searchResults.get(0), 0.0f);
+
+        // -----------------
+        // 2. Delete doc "1"
+        // -----------------
+        deleteKnnDoc(INDEX_NAME, "1");
+        refreshAllIndices();
+
+        // ------------------------------------
+        // 3. Search again – doc "1" is gone
+        // ------------------------------------
+        searchResults = queryResults(target, 3);
+        assertEquals(2, searchResults.size()); // only two live docs left
+        // The first result should now be "2"
+        assertArrayEquals(docs.get("2"), searchResults.get(0), 0.0f);
     }
 
     private Map<String, float[]> generateDocVectors(int dimension, int totalDocuments) {

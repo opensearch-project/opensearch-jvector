@@ -146,19 +146,10 @@ public class JVectorWriter extends KnnVectorsWriter {
                     break;
                 case FLOAT32:
                     var floatVectorFieldWriter = (FieldWriter<float[]>) addField(fieldInfo);
-                    int baseDocId = 0;
-                    for (int i = 0; i < mergeState.knnVectorsReaders.length; i++) {
-                        FloatVectorValues floatVectorValues = mergeState.knnVectorsReaders[i].getFloatVectorValues(fieldInfo.name);
-                        var iteartor = floatVectorValues.iterator();
-                        var floatVectors = new ArrayList<float[]>();
-                        for (int doc = iteartor.nextDoc(); doc != DocIdSetIterator.NO_MORE_DOCS; doc = iteartor.nextDoc()) {
-                            floatVectors.add(floatVectorValues.vectorValue(doc));
-                        }
-                        for (int doc = 0; doc < floatVectors.size(); doc++) {
-                            floatVectorFieldWriter.addValue(baseDocId + doc, floatVectors.get(doc));
-                        }
-
-                        baseDocId += floatVectorValues.size();
+                    var mergedFloats = MergedVectorValues.mergeFloatVectorValues(fieldInfo, mergeState);
+                    var mergeStateIterator = mergedFloats.iterator();
+                    for (int doc = mergeStateIterator.nextDoc(); doc != DocIdSetIterator.NO_MORE_DOCS; doc = mergeStateIterator.nextDoc()) {
+                        floatVectorFieldWriter.addValue(doc, mergedFloats.vectorValue(doc));
                     }
                     writeField(floatVectorFieldWriter);
                     break;
