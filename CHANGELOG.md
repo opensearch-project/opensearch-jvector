@@ -23,6 +23,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Documentation
 ### Maintenance
 ### Refactoring
+Refactor to use the utility method of merged values in writer and add deleted doc tests [#79](https://github.com/opensearch-project/opensearch-jvector/issues/79)
 
 ## [Unreleased 2.x](https://github.com/opensearch-project/k-NN/compare/2.18...2.x)
 ### Features

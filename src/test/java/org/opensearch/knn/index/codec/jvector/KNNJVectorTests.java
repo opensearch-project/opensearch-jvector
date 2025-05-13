@@ -409,6 +409,7 @@ public class KNNJVectorTests extends LuceneTestCase {
              * -------------------- */
             writer.deleteDocuments(new Term("docId", "1"));
             writer.commit(); // commit the delete but keep segments as-is
+            writer.forceMerge(1);
 
             /* ----------------------------------------
              * 3.  Search – the deleted doc must be gone
