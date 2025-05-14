@@ -19,6 +19,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 @Log4j2
 public class JVectorRandomAccessReader implements RandomAccessReader {
@@ -114,25 +115,10 @@ public class JVectorRandomAccessReader implements RandomAccessReader {
 
     @Override
     public void close() throws IOException {
-        log.info("Attempting to close JVectorRandomAccessReader for file {}", indexInputDelegate);
-        boolean success = false;
-        if (!closed) {
-            try {
-                indexInputDelegate.close();
-                log.info("Successfully closed JVectorRandomAccessReader for file {}", indexInputDelegate);
-                success = true;
-            } catch (Exception e) {
-                log.error("Error closing JVectorRandomAccessReader for file {}", indexInputDelegate, e);
-            } finally {
-                if (!closed && !success) {
-                    IOUtils.closeWhileHandlingException(this::close);
-                    log.info("Closed JVectorRandomAccessReader after handling exception for file {}", indexInputDelegate);
-                }
-                closed = true;
-            }
-        } else {
-            log.info("JVectorRandomAccessReader already closed for file {}", indexInputDelegate);
-        }
+        log.debug("Closing JVectorRandomAccessReader for file: {}", indexInputDelegate);
+        this.closed = true;
+        indexInputDelegate.close();
+        log.debug("Closed JVectorRandomAccessReader for file: {}", indexInputDelegate);
     }
 
     public static class Supplier implements ReaderSupplier {
@@ -140,6 +126,7 @@ public class JVectorRandomAccessReader implements RandomAccessReader {
         private final String fileName;
         private final IOContext context;
         private final AtomicInteger readerCount = new AtomicInteger(0);
+        private final AtomicReference<IndexInput> currentInput = new AtomicReference<>(null);
         private final ConcurrentHashMap<Integer, RandomAccessReader> readers = new ConcurrentHashMap<>();
 
         public Supplier(Directory directory, String fileName, IOContext context) {
@@ -151,17 +138,33 @@ public class JVectorRandomAccessReader implements RandomAccessReader {
         @Override
         public RandomAccessReader get() throws IOException {
             synchronized (directory) {
-                var reader = new JVectorRandomAccessReader(directory.openInput(fileName, context));
-                readers.put(readerCount.getAndIncrement(), reader);
+                if (currentInput.get() == null) {
+                    currentInput.set(directory.openInput(fileName, context));
+                }
+                IndexInput input = currentInput.get().clone();
+
+                var reader = new JVectorRandomAccessReader(input);
+                int readerId = readerCount.getAndIncrement();
+                readers.put(readerId, reader);
                 return reader;
             }
+
         }
 
         @Override
         public void close() throws IOException {
-            for (RandomAccessReader reader : readers.values()) {
-                IOUtils.close(reader::close);
+            // Close source of all cloned inputs
+            var input = currentInput.get();
+            if (input != null) {
+                IOUtils.closeWhileHandlingException(input);
             }
+
+            // Close all readers
+            for (RandomAccessReader reader : readers.values()) {
+                IOUtils.closeWhileHandlingException(reader::close);
+            }
+            readers.clear();
+            readerCount.set(0);
         }
     }
 }
