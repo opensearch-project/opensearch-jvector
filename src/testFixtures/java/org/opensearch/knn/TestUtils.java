@@ -33,8 +33,6 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.function.BiFunction;
 
-import static org.apache.lucene.tests.util.LuceneTestCase.random;
-
 class DistVector {
     public float dist;
     public String docID;
@@ -122,16 +120,7 @@ public class TestUtils {
     }
 
     public static float[][] generateRandomVectors(int numVectors, int dimensions) {
-        float[][] randomVectors = new float[numVectors][dimensions];
-
-        for (int i = 0; i < numVectors; i++) {
-            float[] vector = new float[dimensions];
-            for (int j = 0; j < dimensions; j++) {
-                vector[j] = random().nextFloat();
-            }
-            randomVectors[i] = vector;
-        }
-        return randomVectors;
+        return randomlyGenerateStandardVectors(numVectors, dimensions, 1);
     }
 
     /*

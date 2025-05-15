@@ -18,8 +18,7 @@ import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.KnnFloatVectorQuery;
 import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.store.Directory;
-import org.apache.lucene.store.FSLockFactory;
-import org.apache.lucene.store.NIOFSDirectory;
+import org.apache.lucene.store.FSDirectory;
 import org.openjdk.jmh.annotations.*;
 import org.openjdk.jmh.infra.Blackhole;
 
@@ -87,7 +86,7 @@ public class CachelessFormatBenchmarkRandomVectors {
 
         indexDirectoryPath = Files.createTempDirectory("jvector-benchmark");
         log.info("Index path: {}", indexDirectoryPath);
-        directory = new NIOFSDirectory(indexDirectoryPath, FSLockFactory.getDefault());
+        directory = FSDirectory.open(indexDirectoryPath);
 
         // Create index with JVectorFormat
         IndexWriterConfig indexWriterConfig = new IndexWriterConfig();

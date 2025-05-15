@@ -16,7 +16,7 @@ import org.apache.lucene.util.IOUtils;
 import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
+import java.nio.FloatBuffer;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -43,21 +43,20 @@ public class JVectorRandomAccessReader implements RandomAccessReader {
 
     @Override
     public int readInt() throws IOException {
-        indexInputDelegate.readBytes(internalBuffer, 0, Integer.BYTES);
-        // Replace ByteArray.getInt with ByteBuffer implementation
-        return ByteBuffer.wrap(internalBuffer, 0, Integer.BYTES).order(ByteOrder.BIG_ENDIAN).getInt();
+        return indexInputDelegate.readInt();
     }
 
     @Override
     public float readFloat() throws IOException {
-        return Float.intBitsToFloat(readInt());
+        indexInputDelegate.readBytes(internalBuffer, 0, Float.BYTES);
+        FloatBuffer buffer = ByteBuffer.wrap(internalBuffer).asFloatBuffer();
+        return buffer.get(0);
     }
 
     // TODO: bring back to override when upgrading jVector again
     // @Override
     public long readLong() throws IOException {
-        indexInputDelegate.readBytes(internalBuffer, 0, Long.BYTES);
-        return ByteBuffer.wrap(internalBuffer, 0, Long.BYTES).order(ByteOrder.BIG_ENDIAN).getLong();
+        return indexInputDelegate.readLong();
     }
 
     @Override
@@ -117,7 +116,7 @@ public class JVectorRandomAccessReader implements RandomAccessReader {
     public void close() throws IOException {
         log.debug("Closing JVectorRandomAccessReader for file: {}", indexInputDelegate);
         this.closed = true;
-        indexInputDelegate.close();
+        // no need to really close the index input delegate since it is a clone
         log.debug("Closed JVectorRandomAccessReader for file: {}", indexInputDelegate);
     }
 

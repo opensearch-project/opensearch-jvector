@@ -24,11 +24,9 @@ import org.apache.lucene.store.*;
 import org.apache.lucene.util.Bits;
 import org.apache.lucene.util.IOUtils;
 import io.github.jbellis.jvector.vector.VectorSimilarityFunction;
-import org.opensearch.knn.index.codec.KNN80Codec.KNN80CompoundDirectory;
 import org.opensearch.knn.plugin.stats.KNNCounter;
 
 import java.io.IOException;
-import java.nio.file.Path;
 
 import java.util.HashMap;
 import java.util.List;
@@ -75,9 +73,11 @@ public class JVectorReader extends KnnVectorsReader {
 
     @Override
     public void checkIntegrity() throws IOException {
-        // This is already done when loading the fields
-        // TODO: Implement this, for now this will always pass
-        // CodecUtil.checksumEntireFile(vectorIndex);
+        for (FieldEntry fieldEntry : fieldEntryMap.values()) {
+            try (var indexInput = state.directory.openInput(fieldEntry.vectorIndexFieldFileName, state.context)) {
+                CodecUtil.checksumEntireFile(indexInput);
+            }
+        }
     }
 
     @Override
@@ -176,6 +176,7 @@ public class JVectorReader extends KnnVectorsReader {
         private final long vectorIndexLength;
         private final long pqCodebooksAndVectorsLength;
         private final long pqCodebooksAndVectorsOffset;
+        private final String vectorIndexFieldFileName;
         private final ReaderSupplier readerSupplier;
         private final OnDiskGraphIndex index;
         private final PQVectors pqVectors; // The product quantized vectors with their codebooks
@@ -192,7 +193,7 @@ public class JVectorReader extends KnnVectorsReader {
             this.pqCodebooksAndVectorsOffset = vectorIndexFieldMetadata.getPqCodebooksAndVectorsOffset();
             this.dimension = vectorIndexFieldMetadata.getVectorDimension();
 
-            final String vectorIndexFieldFileName = baseDataFileName + "_" + fieldInfo.name + "." + JVectorFormat.VECTOR_INDEX_EXTENSION;
+            this.vectorIndexFieldFileName = baseDataFileName + "_" + fieldInfo.name + "." + JVectorFormat.VECTOR_INDEX_EXTENSION;
 
             // Check the header
             try (IndexInput indexInput = directory.openInput(vectorIndexFieldFileName, state.context)) {
@@ -294,22 +295,5 @@ public class JVectorReader extends KnnVectorsReader {
             }
             throw new IllegalStateException("No matching Lucene VectorSimilarityFunction found for ordinal: " + ord);
         }
-    }
-
-    public static Path resolveDirectoryPath(Directory dir) {
-        while (!(dir instanceof FSDirectory)) {
-            final String dirType = dir.getClass().getName();
-            log.info("unwrapping dir of type: {} to find path", dirType);
-            if (dir instanceof FilterDirectory) {
-                dir = ((FilterDirectory) dir).getDelegate();
-            } else if (dir instanceof KNN80CompoundDirectory) {
-                dir = ((KNN80CompoundDirectory) dir).getDir();
-            } else {
-                throw new IllegalArgumentException("directory must be FSDirectory or a wrapper around it but instead had type: " + dirType);
-            }
-        }
-        final Path path = ((FSDirectory) dir).getDirectory();
-        log.info("resolved directory path from FSDirectory: {}", path);
-        return path;
     }
 }

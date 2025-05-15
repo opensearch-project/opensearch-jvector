@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Enhancements
 * Upgrade to java 22 so that we can use Foreign Memory API and MemorySegmentReader
 * Clone instead of recreating index inputs [#83](https://github.com/opensearch-project/opensearch-jvector/issues/83)
+* Switch to using Lucene indexInput directly and fix integrity verification for vector index files
 ### Bug Fixes
 * Fix CVE-2024-57699 by updating json-path dependencies.
 * Fix concurrency issue [#50](https://github.com/opensearch-project/opensearch-jvector/issues/50)

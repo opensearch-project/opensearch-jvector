@@ -39,6 +39,7 @@ import java.util.stream.Collectors;
 
 import static org.opensearch.knn.KNNRestTestCase.FIELD_NAME;
 import static org.opensearch.knn.KNNRestTestCase.INDEX_NAME;
+import static org.opensearch.knn.TestUtils.generateRandomVectors;
 import static org.opensearch.knn.index.engine.CommonTestUtils.DIMENSION;
 
 @OpenSearchIntegTestCase.ClusterScope(scope = OpenSearchIntegTestCase.Scope.TEST, numDataNodes = 1)
@@ -187,17 +188,6 @@ public class JVectorConcurrentQueryTests extends OpenSearchIntegTestCase {
             client().prepareIndex(INDEX_NAME).setId("doc_" + i).setSource(FIELD_NAME, TEST_VECTORS[i]).get();
         }
         refresh(INDEX_NAME);
-    }
-
-    /**
-     * Generate random vectors for testing
-     */
-    private static float[][] generateRandomVectors(int numVectors, int dimension) {
-        float[][] vectors = new float[numVectors][dimension];
-        for (int i = 0; i < numVectors; i++) {
-            vectors[i] = JVectorEngineIT.generateRandomVector(dimension);
-        }
-        return vectors;
     }
 
     private void createKnnIndexMappingWithJVectorEngine(int dimension, SpaceType spaceType, VectorDataType vectorDataType)
