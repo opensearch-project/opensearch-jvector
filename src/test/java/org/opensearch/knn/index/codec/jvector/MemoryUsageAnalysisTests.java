@@ -1,3 +1,8 @@
+/*
+ * Copyright OpenSearch Contributors
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 package org.opensearch.knn.index.codec.jvector;
 
 import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters;
@@ -40,7 +45,6 @@ public class MemoryUsageAnalysisTests extends LuceneTestCase {
     private static final String VECTOR_FIELD_NAME = "vector_field";
     private static final DecimalFormat MEMORY_FORMAT = new DecimalFormat("#,###.00 MB");
 
-
     /**
      * Measures memory usage during various stages of building a jVector index.
      * This test tracks memory consumption:
@@ -62,25 +66,24 @@ public class MemoryUsageAnalysisTests extends LuceneTestCase {
 
         // Create a temporary directory for the index
         Path indexPath = createTempDir("memory-test-index");
-        
+
         // Configure the JVector codec
         JVectorCodec codec = new JVectorCodec();
-        
+
         // Setup index writer with the JVector codec
-        IndexWriterConfig config = new IndexWriterConfig()
-            .setCodec(codec)
+        IndexWriterConfig config = new IndexWriterConfig().setCodec(codec)
             .setUseCompoundFile(false)
             .setMergePolicy(new ForceMergesOnlyMergePolicy(false))
             .setOpenMode(IndexWriterConfig.OpenMode.CREATE);
-            
+
         try (Directory directory = FSDirectory.open(indexPath)) {
             // Measure baseline memory before starting
             double baselineMemory = measureMemoryUsage("Initial baseline");
             System.gc(); // Request garbage collection to get more accurate measurements
-            
+
             // Create index writer
             try (IndexWriter writer = new IndexWriter(directory, config)) {
-                
+
                 int totalBatches = (int) Math.ceil((double) TOTAL_DOCS / BATCH_SIZE);
 
                 double previousPostCommitMemory = baselineMemory;
@@ -90,9 +93,9 @@ public class MemoryUsageAnalysisTests extends LuceneTestCase {
                 for (int batchNum = 0; batchNum < totalBatches; batchNum++) {
                     int startDoc = batchNum * BATCH_SIZE;
                     int endDoc = Math.min((batchNum + 1) * BATCH_SIZE, TOTAL_DOCS);
-                    
+
                     List<Document> batch = createDocumentBatch(startDoc, endDoc);
-                    
+
                     // Index the batch
                     for (Document doc : batch) {
                         writer.addDocument(doc);
@@ -100,10 +103,11 @@ public class MemoryUsageAnalysisTests extends LuceneTestCase {
 
                     // Measure memory after batch indexing
                     String batchMetricKey = "batch_" + batchNum;
-                    currentPreCommitMemory = measureMemoryUsage("After indexing batch " + (batchNum + 1) + " of " + totalBatches +
-                            " (" + startDoc + " to " + (endDoc - 1) + ")");
+                    currentPreCommitMemory = measureMemoryUsage(
+                        "After indexing batch " + (batchNum + 1) + " of " + totalBatches + " (" + startDoc + " to " + (endDoc - 1) + ")"
+                    );
                     memoryMetrics.put(batchMetricKey + "_precommit", currentPreCommitMemory);
-                    
+
                     // Commit every 4 batches
                     if (batchNum % 4 == 1 || batchNum == totalBatches - 1) {
                         writer.commit();
@@ -111,33 +115,43 @@ public class MemoryUsageAnalysisTests extends LuceneTestCase {
                         memoryMetrics.put(batchMetricKey + "_postcommit", postCommitMemory);
 
                         // Verify memory after commit is less than before commit
-                        log.info("Memory before commit: {} MB, after commit: {} MB",
-                                MEMORY_FORMAT.format(currentPreCommitMemory),
-                                MEMORY_FORMAT.format(postCommitMemory));
+                        log.info(
+                            "Memory before commit: {} MB, after commit: {} MB",
+                            MEMORY_FORMAT.format(currentPreCommitMemory),
+                            MEMORY_FORMAT.format(postCommitMemory)
+                        );
 
                         Assert.assertTrue(
-                                "Memory should decrease after commit. Before: " + currentPreCommitMemory +
-                                        " MB, After: " + postCommitMemory + " MB",
-                                currentPreCommitMemory > postCommitMemory
+                            "Memory should decrease after commit. Before: "
+                                + currentPreCommitMemory
+                                + " MB, After: "
+                                + postCommitMemory
+                                + " MB",
+                            currentPreCommitMemory > postCommitMemory
                         );
 
                         // Verify memory usage is growing with each batch (when commits happen)
                         if (batchNum > 1) {  // Skip the first commit for comparison
-                            log.info("Current post-commit memory: {} MB, previous post-commit memory: {} MB",
-                                    MEMORY_FORMAT.format(postCommitMemory),
-                                    MEMORY_FORMAT.format(previousPostCommitMemory));
+                            log.info(
+                                "Current post-commit memory: {} MB, previous post-commit memory: {} MB",
+                                MEMORY_FORMAT.format(postCommitMemory),
+                                MEMORY_FORMAT.format(previousPostCommitMemory)
+                            );
 
                             Assert.assertTrue(
-                                    "Memory after commit should increase with each batch. Current: " +
-                                            postCommitMemory + " MB, Previous: " + previousPostCommitMemory + " MB",
-                                    postCommitMemory >= previousPostCommitMemory
+                                "Memory after commit should increase with each batch. Current: "
+                                    + postCommitMemory
+                                    + " MB, Previous: "
+                                    + previousPostCommitMemory
+                                    + " MB",
+                                postCommitMemory >= previousPostCommitMemory
                             );
                         }
 
                         previousPostCommitMemory = postCommitMemory;
 
                     }
-                    
+
                     // Force merge every 4 batches
                     if (batchNum % 4 == 3 || batchNum == totalBatches - 1) {
                         double premergeMemory = previousPostCommitMemory;
@@ -145,10 +159,12 @@ public class MemoryUsageAnalysisTests extends LuceneTestCase {
                         double postMergeMemory = measureMemoryUsage("After force merge (batch " + (batchNum + 1) + ")");
                         memoryMetrics.put(batchMetricKey + "_postmerge", postMergeMemory);
 
-                        log.info("Memory impact of merge: before {} MB, after {} MB, diff: {} MB",
-                                MEMORY_FORMAT.format(premergeMemory),
-                                MEMORY_FORMAT.format(postMergeMemory),
-                                MEMORY_FORMAT.format(postMergeMemory - premergeMemory));
+                        log.info(
+                            "Memory impact of merge: before {} MB, after {} MB, diff: {} MB",
+                            MEMORY_FORMAT.format(premergeMemory),
+                            MEMORY_FORMAT.format(postMergeMemory),
+                            MEMORY_FORMAT.format(postMergeMemory - premergeMemory)
+                        );
 
                     }
                 }
@@ -169,19 +185,14 @@ public class MemoryUsageAnalysisTests extends LuceneTestCase {
                 memoryMetrics.put("reader_creation", readerMemory);
 
                 // Log index stats
-                log.info("Final index contains {} documents with {} dimensions per vector",
-                        reader.numDocs(), VECTOR_DIMENSION);
-                log.info("Total index size on disk: {} bytes",
-                        Files.walk(indexPath)
-                                .filter(Files::isRegularFile)
-                                .mapToLong(p -> {
-                                    try {
-                                        return Files.size(p);
-                                    } catch (IOException e) {
-                                        return 0L;
-                                    }
-                                })
-                                .sum());
+                log.info("Final index contains {} documents with {} dimensions per vector", reader.numDocs(), VECTOR_DIMENSION);
+                log.info("Total index size on disk: {} bytes", Files.walk(indexPath).filter(Files::isRegularFile).mapToLong(p -> {
+                    try {
+                        return Files.size(p);
+                    } catch (IOException e) {
+                        return 0L;
+                    }
+                }).sum());
 
                 // Log memory metrics summary
                 log.info("Memory Usage Summary:");
@@ -193,28 +204,28 @@ public class MemoryUsageAnalysisTests extends LuceneTestCase {
             }
         }
     }
-    
+
     /**
      * Creates a batch of documents with vector fields
      */
     private List<Document> createDocumentBatch(int startDoc, int endDoc) {
         List<Document> documents = new ArrayList<>(endDoc - startDoc);
-        
+
         for (int i = startDoc; i < endDoc; i++) {
             Document doc = new Document();
-            
+
             // Add document ID
             doc.add(new StringField("id", "doc_" + i, Field.Store.YES));
-            
+
             // Create random vector
             float[] vector = generateRandomVectors(1, VECTOR_DIMENSION)[0];
-            
+
             // Add vector field
             doc.add(new KnnFloatVectorField(VECTOR_FIELD_NAME, vector, VectorSimilarityFunction.EUCLIDEAN));
-            
+
             documents.add(doc);
         }
-        
+
         return documents;
     }
 
@@ -237,14 +248,15 @@ public class MemoryUsageAnalysisTests extends LuceneTestCase {
         double totalMemoryMB = totalMemory / (1024.0 * 1024.0);
         double freeMemoryMB = freeMemory / (1024.0 * 1024.0);
 
-        log.info("{}: Used Memory: {}, Total Memory: {}, Free Memory: {}",
-                label,
-                MEMORY_FORMAT.format(usedMemoryMB),
-                MEMORY_FORMAT.format(totalMemoryMB),
-                MEMORY_FORMAT.format(freeMemoryMB));
+        log.info(
+            "{}: Used Memory: {}, Total Memory: {}, Free Memory: {}",
+            label,
+            MEMORY_FORMAT.format(usedMemoryMB),
+            MEMORY_FORMAT.format(totalMemoryMB),
+            MEMORY_FORMAT.format(freeMemoryMB)
+        );
 
         return usedMemoryMB;
     }
-
 
 }

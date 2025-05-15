@@ -12,7 +12,6 @@ import org.apache.lucene.index.SegmentReadState;
 import org.apache.lucene.index.SegmentWriteState;
 
 import java.io.IOException;
-import java.nio.file.Path;
 
 public class JVectorFormat extends KnnVectorsFormat {
     public static final String NAME = "JVectorFormat";
@@ -67,9 +66,5 @@ public class JVectorFormat extends KnnVectorsFormat {
     public int getMaxDimensions(String s) {
         // Not a hard limit, but a reasonable default
         return 8192;
-    }
-
-    static Path getVectorIndexPath(Path directoryBasePath, String baseDataFileName, String field) {
-        return directoryBasePath.resolve(baseDataFileName + "_" + field + "." + JVectorFormat.VECTOR_INDEX_EXTENSION);
     }
 }

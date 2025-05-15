@@ -55,10 +55,7 @@ public class KNNJVectorTests extends LuceneTestCase {
         indexWriterConfig.setMergePolicy(new ForceMergesOnlyMergePolicy());
         final Path indexPath = createTempDir();
         log.info("Index path: {}", indexPath);
-        try (
-            FSDirectory dir = FSDirectory.open(indexPath);
-            IndexWriter w = new IndexWriter(dir, indexWriterConfig)
-        ) {
+        try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter w = new IndexWriter(dir, indexWriterConfig)) {
             final float[] target = new float[] { 0.0f, 0.0f };
             for (int i = 1; i < totalNumberOfDocs + 1; i++) {
                 final float[] source = new float[] { 0.0f, 1.0f / i };
@@ -122,10 +119,7 @@ public class KNNJVectorTests extends LuceneTestCase {
         indexWriterConfig.setMergePolicy(new ForceMergesOnlyMergePolicy(false));
         final Path indexPath = createTempDir();
         log.info("Index path: {}", indexPath);
-        try (
-            FSDirectory dir = FSDirectory.open(indexPath);
-            IndexWriter w = new IndexWriter(dir, indexWriterConfig)
-        ) {
+        try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter w = new IndexWriter(dir, indexWriterConfig)) {
             final float[] target = new float[] { 0.0f, 0.0f };
             for (int i = 1; i < totalNumberOfDocs + 1; i++) {
                 final float[] source = new float[] { 0.0f, 1.0f / i };
@@ -188,10 +182,7 @@ public class KNNJVectorTests extends LuceneTestCase {
         indexWriterConfig.setMergeScheduler(new SerialMergeScheduler());
         final Path indexPath = createTempDir();
         log.info("Index path: {}", indexPath);
-        try (
-            FSDirectory dir = FSDirectory.open(indexPath);
-            IndexWriter w = new IndexWriter(dir, indexWriterConfig)
-        ) {
+        try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter w = new IndexWriter(dir, indexWriterConfig)) {
             final float[] target = new float[] { 0.0f, 0.0f };
             for (int i = 1; i < totalNumberOfDocs + 1; i++) {
                 final float[] source = new float[] { 0.0f, 1.0f / i };
@@ -260,10 +251,7 @@ public class KNNJVectorTests extends LuceneTestCase {
         indexWriterConfig.setMergeScheduler(new SerialMergeScheduler());
         final Path indexPath = createTempDir();
         log.info("Index path: {}", indexPath);
-        try (
-            FSDirectory dir = FSDirectory.open(indexPath);
-            IndexWriter w = new IndexWriter(dir, indexWriterConfig)
-        ) {
+        try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter w = new IndexWriter(dir, indexWriterConfig)) {
             final float[] target = new float[] { 0.0f, 0.0f };
             for (int i = 1; i < totalNumberOfDocs + 1; i++) {
                 final float[] source = new float[] { 0.0f, 1.0f / i };
@@ -532,10 +520,7 @@ public class KNNJVectorTests extends LuceneTestCase {
         indexWriterConfig.setMergeScheduler(new SerialMergeScheduler());
         final Path indexPath = createTempDir();
         log.info("Index path: {}", indexPath);
-        try (
-            FSDirectory dir = FSDirectory.open(indexPath);
-            IndexWriter w = new IndexWriter(dir, indexWriterConfig)
-        ) {
+        try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter w = new IndexWriter(dir, indexWriterConfig)) {
             final float[] target = new float[] { 0.0f, 0.0f };
             for (int i = 1; i < totalNumberOfDocs + 1; i++) {
                 final float[] source = new float[] { 0.0f, 1.0f / i };
@@ -602,10 +587,7 @@ public class KNNJVectorTests extends LuceneTestCase {
         indexWriterConfig.setMergeScheduler(new SerialMergeScheduler());
         final Path indexPath = createTempDir();
         log.info("Index path: {}", indexPath);
-        try (
-            FSDirectory dir = FSDirectory.open(indexPath);
-            IndexWriter w = new IndexWriter(dir, indexWriterConfig)
-        ) {
+        try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter w = new IndexWriter(dir, indexWriterConfig)) {
             final float[] target = new float[] { 1.0f, 1.0f };
             for (int i = 1; i < totalNumberOfDocs + 1; i++) {
                 final float[] source = new float[] { 1.0f + i, 2.0f * i };
@@ -751,10 +733,7 @@ public class KNNJVectorTests extends LuceneTestCase {
         indexWriterConfig.setRAMPerThreadHardLimitMB(1000); // 1000MB per thread, this way we make sure that no premature flush will occur
         final Path indexPath = createTempDir();
         log.info("Index path: {}", indexPath);
-        try (
-            FSDirectory dir = FSDirectory.open(indexPath);
-            IndexWriter w = new IndexWriter(dir, indexWriterConfig)
-        ) {
+        try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter w = new IndexWriter(dir, indexWriterConfig)) {
             final float[] target = new float[] {
                 0.0f,
                 0.0f,
@@ -844,10 +823,7 @@ public class KNNJVectorTests extends LuceneTestCase {
         indexWriterConfig.setRAMPerThreadHardLimitMB(1000); // 1000MB per thread, this way we make sure that no premature flush will occur
         final Path indexPath = createTempDir();
         log.info("Index path: {}", indexPath);
-        try (
-            FSDirectory dir = FSDirectory.open(indexPath);
-            IndexWriter w = new IndexWriter(dir, indexWriterConfig)
-        ) {
+        try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter w = new IndexWriter(dir, indexWriterConfig)) {
             final float[] target = new float[] {
                 0.0f,
                 0.0f,
@@ -941,10 +917,7 @@ public class KNNJVectorTests extends LuceneTestCase {
         indexWriterConfig.setRAMPerThreadHardLimitMB(1000); // 1000MB per thread, this way we make sure that no premature flush will occur
         final Path indexPath = createTempDir();
         log.info("Index path: {}", indexPath);
-        try (
-            FSDirectory dir = FSDirectory.open(indexPath);
-            IndexWriter w = new IndexWriter(dir, indexWriterConfig)
-        ) {
+        try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter w = new IndexWriter(dir, indexWriterConfig)) {
             final float[] target = new float[] {
                 0.0f,
                 0.0f,
@@ -1039,10 +1012,7 @@ public class KNNJVectorTests extends LuceneTestCase {
         indexWriterConfig.setRAMPerThreadHardLimitMB(1000); // 1000MB per thread, this way we make sure that no premature flush will occur
         final Path indexPath = createTempDir();
         log.info("Index path: {}", indexPath);
-        try (
-            FSDirectory dir = FSDirectory.open(indexPath);
-            IndexWriter w = new IndexWriter(dir, indexWriterConfig)
-        ) {
+        try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter w = new IndexWriter(dir, indexWriterConfig)) {
             final float[] target = new float[] {
                 0.0f,
                 0.0f,

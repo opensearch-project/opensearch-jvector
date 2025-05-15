@@ -5,7 +5,6 @@
 
 package org.opensearch.knn.index.codec.jvector;
 
-import io.github.jbellis.jvector.disk.RandomAccessWriter;
 import io.github.jbellis.jvector.graph.GraphIndexBuilder;
 import io.github.jbellis.jvector.graph.ListRandomAccessVectorValues;
 import io.github.jbellis.jvector.graph.OnHeapGraphIndex;
@@ -32,7 +31,6 @@ import org.apache.lucene.util.RamUsageEstimator;
 
 import java.io.DataOutput;
 import java.io.IOException;
-import java.nio.file.Path;
 import java.util.*;
 
 import static org.apache.lucene.codecs.lucene99.Lucene99HnswVectorsReader.readVectorEncoding;
@@ -46,7 +44,6 @@ public class JVectorWriter extends KnnVectorsWriter {
     private final IndexOutput vectorIndex;
     private final String indexDataFileName;
     private final String baseDataFileName;
-    private final Path directoryBasePath;
     private final SegmentWriteState segmentWriteState;
     private final int maxConn;
     private final int beamWidth;
@@ -82,9 +79,6 @@ public class JVectorWriter extends KnnVectorsWriter {
             JVectorFormat.VECTOR_INDEX_EXTENSION
         );
         this.baseDataFileName = segmentWriteState.segmentInfo.name + "_" + segmentWriteState.segmentSuffix;
-
-        Directory dir = segmentWriteState.directory;
-        this.directoryBasePath = JVectorReader.resolveDirectoryPath(dir);
 
         boolean success = false;
         try {
@@ -194,67 +188,65 @@ public class JVectorWriter extends KnnVectorsWriter {
      * @throws IOException IOException
      */
     private VectorIndexFieldMetadata writeGraph(OnHeapGraphIndex graph, FieldWriter<?> fieldData) throws IOException {
-        // TODO: use the vector index inputStream instead of this!
-        final Path jvecFilePath = JVectorFormat.getVectorIndexPath(directoryBasePath, baseDataFileName, fieldData.fieldInfo.name);
-        /* This is an ugly hack to make sure Lucene actually knows about our input stream files, otherwise it will delete them */
-        IndexOutput indexOutput = segmentWriteState.directory.createOutput(
-            jvecFilePath.getFileName().toString(),
-            segmentWriteState.context
-        );
-        CodecUtil.writeIndexHeader(
-            indexOutput,
-            JVectorFormat.VECTOR_INDEX_CODEC_NAME,
-            JVectorFormat.VERSION_CURRENT,
-            segmentWriteState.segmentInfo.getId(),
-            segmentWriteState.segmentSuffix
-        );
-        final long startOffset = indexOutput.getFilePointer();
-        indexOutput.close();
-        /* End of ugly hack */
-
-        log.info("Writing graph to {}", jvecFilePath);
-        var resultBuilder = VectorIndexFieldMetadata.builder()
-            .fieldNumber(fieldData.fieldInfo.number)
-            .vectorEncoding(fieldData.fieldInfo.getVectorEncoding())
-            .vectorSimilarityFunction(fieldData.fieldInfo.getVectorSimilarityFunction());
+        final String vectorIndexFieldFileName = baseDataFileName
+            + "_"
+            + fieldData.fieldInfo.name
+            + "."
+            + JVectorFormat.VECTOR_INDEX_EXTENSION;
 
         try (
-            var writer = new OnDiskGraphIndexWriter.Builder(graph, jvecFilePath).with(
-                new InlineVectors(fieldData.randomAccessVectorValues.dimension())
-            ).withStartOffset(startOffset).build()
+            IndexOutput indexOutput = segmentWriteState.directory.createOutput(vectorIndexFieldFileName, segmentWriteState.context);
+            final var randomAccessWriter = new JVectorRandomAccessWriter(indexOutput)
         ) {
-            var suppliers = Feature.singleStateFactory(
-                FeatureId.INLINE_VECTORS,
-                nodeId -> new InlineVectors.State(fieldData.randomAccessVectorValues.getVector(nodeId))
+            CodecUtil.writeIndexHeader(
+                indexOutput,
+                JVectorFormat.VECTOR_INDEX_CODEC_NAME,
+                JVectorFormat.VERSION_CURRENT,
+                segmentWriteState.segmentInfo.getId(),
+                segmentWriteState.segmentSuffix
             );
-            writer.write(suppliers);
-            final RandomAccessWriter randomAccessWriter = writer.getOutput();
-            long endGraphOffset = randomAccessWriter.position();
-            resultBuilder.vectorIndexOffset(startOffset);
-            resultBuilder.vectorIndexLength(endGraphOffset - startOffset);
+            final long startOffset = indexOutput.getFilePointer();
 
-            // If PQ is enabled and we have enough vectors, write the PQ codebooks and compressed vectors
-            if (fieldData.randomAccessVectorValues.size() >= minimumBatchSizeForQuantization) {
-                log.info(
-                    "Writing PQ codebooks and vectors for field {} since the size is {} >= {}",
-                    fieldData.fieldInfo.name,
-                    fieldData.randomAccessVectorValues.size(),
-                    minimumBatchSizeForQuantization
+            log.info("Writing graph to {}", vectorIndexFieldFileName);
+            var resultBuilder = VectorIndexFieldMetadata.builder()
+                .fieldNumber(fieldData.fieldInfo.number)
+                .vectorEncoding(fieldData.fieldInfo.getVectorEncoding())
+                .vectorSimilarityFunction(fieldData.fieldInfo.getVectorSimilarityFunction());
+
+            try (
+                var writer = new OnDiskGraphIndexWriter.Builder(graph, randomAccessWriter).with(
+                    new InlineVectors(fieldData.randomAccessVectorValues.dimension())
+                ).withStartOffset(startOffset).build()
+            ) {
+                var suppliers = Feature.singleStateFactory(
+                    FeatureId.INLINE_VECTORS,
+                    nodeId -> new InlineVectors.State(fieldData.randomAccessVectorValues.getVector(nodeId))
                 );
-                resultBuilder.pqCodebooksAndVectorsOffset(endGraphOffset);
-                writePQCodebooksAndVectors(randomAccessWriter, fieldData);
-                resultBuilder.pqCodebooksAndVectorsLength(randomAccessWriter.position() - endGraphOffset);
-            } else {
-                resultBuilder.pqCodebooksAndVectorsOffset(0);
-                resultBuilder.pqCodebooksAndVectorsLength(0);
-            }
-            // write footer by wrapping jVector RandomAccessOutput to IndexOutput object
-            // This mostly helps to interface with the existing Lucene CodecUtil
-            IndexOutput jvecIndexOutput = new JVectorIndexOutput(writer.getOutput());
-            CodecUtil.writeFooter(jvecIndexOutput);
-        }
+                writer.write(suppliers);
+                long endGraphOffset = randomAccessWriter.position();
+                resultBuilder.vectorIndexOffset(startOffset);
+                resultBuilder.vectorIndexLength(endGraphOffset - startOffset);
 
-        return resultBuilder.build();
+                // If PQ is enabled and we have enough vectors, write the PQ codebooks and compressed vectors
+                if (fieldData.randomAccessVectorValues.size() >= minimumBatchSizeForQuantization) {
+                    log.info(
+                        "Writing PQ codebooks and vectors for field {} since the size is {} >= {}",
+                        fieldData.fieldInfo.name,
+                        fieldData.randomAccessVectorValues.size(),
+                        minimumBatchSizeForQuantization
+                    );
+                    resultBuilder.pqCodebooksAndVectorsOffset(endGraphOffset);
+                    writePQCodebooksAndVectors(randomAccessWriter, fieldData);
+                    resultBuilder.pqCodebooksAndVectorsLength(randomAccessWriter.position() - endGraphOffset);
+                } else {
+                    resultBuilder.pqCodebooksAndVectorsOffset(0);
+                    resultBuilder.pqCodebooksAndVectorsLength(0);
+                }
+                CodecUtil.writeFooter(indexOutput);
+            }
+
+            return resultBuilder.build();
+        }
     }
 
     /**
