@@ -16,8 +16,8 @@ import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.KnnFloatVectorQuery;
 import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.store.Directory;
+import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.store.FSLockFactory;
-import org.apache.lucene.store.NIOFSDirectory;
 import org.openjdk.jmh.annotations.*;
 import org.opensearch.knn.index.codec.jvector.datasets.DataSet;
 import org.opensearch.knn.index.codec.jvector.datasets.DownloadHelper;
@@ -105,7 +105,7 @@ public class FormatBenchmarkWithKnownDatasets {
 
         final Path indexPath = Files.createTempDirectory("jvector-benchmark");
         log.info("Index path: {}", indexPath);
-        directory = new NIOFSDirectory(indexPath, FSLockFactory.getDefault());
+        directory = FSDirectory.open(indexPath);
 
         // Create index with JVectorFormat
         IndexWriterConfig indexWriterConfig = new IndexWriterConfig();

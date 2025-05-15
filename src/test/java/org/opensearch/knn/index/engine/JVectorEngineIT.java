@@ -37,6 +37,7 @@ import java.util.stream.Collectors;
 
 import static org.opensearch.common.xcontent.XContentFactory.jsonBuilder;
 import static org.opensearch.index.engine.EngineConfig.INDEX_USE_COMPOUND_FILE;
+import static org.opensearch.knn.TestUtils.generateRandomVectors;
 import static org.opensearch.knn.common.KNNConstants.DISK_ANN;
 import static org.opensearch.knn.index.engine.CommonTestUtils.*;
 
@@ -601,7 +602,7 @@ public class JVectorEngineIT extends KNNRestTestCase {
             String docId = "doc_" + i;
 
             // Create random vector
-            float[] vector = generateRandomVector(dimension);
+            float[] vector = generateRandomVectors(1, dimension)[0];
 
             // Store vector for recall comparison
             docVectors.put(docId, vector);
@@ -697,26 +698,4 @@ public class JVectorEngineIT extends KNNRestTestCase {
             }
         }
     }
-
-    /**
-     * Generates a random float vector of the specified dimension.
-     * Each element in the vector will be a random float value between 0.0 and 1.0.
-     *
-     * @param dimension The dimension of the vector to generate
-     * @return A float array representing the random vector
-     */
-    public static float[] generateRandomVector(int dimension) {
-        if (dimension <= 0) {
-            throw new IllegalArgumentException("Dimension must be a positive integer");
-        }
-
-        final float[] vector = new float[dimension];
-
-        for (int i = 0; i < dimension; i++) {
-            vector[i] = ThreadLocalRandom.current().nextFloat();
-        }
-
-        return vector;
-    }
-
 }

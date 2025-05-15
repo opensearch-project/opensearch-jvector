@@ -12,8 +12,6 @@ import org.apache.lucene.index.*;
 import org.apache.lucene.search.*;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
-import org.apache.lucene.store.FSLockFactory;
-import org.apache.lucene.store.NIOFSDirectory;
 import org.apache.lucene.tests.index.RandomIndexWriter;
 import org.apache.lucene.tests.util.LuceneTestCase;
 import org.junit.Assert;
@@ -48,7 +46,7 @@ public class KNNJVectorTests extends LuceneTestCase {
      */
     @Test
     public void testJVectorKnnIndex_simpleCase() throws IOException {
-        int k = 3; // The number of nearest neighbours to gather
+        int k = 3; // The number of nearest neighbors to gather
         int totalNumberOfDocs = 10;
         IndexWriterConfig indexWriterConfig = LuceneTestCase.newIndexWriterConfig();
         // TODO: re-enable this after fixing the compound file augmentation for JVector
@@ -58,7 +56,7 @@ public class KNNJVectorTests extends LuceneTestCase {
         final Path indexPath = createTempDir();
         log.info("Index path: {}", indexPath);
         try (
-            FSDirectory dir = new NIOFSDirectory(indexPath, FSLockFactory.getDefault());
+            FSDirectory dir = FSDirectory.open(indexPath);
             IndexWriter w = new IndexWriter(dir, indexWriterConfig)
         ) {
             final float[] target = new float[] { 0.0f, 0.0f };
@@ -125,7 +123,7 @@ public class KNNJVectorTests extends LuceneTestCase {
         final Path indexPath = createTempDir();
         log.info("Index path: {}", indexPath);
         try (
-            FSDirectory dir = new NIOFSDirectory(indexPath, FSLockFactory.getDefault());
+            FSDirectory dir = FSDirectory.open(indexPath);
             IndexWriter w = new IndexWriter(dir, indexWriterConfig)
         ) {
             final float[] target = new float[] { 0.0f, 0.0f };
@@ -191,7 +189,7 @@ public class KNNJVectorTests extends LuceneTestCase {
         final Path indexPath = createTempDir();
         log.info("Index path: {}", indexPath);
         try (
-            FSDirectory dir = new NIOFSDirectory(indexPath, FSLockFactory.getDefault());
+            FSDirectory dir = FSDirectory.open(indexPath);
             IndexWriter w = new IndexWriter(dir, indexWriterConfig)
         ) {
             final float[] target = new float[] { 0.0f, 0.0f };
@@ -263,7 +261,7 @@ public class KNNJVectorTests extends LuceneTestCase {
         final Path indexPath = createTempDir();
         log.info("Index path: {}", indexPath);
         try (
-            FSDirectory dir = new NIOFSDirectory(indexPath, FSLockFactory.getDefault());
+            FSDirectory dir = FSDirectory.open(indexPath);
             IndexWriter w = new IndexWriter(dir, indexWriterConfig)
         ) {
             final float[] target = new float[] { 0.0f, 0.0f };
@@ -315,6 +313,34 @@ public class KNNJVectorTests extends LuceneTestCase {
         }
     }
 
+    /**
+     * Tests the functionality and integrity of a Lucene k-NN index under multiple merge cycles and verifies
+     *  the proper ordering of vectors and document identifiers.
+     *
+     * The method performs the following validation steps:
+     * 1. Indexes a predefined number of documents into a Lucene index, creating many small segments.
+     * Each document
+     *    includes a k-NN float vector field encoding a specific order.
+     * 2. Executes several merge operations on the index (partial and full merges) to validate that the merging
+     *    process maintains correctness and consistency.
+     * 3. Validates the following invariants post-merge:
+     *    (a) Verifies that the index is merged into a single segment.
+     *    (b) Confirms the integrity of vector values by iterating through the merged segment and checking the
+     *        relationship between vector components and document identifiers.
+     *    (c) Performs k-NN searches with various cases:
+     *        - Single-threaded searches using vectors to ensure correct results.
+     *        - Multi-threaded concurrent searches to confirm robustness and verify the index operates correctly
+     *          under concurrent access without exhausting file handles or encountering other issues.
+     *
+     * Assertions are used throughout to ensure the state of the index matches the expected behavior,
+     * validate merge
+     * results, and confirm the accuracy of search operations.
+     * The test also logs the number of successful k-NN queries
+     * during the concurrent search phase.
+     *
+     * @throws IOException if an I/O error occurs during index operations.
+     * @throws InterruptedException if the concurrent search phase is interrupted.
+     */
     @Test
     public void testLuceneKnnIndex_multipleMerges_with_ordering_check() throws IOException, InterruptedException {
         final int numDocs = 10000;
@@ -434,7 +460,7 @@ public class KNNJVectorTests extends LuceneTestCase {
         iwc.setCodec(new JVectorCodec());
         iwc.setMergePolicy(new ForceMergesOnlyMergePolicy(false));
 
-        try (FSDirectory dir = new NIOFSDirectory(indexPath, FSLockFactory.getDefault()); IndexWriter writer = new IndexWriter(dir, iwc)) {
+        try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter writer = new IndexWriter(dir, iwc)) {
             /* ---------------------------
              * 1.  Index three simple docs
              * --------------------------- */
@@ -507,7 +533,7 @@ public class KNNJVectorTests extends LuceneTestCase {
         final Path indexPath = createTempDir();
         log.info("Index path: {}", indexPath);
         try (
-            FSDirectory dir = new NIOFSDirectory(indexPath, FSLockFactory.getDefault());
+            FSDirectory dir = FSDirectory.open(indexPath);
             IndexWriter w = new IndexWriter(dir, indexWriterConfig)
         ) {
             final float[] target = new float[] { 0.0f, 0.0f };
@@ -577,7 +603,7 @@ public class KNNJVectorTests extends LuceneTestCase {
         final Path indexPath = createTempDir();
         log.info("Index path: {}", indexPath);
         try (
-            FSDirectory dir = new NIOFSDirectory(indexPath, FSLockFactory.getDefault());
+            FSDirectory dir = FSDirectory.open(indexPath);
             IndexWriter w = new IndexWriter(dir, indexWriterConfig)
         ) {
             final float[] target = new float[] { 1.0f, 1.0f };
@@ -726,7 +752,7 @@ public class KNNJVectorTests extends LuceneTestCase {
         final Path indexPath = createTempDir();
         log.info("Index path: {}", indexPath);
         try (
-            FSDirectory dir = new NIOFSDirectory(indexPath, FSLockFactory.getDefault());
+            FSDirectory dir = FSDirectory.open(indexPath);
             IndexWriter w = new IndexWriter(dir, indexWriterConfig)
         ) {
             final float[] target = new float[] {
@@ -819,7 +845,7 @@ public class KNNJVectorTests extends LuceneTestCase {
         final Path indexPath = createTempDir();
         log.info("Index path: {}", indexPath);
         try (
-            FSDirectory dir = new NIOFSDirectory(indexPath, FSLockFactory.getDefault());
+            FSDirectory dir = FSDirectory.open(indexPath);
             IndexWriter w = new IndexWriter(dir, indexWriterConfig)
         ) {
             final float[] target = new float[] {
@@ -916,7 +942,7 @@ public class KNNJVectorTests extends LuceneTestCase {
         final Path indexPath = createTempDir();
         log.info("Index path: {}", indexPath);
         try (
-            FSDirectory dir = new NIOFSDirectory(indexPath, FSLockFactory.getDefault());
+            FSDirectory dir = FSDirectory.open(indexPath);
             IndexWriter w = new IndexWriter(dir, indexWriterConfig)
         ) {
             final float[] target = new float[] {
@@ -1014,7 +1040,7 @@ public class KNNJVectorTests extends LuceneTestCase {
         final Path indexPath = createTempDir();
         log.info("Index path: {}", indexPath);
         try (
-            FSDirectory dir = new NIOFSDirectory(indexPath, FSLockFactory.getDefault());
+            FSDirectory dir = FSDirectory.open(indexPath);
             IndexWriter w = new IndexWriter(dir, indexWriterConfig)
         ) {
             final float[] target = new float[] {

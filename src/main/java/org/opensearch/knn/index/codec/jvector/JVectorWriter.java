@@ -429,7 +429,7 @@ public class JVectorWriter extends KnnVectorsWriter {
 
         @Override
         public long ramBytesUsed() {
-            return SHALLOW_SIZE + graphIndexBuilder.getGraph().ramBytesUsed();
+            return SHALLOW_SIZE + graphIndexBuilder.getGraph().ramBytesUsed() + (long) floatVectors.size() * Float.BYTES;
         }
 
         io.github.jbellis.jvector.vector.VectorSimilarityFunction getVectorSimilarityFunction(FieldInfo fieldInfo) {

@@ -56,8 +56,6 @@ import org.opensearch.script.ScriptContext;
 import org.opensearch.script.ScriptEngine;
 import org.opensearch.script.ScriptService;
 import org.opensearch.search.deciders.ConcurrentSearchRequestDecider;
-import org.opensearch.threadpool.ExecutorBuilder;
-import org.opensearch.threadpool.FixedExecutorBuilder;
 import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.watcher.ResourceWatcherService;
 
@@ -69,8 +67,6 @@ import java.util.Optional;
 import java.util.function.Supplier;
 
 import static java.util.Collections.singletonList;
-import static org.opensearch.knn.common.KNNConstants.KNN_THREAD_POOL_PREFIX;
-import static org.opensearch.knn.common.KNNConstants.TRAIN_THREAD_POOL;
 
 /**
  * Entry point for the KNN plugin where we define mapper for knn_vector type
@@ -115,8 +111,6 @@ public class JVectorKNNPlugin extends Plugin
     public static final String LEGACY_KNN_BASE_URI = "/_opendistro/_knn";
     public static final String KNN_BASE_URI = "/_plugins/_knn";
 
-    private ClusterService clusterService;
-
     public JVectorKNNPlugin() {
         super();
     }
@@ -145,8 +139,6 @@ public class JVectorKNNPlugin extends Plugin
         IndexNameExpressionResolver indexNameExpressionResolver,
         Supplier<RepositoriesService> repositoriesServiceSupplier
     ) {
-        this.clusterService = clusterService;
-
         KNNSettings.state().initialize(client, clusterService);
         KNNClusterUtil.instance().initialize(clusterService);
         QuantizationStateCache.setThreadPool(threadPool);
@@ -230,11 +222,6 @@ public class JVectorKNNPlugin extends Plugin
     @Override
     public ScriptEngine getScriptEngine(Settings settings, Collection<ScriptContext<?>> contexts) {
         return new KNNScoringScriptEngine();
-    }
-
-    @Override
-    public List<ExecutorBuilder<?>> getExecutorBuilders(Settings settings) {
-        return ImmutableList.of(new FixedExecutorBuilder(settings, TRAIN_THREAD_POOL, 1, 1, KNN_THREAD_POOL_PREFIX, false));
     }
 
     @Override
