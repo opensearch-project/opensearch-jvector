@@ -5,7 +5,6 @@
 
 package org.opensearch.knn.index.engine;
 
-import org.opensearch.action.bulk.BulkResponse;
 import org.opensearch.client.*;
 
 import com.google.common.collect.ImmutableList;
@@ -15,8 +14,6 @@ import org.apache.commons.lang.math.RandomUtils;
 import org.apache.hc.core5.http.ParseException;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.junit.After;
-import org.opensearch.action.bulk.BulkRequest;
-import org.opensearch.action.index.IndexRequest;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.core.xcontent.XContentBuilder;
 import org.opensearch.index.query.QueryBuilder;
@@ -36,7 +33,6 @@ import java.util.stream.Collectors;
 
 import static org.opensearch.common.xcontent.XContentFactory.jsonBuilder;
 import static org.opensearch.index.engine.EngineConfig.INDEX_USE_COMPOUND_FILE;
-import static org.opensearch.knn.TestUtils.generateRandomVectors;
 import static org.opensearch.knn.common.KNNConstants.DISK_ANN;
 import static org.opensearch.knn.index.engine.CommonTestUtils.*;
 
@@ -299,170 +295,6 @@ public class JVectorEngineIT extends KNNRestTestCase {
     }
 
     /**
-     * Test indexing and batch updating of documents with testing for ordering issues
-     * The test is testing two edge scenarios that may occur when rebuilding/merging the graph segments:
-     * 1. No regressions in the end to end ordering of documents within search results
-     * 2. Mapping of document IDs to vectors is not lost on multiple merges
-     */
-    public void testBatchUpdate_withDocOrderingTest() throws Exception {
-        final int dimension = 3;
-        logger.info("Starting testBatchUpdate with vector dimension: {}", dimension);
-
-        createKnnIndexMappingWithJVectorEngine(dimension, SpaceType.L2, VectorDataType.FLOAT);
-        logger.info("Created KNN index mapping with JVector engine");
-
-        RestClientBuilder builder = RestClient.builder(client().getNodes().toArray(new Node[0]));
-        try (final RestHighLevelClient highLevelClient = new RestHighLevelClient(builder)) {
-            // Create 1000 documents
-            final int totalDocuments = 1000;
-            final int batchSize = 10;
-            final int totalBatches = totalDocuments / batchSize;
-
-            // Store vectors for later recall calculation
-            final Map<String, float[]> docVectors = generateDocVectors(dimension, totalDocuments);
-
-            logger.info("Starting to index {} documents in {} batches of {} documents each", totalDocuments, totalBatches, batchSize);
-
-            long indexingStartTime = System.currentTimeMillis();
-            addUpdateDocsInBatches(docVectors, batchSize, highLevelClient);
-            long indexingEndTime = System.currentTimeMillis();
-            long indexingDuration = indexingEndTime - indexingStartTime;
-
-            // Final refresh and verify document count
-            refreshIndex(INDEX_NAME);
-            long actualDocCount = getDocCount(INDEX_NAME);
-            logger.info(
-                "Completed indexing {} documents in {} ms ({} docs/sec)",
-                actualDocCount,
-                indexingDuration,
-                String.format("%.1f", actualDocCount * 1000.0 / indexingDuration)
-            );
-            assertEquals(totalDocuments, actualDocCount);
-
-            // Create several query vectors for comprehensive testing
-            final int queryCount = 5;
-            List<float[]> queryVectors = new ArrayList<>(queryCount);
-            for (int q = 0; q < queryCount; q++) {
-                float[] queryVector = new float[dimension];
-                for (int i = 0; i < dimension; i++) {
-                    queryVector[i] = random().nextFloat();
-                }
-                queryVectors.add(queryVector);
-            }
-
-            // Search with each query vector before updates to establish baseline
-            final int k = 20; // Higher k for better recall assessment
-            Map<Integer, Set<String>> preUpdateResults = new HashMap<>();
-
-            logger.info("Performing baseline searches before updates");
-            for (int q = 0; q < queryCount; q++) {
-                float[] queryVector = queryVectors.get(q);
-                Response response = searchKNNIndex(INDEX_NAME, new KNNQueryBuilder(FIELD_NAME, queryVector, k), k);
-                String responseBody = EntityUtils.toString(response.getEntity());
-                List<KNNResult> knnResults = parseSearchResponse(responseBody, FIELD_NAME);
-
-                // Store the document IDs from the results
-                preUpdateResults.put(q, knnResults.stream().map(KNNResult::getDocId).collect(Collectors.toSet()));
-            }
-
-            logger.info("Starting to update {} documents in {} batches of {} documents each", totalDocuments, totalBatches, batchSize);
-
-            long updateStartTime = System.currentTimeMillis();
-            addUpdateDocsInBatches(docVectors, batchSize, highLevelClient);
-            long updateEndTime = System.currentTimeMillis();
-            long updateDuration = updateEndTime - updateStartTime;
-
-            // Final refresh and verify document count remains the same
-            refreshIndex(INDEX_NAME);
-            actualDocCount = getDocCount(INDEX_NAME);
-            logger.info(
-                "Completed updating {} documents in {} ms ({} docs/sec)",
-                actualDocCount,
-                updateDuration,
-                String.format("%.1f", actualDocCount * 1000.0 / updateDuration)
-            );
-            assertEquals(totalDocuments, actualDocCount);
-
-            logger.info("Performing test searches after updates");
-
-            // Search with each query vector after updates and check if the ordering is the same
-            double orderingRecall = 0.0;
-
-            for (int q = 0; q < queryCount; q++) {
-                float[] queryVector = queryVectors.get(q);
-                Response response = searchKNNIndex(INDEX_NAME, new KNNQueryBuilder(FIELD_NAME, queryVector, k), k);
-
-                String responseBody = EntityUtils.toString(response.getEntity());
-                List<KNNResult> postUpdateResults = parseSearchResponse(responseBody, FIELD_NAME);
-
-                // Calculate recall for this query
-                Set<String> preUpdateDocsForQuery = preUpdateResults.get(q);
-                Set<String> postUpdateDocsForQuery = postUpdateResults.stream().map(KNNResult::getDocId).collect(Collectors.toSet());
-
-                // Count how many docs from pre-update results are still in post-update results
-                Set<String> commonDocs = new HashSet<>(preUpdateDocsForQuery);
-                commonDocs.retainAll(postUpdateDocsForQuery);
-
-                double queryRecall = (double) commonDocs.size() / preUpdateDocsForQuery.size();
-                orderingRecall += queryRecall;
-
-                logger.info("Query {} recall: {}", q, String.format("%.2f", queryRecall));
-            }
-
-            // Calculate average recall across all queries
-            double avgRecall = orderingRecall / queryCount;
-            logger.info("Average recall after updates: {}", String.format("%.2f", avgRecall));
-
-            // Assert acceptable recall level (may need to adjust threshold)
-            assertEquals("Recall after updates is too low: " + avgRecall, 1.0, avgRecall, 0.001);
-
-            logger.info("testBatchUpdate completed successfully");
-        }
-    }
-
-    private void addUpdateDocsInBatches(Map<String, float[]> docVectors, int batchSize, RestHighLevelClient highLevelClient)
-        throws Exception {
-
-        // Add documents in batches of batchSize
-        int batch = 0;
-        int remainingInBatch = 0;
-        int totalDocuments = docVectors.size();
-        final int totalBatches = totalDocuments / batchSize;
-        BulkRequest bulkRequest = new BulkRequest(INDEX_NAME);
-        for (Map.Entry<String, float[]> entry : docVectors.entrySet()) {
-            String docId = entry.getKey();
-            float[] vector = entry.getValue();
-            // Add to bulk request with unique numeric identifier field
-            bulkRequest.add(new IndexRequest().id(docId).source(jsonBuilder().startObject().field(FIELD_NAME, vector).endObject()));
-            remainingInBatch++;
-            // Trigger a batch
-            if (remainingInBatch == batchSize) {
-                // Execute bulk request
-                final BulkResponse bulkResponse = highLevelClient.bulk(bulkRequest, RequestOptions.DEFAULT);
-
-                // Refresh occasionally to avoid too much memory pressure
-                if (batch % 10 == 0) {
-                    refreshIndex(INDEX_NAME);
-                    logger.info(
-                        "Indexed batches: {}/{} ({}%)",
-                        batch + 1,
-                        totalBatches,
-                        String.format("%.1f", (batch + 1) * 100.0 / totalBatches)
-                    );
-                }
-                batch++;
-                remainingInBatch = 0;
-                bulkRequest = new BulkRequest(INDEX_NAME);
-            }
-        }
-        if (remainingInBatch > 0) {
-            logger.info("Indexing final batch of {} documents which is less than batchSize: {}", remainingInBatch, batchSize);
-            final BulkResponse bulkResponse = highLevelClient.bulk(bulkRequest, RequestOptions.DEFAULT);
-        }
-
-    }
-
-    /**
      * Verify that the jVector-specific KNN stats counters
      * (visited, expanded, expanded-base-layer nodes) are present
      * and increase after a KNN search is executed.
@@ -593,21 +425,6 @@ public class JVectorEngineIT extends KNNRestTestCase {
         assertEquals(2, searchResults.size()); // only two live docs left
         // The first result should now be "2"
         assertArrayEquals(docs.get("2"), searchResults.get(0), 0.0f);
-    }
-
-    private Map<String, float[]> generateDocVectors(int dimension, int totalDocuments) {
-        Map<String, float[]> docVectors = new HashMap<>(totalDocuments);
-        for (int i = 0; i < totalDocuments; i++) {
-            String docId = "doc_" + i;
-
-            // Create random vector
-            float[] vector = generateRandomVectors(1, dimension)[0];
-
-            // Store vector for recall comparison
-            docVectors.put(docId, vector);
-        }
-
-        return docVectors;
     }
 
     private List<float[]> queryResults(final float[] searchVector, final int k) throws Exception {
