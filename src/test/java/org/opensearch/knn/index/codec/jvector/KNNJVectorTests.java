@@ -53,9 +53,7 @@ public class KNNJVectorTests extends LuceneTestCase {
         indexWriterConfig.setUseCompoundFile(false);
         indexWriterConfig.setCodec(new JVectorCodec());
         indexWriterConfig.setMergePolicy(new ForceMergesOnlyMergePolicy());
-        final Path indexPath = createTempDir();
-        log.info("Index path: {}", indexPath);
-        try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter w = new IndexWriter(dir, indexWriterConfig)) {
+        try (Directory dir = newDirectory(); var w = new RandomIndexWriter(random(), dir, indexWriterConfig)) {
             final float[] target = new float[] { 0.0f, 0.0f };
             for (int i = 1; i < totalNumberOfDocs + 1; i++) {
                 final float[] source = new float[] { 0.0f, 1.0f / i };
@@ -66,7 +64,7 @@ public class KNNJVectorTests extends LuceneTestCase {
             log.info("Flushing docs to make them discoverable on the file system");
             w.commit();
 
-            try (IndexReader reader = DirectoryReader.open(w)) {
+            try (IndexReader reader = w.getReader()) {
                 log.info("We should now have a single segment with 10 documents");
                 Assert.assertEquals(1, reader.getContext().leaves().size());
                 Assert.assertEquals(totalNumberOfDocs, reader.numDocs());
@@ -117,9 +115,7 @@ public class KNNJVectorTests extends LuceneTestCase {
         indexWriterConfig.setUseCompoundFile(false);
         indexWriterConfig.setCodec(new JVectorCodec());
         indexWriterConfig.setMergePolicy(new ForceMergesOnlyMergePolicy(false));
-        final Path indexPath = createTempDir();
-        log.info("Index path: {}", indexPath);
-        try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter w = new IndexWriter(dir, indexWriterConfig)) {
+        try (Directory dir = newDirectory(); var w = new RandomIndexWriter(random(), dir, indexWriterConfig)) {
             final float[] target = new float[] { 0.0f, 0.0f };
             for (int i = 1; i < totalNumberOfDocs + 1; i++) {
                 final float[] source = new float[] { 0.0f, 1.0f / i };
@@ -130,7 +126,7 @@ public class KNNJVectorTests extends LuceneTestCase {
             }
             log.info("Done writing all files to the file system");
 
-            try (IndexReader reader = DirectoryReader.open(w)) {
+            try (IndexReader reader = w.getReader()) {
                 log.info("We should now have 10 segments, each with a single document");
                 Assert.assertEquals(10, reader.getContext().leaves().size());
                 Assert.assertEquals(totalNumberOfDocs, reader.numDocs());
@@ -180,9 +176,7 @@ public class KNNJVectorTests extends LuceneTestCase {
         indexWriterConfig.setCodec(new JVectorCodec());
         indexWriterConfig.setMergePolicy(new ForceMergesOnlyMergePolicy());
         indexWriterConfig.setMergeScheduler(new SerialMergeScheduler());
-        final Path indexPath = createTempDir();
-        log.info("Index path: {}", indexPath);
-        try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter w = new IndexWriter(dir, indexWriterConfig)) {
+        try (Directory dir = newDirectory(); var w = new RandomIndexWriter(random(), dir, indexWriterConfig)) {
             final float[] target = new float[] { 0.0f, 0.0f };
             for (int i = 1; i < totalNumberOfDocs + 1; i++) {
                 final float[] source = new float[] { 0.0f, 1.0f / i };
@@ -196,7 +190,7 @@ public class KNNJVectorTests extends LuceneTestCase {
 
             w.forceMerge(1); // this merges all segments into a single segment
             log.info("Done merging all segments");
-            try (IndexReader reader = DirectoryReader.open(w)) {
+            try (IndexReader reader = w.getReader()) {
                 log.info("We should now have 1 segment with 10 documents");
                 Assert.assertEquals(1, reader.getContext().leaves().size());
                 Assert.assertEquals(totalNumberOfDocs, reader.numDocs());
@@ -249,9 +243,7 @@ public class KNNJVectorTests extends LuceneTestCase {
         indexWriterConfig.setCodec(new JVectorCodec());
         indexWriterConfig.setMergePolicy(new ForceMergesOnlyMergePolicy());
         indexWriterConfig.setMergeScheduler(new SerialMergeScheduler());
-        final Path indexPath = createTempDir();
-        log.info("Index path: {}", indexPath);
-        try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter w = new IndexWriter(dir, indexWriterConfig)) {
+        try (Directory dir = newDirectory(); var w = new RandomIndexWriter(random(), dir, indexWriterConfig)) {
             final float[] target = new float[] { 0.0f, 0.0f };
             for (int i = 1; i < totalNumberOfDocs + 1; i++) {
                 final float[] source = new float[] { 0.0f, 1.0f / i };
@@ -266,7 +258,7 @@ public class KNNJVectorTests extends LuceneTestCase {
 
             w.forceMerge(1); // this merges all segments into a single segment
             log.info("Done merging all segments");
-            try (IndexReader reader = DirectoryReader.open(w)) {
+            try (IndexReader reader = w.getReader()) {
                 log.info("We should now have 1 segment with 10 documents");
                 Assert.assertEquals(1, reader.getContext().leaves().size());
                 Assert.assertEquals(totalNumberOfDocs, reader.numDocs());

@@ -116,7 +116,7 @@ public class JVectorRandomAccessReader implements RandomAccessReader {
     public void close() throws IOException {
         log.debug("Closing JVectorRandomAccessReader for file: {}", indexInputDelegate);
         this.closed = true;
-        indexInputDelegate.close();
+        // no need to really close the index input delegate since it is a clone
         log.debug("Closed JVectorRandomAccessReader for file: {}", indexInputDelegate);
     }
 
