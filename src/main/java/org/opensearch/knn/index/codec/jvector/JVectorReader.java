@@ -73,9 +73,6 @@ public class JVectorReader extends KnnVectorsReader {
 
     @Override
     public void checkIntegrity() throws IOException {
-        // This is already done when loading the fields
-        // TODO: Implement this, for now this will always pass
-        // CodecUtil.checksumEntireFile(vectorIndex);
         for (FieldEntry fieldEntry : fieldEntryMap.values()) {
             try (var indexInput = state.directory.openInput(fieldEntry.vectorIndexFieldFileName, state.context)) {
                 CodecUtil.checksumEntireFile(indexInput);

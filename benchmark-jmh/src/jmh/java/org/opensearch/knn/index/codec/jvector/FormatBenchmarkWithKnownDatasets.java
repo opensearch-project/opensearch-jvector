@@ -17,7 +17,6 @@ import org.apache.lucene.search.KnnFloatVectorQuery;
 import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
-import org.apache.lucene.store.FSLockFactory;
 import org.openjdk.jmh.annotations.*;
 import org.opensearch.knn.index.codec.jvector.datasets.DataSet;
 import org.opensearch.knn.index.codec.jvector.datasets.DownloadHelper;
