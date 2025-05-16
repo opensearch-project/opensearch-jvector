@@ -22,6 +22,7 @@ import lombok.Value;
 import lombok.extern.log4j.Log4j2;
 import org.apache.lucene.codecs.CodecUtil;
 import org.apache.lucene.codecs.KnnFieldVectorsWriter;
+import org.apache.lucene.codecs.KnnVectorsReader;
 import org.apache.lucene.codecs.KnnVectorsWriter;
 import org.apache.lucene.index.*;
 import org.apache.lucene.search.DocIdSetIterator;
@@ -110,6 +111,11 @@ public class JVectorWriter extends KnnVectorsWriter {
 
     @Override
     public KnnFieldVectorsWriter<?> addField(FieldInfo fieldInfo) throws IOException {
+        // adding a new field through the path of adding new documents (not through merge!)
+        return addField(fieldInfo, null);
+    }
+
+    private KnnFieldVectorsWriter<?> addField(FieldInfo fieldInfo, RandomAccessVectorValues ravv) throws IOException {
         log.info("Adding field {} in segment {}", fieldInfo.name, segmentWriteState.segmentInfo.name);
         if (fieldInfo.getVectorEncoding() == VectorEncoding.BYTE) {
             final String errorMessage = "byte[] vectors are not supported in JVector. "
@@ -118,7 +124,7 @@ public class JVectorWriter extends KnnVectorsWriter {
             log.error(errorMessage);
             throw new UnsupportedOperationException(errorMessage);
         }
-        FieldWriter<?> newField = new FieldWriter<>(fieldInfo, segmentWriteState.segmentInfo.name);
+        FieldWriter<?> newField = new FieldWriter<>(fieldInfo, segmentWriteState.segmentInfo.name, ravv);
         fields.add(newField);
         return newField;
     }
@@ -139,12 +145,8 @@ public class JVectorWriter extends KnnVectorsWriter {
                     writeField(byteWriter);
                     break;
                 case FLOAT32:
-                    var floatVectorFieldWriter = (FieldWriter<float[]>) addField(fieldInfo);
-                    var mergedFloats = MergedVectorValues.mergeFloatVectorValues(fieldInfo, mergeState);
-                    var mergeStateIterator = mergedFloats.iterator();
-                    for (int doc = mergeStateIterator.nextDoc(); doc != DocIdSetIterator.NO_MORE_DOCS; doc = mergeStateIterator.nextDoc()) {
-                        floatVectorFieldWriter.addValue(doc, mergedFloats.vectorValue(doc));
-                    }
+                    final var ravv = new RandomAccessMergedFloatVectorValues(fieldInfo, mergeState);
+                    var floatVectorFieldWriter = (FieldWriter<float[]>) addField(fieldInfo, ravv);
                     writeField(floatVectorFieldWriter);
                     break;
             }
@@ -362,16 +364,32 @@ public class JVectorWriter extends KnnVectorsWriter {
         private final FieldInfo fieldInfo;
         private int lastDocID = -1;
         private final GraphIndexBuilder graphIndexBuilder;
-        private final List<VectorFloat<?>> floatVectors = new ArrayList<>();
+        private final List<VectorFloat<?>> floatVectors;
         private final String segmentName;
         private final RandomAccessVectorValues randomAccessVectorValues;
         private final BuildScoreProvider buildScoreProvider;
 
         FieldWriter(FieldInfo fieldInfo, String segmentName) {
+            this(fieldInfo, segmentName, null);
+        }
+
+        FieldWriter(FieldInfo fieldInfo, String segmentName, RandomAccessVectorValues ravv) {
+            /*
+             * Either field writer will use existing ravv or will allow to dynamically add values via the floatVectors.
+             * For merges,
+             * we will provide an existing ravv object to avoid copying to heap of what's already can be referenced from
+             * the disk.
+             */
+            if (ravv == null) {
+                this.floatVectors = new ArrayList<>();
+                this.randomAccessVectorValues = new ListRandomAccessVectorValues(floatVectors, fieldInfo.getVectorDimension());
+            } else {
+                this.randomAccessVectorValues = ravv;
+                // This unmodifiable list makes sure that the addition of values outside what's already in ravv will fail.
+                this.floatVectors = Collections.emptyList();
+            }
             this.fieldInfo = fieldInfo;
             this.segmentName = segmentName;
-            var originalDimension = fieldInfo.getVectorDimension();
-            this.randomAccessVectorValues = new ListRandomAccessVectorValues(floatVectors, originalDimension);
             this.buildScoreProvider = BuildScoreProvider.randomAccessScoreProvider(
                 randomAccessVectorValues,
                 getVectorSimilarityFunction(fieldInfo)
@@ -444,8 +462,133 @@ public class JVectorWriter extends KnnVectorsWriter {
          * @throws IOException IOException
          */
         public OnHeapGraphIndex getGraph() throws IOException {
+            if (floatVectors.isEmpty()) {
+                // Float vectors were not added dynamically,
+                // which means we can just create the graph index directly from ravv
+                return graphIndexBuilder.build(randomAccessVectorValues);
+            }
+            // The graph was created dynamically on the heap which means we would have to clean up and explicitly call getGraph
             graphIndexBuilder.cleanup();
             return graphIndexBuilder.getGraph();
         }
     }
+
+    /**
+     * Implementation of RandomAccessVectorValues that directly uses the source
+     * FloatVectorValues from multiple segments without copying the vectors.
+     */
+    static class RandomAccessMergedFloatVectorValues implements RandomAccessVectorValues {
+        private final VectorTypeSupport VECTOR_TYPE_SUPPORT = VectorizationProvider.getInstance().getVectorTypeSupport();
+
+        // Array of sub-readers
+        private final JVectorFloatVectorValues[] readers;
+
+        // For each ordinal, stores which reader and which ordinal in that reader
+        private final int[][] ordMapping;
+
+        // Total number of vectors
+        private final int size;
+
+        // Vector dimension
+        private final int dimension;
+
+        /**
+         * Creates a random access view over merged float vector values.
+         *
+         * @param fieldInfo Field info for the vector field
+         * @param mergeState Merge state containing readers and doc maps
+         */
+        public RandomAccessMergedFloatVectorValues(FieldInfo fieldInfo, MergeState mergeState) throws IOException {
+            // Count total vectors and collect readers
+            int totalSize = 0;
+            // We explicitly show that the readers are of JVectorFloatVectorValues that are capable of random access
+            List<JVectorFloatVectorValues> allReaders = new ArrayList<>();
+
+            for (int i = 0; i < mergeState.knnVectorsReaders.length; i++) {
+                FieldInfos fieldInfos = mergeState.fieldInfos[i];
+                if (KnnVectorsWriter.MergedVectorValues.hasVectorValues(fieldInfos, fieldInfo.name)) {
+                    KnnVectorsReader reader = mergeState.knnVectorsReaders[i];
+                    if (reader != null) {
+                        JVectorFloatVectorValues values = (JVectorFloatVectorValues) reader.getFloatVectorValues(fieldInfo.name);
+                        if (values != null) {
+                            allReaders.add(values);
+                            totalSize += values.size();
+                        }
+                    }
+                }
+            }
+
+            this.size = totalSize;
+            this.readers = allReaders.toArray(new JVectorFloatVectorValues[0]);
+            this.dimension = readers.length > 0 ? readers[0].dimension() : 0;
+
+            // Build mapping from global ordinal to [readerIndex, readerOrd]
+            this.ordMapping = new int[totalSize][2];
+
+            // Simulate the merge process to build the ordinal mapping
+            // This is similar to what DocIDMerger would do but tracks ordinals
+            int globalOrd = 0;
+
+            // For each reader
+            for (int readerIdx = 0; readerIdx < readers.length; readerIdx++) {
+                FloatVectorValues reader = readers[readerIdx];
+                // For each vector in this reader
+                KnnVectorValues.DocIndexIterator it = reader.iterator();
+                for (int docId = it.nextDoc(); docId != DocIdSetIterator.NO_MORE_DOCS; docId = it.nextDoc()) {
+                    ordMapping[globalOrd][0] = readerIdx; // Reader index
+                    ordMapping[globalOrd][1] = docId; // Ordinal in reader
+                    globalOrd++;
+                }
+            }
+
+            if (globalOrd != totalSize) {
+                throw new IllegalStateException("Built mapping for " + globalOrd + " vectors but expected " + totalSize);
+            }
+
+            log.debug("Created RandomAccessMergedFloatVectorValues with {} total vectors from {} readers", size, readers.length);
+        }
+
+        @Override
+        public int size() {
+            return size;
+        }
+
+        @Override
+        public int dimension() {
+            return dimension;
+        }
+
+        @Override
+        public VectorFloat<?> getVector(int ord) {
+            if (ord < 0 || ord >= size) {
+                throw new IllegalArgumentException("Ordinal out of bounds: " + ord);
+            }
+
+            try {
+                int readerIdx = ordMapping[ord][0];
+                int readerOrd = ordMapping[ord][1];
+
+                final float[] vector;
+                // Access to readers is always assumed to be single threaded!
+                synchronized (readers[readerIdx]) {
+                    vector = readers[readerIdx].vectorValue(readerOrd);
+                }
+                return VECTOR_TYPE_SUPPORT.createFloatVector(vector);
+            } catch (IOException e) {
+                log.error("Error retrieving vector at ordinal {}", ord, e);
+                throw new RuntimeException(e);
+            }
+        }
+
+        @Override
+        public boolean isValueShared() {
+            return false;
+        }
+
+        @Override
+        public RandomAccessVectorValues copy() {
+            throw new UnsupportedOperationException("Copy not supported");
+        }
+    }
+
 }
