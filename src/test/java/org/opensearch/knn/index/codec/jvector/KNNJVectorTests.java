@@ -996,9 +996,8 @@ public class KNNJVectorTests extends LuceneTestCase {
         final int notIdealBatchSize = DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION / 3; // Batch size that is not ideal for quantization and
         // shouldn't trigger it
         final int totalNumberOfDocs = notIdealBatchSize * 30; // 3 batches of documents each will result in quantization only when the merge
-        // is triggered, and we have a batch size of {@link
-        // MINIMUM_BATCH_SIZE_FOR_QUANTIZATION} as a result of merging all the smaller
-        // batches
+        // is triggered, and we have a batch size of {@link MINIMUM_BATCH_SIZE_FOR_QUANTIZATION}
+        // as a result of merging all the smaller batches
 
         IndexWriterConfig indexWriterConfig = LuceneTestCase.newIndexWriterConfig();
         // TODO: re-enable this after fixing the compound file augmentation for JVector
@@ -1073,7 +1072,7 @@ public class KNNJVectorTests extends LuceneTestCase {
                     new float[] { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, k }
                 );
                 final float recall = calculateRecall(topDocs, expectedMinScoreInTopK);
-                Assert.assertEquals(1.0f, recall, 0.05f);
+                Assert.assertEquals("Expected to have recall of 1.0+/-0.05 but got " + recall, 1.0f, recall, 0.05f);
                 log.info("successfully completed search tests");
             }
         }

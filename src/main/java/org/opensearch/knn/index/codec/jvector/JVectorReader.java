@@ -26,6 +26,7 @@ import org.apache.lucene.util.IOUtils;
 import io.github.jbellis.jvector.vector.VectorSimilarityFunction;
 import org.opensearch.knn.plugin.stats.KNNCounter;
 
+import java.io.Closeable;
 import java.io.IOException;
 
 import java.util.HashMap;
@@ -154,7 +155,7 @@ public class JVectorReader extends KnnVectorsReader {
     @Override
     public void close() throws IOException {
         for (FieldEntry fieldEntry : fieldEntryMap.values()) {
-            IOUtils.close(fieldEntry.readerSupplier::close);
+            IOUtils.close(fieldEntry);
         }
     }
 
@@ -167,7 +168,7 @@ public class JVectorReader extends KnnVectorsReader {
         }
     }
 
-    class FieldEntry {
+    class FieldEntry implements Closeable {
         private final FieldInfo fieldInfo;
         private final VectorEncoding vectorEncoding;
         private final VectorSimilarityFunction similarityFunction;
@@ -177,7 +178,8 @@ public class JVectorReader extends KnnVectorsReader {
         private final long pqCodebooksAndVectorsLength;
         private final long pqCodebooksAndVectorsOffset;
         private final String vectorIndexFieldFileName;
-        private final ReaderSupplier readerSupplier;
+        private final ReaderSupplier indexReaderSupplier;
+        private final ReaderSupplier pqCodebooksReaderSupplier;
         private final OnDiskGraphIndex index;
         private final PQVectors pqVectors; // The product quantized vectors with their codebooks
 
@@ -195,37 +197,32 @@ public class JVectorReader extends KnnVectorsReader {
 
             this.vectorIndexFieldFileName = baseDataFileName + "_" + fieldInfo.name + "." + JVectorFormat.VECTOR_INDEX_EXTENSION;
 
-            // Check the header
-            try (IndexInput indexInput = directory.openInput(vectorIndexFieldFileName, state.context)) {
-                CodecUtil.checkIndexHeader(
-                    indexInput,
-                    JVectorFormat.VECTOR_INDEX_CODEC_NAME,
-                    JVectorFormat.VERSION_START,
-                    JVectorFormat.VERSION_CURRENT,
-                    state.segmentInfo.getId(),
-                    state.segmentSuffix
-                );
-            }
-
             // Load the graph index
-            this.readerSupplier = new JVectorRandomAccessReader.Supplier(directory, vectorIndexFieldFileName, state.context);
-            this.index = OnDiskGraphIndex.load(readerSupplier, vectorIndexOffset);
+            this.indexReaderSupplier = new JVectorRandomAccessReader.Supplier(
+                directory.openInput(vectorIndexFieldFileName, state.context),
+                vectorIndexOffset
+            );
+            this.index = OnDiskGraphIndex.load(indexReaderSupplier);
             // If quantized load the compressed product quantized vectors with their codebooks
             if (pqCodebooksAndVectorsLength > 0) {
+                assert pqCodebooksAndVectorsOffset > 0;
+                if (pqCodebooksAndVectorsOffset < vectorIndexOffset) {
+                    throw new IllegalArgumentException("pqCodebooksAndVectorsOffset must be greater than vectorIndexOffset");
+                }
+                this.pqCodebooksReaderSupplier = new JVectorRandomAccessReader.Supplier(
+                    directory.openInput(vectorIndexFieldFileName, state.context),
+                    pqCodebooksAndVectorsOffset
+                );
                 log.debug(
                     "Loading PQ codebooks and vectors for field {}, with numbers of vectors: {}",
                     fieldInfo.name,
                     state.segmentInfo.maxDoc()
                 );
-                assert pqCodebooksAndVectorsOffset > 0;
-                if (pqCodebooksAndVectorsOffset < vectorIndexOffset) {
-                    throw new IllegalArgumentException("pqCodebooksAndVectorsOffset must be greater than vectorIndexOffset");
-                }
-                try (final var randomAccessReader = readerSupplier.get()) {
-                    randomAccessReader.seek(pqCodebooksAndVectorsOffset);
+                try (final var randomAccessReader = pqCodebooksReaderSupplier.get()) {
                     this.pqVectors = PQVectors.load(randomAccessReader);
                 }
             } else {
+                this.pqCodebooksReaderSupplier = null;
                 this.pqVectors = null;
             }
 
@@ -244,6 +241,16 @@ public class JVectorReader extends KnnVectorsReader {
 
             }
 
+        }
+
+        @Override
+        public void close() throws IOException {
+            if (indexReaderSupplier != null) {
+                IOUtils.close(indexReaderSupplier::close);
+            }
+            if (pqCodebooksReaderSupplier != null) {
+                IOUtils.close(pqCodebooksReaderSupplier::close);
+            }
         }
     }
 

@@ -369,10 +369,6 @@ public class JVectorWriter extends KnnVectorsWriter {
         private final RandomAccessVectorValues randomAccessVectorValues;
         private final BuildScoreProvider buildScoreProvider;
 
-        FieldWriter(FieldInfo fieldInfo, String segmentName) {
-            this(fieldInfo, segmentName, null);
-        }
-
         FieldWriter(FieldInfo fieldInfo, String segmentName, RandomAccessVectorValues ravv) {
             /*
              * Either field writer will use existing ravv or will allow to dynamically add values via the floatVectors.
