@@ -1095,7 +1095,12 @@ public class KNNJVectorTests extends LuceneTestCase {
         float recall = ((float) totalRelevantDocs) / ((float) topDocs.scoreDocs.length);
 
         if (recall == 0.0f) {
-            log.info("Recall is 0.0, this is probably not correct, here is some debug information\n topDocs: {}, minScoreInTopK: {}, totalRelevantDocs: {}", topDocsToString(topDocs), minScoreInTopK, totalRelevantDocs);
+            log.info(
+                "Recall is 0.0, this is probably not correct, here is some debug information\n topDocs: {}, minScoreInTopK: {}, totalRelevantDocs: {}",
+                topDocsToString(topDocs),
+                minScoreInTopK,
+                totalRelevantDocs
+            );
         }
         return recall;
     }
