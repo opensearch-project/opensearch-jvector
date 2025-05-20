@@ -1092,7 +1092,23 @@ public class KNNJVectorTests extends LuceneTestCase {
                 totalRelevantDocs++;
             }
         }
-        return ((float) totalRelevantDocs) / ((float) topDocs.scoreDocs.length);
+        float recall = ((float) totalRelevantDocs) / ((float) topDocs.scoreDocs.length);
+
+        if (recall == 0.0f) {
+            log.info("Recall is 0.0, this is probably not correct, here is some debug information\n topDocs: {}, minScoreInTopK: {}, totalRelevantDocs: {}", topDocsToString(topDocs), minScoreInTopK, totalRelevantDocs);
+        }
+        return recall;
+    }
+
+    // convert topDocs to a pretty printed string
+    private String topDocsToString(TopDocs topDocs) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("TopDocs: [");
+        for (int i = 0; i < topDocs.scoreDocs.length; i++) {
+            sb.append(topDocs.scoreDocs[i].doc).append(" (").append(topDocs.scoreDocs[i].score).append("), ");
+        }
+        sb.append("]");
+        return sb.toString();
     }
 
 }
