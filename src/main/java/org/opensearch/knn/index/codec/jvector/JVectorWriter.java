@@ -566,10 +566,10 @@ public class JVectorWriter extends KnnVectorsWriter {
 
                 final float[] vector;
                 // Access to readers is always assumed to be single threaded!
-                synchronized (this) {
+                synchronized (readers[readerIdx]) {
                     vector = readers[readerIdx].vectorValue(readerOrd);
-                    return VECTOR_TYPE_SUPPORT.createFloatVector(vector);
                 }
+                return VECTOR_TYPE_SUPPORT.createFloatVector(vector);
             } catch (IOException e) {
                 log.error("Error retrieving vector at ordinal {}", ord, e);
                 throw new RuntimeException(e);
