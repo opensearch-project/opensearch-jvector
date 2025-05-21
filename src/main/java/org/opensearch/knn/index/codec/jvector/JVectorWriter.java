@@ -33,6 +33,7 @@ import org.apache.lucene.util.RamUsageEstimator;
 import java.io.DataOutput;
 import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static org.apache.lucene.codecs.lucene99.Lucene99HnswVectorsReader.readVectorEncoding;
 
@@ -477,7 +478,10 @@ public class JVectorWriter extends KnnVectorsWriter {
         private final VectorTypeSupport VECTOR_TYPE_SUPPORT = VectorizationProvider.getInstance().getVectorTypeSupport();
 
         // Array of sub-readers
-        private final JVectorFloatVectorValues[] readers;
+        private final KnnVectorsReader[] readers;
+
+        // Per-thread FloatVectorValues
+        private final Map<PerThreadReaderKey, JVectorFloatVectorValues> perThreadFloatVectorValues = new ConcurrentHashMap<>();
 
         // For each ordinal, stores which reader and which ordinal in that reader
         private final int[][] ordMapping;
@@ -487,6 +491,7 @@ public class JVectorWriter extends KnnVectorsWriter {
 
         // Vector dimension
         private final int dimension;
+        private String fieldName;
 
         /**
          * Creates a random access view over merged float vector values.
@@ -495,28 +500,35 @@ public class JVectorWriter extends KnnVectorsWriter {
          * @param mergeState Merge state containing readers and doc maps
          */
         public RandomAccessMergedFloatVectorValues(FieldInfo fieldInfo, MergeState mergeState) throws IOException {
+            this.fieldName = fieldInfo.name;
             // Count total vectors and collect readers
             int totalSize = 0;
+            int dimension = 0;
             // We explicitly show that the readers are of JVectorFloatVectorValues that are capable of random access
-            List<JVectorFloatVectorValues> allReaders = new ArrayList<>();
+            List<KnnVectorsReader> allReaders = new ArrayList<>();
 
             for (int i = 0; i < mergeState.knnVectorsReaders.length; i++) {
                 FieldInfos fieldInfos = mergeState.fieldInfos[i];
-                if (KnnVectorsWriter.MergedVectorValues.hasVectorValues(fieldInfos, fieldInfo.name)) {
+                if (KnnVectorsWriter.MergedVectorValues.hasVectorValues(fieldInfos, fieldName)) {
                     KnnVectorsReader reader = mergeState.knnVectorsReaders[i];
                     if (reader != null) {
-                        JVectorFloatVectorValues values = (JVectorFloatVectorValues) reader.getFloatVectorValues(fieldInfo.name);
+                        JVectorFloatVectorValues values = (JVectorFloatVectorValues) reader.getFloatVectorValues(fieldName);
                         if (values != null) {
-                            allReaders.add(values);
+                            allReaders.add(reader);
                             totalSize += values.size();
+                            dimension = Math.max(dimension, values.dimension());
                         }
                     }
                 }
             }
 
+            assert (totalSize <= Arrays.stream(mergeState.maxDocs).asLongStream().sum())
+                : "Total number of vectors exceeds the total number of documents";
+            assert (dimension > 0) : "No vectors found for field " + fieldName;
+
             this.size = totalSize;
-            this.readers = allReaders.toArray(new JVectorFloatVectorValues[0]);
-            this.dimension = readers.length > 0 ? readers[0].dimension() : 0;
+            this.readers = allReaders.toArray(new KnnVectorsReader[0]);
+            this.dimension = dimension;
 
             // Build mapping from global ordinal to [readerIndex, readerOrd]
             this.ordMapping = new int[totalSize][2];
@@ -527,9 +539,9 @@ public class JVectorWriter extends KnnVectorsWriter {
 
             // For each reader
             for (int readerIdx = 0; readerIdx < readers.length; readerIdx++) {
-                FloatVectorValues reader = readers[readerIdx];
+                final FloatVectorValues values = readers[readerIdx].getFloatVectorValues(fieldName);
                 // For each vector in this reader
-                KnnVectorValues.DocIndexIterator it = reader.iterator();
+                KnnVectorValues.DocIndexIterator it = values.iterator();
                 for (int docId = it.nextDoc(); docId != DocIdSetIterator.NO_MORE_DOCS; docId = it.nextDoc()) {
                     ordMapping[globalOrd][0] = readerIdx; // Reader index
                     ordMapping[globalOrd][1] = docId; // Ordinal in reader
@@ -561,14 +573,32 @@ public class JVectorWriter extends KnnVectorsWriter {
             }
 
             try {
-                int readerIdx = ordMapping[ord][0];
-                int readerOrd = ordMapping[ord][1];
+                final int readerIdx = ordMapping[ord][0];
+                final int readerOrd = ordMapping[ord][1];
 
                 final float[] vector;
-                // Access to readers is always assumed to be single threaded!
-                synchronized (readers[readerIdx]) {
-                    vector = readers[readerIdx].vectorValue(readerOrd);
-                }
+                // Access to float values is most optimized when reused by the same thread
+                final JVectorFloatVectorValues values = perThreadFloatVectorValues.computeIfAbsent(
+                    new PerThreadReaderKey(readerIdx, Thread.currentThread().threadId()),
+                    k -> {
+                        try {
+                            /* TODO: remove this
+                            log.info("computing float vector values in reader {}", readerIdx);
+                            if (Thread.currentThread().getName().contains("ForkJoinPool")) {
+                                log.info("The thread is a ForkJoinPool thread.");
+                            } else {
+                                log.info("The thread is not a ForkJoinPool thread. Here are the thread details, thread name: {}, group name: {}", Thread.currentThread().getName(), Thread.currentThread().getThreadGroup().getName());
+                            }
+                             */
+                            return (JVectorFloatVectorValues) readers[readerIdx].getFloatVectorValues(fieldName);
+                        } catch (IOException e) {
+                            log.error("Error retrieving float vector values for field {}", fieldName, e);
+                            throw new RuntimeException(e);
+                        }
+                    }
+                );
+                vector = values.vectorValue(readerOrd);
+                // log.info("Retrieved vector at ordinal {} from reader {} with vector {}", ord, readerIdx, Arrays.toString(vector));
                 return VECTOR_TYPE_SUPPORT.createFloatVector(vector);
             } catch (IOException e) {
                 log.error("Error retrieving vector at ordinal {}", ord, e);
@@ -584,6 +614,16 @@ public class JVectorWriter extends KnnVectorsWriter {
         @Override
         public RandomAccessVectorValues copy() {
             throw new UnsupportedOperationException("Copy not supported");
+        }
+    }
+
+    record PerThreadReaderKey(int readerIdx, long threadId) {
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            PerThreadReaderKey that = (PerThreadReaderKey) o;
+            return readerIdx == that.readerIdx && threadId == that.threadId;
         }
     }
 
