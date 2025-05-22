@@ -18,6 +18,10 @@ import io.github.jbellis.jvector.vector.types.VectorTypeSupport;
 import lombok.extern.log4j.Log4j2;
 import org.apache.lucene.codecs.CodecUtil;
 import org.apache.lucene.codecs.KnnVectorsReader;
+import org.apache.lucene.codecs.hnsw.FlatVectorScorerUtil;
+import org.apache.lucene.codecs.hnsw.FlatVectorsFormat;
+import org.apache.lucene.codecs.hnsw.FlatVectorsReader;
+import org.apache.lucene.codecs.lucene99.Lucene99FlatVectorsFormat;
 import org.apache.lucene.index.*;
 import org.apache.lucene.search.KnnCollector;
 import org.apache.lucene.store.*;
@@ -36,6 +40,7 @@ import java.util.Map;
 @Log4j2
 public class JVectorReader extends KnnVectorsReader {
     private static final VectorTypeSupport VECTOR_TYPE_SUPPORT = VectorizationProvider.getInstance().getVectorTypeSupport();
+    private static final FlatVectorsFormat FLAT_VECTORS_FORMAT = new Lucene99FlatVectorsFormat(FlatVectorScorerUtil.getLucene99FlatVectorsScorer());
     private static final int DEFAULT_OVER_QUERY_FACTOR = 5; // We will query 5x more than topKFor reranking
 
     private final FieldInfos fieldInfos;
@@ -44,9 +49,11 @@ public class JVectorReader extends KnnVectorsReader {
     private final Map<String, FieldEntry> fieldEntryMap = new HashMap<>(1);
     private final Directory directory;
     private final SegmentReadState state;
+    private final FlatVectorsReader flatVectorsReader;
 
     public JVectorReader(SegmentReadState state) throws IOException {
         this.state = state;
+        this.flatVectorsReader = FLAT_VECTORS_FORMAT.fieldsReader(state);
         this.fieldInfos = state.fieldInfos;
         this.baseDataFileName = state.segmentInfo.name + "_" + state.segmentSuffix;
         String metaFileName = IndexFileNames.segmentFileName(state.segmentInfo.name, state.segmentSuffix, JVectorFormat.META_EXTENSION);
@@ -74,6 +81,7 @@ public class JVectorReader extends KnnVectorsReader {
 
     @Override
     public void checkIntegrity() throws IOException {
+        flatVectorsReader.checkIntegrity();
         for (FieldEntry fieldEntry : fieldEntryMap.values()) {
             try (var indexInput = state.directory.openInput(fieldEntry.vectorIndexFieldFileName, state.context)) {
                 CodecUtil.checksumEntireFile(indexInput);
@@ -83,7 +91,7 @@ public class JVectorReader extends KnnVectorsReader {
 
     @Override
     public FloatVectorValues getFloatVectorValues(String field) throws IOException {
-        return new JVectorFloatVectorValues(fieldEntryMap.get(field).index, fieldEntryMap.get(field).similarityFunction);
+        return flatVectorsReader.getFloatVectorValues(field);
     }
 
     @Override
@@ -154,6 +162,7 @@ public class JVectorReader extends KnnVectorsReader {
 
     @Override
     public void close() throws IOException {
+        IOUtils.close(flatVectorsReader);
         for (FieldEntry fieldEntry : fieldEntryMap.values()) {
             IOUtils.close(fieldEntry);
         }

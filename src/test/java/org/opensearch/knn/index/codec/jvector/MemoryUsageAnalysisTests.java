@@ -7,6 +7,7 @@ package org.opensearch.knn.index.codec.jvector;
 
 import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters;
 import lombok.extern.log4j.Log4j2;
+import org.apache.lucene.codecs.lucene101.Lucene101Codec;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.KnnFloatVectorField;
@@ -35,7 +36,7 @@ import static org.opensearch.knn.TestUtils.generateRandomVectors;
 public class MemoryUsageAnalysisTests extends LuceneTestCase {
 
     private static final int VECTOR_DIMENSION = 128;
-    private static final int TOTAL_DOCS = 1000;
+    private static final int TOTAL_DOCS = 100000;
     private static final int BATCH_SIZE = 100;
     private static final String VECTOR_FIELD_NAME = "vector_field";
     private static final DecimalFormat MEMORY_FORMAT = new DecimalFormat("#,###.00 MB");
@@ -63,7 +64,7 @@ public class MemoryUsageAnalysisTests extends LuceneTestCase {
         Path indexPath = createTempDir("memory-test-index");
 
         // Configure the JVector codec
-        JVectorCodec codec = new JVectorCodec();
+        var codec = new JVectorCodec();
 
         // Setup index writer with the JVector codec
         IndexWriterConfig config = new IndexWriterConfig().setCodec(codec)

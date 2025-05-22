@@ -24,11 +24,17 @@ import org.apache.lucene.codecs.CodecUtil;
 import org.apache.lucene.codecs.KnnFieldVectorsWriter;
 import org.apache.lucene.codecs.KnnVectorsReader;
 import org.apache.lucene.codecs.KnnVectorsWriter;
+import org.apache.lucene.codecs.hnsw.FlatFieldVectorsWriter;
+import org.apache.lucene.codecs.hnsw.FlatVectorScorerUtil;
+import org.apache.lucene.codecs.hnsw.FlatVectorsFormat;
+import org.apache.lucene.codecs.hnsw.FlatVectorsWriter;
+import org.apache.lucene.codecs.lucene99.Lucene99FlatVectorsFormat;
 import org.apache.lucene.index.*;
 import org.apache.lucene.search.DocIdSetIterator;
 import org.apache.lucene.store.*;
 import org.apache.lucene.util.IOUtils;
 import org.apache.lucene.util.RamUsageEstimator;
+import org.apache.lucene.util.hnsw.CloseableRandomVectorScorerSupplier;
 
 import java.io.DataOutput;
 import java.io.IOException;
@@ -40,10 +46,13 @@ import static org.apache.lucene.codecs.lucene99.Lucene99HnswVectorsReader.readVe
 @Log4j2
 public class JVectorWriter extends KnnVectorsWriter {
     private static final long SHALLOW_RAM_BYTES_USED = RamUsageEstimator.shallowSizeOfInstance(JVectorWriter.class);
+    private static final FlatVectorsFormat FLAT_VECTORS_FORMAT = new Lucene99FlatVectorsFormat(FlatVectorScorerUtil.getLucene99FlatVectorsScorer());
+    private final boolean mergeOnDisk = false;
     private final List<FieldWriter<?>> fields = new ArrayList<>();
 
     private final IndexOutput meta;
     private final IndexOutput vectorIndex;
+    private final FlatVectorsWriter flatVectorWriter;
     private final String indexDataFileName;
     private final String baseDataFileName;
     private final SegmentWriteState segmentWriteState;
@@ -69,6 +78,7 @@ public class JVectorWriter extends KnnVectorsWriter {
         this.degreeOverflow = degreeOverflow;
         this.alpha = alpha;
         this.minimumBatchSizeForQuantization = minimumBatchSizeForQuantization;
+        this.flatVectorWriter = FLAT_VECTORS_FORMAT.fieldsWriter(segmentWriteState);
         String metaFileName = IndexFileNames.segmentFileName(
             segmentWriteState.segmentInfo.name,
             segmentWriteState.segmentSuffix,
@@ -125,7 +135,9 @@ public class JVectorWriter extends KnnVectorsWriter {
             log.error(errorMessage);
             throw new UnsupportedOperationException(errorMessage);
         }
-        FieldWriter<?> newField = new FieldWriter<>(fieldInfo, segmentWriteState.segmentInfo.name, ravv);
+        final FlatFieldVectorsWriter<?> flatFieldVectorsWriter = flatVectorWriter.addField(fieldInfo);
+        FieldWriter<?> newField = new FieldWriter<>(fieldInfo, segmentWriteState.segmentInfo.name, flatFieldVectorsWriter, ravv);
+
         fields.add(newField);
         return newField;
     }
@@ -133,6 +145,8 @@ public class JVectorWriter extends KnnVectorsWriter {
     @Override
     public void mergeOneField(FieldInfo fieldInfo, MergeState mergeState) throws IOException {
         log.info("Merging field {} into segment {}", fieldInfo.name, segmentWriteState.segmentInfo.name);
+        CloseableRandomVectorScorerSupplier scorerSupplier =
+                flatVectorWriter.mergeOneFieldToIndex(fieldInfo, mergeState);
         var success = false;
         try {
             switch (fieldInfo.getVectorEncoding()) {
@@ -146,14 +160,25 @@ public class JVectorWriter extends KnnVectorsWriter {
                     writeField(byteWriter);
                     break;
                 case FLOAT32:
-                    final var ravv = new RandomAccessMergedFloatVectorValues(fieldInfo, mergeState);
-                    var floatVectorFieldWriter = (FieldWriter<float[]>) addField(fieldInfo, ravv);
+                    final FieldWriter<float[]> floatVectorFieldWriter;
+                    if (mergeOnDisk) {
+                        final var ravv = new RandomAccessMergedFloatVectorValues(fieldInfo, mergeState, scorerSupplier);
+                        floatVectorFieldWriter = (FieldWriter<float[]>) addField(fieldInfo, ravv);
+                    } else {
+                        floatVectorFieldWriter = (FieldWriter<float[]>) addField(fieldInfo);
+                        FloatVectorValues mergeFloatVector = MergedVectorValues.mergeFloatVectorValues(fieldInfo, mergeState);
+                        var itr = mergeFloatVector.iterator();
+                        for (int doc = itr.nextDoc(); doc != DocIdSetIterator.NO_MORE_DOCS; doc = itr.nextDoc()) {
+                            floatVectorFieldWriter.addValue(doc, mergeFloatVector.vectorValue(doc));
+                        }
+                    }
                     writeField(floatVectorFieldWriter);
                     break;
             }
             success = true;
             log.info("Completed Merge field {} into segment {}", fieldInfo.name, segmentWriteState.segmentInfo.name);
         } finally {
+            IOUtils.close(scorerSupplier);
             if (success) {
                 // IOUtils.close(scorerSupplier);
             } else {
@@ -166,6 +191,9 @@ public class JVectorWriter extends KnnVectorsWriter {
     public void flush(int maxDoc, Sorter.DocMap sortMap) throws IOException {
         log.info("Flushing {} fields", fields.size());
 
+        log.info("Writing flat vectors");
+        flatVectorWriter.flush(maxDoc, sortMap);
+        log.info("Writing jVector graph index");
         for (FieldWriter<?> field : fields) {
             if (sortMap == null) {
                 writeField(field);
@@ -333,11 +361,13 @@ public class JVectorWriter extends KnnVectorsWriter {
         if (vectorIndex != null) {
             CodecUtil.writeFooter(vectorIndex);
         }
+
+        flatVectorWriter.finish();
     }
 
     @Override
     public void close() throws IOException {
-        IOUtils.close(meta, vectorIndex);
+        IOUtils.close(meta, vectorIndex, flatVectorWriter);
     }
 
     @Override
@@ -368,15 +398,17 @@ public class JVectorWriter extends KnnVectorsWriter {
         private final List<VectorFloat<?>> floatVectors;
         private final String segmentName;
         private final RandomAccessVectorValues randomAccessVectorValues;
+        private final FlatFieldVectorsWriter<T> flatFieldVectorsWriter;
         private final BuildScoreProvider buildScoreProvider;
 
-        FieldWriter(FieldInfo fieldInfo, String segmentName, RandomAccessVectorValues ravv) {
+        FieldWriter(FieldInfo fieldInfo, String segmentName, FlatFieldVectorsWriter<T> flatFieldVectorsWriter, RandomAccessVectorValues ravv) {
             /*
              * Either field writer will use existing ravv or will allow to dynamically add values via the floatVectors.
              * For merges,
              * we will provide an existing ravv object to avoid copying to heap of what's already can be referenced from
              * the disk.
              */
+            this.flatFieldVectorsWriter = flatFieldVectorsWriter;
             if (ravv == null) {
                 this.floatVectors = new ArrayList<>();
                 this.randomAccessVectorValues = new ListRandomAccessVectorValues(floatVectors, fieldInfo.getVectorDimension());
@@ -411,6 +443,7 @@ public class JVectorWriter extends KnnVectorsWriter {
                         + "\" appears more than once in this document (only one value is allowed per field)"
                 );
             }
+            flatFieldVectorsWriter.addValue(docID, vectorValue);
             if (vectorValue instanceof float[]) {
                 var floats = (float[]) vectorValue;
                 var vector = VECTOR_TYPE_SUPPORT.createFloatVector(floats);
@@ -481,7 +514,7 @@ public class JVectorWriter extends KnnVectorsWriter {
         private final KnnVectorsReader[] readers;
 
         // Per-thread FloatVectorValues
-        private final Map<PerThreadReaderKey, JVectorFloatVectorValues> perThreadFloatVectorValues = new ConcurrentHashMap<>();
+        private final Map<PerThreadReaderKey, FloatVectorValues> perThreadFloatVectorValues = new ConcurrentHashMap<>();
 
         // For each ordinal, stores which reader and which ordinal in that reader
         private final int[][] ordMapping;
@@ -491,6 +524,8 @@ public class JVectorWriter extends KnnVectorsWriter {
 
         // Vector dimension
         private final int dimension;
+        private final CloseableRandomVectorScorerSupplier scorerSupplier;
+
         private String fieldName;
 
         /**
@@ -499,8 +534,9 @@ public class JVectorWriter extends KnnVectorsWriter {
          * @param fieldInfo Field info for the vector field
          * @param mergeState Merge state containing readers and doc maps
          */
-        public RandomAccessMergedFloatVectorValues(FieldInfo fieldInfo, MergeState mergeState) throws IOException {
+        public RandomAccessMergedFloatVectorValues(FieldInfo fieldInfo, MergeState mergeState, CloseableRandomVectorScorerSupplier scorerSupplier) throws IOException {
             this.fieldName = fieldInfo.name;
+            this.scorerSupplier = scorerSupplier;
             // Count total vectors and collect readers
             int totalSize = 0;
             int dimension = 0;
@@ -512,7 +548,7 @@ public class JVectorWriter extends KnnVectorsWriter {
                 if (KnnVectorsWriter.MergedVectorValues.hasVectorValues(fieldInfos, fieldName)) {
                     KnnVectorsReader reader = mergeState.knnVectorsReaders[i];
                     if (reader != null) {
-                        JVectorFloatVectorValues values = (JVectorFloatVectorValues) reader.getFloatVectorValues(fieldName);
+                        FloatVectorValues values = reader.getFloatVectorValues(fieldName);
                         if (values != null) {
                             allReaders.add(reader);
                             totalSize += values.size();
@@ -578,7 +614,7 @@ public class JVectorWriter extends KnnVectorsWriter {
 
                 final float[] vector;
                 // Access to float values is most optimized when reused by the same thread
-                final JVectorFloatVectorValues values = perThreadFloatVectorValues.computeIfAbsent(
+                final FloatVectorValues values = perThreadFloatVectorValues.computeIfAbsent(
                     new PerThreadReaderKey(readerIdx, Thread.currentThread().threadId()),
                     k -> {
                         try {
@@ -590,7 +626,7 @@ public class JVectorWriter extends KnnVectorsWriter {
                                 log.info("The thread is not a ForkJoinPool thread. Here are the thread details, thread name: {}, group name: {}", Thread.currentThread().getName(), Thread.currentThread().getThreadGroup().getName());
                             }
                              */
-                            return (JVectorFloatVectorValues) readers[readerIdx].getFloatVectorValues(fieldName);
+                            return readers[readerIdx].getFloatVectorValues(fieldName);
                         } catch (IOException e) {
                             log.error("Error retrieving float vector values for field {}", fieldName, e);
                             throw new RuntimeException(e);
