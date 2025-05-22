@@ -21,6 +21,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 @Log4j2
 public class JVectorRandomAccessReader implements RandomAccessReader {
     private final byte[] internalBuffer = new byte[Long.BYTES];
+    private final byte[] internalFloatBuffer = new byte[Float.BYTES];
     private final IndexInput indexInputDelegate;
     private volatile boolean closed = false;
 
@@ -45,9 +46,9 @@ public class JVectorRandomAccessReader implements RandomAccessReader {
 
     @Override
     public float readFloat() throws IOException {
-        indexInputDelegate.readBytes(internalBuffer, 0, Float.BYTES);
-        FloatBuffer buffer = ByteBuffer.wrap(internalBuffer).asFloatBuffer();
-        return buffer.get(0);
+        indexInputDelegate.readBytes(internalFloatBuffer, 0, Float.BYTES);
+        FloatBuffer buffer = ByteBuffer.wrap(internalFloatBuffer).asFloatBuffer();
+        return buffer.get();
     }
 
     // TODO: bring back to override when upgrading jVector again
@@ -102,11 +103,10 @@ public class JVectorRandomAccessReader implements RandomAccessReader {
 
     @Override
     public void read(float[] floats, int offset, int count) throws IOException {
-        // Note that we are not using the readFloats method from IndexInput because it does not support the endianess correctly as is
-        // written by the jvector writer
-        for (int i = 0; i < count; i++) {
-            floats[offset + i] = readFloat();
-        }
+        final ByteBuffer byteBuffer = ByteBuffer.allocate(Float.BYTES * count);
+        indexInputDelegate.readBytes(byteBuffer.array(), offset, Float.BYTES * count);
+        FloatBuffer buffer = byteBuffer.asFloatBuffer();
+        buffer.get(floats, offset, count);
     }
 
     @Override
