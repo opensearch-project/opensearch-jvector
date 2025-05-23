@@ -8,8 +8,6 @@ package org.opensearch.knn.index.codec.jvector;
 import io.github.jbellis.jvector.disk.RandomAccessReader;
 import io.github.jbellis.jvector.disk.ReaderSupplier;
 import lombok.extern.log4j.Log4j2;
-import org.apache.lucene.store.Directory;
-import org.apache.lucene.store.IOContext;
 import org.apache.lucene.store.IndexInput;
 import org.apache.lucene.util.IOUtils;
 
@@ -19,11 +17,11 @@ import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 
 @Log4j2
 public class JVectorRandomAccessReader implements RandomAccessReader {
     private final byte[] internalBuffer = new byte[Long.BYTES];
+    private final byte[] internalFloatBuffer = new byte[Float.BYTES];
     private final IndexInput indexInputDelegate;
     private volatile boolean closed = false;
 
@@ -48,9 +46,9 @@ public class JVectorRandomAccessReader implements RandomAccessReader {
 
     @Override
     public float readFloat() throws IOException {
-        indexInputDelegate.readBytes(internalBuffer, 0, Float.BYTES);
-        FloatBuffer buffer = ByteBuffer.wrap(internalBuffer).asFloatBuffer();
-        return buffer.get(0);
+        indexInputDelegate.readBytes(internalFloatBuffer, 0, Float.BYTES);
+        FloatBuffer buffer = ByteBuffer.wrap(internalFloatBuffer).asFloatBuffer();
+        return buffer.get();
     }
 
     // TODO: bring back to override when upgrading jVector again
@@ -105,11 +103,10 @@ public class JVectorRandomAccessReader implements RandomAccessReader {
 
     @Override
     public void read(float[] floats, int offset, int count) throws IOException {
-        // Note that we are not using the readFloats method from IndexInput because it does not support the endianess correctly as is
-        // written by the jvector writer
-        for (int i = 0; i < count; i++) {
-            floats[offset + i] = readFloat();
-        }
+        final ByteBuffer byteBuffer = ByteBuffer.allocate(Float.BYTES * count);
+        indexInputDelegate.readBytes(byteBuffer.array(), offset, Float.BYTES * count);
+        FloatBuffer buffer = byteBuffer.asFloatBuffer();
+        buffer.get(floats, offset, count);
     }
 
     @Override
@@ -121,26 +118,22 @@ public class JVectorRandomAccessReader implements RandomAccessReader {
     }
 
     public static class Supplier implements ReaderSupplier {
-        private final Directory directory;
-        private final String fileName;
-        private final IOContext context;
         private final AtomicInteger readerCount = new AtomicInteger(0);
-        private final AtomicReference<IndexInput> currentInput = new AtomicReference<>(null);
+        private final IndexInput currentInput;
         private final ConcurrentHashMap<Integer, RandomAccessReader> readers = new ConcurrentHashMap<>();
 
-        public Supplier(Directory directory, String fileName, IOContext context) {
-            this.directory = directory;
-            this.fileName = fileName;
-            this.context = context;
+        public Supplier(IndexInput indexInput, long startOffset) throws IOException {
+            this.currentInput = indexInput;
+            this.currentInput.seek(startOffset);
         }
 
         @Override
         public RandomAccessReader get() throws IOException {
-            synchronized (directory) {
-                if (currentInput.get() == null) {
-                    currentInput.set(directory.openInput(fileName, context));
-                }
-                IndexInput input = currentInput.get().clone();
+            synchronized (this) {
+                final long startOffset = currentInput.getFilePointer();
+                final long remainingLength = currentInput.length() - startOffset;
+                final IndexInput input = currentInput.slice("Input Slice for the jVector graph or PQ", startOffset, remainingLength)
+                    .clone();
 
                 var reader = new JVectorRandomAccessReader(input);
                 int readerId = readerCount.getAndIncrement();
@@ -153,10 +146,7 @@ public class JVectorRandomAccessReader implements RandomAccessReader {
         @Override
         public void close() throws IOException {
             // Close source of all cloned inputs
-            var input = currentInput.get();
-            if (input != null) {
-                IOUtils.closeWhileHandlingException(input);
-            }
+            IOUtils.closeWhileHandlingException(currentInput);
 
             // Close all readers
             for (RandomAccessReader reader : readers.values()) {

@@ -28,38 +28,49 @@ public class JVectorFormat extends KnnVectorsFormat {
     private static final int DEFAULT_BEAM_WIDTH = 100;
     private static final float DEFAULT_DEGREE_OVERFLOW = 1.2f;
     private static final float DEFAULT_ALPHA = 1.2f;
+    public static final boolean DEFAULT_MERGE_ON_DISK = true;
 
     private final int maxConn;
     private final int beamWidth;
     private final int minBatchSizeForQuantization;
+    private final boolean mergeOnDisk;
 
     public JVectorFormat() {
-        this(NAME, DEFAULT_MAX_CONN, DEFAULT_BEAM_WIDTH, DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION);
+        this(NAME, DEFAULT_MAX_CONN, DEFAULT_BEAM_WIDTH, DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION, DEFAULT_MERGE_ON_DISK);
     }
 
-    public JVectorFormat(int minBatchSizeForQuantization) {
-        this(NAME, DEFAULT_MAX_CONN, DEFAULT_BEAM_WIDTH, minBatchSizeForQuantization);
+    public JVectorFormat(int minBatchSizeForQuantization, boolean mergeOnDisk) {
+        this(NAME, DEFAULT_MAX_CONN, DEFAULT_BEAM_WIDTH, minBatchSizeForQuantization, mergeOnDisk);
     }
 
-    public JVectorFormat(int maxConn, int beamWidth) {
-        this(NAME, maxConn, beamWidth, DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION);
+    public JVectorFormat(int maxConn, int beamWidth, int minBatchSizeForQuantization, boolean mergeOnDisk) {
+        this(NAME, maxConn, beamWidth, minBatchSizeForQuantization, mergeOnDisk);
     }
 
-    public JVectorFormat(String name, int maxConn, int beamWidth, int minBatchSizeForQuantization) {
+    public JVectorFormat(String name, int maxConn, int beamWidth, int minBatchSizeForQuantization, boolean mergeOnDisk) {
         super(name);
         this.maxConn = maxConn;
         this.beamWidth = beamWidth;
         this.minBatchSizeForQuantization = minBatchSizeForQuantization;
+        this.mergeOnDisk = mergeOnDisk;
     }
 
     @Override
     public KnnVectorsWriter fieldsWriter(SegmentWriteState state) throws IOException {
-        return new JVectorWriter(state, maxConn, beamWidth, DEFAULT_DEGREE_OVERFLOW, DEFAULT_ALPHA, minBatchSizeForQuantization);
+        return new JVectorWriter(
+            state,
+            maxConn,
+            beamWidth,
+            DEFAULT_DEGREE_OVERFLOW,
+            DEFAULT_ALPHA,
+            minBatchSizeForQuantization,
+            mergeOnDisk
+        );
     }
 
     @Override
     public KnnVectorsReader fieldsReader(SegmentReadState state) throws IOException {
-        return new JVectorReader(state);
+        return new JVectorReader(state, mergeOnDisk);
     }
 
     @Override

@@ -58,7 +58,12 @@ public class KNN9120PerFieldKnnVectorsFormat extends BasePerFieldKnnVectorsForma
                             );
                         }
                     case JVECTOR:
-                        return new JVectorFormat(knnVectorsFormatParams.getMaxConnections(), knnVectorsFormatParams.getBeamWidth());
+                        return new JVectorFormat(
+                            knnVectorsFormatParams.getMaxConnections(),
+                            knnVectorsFormatParams.getBeamWidth(),
+                            Integer.MAX_VALUE,
+                            true
+                        );
                     default:
                         throw new IllegalArgumentException("Unsupported java engine: " + knnEngine);
                 }

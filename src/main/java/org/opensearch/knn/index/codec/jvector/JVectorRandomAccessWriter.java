@@ -10,8 +10,11 @@ import lombok.extern.log4j.Log4j2;
 import org.apache.lucene.store.IndexOutput;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 
+/**
+ * JVectorRandomAccessWriter is a wrapper around IndexOutput that implements RandomAccessWriter.
+ * Note: This is not thread safe!
+ */
 @Log4j2
 public class JVectorRandomAccessWriter implements RandomAccessWriter {
     private final byte[] writeBuffer = new byte[Long.BYTES]; // used to store temporary bytes conversion before writing
@@ -100,8 +103,7 @@ public class JVectorRandomAccessWriter implements RandomAccessWriter {
 
     @Override
     public void writeFloat(float v) throws IOException {
-        ByteBuffer.wrap(writeBuffer).putFloat(v);
-        indexOutputDelegate.writeBytes(writeBuffer, 0, Float.BYTES);
+        indexOutputDelegate.writeInt(Float.floatToIntBits(v));
     }
 
     @Override
