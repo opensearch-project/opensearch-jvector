@@ -37,12 +37,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static org.opensearch.knn.index.codec.jvector.JVectorFormat.DEFAULT_MERGE_ON_DISK;
-
 @Log4j2
 public class JVectorReader extends KnnVectorsReader {
     private static final VectorTypeSupport VECTOR_TYPE_SUPPORT = VectorizationProvider.getInstance().getVectorTypeSupport();
-    private static final FlatVectorsFormat FLAT_VECTORS_FORMAT = new Lucene99FlatVectorsFormat(FlatVectorScorerUtil.getLucene99FlatVectorsScorer());
+    private static final FlatVectorsFormat FLAT_VECTORS_FORMAT = new Lucene99FlatVectorsFormat(
+        FlatVectorScorerUtil.getLucene99FlatVectorsScorer()
+    );
     private static final int DEFAULT_OVER_QUERY_FACTOR = 5; // We will query 5x more than topKFor reranking
 
     private final FieldInfos fieldInfos;
@@ -52,9 +52,11 @@ public class JVectorReader extends KnnVectorsReader {
     private final Directory directory;
     private final SegmentReadState state;
     private final FlatVectorsReader flatVectorsReader;
+    private final boolean mergeOnDisk;
 
-    public JVectorReader(SegmentReadState state) throws IOException {
+    public JVectorReader(SegmentReadState state, boolean mergeOnDisk) throws IOException {
         this.state = state;
+        this.mergeOnDisk = mergeOnDisk;
         this.flatVectorsReader = FLAT_VECTORS_FORMAT.fieldsReader(state);
         this.fieldInfos = state.fieldInfos;
         this.baseDataFileName = state.segmentInfo.name + "_" + state.segmentSuffix;
@@ -93,7 +95,7 @@ public class JVectorReader extends KnnVectorsReader {
 
     @Override
     public FloatVectorValues getFloatVectorValues(String field) throws IOException {
-        if (DEFAULT_MERGE_ON_DISK) {
+        if (mergeOnDisk) {
             return flatVectorsReader.getFloatVectorValues(field);
         }
         final FieldEntry fieldEntry = fieldEntryMap.get(field);

@@ -6,7 +6,6 @@
 package org.opensearch.knn.index.codec.jvector;
 
 import io.github.jbellis.jvector.graph.GraphIndexBuilder;
-import io.github.jbellis.jvector.graph.ListRandomAccessVectorValues;
 import io.github.jbellis.jvector.graph.OnHeapGraphIndex;
 import io.github.jbellis.jvector.graph.RandomAccessVectorValues;
 import io.github.jbellis.jvector.graph.disk.*;
@@ -42,12 +41,13 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static org.apache.lucene.codecs.lucene99.Lucene99HnswVectorsReader.readVectorEncoding;
-import static org.opensearch.knn.index.codec.jvector.JVectorFormat.DEFAULT_MERGE_ON_DISK;
 
 @Log4j2
 public class JVectorWriter extends KnnVectorsWriter {
     private static final long SHALLOW_RAM_BYTES_USED = RamUsageEstimator.shallowSizeOfInstance(JVectorWriter.class);
-    private static final FlatVectorsFormat FLAT_VECTORS_FORMAT = new Lucene99FlatVectorsFormat(FlatVectorScorerUtil.getLucene99FlatVectorsScorer());
+    private static final FlatVectorsFormat FLAT_VECTORS_FORMAT = new Lucene99FlatVectorsFormat(
+        FlatVectorScorerUtil.getLucene99FlatVectorsScorer()
+    );
     private final List<FieldWriter<?>> fields = new ArrayList<>();
 
     private final IndexOutput meta;
@@ -61,6 +61,7 @@ public class JVectorWriter extends KnnVectorsWriter {
     private final float degreeOverflow;
     private final float alpha;
     private final int minimumBatchSizeForQuantization;
+    private final boolean mergeOnDisk;
 
     private boolean finished = false;
 
@@ -70,7 +71,8 @@ public class JVectorWriter extends KnnVectorsWriter {
         int beamWidth,
         float degreeOverflow,
         float alpha,
-        int minimumBatchSizeForQuantization
+        int minimumBatchSizeForQuantization,
+        boolean mergeOnDisk
     ) throws IOException {
         this.segmentWriteState = segmentWriteState;
         this.maxConn = maxConn;
@@ -78,6 +80,7 @@ public class JVectorWriter extends KnnVectorsWriter {
         this.degreeOverflow = degreeOverflow;
         this.alpha = alpha;
         this.minimumBatchSizeForQuantization = minimumBatchSizeForQuantization;
+        this.mergeOnDisk = mergeOnDisk;
         this.flatVectorWriter = FLAT_VECTORS_FORMAT.fieldsWriter(segmentWriteState);
         String metaFileName = IndexFileNames.segmentFileName(
             segmentWriteState.segmentInfo.name,
@@ -125,8 +128,8 @@ public class JVectorWriter extends KnnVectorsWriter {
         log.info("Adding field {} in segment {}", fieldInfo.name, segmentWriteState.segmentInfo.name);
         if (fieldInfo.getVectorEncoding() == VectorEncoding.BYTE) {
             final String errorMessage = "byte[] vectors are not supported in JVector. "
-                    + "Instead you should only use float vectors and leverage product quantization during indexing."
-                    + "This can provides much greater savings in storage and memory";
+                + "Instead you should only use float vectors and leverage product quantization during indexing."
+                + "This can provides much greater savings in storage and memory";
             log.error(errorMessage);
             throw new UnsupportedOperationException(errorMessage);
         }
@@ -141,8 +144,8 @@ public class JVectorWriter extends KnnVectorsWriter {
         log.info("Adding merge field {} in segment {}", fieldInfo.name, segmentWriteState.segmentInfo.name);
         if (fieldInfo.getVectorEncoding() == VectorEncoding.BYTE) {
             final String errorMessage = "byte[] vectors are not supported in JVector. "
-                    + "Instead you should only use float vectors and leverage product quantization during indexing."
-                    + "This can provides much greater savings in storage and memory";
+                + "Instead you should only use float vectors and leverage product quantization during indexing."
+                + "This can provides much greater savings in storage and memory";
             log.error(errorMessage);
             throw new UnsupportedOperationException(errorMessage);
         }
@@ -152,8 +155,7 @@ public class JVectorWriter extends KnnVectorsWriter {
     @Override
     public void mergeOneField(FieldInfo fieldInfo, MergeState mergeState) throws IOException {
         log.info("Merging field {} into segment {}", fieldInfo.name, segmentWriteState.segmentInfo.name);
-        CloseableRandomVectorScorerSupplier scorerSupplier =
-                flatVectorWriter.mergeOneFieldToIndex(fieldInfo, mergeState);
+        CloseableRandomVectorScorerSupplier scorerSupplier = flatVectorWriter.mergeOneFieldToIndex(fieldInfo, mergeState);
         var success = false;
         try {
             switch (fieldInfo.getVectorEncoding()) {
@@ -168,7 +170,7 @@ public class JVectorWriter extends KnnVectorsWriter {
                     break;
                 case FLOAT32:
                     final FieldWriter<float[]> floatVectorFieldWriter;
-                    if (DEFAULT_MERGE_ON_DISK) {
+                    if (mergeOnDisk) {
                         final var ravv = new RandomAccessMergedFloatVectorValues(fieldInfo, mergeState, scorerSupplier);
                         floatVectorFieldWriter = (FieldWriter<float[]>) addMergeField(fieldInfo, ravv);
                     } else {
@@ -414,16 +416,16 @@ public class JVectorWriter extends KnnVectorsWriter {
             this.fieldInfo = fieldInfo;
             this.segmentName = segmentName;
             this.buildScoreProvider = BuildScoreProvider.randomAccessScoreProvider(
-                    randomAccessVectorValues,
-                    getVectorSimilarityFunction(fieldInfo)
+                randomAccessVectorValues,
+                getVectorSimilarityFunction(fieldInfo)
             );
             this.graphIndexBuilder = new GraphIndexBuilder(
-                    buildScoreProvider,
-                    fieldInfo.getVectorDimension(),
-                    maxConn,
-                    beamWidth,
-                    degreeOverflow,
-                    alpha
+                buildScoreProvider,
+                fieldInfo.getVectorDimension(),
+                maxConn,
+                beamWidth,
+                degreeOverflow,
+                alpha
             );
         }
 
@@ -539,7 +541,11 @@ public class JVectorWriter extends KnnVectorsWriter {
          * @param fieldInfo Field info for the vector field
          * @param mergeState Merge state containing readers and doc maps
          */
-        public RandomAccessMergedFloatVectorValues(FieldInfo fieldInfo, MergeState mergeState, CloseableRandomVectorScorerSupplier scorerSupplier) throws IOException {
+        public RandomAccessMergedFloatVectorValues(
+            FieldInfo fieldInfo,
+            MergeState mergeState,
+            CloseableRandomVectorScorerSupplier scorerSupplier
+        ) throws IOException {
             this.fieldName = fieldInfo.name;
             this.scorerSupplier = scorerSupplier;
             // Count total vectors and collect readers

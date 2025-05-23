@@ -10,8 +10,6 @@ import lombok.extern.log4j.Log4j2;
 import org.apache.lucene.store.IndexOutput;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 
 /**
  * JVectorRandomAccessWriter is a wrapper around IndexOutput that implements RandomAccessWriter.
