@@ -42,12 +42,12 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static org.apache.lucene.codecs.lucene99.Lucene99HnswVectorsReader.readVectorEncoding;
+import static org.opensearch.knn.index.codec.jvector.JVectorFormat.DEFAULT_MERGE_ON_DISK;
 
 @Log4j2
 public class JVectorWriter extends KnnVectorsWriter {
     private static final long SHALLOW_RAM_BYTES_USED = RamUsageEstimator.shallowSizeOfInstance(JVectorWriter.class);
     private static final FlatVectorsFormat FLAT_VECTORS_FORMAT = new Lucene99FlatVectorsFormat(FlatVectorScorerUtil.getLucene99FlatVectorsScorer());
-    private final boolean mergeOnDisk = false;
     private final List<FieldWriter<?>> fields = new ArrayList<>();
 
     private final IndexOutput meta;
@@ -122,24 +122,31 @@ public class JVectorWriter extends KnnVectorsWriter {
 
     @Override
     public KnnFieldVectorsWriter<?> addField(FieldInfo fieldInfo) throws IOException {
-        // adding a new field through the path of adding new documents (not through merge!)
-        return addField(fieldInfo, null);
-    }
-
-    private KnnFieldVectorsWriter<?> addField(FieldInfo fieldInfo, RandomAccessVectorValues ravv) throws IOException {
         log.info("Adding field {} in segment {}", fieldInfo.name, segmentWriteState.segmentInfo.name);
         if (fieldInfo.getVectorEncoding() == VectorEncoding.BYTE) {
             final String errorMessage = "byte[] vectors are not supported in JVector. "
-                + "Instead you should only use float vectors and leverage product quantization during indexing."
-                + "This can provides much greater savings in storage and memory";
+                    + "Instead you should only use float vectors and leverage product quantization during indexing."
+                    + "This can provides much greater savings in storage and memory";
             log.error(errorMessage);
             throw new UnsupportedOperationException(errorMessage);
         }
         final FlatFieldVectorsWriter<?> flatFieldVectorsWriter = flatVectorWriter.addField(fieldInfo);
-        FieldWriter<?> newField = new FieldWriter<>(fieldInfo, segmentWriteState.segmentInfo.name, flatFieldVectorsWriter, ravv);
+        FieldWriter<?> newField = new FieldWriter<>(fieldInfo, segmentWriteState.segmentInfo.name, flatFieldVectorsWriter);
 
         fields.add(newField);
         return newField;
+    }
+
+    public KnnFieldVectorsWriter<?> addMergeField(FieldInfo fieldInfo, RandomAccessVectorValues ravv) throws IOException {
+        log.info("Adding merge field {} in segment {}", fieldInfo.name, segmentWriteState.segmentInfo.name);
+        if (fieldInfo.getVectorEncoding() == VectorEncoding.BYTE) {
+            final String errorMessage = "byte[] vectors are not supported in JVector. "
+                    + "Instead you should only use float vectors and leverage product quantization during indexing."
+                    + "This can provides much greater savings in storage and memory";
+            log.error(errorMessage);
+            throw new UnsupportedOperationException(errorMessage);
+        }
+        return new FieldWriter<>(fieldInfo, segmentWriteState.segmentInfo.name, ravv);
     }
 
     @Override
@@ -161,9 +168,9 @@ public class JVectorWriter extends KnnVectorsWriter {
                     break;
                 case FLOAT32:
                     final FieldWriter<float[]> floatVectorFieldWriter;
-                    if (mergeOnDisk) {
+                    if (DEFAULT_MERGE_ON_DISK) {
                         final var ravv = new RandomAccessMergedFloatVectorValues(fieldInfo, mergeState, scorerSupplier);
-                        floatVectorFieldWriter = (FieldWriter<float[]>) addField(fieldInfo, ravv);
+                        floatVectorFieldWriter = (FieldWriter<float[]>) addMergeField(fieldInfo, ravv);
                     } else {
                         floatVectorFieldWriter = (FieldWriter<float[]>) addField(fieldInfo);
                         FloatVectorValues mergeFloatVector = MergedVectorValues.mergeFloatVectorValues(fieldInfo, mergeState);
@@ -389,34 +396,43 @@ public class JVectorWriter extends KnnVectorsWriter {
      * This is often specialized to support specific implementations, such as float[] or byte[] vectors.
      */
     class FieldWriter<T> extends KnnFieldVectorsWriter<T> {
-        private final VectorTypeSupport VECTOR_TYPE_SUPPORT = VectorizationProvider.getInstance().getVectorTypeSupport();
         private final long SHALLOW_SIZE = RamUsageEstimator.shallowSizeOfInstance(FieldWriter.class);
         @Getter
         private final FieldInfo fieldInfo;
         private int lastDocID = -1;
         private final GraphIndexBuilder graphIndexBuilder;
-        private final List<VectorFloat<?>> floatVectors;
         private final String segmentName;
         private final RandomAccessVectorValues randomAccessVectorValues;
         private final FlatFieldVectorsWriter<T> flatFieldVectorsWriter;
         private final BuildScoreProvider buildScoreProvider;
 
-        FieldWriter(FieldInfo fieldInfo, String segmentName, FlatFieldVectorsWriter<T> flatFieldVectorsWriter, RandomAccessVectorValues ravv) {
-            /*
-             * Either field writer will use existing ravv or will allow to dynamically add values via the floatVectors.
-             * For merges,
-             * we will provide an existing ravv object to avoid copying to heap of what's already can be referenced from
-             * the disk.
+        // For merge fields only
+        FieldWriter(FieldInfo fieldInfo, String segmentName, RandomAccessVectorValues ravv) {
+            this.flatFieldVectorsWriter = null;
+            this.randomAccessVectorValues = ravv;
+            // This unmodifiable list makes sure that the addition of values outside what's already in ravv will fail.
+            this.fieldInfo = fieldInfo;
+            this.segmentName = segmentName;
+            this.buildScoreProvider = BuildScoreProvider.randomAccessScoreProvider(
+                    randomAccessVectorValues,
+                    getVectorSimilarityFunction(fieldInfo)
+            );
+            this.graphIndexBuilder = new GraphIndexBuilder(
+                    buildScoreProvider,
+                    fieldInfo.getVectorDimension(),
+                    maxConn,
+                    beamWidth,
+                    degreeOverflow,
+                    alpha
+            );
+        }
+
+        FieldWriter(FieldInfo fieldInfo, String segmentName, FlatFieldVectorsWriter<T> flatFieldVectorsWriter) {
+            /**
+             * For creating a new field from a flat field vectors writer.
              */
             this.flatFieldVectorsWriter = flatFieldVectorsWriter;
-            if (ravv == null) {
-                this.floatVectors = new ArrayList<>();
-                this.randomAccessVectorValues = new ListRandomAccessVectorValues(floatVectors, fieldInfo.getVectorDimension());
-            } else {
-                this.randomAccessVectorValues = ravv;
-                // This unmodifiable list makes sure that the addition of values outside what's already in ravv will fail.
-                this.floatVectors = Collections.emptyList();
-            }
+            this.randomAccessVectorValues = new RandomAccessVectorValuesOverFlatFields(flatFieldVectorsWriter, fieldInfo);
             this.fieldInfo = fieldInfo;
             this.segmentName = segmentName;
             this.buildScoreProvider = BuildScoreProvider.randomAccessScoreProvider(
@@ -443,12 +459,8 @@ public class JVectorWriter extends KnnVectorsWriter {
                         + "\" appears more than once in this document (only one value is allowed per field)"
                 );
             }
-            flatFieldVectorsWriter.addValue(docID, vectorValue);
             if (vectorValue instanceof float[]) {
-                var floats = (float[]) vectorValue;
-                var vector = VECTOR_TYPE_SUPPORT.createFloatVector(floats);
-                floatVectors.add(vector);
-                graphIndexBuilder.addGraphNode(docID, vector);
+                flatFieldVectorsWriter.addValue(docID, vectorValue);
             } else if (vectorValue instanceof byte[]) {
                 final String errorMessage = "byte[] vectors are not supported in JVector. "
                     + "Instead you should only use float vectors and leverage product quantization during indexing."
@@ -469,7 +481,7 @@ public class JVectorWriter extends KnnVectorsWriter {
 
         @Override
         public long ramBytesUsed() {
-            return SHALLOW_SIZE + RamUsageEstimator.sizeOfCollection(floatVectors);
+            return SHALLOW_SIZE + flatFieldVectorsWriter.ramBytesUsed();
         }
 
         io.github.jbellis.jvector.vector.VectorSimilarityFunction getVectorSimilarityFunction(FieldInfo fieldInfo) {
@@ -492,14 +504,7 @@ public class JVectorWriter extends KnnVectorsWriter {
          * @throws IOException IOException
          */
         public OnHeapGraphIndex getGraph() throws IOException {
-            if (floatVectors.isEmpty()) {
-                // Float vectors were not added dynamically,
-                // which means we can just create the graph index directly from ravv
-                return graphIndexBuilder.build(randomAccessVectorValues);
-            }
-            // The graph was created dynamically on the heap which means we would have to clean up and explicitly call getGraph
-            graphIndexBuilder.cleanup();
-            return graphIndexBuilder.getGraph();
+            return graphIndexBuilder.build(randomAccessVectorValues);
         }
     }
 
@@ -651,16 +656,53 @@ public class JVectorWriter extends KnnVectorsWriter {
         public RandomAccessVectorValues copy() {
             throw new UnsupportedOperationException("Copy not supported");
         }
-    }
 
-    record PerThreadReaderKey(int readerIdx, long threadId) {
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            PerThreadReaderKey that = (PerThreadReaderKey) o;
-            return readerIdx == that.readerIdx && threadId == that.threadId;
+        record PerThreadReaderKey(int readerIdx, long threadId) {
+            @Override
+            public boolean equals(Object o) {
+                if (this == o) return true;
+                if (o == null || getClass() != o.getClass()) return false;
+                PerThreadReaderKey that = (PerThreadReaderKey) o;
+                return readerIdx == that.readerIdx && threadId == that.threadId;
+            }
         }
     }
 
+    static class RandomAccessVectorValuesOverFlatFields implements RandomAccessVectorValues {
+        private final VectorTypeSupport VECTOR_TYPE_SUPPORT = VectorizationProvider.getInstance().getVectorTypeSupport();
+
+        private final FlatFieldVectorsWriter<?> flatFieldVectorsWriter;
+        private final int dimension;
+
+        RandomAccessVectorValuesOverFlatFields(FlatFieldVectorsWriter<?> flatFieldVectorsWriter, FieldInfo fieldInfo) {
+            this.flatFieldVectorsWriter = flatFieldVectorsWriter;
+            this.dimension = fieldInfo.getVectorDimension();
+        }
+
+        @Override
+        public int size() {
+            return flatFieldVectorsWriter.getVectors().size();
+        }
+
+        @Override
+        public int dimension() {
+            return dimension;
+        }
+
+        @Override
+        public VectorFloat<?> getVector(int nodeId) {
+            final float[] vector = (float[]) flatFieldVectorsWriter.getVectors().get(nodeId);
+            return VECTOR_TYPE_SUPPORT.createFloatVector(vector);
+        }
+
+        @Override
+        public boolean isValueShared() {
+            return false;
+        }
+
+        @Override
+        public RandomAccessVectorValues copy() {
+            throw new UnsupportedOperationException("Copy not supported");
+        }
+    }
 }

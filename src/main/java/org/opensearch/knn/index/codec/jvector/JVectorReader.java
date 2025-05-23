@@ -37,6 +37,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static org.opensearch.knn.index.codec.jvector.JVectorFormat.DEFAULT_MERGE_ON_DISK;
+
 @Log4j2
 public class JVectorReader extends KnnVectorsReader {
     private static final VectorTypeSupport VECTOR_TYPE_SUPPORT = VectorizationProvider.getInstance().getVectorTypeSupport();
@@ -91,7 +93,11 @@ public class JVectorReader extends KnnVectorsReader {
 
     @Override
     public FloatVectorValues getFloatVectorValues(String field) throws IOException {
-        return flatVectorsReader.getFloatVectorValues(field);
+        if (DEFAULT_MERGE_ON_DISK) {
+            return flatVectorsReader.getFloatVectorValues(field);
+        }
+        final FieldEntry fieldEntry = fieldEntryMap.get(field);
+        return new JVectorFloatVectorValues(fieldEntry.index, fieldEntry.similarityFunction);
     }
 
     @Override
