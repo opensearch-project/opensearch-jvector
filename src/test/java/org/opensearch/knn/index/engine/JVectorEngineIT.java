@@ -358,9 +358,10 @@ public class JVectorEngineIT extends KNNRestTestCase {
             )).longValue()
         );
 
+        // TODO: bring back to increment when we re-enable PQ in jVector plugin
         assertTrue(
             "Reranked counter did not increase",
-            ((Number) after.get(StatNames.KNN_QUERY_RERANKED_COUNT.getName())).longValue() > ((Number) before.get(
+            ((Number) after.get(StatNames.KNN_QUERY_RERANKED_COUNT.getName())).longValue() == ((Number) before.get(
                 StatNames.KNN_QUERY_RERANKED_COUNT.getName()
             )).longValue()
         );
