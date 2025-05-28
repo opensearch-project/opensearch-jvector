@@ -44,7 +44,7 @@ def create_index(host, index_name, dimension, shards=1):
     print(f"Successfully created index {index_name}")
     return response.json()
 
-def index_vectors(host, index_name, num_vectors, dimension, batch_size=1000):
+def index_vectors(host, index_name, num_vectors, dimension, batch_size=1000, force_merge_frequency=0):
     """Index vectors in batches"""
     url = f"http://{host}/{index_name}/_bulk"
     headers = {"Content-Type": "application/x-ndjson"}
@@ -76,6 +76,13 @@ def index_vectors(host, index_name, num_vectors, dimension, batch_size=1000):
             sys.exit(1)
         
         print(f"Indexed batch {batch+1}/{total_batches} ({current_batch_size} vectors)")
+        
+        # Force merge if frequency is set and we've reached the threshold
+        if force_merge_frequency > 0 and (end_idx % force_merge_frequency < batch_size):
+            print(f"\nPerforming intermediate force merge after {end_idx} documents...")
+            force_merge(host, index_name)
+            print(f"Index stats after intermediate force merge:")
+            get_index_stats(host, index_name)
     
     return True
 
@@ -299,6 +306,8 @@ def main():
     parser.add_argument("--shards", type=int, default=1, help="Number of shards")
     parser.add_argument("--num-searches", type=int, default=5, help="Number of searches to perform for stats testing")
     parser.add_argument("--skip-indexing", action="store_true", help="Skip index creation and indexing, only run searches")
+    parser.add_argument("--force-merge-frequency", type=int, default=0, 
+                        help="Force merge after every N documents (0 to disable intermediate merges)")
     
     args = parser.parse_args()
     
@@ -310,17 +319,17 @@ def main():
         create_index(args.host, args.index, args.dimension, args.shards)
         
         # Index vectors
-        index_vectors(args.host, args.index, args.num_vectors, args.dimension, args.batch_size)
+        index_vectors(args.host, args.index, args.num_vectors, args.dimension, args.batch_size, args.force_merge_frequency)
         
-        # Get stats before force merge
-        print("\nIndex stats before force merge:")
+        # Get stats before final force merge
+        print("\nIndex stats before final force merge:")
         get_index_stats(args.host, args.index)
         
         # Force merge
         force_merge(args.host, args.index)
         
         # Get stats after force merge
-        print("\nIndex stats after force merge:")
+        print("\nIndex stats after final force merge:")
         get_index_stats(args.host, args.index)
     else:
         print(f"Skipping index creation and indexing. Using existing index: {args.index}")

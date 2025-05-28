@@ -14,22 +14,29 @@ public class JVectorCodec extends FilterCodec {
 
     public static final String CODEC_NAME = "JVectorCodec";
     private int minBatchSizeForQuantization;
+    private boolean mergeOnDisk;
 
     public JVectorCodec() {
-        this(CODEC_NAME, new Lucene101Codec(), JVectorFormat.DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION);
+        this(
+            CODEC_NAME,
+            new Lucene101Codec(),
+            JVectorFormat.DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION,
+            JVectorFormat.DEFAULT_MERGE_ON_DISK
+        );
     }
 
-    public JVectorCodec(int minBatchSizeForQuantization) {
-        this(CODEC_NAME, new Lucene101Codec(), minBatchSizeForQuantization);
+    public JVectorCodec(int minBatchSizeForQuantization, boolean mergeOnDisk) {
+        this(CODEC_NAME, new Lucene101Codec(), minBatchSizeForQuantization, mergeOnDisk);
     }
 
-    public JVectorCodec(String codecName, Codec delegate, int minBatchSizeForQuantization) {
+    public JVectorCodec(String codecName, Codec delegate, int minBatchSizeForQuantization, boolean mergeOnDisk) {
         super(codecName, delegate);
         this.minBatchSizeForQuantization = minBatchSizeForQuantization;
+        this.mergeOnDisk = mergeOnDisk;
     }
 
     @Override
     public KnnVectorsFormat knnVectorsFormat() {
-        return new JVectorFormat(minBatchSizeForQuantization);
+        return new JVectorFormat(minBatchSizeForQuantization, mergeOnDisk);
     }
 }

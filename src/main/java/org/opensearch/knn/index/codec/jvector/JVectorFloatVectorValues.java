@@ -5,8 +5,8 @@
 
 package org.opensearch.knn.index.codec.jvector;
 
-import io.github.jbellis.jvector.graph.NodesIterator;
 import io.github.jbellis.jvector.graph.disk.OnDiskGraphIndex;
+import io.github.jbellis.jvector.util.Bits;
 import io.github.jbellis.jvector.vector.VectorSimilarityFunction;
 import io.github.jbellis.jvector.vector.VectorizationProvider;
 import io.github.jbellis.jvector.vector.types.VectorFloat;
@@ -19,38 +19,36 @@ import java.io.IOException;
 public class JVectorFloatVectorValues extends FloatVectorValues {
     private static final VectorTypeSupport VECTOR_TYPE_SUPPORT = VectorizationProvider.getInstance().getVectorTypeSupport();
 
-    private final OnDiskGraphIndex onDiskGraphIndex;
     private final OnDiskGraphIndex.View view;
     private final VectorSimilarityFunction similarityFunction;
+    private final int dimension;
+    private final int size;
 
     public JVectorFloatVectorValues(OnDiskGraphIndex onDiskGraphIndex, VectorSimilarityFunction similarityFunction) throws IOException {
-        this.onDiskGraphIndex = onDiskGraphIndex;
+        this.dimension = onDiskGraphIndex.getDimension();
+        this.size = onDiskGraphIndex.size();
         this.view = onDiskGraphIndex.getView();
         this.similarityFunction = similarityFunction;
     }
 
     @Override
     public int dimension() {
-        return onDiskGraphIndex.getDimension();
+        return dimension;
     }
 
     @Override
     public int size() {
-        return onDiskGraphIndex.size();
+        return size;
     }
 
     public VectorFloat<?> vectorFloatValue(int ord) {
-        if (!onDiskGraphIndex.containsNode(ord)) {
-            throw new RuntimeException("ord " + ord + " not found in graph");
-        }
-
         return view.getVector(ord);
     }
 
     public DocIndexIterator iterator() {
         return new DocIndexIterator() {
             private int docId = -1;
-            private final NodesIterator nodesIterator = onDiskGraphIndex.getNodes();
+            private final Bits liveNodes = view.liveNodes();
 
             @Override
             public long cost() {
@@ -69,11 +67,15 @@ public class JVectorFloatVectorValues extends FloatVectorValues {
 
             @Override
             public int nextDoc() throws IOException {
-                if (nodesIterator.hasNext()) {
-                    docId = nodesIterator.next();
-                } else {
-                    docId = NO_MORE_DOCS;
+                // Advance to the next node docId starts from -1 which is why we need to increment docId by 1 "size"
+                // times
+                while (docId < size - 1) {
+                    docId++;
+                    if (liveNodes.get(docId)) {
+                        return docId;
+                    }
                 }
+                docId = NO_MORE_DOCS;
 
                 return docId;
             }
