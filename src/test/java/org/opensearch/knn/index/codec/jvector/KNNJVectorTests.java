@@ -50,7 +50,6 @@ public class KNNJVectorTests extends LuceneTestCase {
         int k = 3; // The number of nearest neighbors to gather
         int totalNumberOfDocs = 10;
         IndexWriterConfig indexWriterConfig = LuceneTestCase.newIndexWriterConfig();
-        // TODO: re-enable this after fixing the compound file augmentation for JVector
         indexWriterConfig.setUseCompoundFile(false);
         indexWriterConfig.setCodec(new JVectorCodec());
         indexWriterConfig.setMergePolicy(new ForceMergesOnlyMergePolicy());
@@ -114,7 +113,6 @@ public class KNNJVectorTests extends LuceneTestCase {
         int k = 3; // The number of nearest neighbours to gather
         int totalNumberOfDocs = 10;
         IndexWriterConfig indexWriterConfig = LuceneTestCase.newIndexWriterConfig();
-        // TODO: re-enable this after fixing the compound file augmentation for JVector
         indexWriterConfig.setUseCompoundFile(false);
         indexWriterConfig.setCodec(new JVectorCodec());
         indexWriterConfig.setMergePolicy(new ForceMergesOnlyMergePolicy(false));
@@ -176,7 +174,6 @@ public class KNNJVectorTests extends LuceneTestCase {
         int k = 3; // The number of nearest neighbours to gather
         int totalNumberOfDocs = 10;
         IndexWriterConfig indexWriterConfig = LuceneTestCase.newIndexWriterConfig();
-        // TODO: re-enable this after fixing the compound file augmentation for JVector
         indexWriterConfig.setUseCompoundFile(false);
         indexWriterConfig.setCodec(new JVectorCodec());
         indexWriterConfig.setMergePolicy(new ForceMergesOnlyMergePolicy());
@@ -577,7 +574,6 @@ public class KNNJVectorTests extends LuceneTestCase {
         int k = 3; // The number of nearest neighbors to gather
         int totalNumberOfDocs = 10;
         IndexWriterConfig indexWriterConfig = LuceneTestCase.newIndexWriterConfig();
-        // TODO: re-enable this after fixing the compound file augmentation for JVector
         indexWriterConfig.setUseCompoundFile(true);
         indexWriterConfig.setCodec(new JVectorCodec());
         indexWriterConfig.setMergePolicy(new ForceMergesOnlyMergePolicy(true));
@@ -698,7 +694,7 @@ public class KNNJVectorTests extends LuceneTestCase {
 
     /**
      * Test to verify that the JVector codec is providing proper error if used with byte vector
-     * TODO: Create Product Quantization support for JVector codec
+     * TODO: Create Binary Quantization support for JVector codec
      */
     @Test
     public void testJVectorKnnIndex_simpleCase_withBinaryVector() throws IOException {
@@ -728,7 +724,6 @@ public class KNNJVectorTests extends LuceneTestCase {
         int k = 3; // The number of nearest neighbours to gather
         int totalNumberOfDocs = 10;
         IndexWriterConfig indexWriterConfig = LuceneTestCase.newIndexWriterConfig();
-        // TODO: re-enable this after fixing the compound file augmentation for JVector
         indexWriterConfig.setUseCompoundFile(false);
         indexWriterConfig.setCodec(new JVectorCodec());
         indexWriterConfig.setMergePolicy(new ForceMergesOnlyMergePolicy());
@@ -786,11 +781,10 @@ public class KNNJVectorTests extends LuceneTestCase {
         int k = 50; // The number of nearest neighbours to gather
         int totalNumberOfDocs = DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION;
         IndexWriterConfig indexWriterConfig = LuceneTestCase.newIndexWriterConfig();
-        // TODO: re-enable this after fixing the compound file augmentation for JVector
         indexWriterConfig.setUseCompoundFile(false);
         // quantization fails with mergeOnDisk, turning it off for now during quantization test
         // TODO: turn mergeOnDisk back on with quantization
-        indexWriterConfig.setCodec(new JVectorCodec(DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION, false));
+        indexWriterConfig.setCodec(new JVectorCodec(DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION, true));
         indexWriterConfig.setMergePolicy(new ForceMergesOnlyMergePolicy());
         // We set the below parameters to make sure no permature flush will occur, this way we can have a single segment, and we can force
         // test the quantization case

@@ -61,7 +61,7 @@ public class KNN9120PerFieldKnnVectorsFormat extends BasePerFieldKnnVectorsForma
                         return new JVectorFormat(
                             knnVectorsFormatParams.getMaxConnections(),
                             knnVectorsFormatParams.getBeamWidth(),
-                            Integer.MAX_VALUE,
+                            JVectorFormat.DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION,
                             false
                         );
                     default:

@@ -506,7 +506,11 @@ public class JVectorWriter extends KnnVectorsWriter {
          * @throws IOException IOException
          */
         public OnHeapGraphIndex getGraph() throws IOException {
-            return graphIndexBuilder.build(randomAccessVectorValues);
+            for (int i = 0; i < randomAccessVectorValues.size(); i++) {
+                graphIndexBuilder.addGraphNode(i, randomAccessVectorValues.getVector(i));
+            }
+            graphIndexBuilder.cleanup();
+            return graphIndexBuilder.getGraph();
         }
     }
 
@@ -625,26 +629,29 @@ public class JVectorWriter extends KnnVectorsWriter {
 
                 final float[] vector;
                 // Access to float values is most optimized when reused by the same thread
-                final FloatVectorValues values = perThreadFloatVectorValues.computeIfAbsent(
-                    new PerThreadReaderKey(readerIdx, Thread.currentThread().threadId()),
-                    k -> {
-                        try {
-                            /* TODO: remove this
-                            log.info("computing float vector values in reader {}", readerIdx);
-                            if (Thread.currentThread().getName().contains("ForkJoinPool")) {
-                                log.info("The thread is a ForkJoinPool thread.");
-                            } else {
-                                log.info("The thread is not a ForkJoinPool thread. Here are the thread details, thread name: {}, group name: {}", Thread.currentThread().getName(), Thread.currentThread().getThreadGroup().getName());
+                synchronized (this) {
+                    final FloatVectorValues values = perThreadFloatVectorValues.computeIfAbsent(
+                        new PerThreadReaderKey(readerIdx, Thread.currentThread().threadId()),
+                        k -> {
+                            try {
+                                /* TODO: remove this
+                                log.info("computing float vector values in reader {}", readerIdx);
+                                if (Thread.currentThread().getName().contains("ForkJoinPool")) {
+                                    log.info("The thread is a ForkJoinPool thread.");
+                                } else {
+                                    log.info("The thread is not a ForkJoinPool thread. Here are the thread details, thread name: {}, group name: {}", Thread.currentThread().getName(), Thread.currentThread().getThreadGroup().getName());
+                                }
+                                 */
+                                return readers[readerIdx].getFloatVectorValues(fieldName);
+                            } catch (IOException e) {
+                                log.error("Error retrieving float vector values for field {}", fieldName, e);
+                                throw new RuntimeException(e);
                             }
-                             */
-                            return readers[readerIdx].getFloatVectorValues(fieldName);
-                        } catch (IOException e) {
-                            log.error("Error retrieving float vector values for field {}", fieldName, e);
-                            throw new RuntimeException(e);
                         }
-                    }
-                );
-                vector = values.vectorValue(readerOrd);
+                    );
+                    vector = values.vectorValue(readerOrd);
+                }
+
                 // log.info("Retrieved vector at ordinal {} from reader {} with vector {}", ord, readerIdx, Arrays.toString(vector));
                 return VECTOR_TYPE_SUPPORT.createFloatVector(vector);
             } catch (IOException e) {
