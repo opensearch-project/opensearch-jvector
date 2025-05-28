@@ -62,7 +62,7 @@ public class KNN9120PerFieldKnnVectorsFormat extends BasePerFieldKnnVectorsForma
                             knnVectorsFormatParams.getMaxConnections(),
                             knnVectorsFormatParams.getBeamWidth(),
                             JVectorFormat.DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION,
-                            false
+                            true
                         );
                     default:
                         throw new IllegalArgumentException("Unsupported java engine: " + knnEngine);

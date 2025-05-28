@@ -38,7 +38,6 @@ import org.apache.lucene.util.hnsw.CloseableRandomVectorScorerSupplier;
 import java.io.DataOutput;
 import java.io.IOException;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 
 import static org.apache.lucene.codecs.lucene99.Lucene99HnswVectorsReader.readVectorEncoding;
 
@@ -523,9 +522,7 @@ public class JVectorWriter extends KnnVectorsWriter {
 
         // Array of sub-readers
         private final KnnVectorsReader[] readers;
-
-        // Per-thread FloatVectorValues
-        private final Map<PerThreadReaderKey, FloatVectorValues> perThreadFloatVectorValues = new ConcurrentHashMap<>();
+        private final FloatVectorValues[] perReaderFloatVectorValues;
 
         // For each ordinal, stores which reader and which ordinal in that reader
         private final int[][] ordMapping;
@@ -578,30 +575,37 @@ public class JVectorWriter extends KnnVectorsWriter {
             assert (dimension > 0) : "No vectors found for field " + fieldName;
 
             this.size = totalSize;
-            this.readers = allReaders.toArray(new KnnVectorsReader[0]);
+            this.readers = new KnnVectorsReader[allReaders.size()];
+            for (int i = 0; i < readers.length; i++) {
+                readers[i] = allReaders.get(i);
+            }
+            this.perReaderFloatVectorValues = new FloatVectorValues[readers.length];
             this.dimension = dimension;
 
             // Build mapping from global ordinal to [readerIndex, readerOrd]
             this.ordMapping = new int[totalSize][2];
 
+            int documentsIterated = 0;
+
             // Simulate the merge process to build the ordinal mapping
             // This is similar to what DocIDMerger would do but tracks ordinals
-            int globalOrd = 0;
-
+            MergeState.DocMap[] docMaps = mergeState.docMaps;
             // For each reader
             for (int readerIdx = 0; readerIdx < readers.length; readerIdx++) {
                 final FloatVectorValues values = readers[readerIdx].getFloatVectorValues(fieldName);
+                perReaderFloatVectorValues[readerIdx] = values;
                 // For each vector in this reader
                 KnnVectorValues.DocIndexIterator it = values.iterator();
                 for (int docId = it.nextDoc(); docId != DocIdSetIterator.NO_MORE_DOCS; docId = it.nextDoc()) {
+                    final int globalOrd = docMaps[readerIdx].get(docId);
                     ordMapping[globalOrd][0] = readerIdx; // Reader index
                     ordMapping[globalOrd][1] = docId; // Ordinal in reader
-                    globalOrd++;
+                    documentsIterated++;
                 }
             }
 
-            if (globalOrd != totalSize) {
-                throw new IllegalStateException("Built mapping for " + globalOrd + " vectors but expected " + totalSize);
+            if (documentsIterated != totalSize) {
+                throw new IllegalStateException("Built mapping for " + documentsIterated + " vectors but expected " + totalSize);
             }
 
             log.debug("Created RandomAccessMergedFloatVectorValues with {} total vectors from {} readers", size, readers.length);
@@ -624,36 +628,18 @@ public class JVectorWriter extends KnnVectorsWriter {
             }
 
             try {
+
                 final int readerIdx = ordMapping[ord][0];
                 final int readerOrd = ordMapping[ord][1];
 
-                final float[] vector;
-                // Access to float values is most optimized when reused by the same thread
+                // Access to float values is not thread safe
                 synchronized (this) {
-                    final FloatVectorValues values = perThreadFloatVectorValues.computeIfAbsent(
-                        new PerThreadReaderKey(readerIdx, Thread.currentThread().threadId()),
-                        k -> {
-                            try {
-                                /* TODO: remove this
-                                log.info("computing float vector values in reader {}", readerIdx);
-                                if (Thread.currentThread().getName().contains("ForkJoinPool")) {
-                                    log.info("The thread is a ForkJoinPool thread.");
-                                } else {
-                                    log.info("The thread is not a ForkJoinPool thread. Here are the thread details, thread name: {}, group name: {}", Thread.currentThread().getName(), Thread.currentThread().getThreadGroup().getName());
-                                }
-                                 */
-                                return readers[readerIdx].getFloatVectorValues(fieldName);
-                            } catch (IOException e) {
-                                log.error("Error retrieving float vector values for field {}", fieldName, e);
-                                throw new RuntimeException(e);
-                            }
-                        }
-                    );
-                    vector = values.vectorValue(readerOrd);
+                    final FloatVectorValues values = perReaderFloatVectorValues[readerIdx];
+                    final float[] vector = values.vectorValue(readerOrd);
+                    final float[] copy = new float[vector.length];
+                    System.arraycopy(vector, 0, copy, 0, vector.length);
+                    return VECTOR_TYPE_SUPPORT.createFloatVector(copy);
                 }
-
-                // log.info("Retrieved vector at ordinal {} from reader {} with vector {}", ord, readerIdx, Arrays.toString(vector));
-                return VECTOR_TYPE_SUPPORT.createFloatVector(vector);
             } catch (IOException e) {
                 log.error("Error retrieving vector at ordinal {}", ord, e);
                 throw new RuntimeException(e);
@@ -668,16 +654,6 @@ public class JVectorWriter extends KnnVectorsWriter {
         @Override
         public RandomAccessVectorValues copy() {
             throw new UnsupportedOperationException("Copy not supported");
-        }
-
-        record PerThreadReaderKey(int readerIdx, long threadId) {
-            @Override
-            public boolean equals(Object o) {
-                if (this == o) return true;
-                if (o == null || getClass() != o.getClass()) return false;
-                PerThreadReaderKey that = (PerThreadReaderKey) o;
-                return readerIdx == that.readerIdx && threadId == that.threadId;
-            }
         }
     }
 
