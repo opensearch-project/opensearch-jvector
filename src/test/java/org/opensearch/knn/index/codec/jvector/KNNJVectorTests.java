@@ -542,13 +542,22 @@ public class KNNJVectorTests extends LuceneTestCase {
              * 3.  Search – the deleted doc must be gone
              * ---------------------------------------- */
             try (IndexReader reader = DirectoryReader.open(writer)) {
-                assertEquals("All documents except the deleted ones should be live", totalNumberOfDocs - (totalNumberOfDocs / batchSize), reader.numDocs());
+                assertEquals(
+                    "All documents except the deleted ones should be live",
+                    totalNumberOfDocs - (totalNumberOfDocs / batchSize),
+                    reader.numDocs()
+                );
                 // For each batch we will verify that the deleted document doesn't come up in search and only it's neighbours are returned
 
                 for (int i = 0; i < totalNumberOfDocs; i += batchSize) {
                     final float[] target = { 0.0f, 1.0f * (i + docToDeleteInEachBatch) };
                     final IndexSearcher searcher = newSearcher(reader);
-                    final KnnFloatVectorQuery knnFloatVectorQuery = new KnnFloatVectorQuery("test_field", target, k, new MatchAllDocsQuery());
+                    final KnnFloatVectorQuery knnFloatVectorQuery = new KnnFloatVectorQuery(
+                        "test_field",
+                        target,
+                        k,
+                        new MatchAllDocsQuery()
+                    );
                     TopDocs topDocs = searcher.search(knnFloatVectorQuery, k);
                     assertEquals(k, topDocs.totalHits.value());
                     for (int j = 0; j < k; j++) {

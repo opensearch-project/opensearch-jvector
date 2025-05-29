@@ -15,6 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Bug Fixes
 * Fix the limitation of the 2 GB segment with backwards compatibility to JDK21 and move default build to 21 target
 * Fix file handle leak during queries
+* Fix edge case for deleted docs or out of order readers with off heap merges
 ### Infrastructure
 ### Documentation
 ### Maintenance
