@@ -139,7 +139,8 @@ public class JVectorWriter extends KnnVectorsWriter {
         return newField;
     }
 
-    public KnnFieldVectorsWriter<?> addMergeField(FieldInfo fieldInfo, RandomAccessVectorValues ravv) throws IOException {
+    public KnnFieldVectorsWriter<?> addMergeField(FieldInfo fieldInfo, FloatVectorValues mergeFloatVector, RandomAccessVectorValues ravv)
+        throws IOException {
         log.info("Adding merge field {} in segment {}", fieldInfo.name, segmentWriteState.segmentInfo.name);
         if (fieldInfo.getVectorEncoding() == VectorEncoding.BYTE) {
             final String errorMessage = "byte[] vectors are not supported in JVector. "
@@ -148,7 +149,7 @@ public class JVectorWriter extends KnnVectorsWriter {
             log.error(errorMessage);
             throw new UnsupportedOperationException(errorMessage);
         }
-        return new FieldWriter<>(fieldInfo, segmentWriteState.segmentInfo.name, ravv);
+        return new FieldWriter<>(fieldInfo, segmentWriteState.segmentInfo.name, mergeFloatVector, ravv);
     }
 
     @Override
@@ -169,12 +170,12 @@ public class JVectorWriter extends KnnVectorsWriter {
                     break;
                 case FLOAT32:
                     final FieldWriter<float[]> floatVectorFieldWriter;
+                    FloatVectorValues mergeFloatVector = MergedVectorValues.mergeFloatVectorValues(fieldInfo, mergeState);
                     if (mergeOnDisk) {
                         final var ravv = new RandomAccessMergedFloatVectorValues(fieldInfo, mergeState, scorerSupplier);
-                        floatVectorFieldWriter = (FieldWriter<float[]>) addMergeField(fieldInfo, ravv);
+                        floatVectorFieldWriter = (FieldWriter<float[]>) addMergeField(fieldInfo, mergeFloatVector, ravv);
                     } else {
                         floatVectorFieldWriter = (FieldWriter<float[]>) addField(fieldInfo);
-                        FloatVectorValues mergeFloatVector = MergedVectorValues.mergeFloatVectorValues(fieldInfo, mergeState);
                         var itr = mergeFloatVector.iterator();
                         for (int doc = itr.nextDoc(); doc != DocIdSetIterator.NO_MORE_DOCS; doc = itr.nextDoc()) {
                             floatVectorFieldWriter.addValue(doc, mergeFloatVector.vectorValue(doc));
@@ -404,13 +405,15 @@ public class JVectorWriter extends KnnVectorsWriter {
         private final GraphIndexBuilder graphIndexBuilder;
         private final String segmentName;
         private final RandomAccessVectorValues randomAccessVectorValues;
+        private final FloatVectorValues mergedFloatVector;
         private final FlatFieldVectorsWriter<T> flatFieldVectorsWriter;
         private final BuildScoreProvider buildScoreProvider;
 
         // For merge fields only
-        FieldWriter(FieldInfo fieldInfo, String segmentName, RandomAccessVectorValues ravv) {
+        FieldWriter(FieldInfo fieldInfo, String segmentName, FloatVectorValues mergedFloatVector, RandomAccessVectorValues ravv) {
             this.flatFieldVectorsWriter = null;
             this.randomAccessVectorValues = ravv;
+            this.mergedFloatVector = mergedFloatVector;
             // This unmodifiable list makes sure that the addition of values outside what's already in ravv will fail.
             this.fieldInfo = fieldInfo;
             this.segmentName = segmentName;
@@ -434,6 +437,7 @@ public class JVectorWriter extends KnnVectorsWriter {
              */
             this.flatFieldVectorsWriter = flatFieldVectorsWriter;
             this.randomAccessVectorValues = new RandomAccessVectorValuesOverFlatFields(flatFieldVectorsWriter, fieldInfo);
+            this.mergedFloatVector = null;
             this.fieldInfo = fieldInfo;
             this.segmentName = segmentName;
             this.buildScoreProvider = BuildScoreProvider.randomAccessScoreProvider(
@@ -505,9 +509,25 @@ public class JVectorWriter extends KnnVectorsWriter {
          * @throws IOException IOException
          */
         public OnHeapGraphIndex getGraph() throws IOException {
-            for (int i = 0; i < randomAccessVectorValues.size(); i++) {
-                graphIndexBuilder.addGraphNode(i, randomAccessVectorValues.getVector(i));
+            /*
+             * We cannot always use randomAccessVectorValues for the graph building
+             * because it's size will not always correspond to the document count.
+             * To have the right mapping from docId to vector ordinal we need to use the mergedFloatVector.
+             * This is the case when we are merging segments and we might have more documents than vectors.
+             */
+            if (mergedFloatVector != null) {
+                log.info("Building graph from merged float vector");
+                var itr = mergedFloatVector.iterator();
+                for (int doc = itr.nextDoc(); doc != DocIdSetIterator.NO_MORE_DOCS; doc = itr.nextDoc()) {
+                    graphIndexBuilder.addGraphNode(doc, randomAccessVectorValues.getVector(doc));
+                }
+            } else {
+                log.info("Building graph from random access vector values");
+                for (int i = 0; i < randomAccessVectorValues.size(); i++) {
+                    graphIndexBuilder.addGraphNode(i, randomAccessVectorValues.getVector(i));
+                }
             }
+
             graphIndexBuilder.cleanup();
             return graphIndexBuilder.getGraph();
         }
@@ -529,6 +549,8 @@ public class JVectorWriter extends KnnVectorsWriter {
 
         // Total number of vectors
         private final int size;
+        // Total number of documents including those without values
+        private final int totalDocsCount;
 
         // Vector dimension
         private final int dimension;
@@ -549,8 +571,9 @@ public class JVectorWriter extends KnnVectorsWriter {
         ) throws IOException {
             this.fieldName = fieldInfo.name;
             this.scorerSupplier = scorerSupplier;
+            this.totalDocsCount = Math.toIntExact(Arrays.stream(mergeState.maxDocs).asLongStream().sum());
             // Count total vectors and collect readers
-            int totalSize = 0;
+            int totalVectorsCount = 0;
             int dimension = 0;
             // We explicitly show that the readers are of JVectorFloatVectorValues that are capable of random access
             List<KnnVectorsReader> allReaders = new ArrayList<>();
@@ -563,18 +586,17 @@ public class JVectorWriter extends KnnVectorsWriter {
                         FloatVectorValues values = reader.getFloatVectorValues(fieldName);
                         if (values != null) {
                             allReaders.add(reader);
-                            totalSize += values.size();
+                            totalVectorsCount += values.size();
                             dimension = Math.max(dimension, values.dimension());
                         }
                     }
                 }
             }
 
-            assert (totalSize <= Arrays.stream(mergeState.maxDocs).asLongStream().sum())
-                : "Total number of vectors exceeds the total number of documents";
+            assert (totalVectorsCount <= totalDocsCount) : "Total number of vectors exceeds the total number of documents";
             assert (dimension > 0) : "No vectors found for field " + fieldName;
 
-            this.size = totalSize;
+            this.size = totalVectorsCount;
             this.readers = new KnnVectorsReader[allReaders.size()];
             for (int i = 0; i < readers.length; i++) {
                 readers[i] = allReaders.get(i);
@@ -583,7 +605,7 @@ public class JVectorWriter extends KnnVectorsWriter {
             this.dimension = dimension;
 
             // Build mapping from global ordinal to [readerIndex, readerOrd]
-            this.ordMapping = new int[totalSize][2];
+            this.ordMapping = new int[totalDocsCount][2];
 
             int documentsIterated = 0;
 
@@ -597,15 +619,32 @@ public class JVectorWriter extends KnnVectorsWriter {
                 // For each vector in this reader
                 KnnVectorValues.DocIndexIterator it = values.iterator();
                 for (int docId = it.nextDoc(); docId != DocIdSetIterator.NO_MORE_DOCS; docId = it.nextDoc()) {
-                    final int globalOrd = docMaps[readerIdx].get(docId);
-                    ordMapping[globalOrd][0] = readerIdx; // Reader index
-                    ordMapping[globalOrd][1] = docId; // Ordinal in reader
+                    if (docMaps[readerIdx].get(docId) == -1) {
+                        log.warn(
+                            "Document {} in reader {} is not mapped to a global ordinal from the merge docMaps. Will skip this document for now",
+                            docId,
+                            readerIdx
+                        );
+                    } else {
+                        // Mapping from global ordinal to [readerIndex, readerOrd]
+                        final int globalOrd = docMaps[readerIdx].get(docId);
+                        ordMapping[globalOrd][0] = readerIdx; // Reader index
+                        ordMapping[globalOrd][1] = docId; // Ordinal in reader
+                    }
+
                     documentsIterated++;
                 }
             }
 
-            if (documentsIterated != totalSize) {
-                throw new IllegalStateException("Built mapping for " + documentsIterated + " vectors but expected " + totalSize);
+            if (documentsIterated < totalVectorsCount) {
+                throw new IllegalStateException(
+                    "More documents were expected than what was found in the readers."
+                        + "Expected at least number of total vectors: "
+                        + totalVectorsCount
+                        + " but found only: "
+                        + documentsIterated
+                        + " documents."
+                );
             }
 
             log.debug("Created RandomAccessMergedFloatVectorValues with {} total vectors from {} readers", size, readers.length);
@@ -623,7 +662,7 @@ public class JVectorWriter extends KnnVectorsWriter {
 
         @Override
         public VectorFloat<?> getVector(int ord) {
-            if (ord < 0 || ord >= size) {
+            if (ord < 0 || ord >= totalDocsCount) {
                 throw new IllegalArgumentException("Ordinal out of bounds: " + ord);
             }
 
