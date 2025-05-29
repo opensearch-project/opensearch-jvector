@@ -149,15 +149,13 @@ public class JVectorReader extends KnnVectorsReader {
                 final int visitedNodesCount = searchResults.getVisitedCount();
                 final int rerankedCount = searchResults.getRerankedCount();
 
-                // TODO: bring back when we re-introduce levels in jVector
-                // final int expandedCount = searchResults.getExpandedCount();
-                // final int expandedBaseLayerCount = searchResults.getExpandedCountBaseLayer();
+                final int expandedCount = searchResults.getExpandedCount();
+                final int expandedBaseLayerCount = searchResults.getExpandedCountBaseLayer();
 
                 KNNCounter.KNN_QUERY_VISITED_NODES.add(visitedNodesCount);
                 KNNCounter.KNN_QUERY_RERANKED_COUNT.add(rerankedCount);
-                // TODO: bring back when we re-introduce levels in jVector
-                // KNNCounter.KNN_QUERY_EXPANDED_NODES.add(expandedCount);
-                // KNNCounter.KNN_QUERY_EXPANDED_BASE_LAYER_NODES.add(expandedBaseLayerCount);
+                KNNCounter.KNN_QUERY_EXPANDED_NODES.add(expandedCount);
+                KNNCounter.KNN_QUERY_EXPANDED_BASE_LAYER_NODES.add(expandedBaseLayerCount);
 
             }
         }
