@@ -465,8 +465,8 @@ run {
     // Set JVM arguments for memory
     testClusters.integTest.nodes.each { node ->
         node.jvmArgs(
-                '-Xms4g',  // Initial heap size
-                '-Xmx4g'   // Maximum heap size
+                '-Xms2g',  // Initial heap size
+                '-Xmx2g'   // Maximum heap size
         )
     }
 

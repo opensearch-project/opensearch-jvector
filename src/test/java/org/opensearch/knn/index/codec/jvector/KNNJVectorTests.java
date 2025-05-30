@@ -501,7 +501,10 @@ public class KNNJVectorTests extends LuceneTestCase {
      */
     @Test
     public void testJVectorKnnIndex_deletedDocs() throws IOException {
-        final int k = 3;
+        final int totalNumberOfDocs = 100;
+        final int batchSize = 10;
+        final int k = batchSize - 1;
+        final int docToDeleteInEachBatch = 5;
         final Path indexPath = createTempDir();
         final IndexWriterConfig iwc = newIndexWriterConfig();
         // JVector codec requires compound files to be disabled at the moment
@@ -510,51 +513,59 @@ public class KNNJVectorTests extends LuceneTestCase {
         iwc.setMergePolicy(new ForceMergesOnlyMergePolicy(false));
 
         try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter writer = new IndexWriter(dir, iwc)) {
-            /* ---------------------------
-             * 1.  Index three simple docs
-             * --------------------------- */
-            float[][] vectors = {
-                { 0.0f, 0.2f }, // doc "1" – nearest to target
-                { 0.0f, 0.4f }, // doc "2"
-                { 0.0f, 0.6f }  // doc "3"
-            };
 
-            for (int i = 0; i < vectors.length; i++) {
+            /*
+             * 1.  Index 100 docs, in batches of 10.  Delete the 5th doc in each batch.
+             *     will leave us with 10 segments, each with 9 live docs.
+             */
+            int batchNumber = 0;
+            for (int i = 1; i <= totalNumberOfDocs; i++) {
                 Document doc = new Document();
+                final float[] vector = { 0.0f, 1.0f * (i + batchNumber) };
                 doc.add(new StringField("docId", Integer.toString(i + 1), Field.Store.YES));
-                doc.add(new KnnFloatVectorField("test_field", vectors[i], VectorSimilarityFunction.EUCLIDEAN));
+                doc.add(new KnnFloatVectorField("test_field", vector, VectorSimilarityFunction.EUCLIDEAN));
                 writer.addDocument(doc);
-                writer.commit(); // keep every doc in its own segment
+                if (i % batchSize == 0) {
+                    writer.flush();
+                    writer.deleteDocuments(new TermQuery(new Term("docId", Integer.toString(i - docToDeleteInEachBatch))));
+                    batchNumber++;
+                }
             }
+            writer.commit();
 
-            /* --------------------
-             * 2.  Delete doc "1"
-             * -------------------- */
-            writer.deleteDocuments(new Term("docId", "1"));
-            writer.commit(); // commit the delete but keep segments as-is
+            /* ----------------------------------------
+             * 2.  Merge all segments into one
+             * ---------------------------------------- */
             writer.forceMerge(1);
 
             /* ----------------------------------------
              * 3.  Search – the deleted doc must be gone
              * ---------------------------------------- */
             try (IndexReader reader = DirectoryReader.open(writer)) {
-                assertEquals("All documents except the deleted one should be live", 2, reader.numDocs());
+                assertEquals(
+                    "All documents except the deleted ones should be live",
+                    totalNumberOfDocs - (totalNumberOfDocs / batchSize),
+                    reader.numDocs()
+                );
+                // For each batch we will verify that the deleted document doesn't come up in search and only it's neighbours are returned
 
-                IndexSearcher searcher = newSearcher(reader);
-                float[] target = { 0.0f, 0.0f }; // closest to doc "1", which is deleted
-
-                TopDocs results = searcher.search(new KnnFloatVectorQuery("test_field", target, k), k);
-
-                // We expect only 2 hits because one document was deleted
-                assertEquals(2, results.totalHits.value());
-
-                // Retrieve the first returned document and verify that it is *not* "1"
-                Document document = reader.storedFields().document(results.scoreDocs[0].doc);
-                String docId = document.get("docId");
-                assertNotEquals("1", docId);
-
-                // The first hit should now be the former 2nd-nearest neighbour – "2"
-                assertEquals("2", docId);
+                for (int i = 0; i < totalNumberOfDocs; i += batchSize) {
+                    final float[] target = { 0.0f, 1.0f * (i + docToDeleteInEachBatch) };
+                    final IndexSearcher searcher = newSearcher(reader);
+                    final KnnFloatVectorQuery knnFloatVectorQuery = new KnnFloatVectorQuery(
+                        "test_field",
+                        target,
+                        k,
+                        new MatchAllDocsQuery()
+                    );
+                    TopDocs topDocs = searcher.search(knnFloatVectorQuery, k);
+                    assertEquals(k, topDocs.totalHits.value());
+                    for (int j = 0; j < k; j++) {
+                        Document doc = reader.storedFields().document(topDocs.scoreDocs[j].doc);
+                        int docId = Integer.parseInt(doc.get("docId"));
+                        assertNotEquals("Deleted doc should not be returned in search results", i + docToDeleteInEachBatch, docId);
+                    }
+                }
             }
         }
     }
