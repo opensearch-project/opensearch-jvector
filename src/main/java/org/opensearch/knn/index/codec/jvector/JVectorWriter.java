@@ -538,6 +538,9 @@ public class JVectorWriter extends KnnVectorsWriter {
      * FloatVectorValues from multiple segments without copying the vectors.
      */
     static class RandomAccessMergedFloatVectorValues implements RandomAccessVectorValues {
+        private static final int READER_ID = 0;
+        private static final int READER_ORD = 1;
+
         private final VectorTypeSupport VECTOR_TYPE_SUPPORT = VectorizationProvider.getInstance().getVectorTypeSupport();
 
         // Array of sub-readers
@@ -628,8 +631,8 @@ public class JVectorWriter extends KnnVectorsWriter {
                     } else {
                         // Mapping from global ordinal to [readerIndex, readerOrd]
                         final int globalOrd = docMaps[readerIdx].get(docId);
-                        ordMapping[globalOrd][0] = readerIdx; // Reader index
-                        ordMapping[globalOrd][1] = docId; // Ordinal in reader
+                        ordMapping[globalOrd][READER_ID] = readerIdx; // Reader index
+                        ordMapping[globalOrd][READER_ORD] = docId; // Ordinal in reader
                     }
 
                     documentsIterated++;
@@ -668,8 +671,8 @@ public class JVectorWriter extends KnnVectorsWriter {
 
             try {
 
-                final int readerIdx = ordMapping[ord][0];
-                final int readerOrd = ordMapping[ord][1];
+                final int readerIdx = ordMapping[ord][READER_ID];
+                final int readerOrd = ordMapping[ord][READER_ORD];
 
                 // Access to float values is not thread safe
                 synchronized (this) {
