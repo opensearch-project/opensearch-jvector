@@ -17,7 +17,6 @@ import java.io.IOException;
  */
 @Log4j2
 public class JVectorRandomAccessWriter implements RandomAccessWriter {
-    private final byte[] writeBuffer = new byte[Long.BYTES]; // used to store temporary bytes conversion before writing
     private final IndexOutput indexOutputDelegate;
 
     public JVectorRandomAccessWriter(IndexOutput indexOutputDelegate) {
@@ -26,7 +25,10 @@ public class JVectorRandomAccessWriter implements RandomAccessWriter {
 
     @Override
     public void seek(long position) throws IOException {
-        log.info("Pretending to be seeking to position {} in JVectorRandomAccessWriter, in practice it is not seeking anywhere.", position);
+        log.warn("Pretending to be seeking to position {} in JVectorRandomAccessWriter, in practice it is not seeking anywhere.", position);
+        throw new UnsupportedOperationException(
+            "Lucene IndexOutput does not support seeking. It is only used to write data to disk. Make sure to use override jVector serialization functionalities that require seek during writes"
+        );
     }
 
     @Override

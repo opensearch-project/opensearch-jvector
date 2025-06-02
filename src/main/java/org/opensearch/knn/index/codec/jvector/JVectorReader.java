@@ -8,6 +8,7 @@ package org.opensearch.knn.index.codec.jvector;
 import io.github.jbellis.jvector.disk.ReaderSupplier;
 import io.github.jbellis.jvector.graph.GraphSearcher;
 import io.github.jbellis.jvector.graph.SearchResult;
+import io.github.jbellis.jvector.graph.disk.Header;
 import io.github.jbellis.jvector.graph.disk.OnDiskGraphIndex;
 import io.github.jbellis.jvector.graph.similarity.ScoreFunction;
 import io.github.jbellis.jvector.graph.similarity.SearchScoreProvider;
@@ -87,7 +88,7 @@ public class JVectorReader extends KnnVectorsReader {
     public void checkIntegrity() throws IOException {
         flatVectorsReader.checkIntegrity();
         for (FieldEntry fieldEntry : fieldEntryMap.values()) {
-            try (var indexInput = state.directory.openInput(fieldEntry.vectorIndexFieldFileName, state.context)) {
+            try (var indexInput = state.directory.openInput(fieldEntry.vectorIndexFieldDataFileName, state.context)) {
                 CodecUtil.checksumEntireFile(indexInput);
             }
         }
@@ -149,15 +150,13 @@ public class JVectorReader extends KnnVectorsReader {
                 final int visitedNodesCount = searchResults.getVisitedCount();
                 final int rerankedCount = searchResults.getRerankedCount();
 
-                // TODO: bring back when we re-introduce levels in jVector
-                // final int expandedCount = searchResults.getExpandedCount();
-                // final int expandedBaseLayerCount = searchResults.getExpandedCountBaseLayer();
+                final int expandedCount = searchResults.getExpandedCount();
+                final int expandedBaseLayerCount = searchResults.getExpandedCountBaseLayer();
 
                 KNNCounter.KNN_QUERY_VISITED_NODES.add(visitedNodesCount);
                 KNNCounter.KNN_QUERY_RERANKED_COUNT.add(rerankedCount);
-                // TODO: bring back when we re-introduce levels in jVector
-                // KNNCounter.KNN_QUERY_EXPANDED_NODES.add(expandedCount);
-                // KNNCounter.KNN_QUERY_EXPANDED_BASE_LAYER_NODES.add(expandedBaseLayerCount);
+                KNNCounter.KNN_QUERY_EXPANDED_NODES.add(expandedCount);
+                KNNCounter.KNN_QUERY_EXPANDED_BASE_LAYER_NODES.add(expandedBaseLayerCount);
 
             }
         }
@@ -194,11 +193,13 @@ public class JVectorReader extends KnnVectorsReader {
         private final long vectorIndexLength;
         private final long pqCodebooksAndVectorsLength;
         private final long pqCodebooksAndVectorsOffset;
-        private final String vectorIndexFieldFileName;
+        private final String vectorIndexFieldDataFileName;
+        private final String vectorIndexFieldMetaFileName;
         private final ReaderSupplier indexReaderSupplier;
         private final ReaderSupplier pqCodebooksReaderSupplier;
         private final OnDiskGraphIndex index;
         private final PQVectors pqVectors; // The product quantized vectors with their codebooks
+        private final Header graphHeader;
 
         public FieldEntry(FieldInfo fieldInfo, JVectorWriter.VectorIndexFieldMetadata vectorIndexFieldMetadata) throws IOException {
             this.fieldInfo = fieldInfo;
@@ -211,15 +212,18 @@ public class JVectorReader extends KnnVectorsReader {
             this.pqCodebooksAndVectorsLength = vectorIndexFieldMetadata.getPqCodebooksAndVectorsLength();
             this.pqCodebooksAndVectorsOffset = vectorIndexFieldMetadata.getPqCodebooksAndVectorsOffset();
             this.dimension = vectorIndexFieldMetadata.getVectorDimension();
+            this.graphHeader = vectorIndexFieldMetadata.getGraphHeader();
 
-            this.vectorIndexFieldFileName = baseDataFileName + "_" + fieldInfo.name + "." + JVectorFormat.VECTOR_INDEX_EXTENSION;
+            this.vectorIndexFieldDataFileName = baseDataFileName + "_" + fieldInfo.name + "." + JVectorFormat.VECTOR_INDEX_EXTENSION;
+            this.vectorIndexFieldMetaFileName = baseDataFileName + "_" + fieldInfo.name + "." + JVectorFormat.META_EXTENSION;
 
             // Load the graph index
             this.indexReaderSupplier = new JVectorRandomAccessReader.Supplier(
-                directory.openInput(vectorIndexFieldFileName, state.context),
+                directory.openInput(vectorIndexFieldDataFileName, state.context),
                 vectorIndexOffset
             );
-            this.index = OnDiskGraphIndex.load(indexReaderSupplier);
+            this.index = new OnDiskGraphIndex(indexReaderSupplier, graphHeader, 0);
+
             // If quantized load the compressed product quantized vectors with their codebooks
             if (pqCodebooksAndVectorsLength > 0) {
                 assert pqCodebooksAndVectorsOffset > 0;
@@ -227,7 +231,7 @@ public class JVectorReader extends KnnVectorsReader {
                     throw new IllegalArgumentException("pqCodebooksAndVectorsOffset must be greater than vectorIndexOffset");
                 }
                 this.pqCodebooksReaderSupplier = new JVectorRandomAccessReader.Supplier(
-                    directory.openInput(vectorIndexFieldFileName, state.context),
+                    directory.openInput(vectorIndexFieldDataFileName, state.context),
                     pqCodebooksAndVectorsOffset
                 );
                 log.debug(
@@ -244,7 +248,7 @@ public class JVectorReader extends KnnVectorsReader {
             }
 
             // Check the footer
-            try (ChecksumIndexInput indexInput = directory.openChecksumInput(vectorIndexFieldFileName)) {
+            try (ChecksumIndexInput indexInput = directory.openChecksumInput(vectorIndexFieldDataFileName)) {
                 // If there are pq codebooks and vectors, then the footer is at the end of the pq codebooks and vectors
                 if (pqCodebooksAndVectorsOffset > 0) {
                     indexInput.seek(pqCodebooksAndVectorsOffset + pqCodebooksAndVectorsLength);
@@ -255,9 +259,7 @@ public class JVectorReader extends KnnVectorsReader {
                     indexInput.seek(vectorIndexOffset + vectorIndexLength);
                     CodecUtil.checkFooter(indexInput);
                 }
-
             }
-
         }
 
         @Override
