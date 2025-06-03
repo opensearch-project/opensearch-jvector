@@ -70,12 +70,12 @@ public class RecallTestsIT extends KNNRestTestCase {
     private final static float[][] INDEX_VECTORS = TestUtils.getIndexVectors(DOC_COUNT, TEST_DIMENSION, true);
     private final static float[][] QUERY_VECTORS = TestUtils.getQueryVectors(QUERY_COUNT, TEST_DIMENSION, DOC_COUNT, true);
     private final static Map<SpaceType, List<Set<String>>> GROUND_TRUTH = Map.of(
-            SpaceType.L2,
-            TestUtils.computeGroundTruthValues(INDEX_VECTORS, QUERY_VECTORS, SpaceType.L2, TEST_K),
-            SpaceType.COSINESIMIL,
-            TestUtils.computeGroundTruthValues(INDEX_VECTORS, QUERY_VECTORS, SpaceType.COSINESIMIL, TEST_K),
-            SpaceType.INNER_PRODUCT,
-            TestUtils.computeGroundTruthValues(INDEX_VECTORS, QUERY_VECTORS, SpaceType.INNER_PRODUCT, TEST_K)
+        SpaceType.L2,
+        TestUtils.computeGroundTruthValues(INDEX_VECTORS, QUERY_VECTORS, SpaceType.L2, TEST_K),
+        SpaceType.COSINESIMIL,
+        TestUtils.computeGroundTruthValues(INDEX_VECTORS, QUERY_VECTORS, SpaceType.COSINESIMIL, TEST_K),
+        SpaceType.INNER_PRODUCT,
+        TestUtils.computeGroundTruthValues(INDEX_VECTORS, QUERY_VECTORS, SpaceType.INNER_PRODUCT, TEST_K)
     );
 
     @SneakyThrows
@@ -110,23 +110,23 @@ public class RecallTestsIT extends KNNRestTestCase {
         for (SpaceType spaceType : spaceTypes) {
             String indexName = createIndexName(KNNEngine.LUCENE, spaceType);
             XContentBuilder builder = XContentFactory.jsonBuilder()
-                    .startObject()
-                    .startObject(PROPERTIES_FIELD)
-                    .startObject(TEST_FIELD_NAME)
-                    .field(TYPE, TYPE_KNN_VECTOR)
-                    .field(DIMENSION, TEST_DIMENSION)
-                    .startObject(KNN_METHOD)
-                    .field(METHOD_PARAMETER_SPACE_TYPE, spaceType.getValue())
-                    .field(KNN_ENGINE, KNNEngine.LUCENE.getName())
-                    .field(NAME, METHOD_HNSW)
-                    .startObject(PARAMETERS)
-                    .field(METHOD_PARAMETER_EF_CONSTRUCTION, HNSW_EF_CONSTRUCTION)
-                    .field(METHOD_PARAMETER_M, HNSW_M)
-                    .endObject()
-                    .endObject()
-                    .endObject()
-                    .endObject()
-                    .endObject();
+                .startObject()
+                .startObject(PROPERTIES_FIELD)
+                .startObject(TEST_FIELD_NAME)
+                .field(TYPE, TYPE_KNN_VECTOR)
+                .field(DIMENSION, TEST_DIMENSION)
+                .startObject(KNN_METHOD)
+                .field(METHOD_PARAMETER_SPACE_TYPE, spaceType.getValue())
+                .field(KNN_ENGINE, KNNEngine.LUCENE.getName())
+                .field(NAME, METHOD_HNSW)
+                .startObject(PARAMETERS)
+                .field(METHOD_PARAMETER_EF_CONSTRUCTION, HNSW_EF_CONSTRUCTION)
+                .field(METHOD_PARAMETER_M, HNSW_M)
+                .endObject()
+                .endObject()
+                .endObject()
+                .endObject()
+                .endObject();
             createIndexAndIngestDocs(indexName, TEST_FIELD_NAME, getSettings(), builder.toString());
             assertRecall(indexName, spaceType, 0.25f);
         }
@@ -158,29 +158,27 @@ public class RecallTestsIT extends KNNRestTestCase {
         for (SpaceType spaceType : spaceTypes) {
             String indexName = createIndexName(KNNEngine.JVECTOR, spaceType);
             XContentBuilder builder = XContentFactory.jsonBuilder()
-                    .startObject()
-                    .startObject(PROPERTIES_FIELD)
-                    .startObject(TEST_FIELD_NAME)
-                    .field(TYPE, TYPE_KNN_VECTOR)
-                    .field(DIMENSION, TEST_DIMENSION)
-                    .startObject(KNN_METHOD)
-                    .field(METHOD_PARAMETER_SPACE_TYPE, spaceType.getValue())
-                    .field(KNN_ENGINE, KNNEngine.JVECTOR.getName())
-                    .field(NAME, DISK_ANN)
-                    .startObject(PARAMETERS)
-                    .field(METHOD_PARAMETER_EF_CONSTRUCTION, HNSW_EF_CONSTRUCTION)
-                    .field(METHOD_PARAMETER_M, HNSW_M)
-                    .endObject()
-                    .endObject()
-                    .endObject()
-                    .endObject()
-                    .endObject();
+                .startObject()
+                .startObject(PROPERTIES_FIELD)
+                .startObject(TEST_FIELD_NAME)
+                .field(TYPE, TYPE_KNN_VECTOR)
+                .field(DIMENSION, TEST_DIMENSION)
+                .startObject(KNN_METHOD)
+                .field(METHOD_PARAMETER_SPACE_TYPE, spaceType.getValue())
+                .field(KNN_ENGINE, KNNEngine.JVECTOR.getName())
+                .field(NAME, DISK_ANN)
+                .startObject(PARAMETERS)
+                .field(METHOD_PARAMETER_EF_CONSTRUCTION, HNSW_EF_CONSTRUCTION)
+                .field(METHOD_PARAMETER_M, HNSW_M)
+                .endObject()
+                .endObject()
+                .endObject()
+                .endObject()
+                .endObject();
             createIndexAndIngestDocs(indexName, TEST_FIELD_NAME, getSettings(), builder.toString());
             assertRecall(indexName, spaceType, 0.25f);
         }
     }
-
-
 
     @SneakyThrows
     private void assertRecall(String testIndexName, SpaceType spaceType, float acceptableRecallFromPerfect) {
@@ -204,28 +202,28 @@ public class RecallTestsIT extends KNNRestTestCase {
     @SneakyThrows
     private void setupTrainingIndex() {
         XContentBuilder trainingIndexBuilder = XContentFactory.jsonBuilder()
-                .startObject()
-                .startObject(PROPERTIES_FIELD)
-                .startObject(TRAIN_FIELD_NAME)
-                .field(TYPE, TYPE_KNN_VECTOR)
-                .field(DIMENSION, TEST_DIMENSION)
-                .endObject()
-                .endObject()
-                .endObject();
+            .startObject()
+            .startObject(PROPERTIES_FIELD)
+            .startObject(TRAIN_FIELD_NAME)
+            .field(TYPE, TYPE_KNN_VECTOR)
+            .field(DIMENSION, TEST_DIMENSION)
+            .endObject()
+            .endObject()
+            .endObject();
         createIndexAndIngestDocs(
-                TRAIN_INDEX_NAME,
-                TRAIN_FIELD_NAME,
-                Settings.builder().put("number_of_shards", SHARD_COUNT).put("number_of_replicas", REPLICA_COUNT).build(),
-                trainingIndexBuilder.toString()
+            TRAIN_INDEX_NAME,
+            TRAIN_FIELD_NAME,
+            Settings.builder().put("number_of_shards", SHARD_COUNT).put("number_of_replicas", REPLICA_COUNT).build(),
+            trainingIndexBuilder.toString()
         );
     }
 
     private Settings getSettings() {
         return Settings.builder()
-                .put("number_of_shards", SHARD_COUNT)
-                .put("number_of_replicas", REPLICA_COUNT)
-                .put("index.knn", true)
-                .put(INDEX_KNN_ADVANCED_APPROXIMATE_THRESHOLD, 0)
-                .build();
+            .put("number_of_shards", SHARD_COUNT)
+            .put("number_of_replicas", REPLICA_COUNT)
+            .put("index.knn", true)
+            .put(INDEX_KNN_ADVANCED_APPROXIMATE_THRESHOLD, 0)
+            .build();
     }
 }

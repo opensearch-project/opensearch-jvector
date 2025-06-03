@@ -11,7 +11,6 @@ import io.github.jbellis.jvector.graph.RandomAccessVectorValues;
 import io.github.jbellis.jvector.graph.disk.*;
 import io.github.jbellis.jvector.graph.similarity.BuildScoreProvider;
 import io.github.jbellis.jvector.quantization.ProductQuantization;
-import io.github.jbellis.jvector.vector.ArrayVectorFloat;
 import io.github.jbellis.jvector.vector.VectorizationProvider;
 import io.github.jbellis.jvector.vector.types.VectorFloat;
 import io.github.jbellis.jvector.vector.types.VectorTypeSupport;
@@ -63,7 +62,6 @@ public class JVectorWriter extends KnnVectorsWriter {
     private final int minimumBatchSizeForQuantization;
     private final boolean mergeOnDisk;
     private final VectorTypeSupport VECTOR_TYPE_SUPPORT = VectorizationProvider.getInstance().getVectorTypeSupport();
-
 
     private boolean finished = false;
 
@@ -292,40 +290,33 @@ public class JVectorWriter extends KnnVectorsWriter {
         }
     }
 
-    private static int defaultPQBytesFor(int originalDimension)
-    {
+    private static int defaultPQBytesFor(int originalDimension) {
         // the idea here is that higher dimensions compress well, but not so well that we should use fewer bits
         // than a lower-dimension vector, which is what you could get with cutoff points to switch between (e.g.)
-        // D*0.5 and D*0.25.  Thus, the following ensures that bytes per vector is strictly increasing with D.
+        // D*0.5 and D*0.25. Thus, the following ensures that bytes per vector is strictly increasing with D.
         int compressedBytes;
         if (originalDimension <= 32) {
             // We are compressing from 4-byte floats to single-byte codebook indexes,
             // so this represents compression of 4x
             // * GloVe-25 needs 25 BPV to achieve good recall
             compressedBytes = originalDimension;
-        }
-        else if (originalDimension <= 64) {
+        } else if (originalDimension <= 64) {
             // * GloVe-50 performs fine at 25
             compressedBytes = 32;
-        }
-        else if (originalDimension <= 200) {
+        } else if (originalDimension <= 200) {
             // * GloVe-100 and -200 perform well at 50 and 100 BPV, respectively
             compressedBytes = (int) (originalDimension * 0.5);
-        }
-        else if (originalDimension <= 400) {
+        } else if (originalDimension <= 400) {
             // * NYTimes-256 actually performs fine at 64 BPV but we'll be conservative
-            //   since we don't want BPV to decrease
+            // since we don't want BPV to decrease
             compressedBytes = 100;
-        }
-        else if (originalDimension <= 768) {
+        } else if (originalDimension <= 768) {
             // allow BPV to increase linearly up to 192
             compressedBytes = (int) (originalDimension * 0.25);
-        }
-        else if (originalDimension <= 1536) {
+        } else if (originalDimension <= 1536) {
             // * ada002 vectors have good recall even at 192 BPV = compression of 32x
             compressedBytes = 192;
-        }
-        else {
+        } else {
             // We have not tested recall with larger vectors than this, let's let it increase linearly
             compressedBytes = (int) (originalDimension * 0.125);
         }
