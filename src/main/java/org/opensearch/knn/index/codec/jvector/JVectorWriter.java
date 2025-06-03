@@ -11,6 +11,7 @@ import io.github.jbellis.jvector.graph.RandomAccessVectorValues;
 import io.github.jbellis.jvector.graph.disk.*;
 import io.github.jbellis.jvector.graph.similarity.BuildScoreProvider;
 import io.github.jbellis.jvector.quantization.ProductQuantization;
+import io.github.jbellis.jvector.vector.ArrayVectorFloat;
 import io.github.jbellis.jvector.vector.VectorizationProvider;
 import io.github.jbellis.jvector.vector.types.VectorFloat;
 import io.github.jbellis.jvector.vector.types.VectorTypeSupport;
@@ -61,6 +62,8 @@ public class JVectorWriter extends KnnVectorsWriter {
     private final float alpha;
     private final int minimumBatchSizeForQuantization;
     private final boolean mergeOnDisk;
+    private final VectorTypeSupport VECTOR_TYPE_SUPPORT = VectorizationProvider.getInstance().getVectorTypeSupport();
+
 
     private boolean finished = false;
 
@@ -289,6 +292,46 @@ public class JVectorWriter extends KnnVectorsWriter {
         }
     }
 
+    private static int defaultPQBytesFor(int originalDimension)
+    {
+        // the idea here is that higher dimensions compress well, but not so well that we should use fewer bits
+        // than a lower-dimension vector, which is what you could get with cutoff points to switch between (e.g.)
+        // D*0.5 and D*0.25.  Thus, the following ensures that bytes per vector is strictly increasing with D.
+        int compressedBytes;
+        if (originalDimension <= 32) {
+            // We are compressing from 4-byte floats to single-byte codebook indexes,
+            // so this represents compression of 4x
+            // * GloVe-25 needs 25 BPV to achieve good recall
+            compressedBytes = originalDimension;
+        }
+        else if (originalDimension <= 64) {
+            // * GloVe-50 performs fine at 25
+            compressedBytes = 32;
+        }
+        else if (originalDimension <= 200) {
+            // * GloVe-100 and -200 perform well at 50 and 100 BPV, respectively
+            compressedBytes = (int) (originalDimension * 0.5);
+        }
+        else if (originalDimension <= 400) {
+            // * NYTimes-256 actually performs fine at 64 BPV but we'll be conservative
+            //   since we don't want BPV to decrease
+            compressedBytes = 100;
+        }
+        else if (originalDimension <= 768) {
+            // allow BPV to increase linearly up to 192
+            compressedBytes = (int) (originalDimension * 0.25);
+        }
+        else if (originalDimension <= 1536) {
+            // * ada002 vectors have good recall even at 192 BPV = compression of 32x
+            compressedBytes = 192;
+        }
+        else {
+            // We have not tested recall with larger vectors than this, let's let it increase linearly
+            compressedBytes = (int) (originalDimension * 0.125);
+        }
+        return compressedBytes;
+    }
+
     /**
      * Writes the product quantization (PQ) codebooks and encoded vectors to a DataOutput stream.
      * This method compresses the original vector data using product quantization and encodes
@@ -302,15 +345,15 @@ public class JVectorWriter extends KnnVectorsWriter {
 
         // TODO: should we make this configurable?
         // Compress the original vectors using PQ. this represents a compression ratio of 128 * 4 / 16 = 32x
-        final var M = Math.min(fieldData.randomAccessVectorValues.dimension(), 16); // number of subspaces
+        final var M = defaultPQBytesFor(fieldData.randomAccessVectorValues.dimension()); // number of subspaces
         final var numberOfClustersPerSubspace = Math.min(256, fieldData.randomAccessVectorValues.size()); // number of centroids per
                                                                                                           // subspace
         ProductQuantization pq = ProductQuantization.compute(
             fieldData.randomAccessVectorValues,
             M, // number of subspaces
             numberOfClustersPerSubspace, // number of centroids per subspace
-            true
-        ); // center the dataset
+            false
+        );
         var pqv = pq.encodeAll(fieldData.randomAccessVectorValues);
         // write the compressed vectors to disk
         pqv.write(out);
@@ -466,6 +509,7 @@ public class JVectorWriter extends KnnVectorsWriter {
             }
             if (vectorValue instanceof float[]) {
                 flatFieldVectorsWriter.addValue(docID, vectorValue);
+                graphIndexBuilder.addGraphNode(docID, randomAccessVectorValues.getVector(docID));
             } else if (vectorValue instanceof byte[]) {
                 final String errorMessage = "byte[] vectors are not supported in JVector. "
                     + "Instead you should only use float vectors and leverage product quantization during indexing."
@@ -486,7 +530,7 @@ public class JVectorWriter extends KnnVectorsWriter {
 
         @Override
         public long ramBytesUsed() {
-            return SHALLOW_SIZE + flatFieldVectorsWriter.ramBytesUsed();
+            return SHALLOW_SIZE + flatFieldVectorsWriter.ramBytesUsed() + graphIndexBuilder.getGraph().ramBytesUsed();
         }
 
         io.github.jbellis.jvector.vector.VectorSimilarityFunction getVectorSimilarityFunction(FieldInfo fieldInfo) {

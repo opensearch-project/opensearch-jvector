@@ -603,6 +603,19 @@ public class KNNRestTestCase extends ODFERestTestCase {
         forceMergeKnnIndex(index, 1);
     }
 
+    protected void waitForTaskCompletion(String taskId) throws Exception {
+        Request request = new Request("GET", "/_tasks/" + taskId);
+        Response response = client().performRequest(request);
+        String responseBody = EntityUtils.toString(response.getEntity());
+        Map<String, Object> responseMap = createParser(MediaTypeRegistry.getDefaultMediaType().xContent(), responseBody).map();
+        while (!(Boolean) responseMap.get("completed")) {
+            TimeUnit.SECONDS.sleep(10);
+            response = client().performRequest(request);
+            responseBody = EntityUtils.toString(response.getEntity());
+            responseMap = createParser(MediaTypeRegistry.getDefaultMediaType().xContent(), responseBody).map();
+        }
+    }
+
     /**
      * Force merge KNN index segments
      */
@@ -613,10 +626,18 @@ public class KNNRestTestCase extends ODFERestTestCase {
         assertEquals(request.getEndpoint() + ": failed", RestStatus.OK, RestStatus.fromCode(response.getStatusLine().getStatusCode()));
 
         request = new Request("POST", "/" + index + "/_forcemerge");
-
+        request.addParameter("wait_for_completion", "false");
         request.addParameter("max_num_segments", String.valueOf(maxSegments));
         request.addParameter("flush", "true");
         response = client().performRequest(request);
+
+        // Get task id
+        String responseBody = EntityUtils.toString(response.getEntity());
+        Map<String, Object> responseMap = createParser(MediaTypeRegistry.getDefaultMediaType().xContent(), responseBody).map();
+        String taskId = (String) responseMap.get("task");
+
+        waitForTaskCompletion(taskId);
+
         assertEquals(request.getEndpoint() + ": failed", RestStatus.OK, RestStatus.fromCode(response.getStatusLine().getStatusCode()));
         TimeUnit.SECONDS.sleep(5); // To make sure force merge is completed
     }
@@ -1588,30 +1609,42 @@ public class KNNRestTestCase extends ODFERestTestCase {
         }
     }
 
-    // Method that adds multiple documents into the index using Bulk API
+    // Method that adds multiple documents into the index using Bulk API in batches of 100
     public void bulkAddKnnDocs(String index, String fieldName, float[][] indexVectors, int docCount) throws IOException {
-        Request request = new Request("POST", "/_bulk");
+        final int BATCH_SIZE = 1000;
 
-        request.addParameter("refresh", "true");
-        StringBuilder sb = new StringBuilder();
+        for (int batchStart = 0; batchStart < docCount; batchStart += BATCH_SIZE) {
+            int batchEnd = Math.min(batchStart + BATCH_SIZE, docCount);
+            Request request = new Request("POST", "/_bulk");
 
-        for (int i = 0; i < docCount; i++) {
-            sb.append("{ \"index\" : { \"_index\" : \"")
-                .append(index)
-                .append("\", \"_id\" : \"")
-                .append(i)
-                .append("\" } }\n")
-                .append("{ \"")
-                .append(fieldName)
-                .append("\" : ")
-                .append(Arrays.toString(indexVectors[i]))
-                .append(" }\n");
+            StringBuilder sb = new StringBuilder();
+
+            for (int i = batchStart; i < batchEnd; i++) {
+                sb.append("{ \"index\" : { \"_index\" : \"")
+                  .append(index)
+                  .append("\", \"_id\" : \"")
+                  .append(i)
+                  .append("\" } }\n")
+                  .append("{ \"")
+                  .append(fieldName)
+                  .append("\" : ")
+                  .append(Arrays.toString(indexVectors[i]))
+                  .append(" }\n");
+            }
+
+            request.setJsonEntity(sb.toString());
+
+            Response response = client().performRequest(request);
+            assertEquals(response.getStatusLine().getStatusCode(), 200);
+            logger.info("Indexed batch " + batchStart + " to " + (batchEnd - 1));
         }
 
-        request.setJsonEntity(sb.toString());
-
-        Response response = client().performRequest(request);
-        assertEquals(response.getStatusLine().getStatusCode(), 200);
+        // Ensure the index is refreshed after all batches
+        if (docCount > 0) {
+            Request refreshRequest = new Request("POST", "/" + index + "/_refresh");
+            Response refreshResponse = client().performRequest(refreshRequest);
+            assertEquals(refreshResponse.getStatusLine().getStatusCode(), 200);
+        }
     }
 
     // Method that returns index vectors of the documents that were added before into the index

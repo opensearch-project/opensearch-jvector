@@ -351,6 +351,7 @@ test {
             '--add-opens', 'java.base/java.nio=ALL-UNNAMED',
             '--add-opens', 'java.base/sun.nio.ch=ALL-UNNAMED',
             '-Djdk.incubator.foreign.restricted=permit',
+            '-Djdk.incubator.vector.VECTOR_ACCESS_OOB_CHECK=0',
             '--enable-native-access=ALL-UNNAMED',
             '-Dio.netty.tryReflectionSetAccessible=true',
             '--enable-preview'
@@ -396,6 +397,18 @@ integTest {
         systemProperty 'cluster.debug', isDebuggingCluster
         // Set number of nodes system property to be used in tests
         systemProperty 'cluster.number_of_nodes', "${_numNodes}"
+
+        jvmArgs = [
+                '--add-modules', 'jdk.incubator.vector',
+                '--add-opens', 'java.base/java.nio=ALL-UNNAMED',
+                '--add-opens', 'java.base/sun.nio.ch=ALL-UNNAMED',
+                '-Djdk.incubator.foreign.restricted=permit',
+                '-Djdk.incubator.vector.VECTOR_ACCESS_OOB_CHECK=0',
+                '--enable-native-access=ALL-UNNAMED',
+                '-Dio.netty.tryReflectionSetAccessible=true',
+                '--enable-preview'
+        ]
+
         // There seems to be an issue when running multi node run or integ tasks with unicast_hosts
         // not being written, the waitForAllConditions ensures it's written
         getClusters().forEach { cluster ->
