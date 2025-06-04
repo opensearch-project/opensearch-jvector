@@ -31,10 +31,10 @@ public class JVectorDiskANNMethod extends AbstractKNNMethod {
         SpaceType.INNER_PRODUCT
     );
 
-    final static MethodComponent HNSW_METHOD_COMPONENT = initMethodComponent();
+    final static MethodComponent DISK_ANN_METHOD_COMPONENT = initMethodComponent();
 
     private static MethodComponent initMethodComponent() {
-        return MethodComponent.Builder.builder(METHOD_HNSW)
+        return MethodComponent.Builder.builder(DISK_ANN)
             .addSupportedDataTypes(SUPPORTED_DATA_TYPES)
             .addParameter(
                 METHOD_PARAMETER_M,
@@ -52,6 +52,6 @@ public class JVectorDiskANNMethod extends AbstractKNNMethod {
     }
 
     public JVectorDiskANNMethod() {
-        super(HNSW_METHOD_COMPONENT, Set.copyOf(SUPPORTED_SPACES), new DefaultHnswSearchContext());
+        super(DISK_ANN_METHOD_COMPONENT, Set.copyOf(SUPPORTED_SPACES), new JVectorDiskANNSearchContext());
     }
 }

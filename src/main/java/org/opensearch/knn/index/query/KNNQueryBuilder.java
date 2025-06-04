@@ -23,6 +23,7 @@ import org.opensearch.index.query.QueryBuilder;
 import org.opensearch.index.query.QueryRewriteContext;
 import org.opensearch.index.query.QueryShardContext;
 import org.opensearch.index.query.WithFieldName;
+import org.opensearch.knn.index.codec.jvector.JVectorKnnFloatVectorQuery;
 import org.opensearch.knn.index.engine.KNNMethodConfigContext;
 import org.opensearch.knn.index.engine.model.QueryContext;
 import org.opensearch.knn.index.engine.qframe.QuantizationConfig;
@@ -46,13 +47,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 
-import static org.opensearch.knn.common.KNNConstants.EXPAND_NESTED;
-import static org.opensearch.knn.common.KNNConstants.MAX_DISTANCE;
-import static org.opensearch.knn.common.KNNConstants.METHOD_PARAMETER;
-import static org.opensearch.knn.common.KNNConstants.METHOD_PARAMETER_EF_SEARCH;
-import static org.opensearch.knn.common.KNNConstants.METHOD_PARAMETER_NPROBES;
-import static org.opensearch.knn.common.KNNConstants.MIN_SCORE;
+import static org.opensearch.knn.common.KNNConstants.*;
 import static org.opensearch.knn.common.KNNValidationUtil.validateByteVectorValue;
+import static org.opensearch.knn.index.engine.KNNEngine.JVECTOR;
 import static org.opensearch.knn.index.query.parser.MethodParametersParser.validateMethodParameters;
 import static org.opensearch.knn.index.engine.KNNEngine.ENGINES_SUPPORTING_RADIAL_SEARCH;
 import static org.opensearch.knn.index.engine.validation.ParameterValidator.validateParameters;
@@ -75,6 +72,9 @@ public class KNNQueryBuilder extends AbstractQueryBuilder<KNNQueryBuilder> imple
     public static final ParseField MIN_SCORE_FIELD = new ParseField(MIN_SCORE);
     public static final ParseField EF_SEARCH_FIELD = new ParseField(METHOD_PARAMETER_EF_SEARCH);
     public static final ParseField NPROBE_FIELD = new ParseField(METHOD_PARAMETER_NPROBES);
+    public static final ParseField OVERQUERY_FACTOR_FIELD = new ParseField(METHOD_PARAMETER_OVERQUERY_FACTOR);
+    public static final ParseField THRESHOLD_FIELD = new ParseField(METHOD_PARAMETER_THRESHOLD);
+    public static final ParseField REREANK_FLOOR_FIELD = new ParseField(METHOD_PARAMETER_RERANK_FLOOR);
     public static final ParseField METHOD_PARAMS_FIELD = new ParseField(METHOD_PARAMETER);
     public static final ParseField RESCORE_FIELD = new ParseField(RESCORE_PARAMETER);
     public static final ParseField RESCORE_OVERSAMPLE_FIELD = new ParseField(RESCORE_OVERSAMPLE_PARAMETER);
@@ -539,15 +539,34 @@ public class KNNQueryBuilder extends AbstractQueryBuilder<KNNQueryBuilder> imple
             } else {
                 filterQuery = new MatchAllDocsQuery();
             }
-            if (byteVector.length > 0) {
-                byte[] target = getVectorForCreatingQueryRequest(vectorDataType, knnEngine, byteVector);
-                assert target != null;
-                return new KnnByteVectorQuery(this.fieldName, target, k, filterQuery);
-            } else {
-                float[] target = getVectorForCreatingQueryRequest(vectorDataType, knnEngine);
-                assert target != null;
-                return new KnnFloatVectorQuery(this.fieldName, target, k, filterQuery);
+            switch (knnEngine) {
+                case LUCENE:
+                    if (byteVector.length > 0) {
+                        byte[] target = getVectorForCreatingQueryRequest(vectorDataType, knnEngine, byteVector);
+                        return new KnnByteVectorQuery(this.fieldName, target, k, filterQuery);
+                    } else {
+                        float[] target = getVectorForCreatingQueryRequest(vectorDataType, knnEngine);
+                        assert target != null;
+                        return new KnnFloatVectorQuery(this.fieldName, target, k, filterQuery);
+                    }
+                case JVECTOR:
+                    final int overQueryFactor;
+                    final float threshold;
+                    final float rerankFloor;
+                    Map<String, Object> methodParameters = (Map<String, Object>) this.getMethodParameters();
+                    overQueryFactor = (Integer) methodParameters.get(METHOD_PARAMETER_OVERQUERY_FACTOR);
+                    threshold = (Float) methodParameters.get(METHOD_PARAMETER_THRESHOLD);
+                    rerankFloor = (Float) methodParameters.get(METHOD_PARAMETER_RERANK_FLOOR);
+                    if (byteVector.length > 0) {
+                        throw new UnsupportedOperationException("JVECTOR queries are not supporting byte vectors at the moment");
+                    }
+                    float[] target = getVectorForCreatingQueryRequest(vectorDataType, knnEngine);
+                    assert target != null;
+                    return new JVectorKnnFloatVectorQuery(this.fieldName, target, k, filterQuery, overQueryFactor, threshold, rerankFloor);
+                default:
+                    throw new RuntimeException("Unknown KNNEngine " + knnEngine);
             }
+
         }
         if (radius != null) {
             RNNQueryFactory.CreateQueryRequest createQueryRequest = RNNQueryFactory.CreateQueryRequest.builder()

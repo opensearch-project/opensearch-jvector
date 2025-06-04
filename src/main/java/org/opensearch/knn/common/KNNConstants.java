@@ -111,6 +111,12 @@ public class KNNConstants {
 
     // JVector specific constants
     public static final String JVECTOR_NAME = "jvector";
+    public static final String METHOD_PARAMETER_OVERQUERY_FACTOR = "overquery_factor";
+    public static final String METHOD_PARAMETER_THRESHOLD = "threshold";
+    public static final String METHOD_PARAMETER_RERANK_FLOOR = "rerank_floor";
+    public static final int DEFAULT_OVER_QUERY_FACTOR = 5; // We will query 5x more than topKFor reranking
+    public static final Double DEFAULT_QUERY_SIMILARITY_THRESHOLD = 0.0;
+    public static final Double DEFAULT_QUERY_RERANK_FLOOR = 0.0;
 
     // Parameter defaults/limits
     public static final Integer ENCODER_PARAMETER_PQ_CODE_COUNT_DEFAULT = 1;

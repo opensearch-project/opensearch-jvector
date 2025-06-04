@@ -16,6 +16,7 @@ import org.apache.lucene.tests.index.RandomIndexWriter;
 import org.apache.lucene.tests.util.LuceneTestCase;
 import org.junit.Assert;
 import org.junit.Test;
+import org.opensearch.knn.common.KNNConstants;
 import org.opensearch.knn.index.ThreadLeakFiltersForTests;
 
 import java.io.IOException;
@@ -73,7 +74,7 @@ public class KNNJVectorTests extends LuceneTestCase {
 
                 final Query filterQuery = new MatchAllDocsQuery();
                 final IndexSearcher searcher = newSearcher(reader);
-                KnnFloatVectorQuery knnFloatVectorQuery = new KnnFloatVectorQuery("test_field", target, k, filterQuery);
+                KnnFloatVectorQuery knnFloatVectorQuery = getJVectorKnnFloatVectorQuery("test_field", target, k, filterQuery);
                 TopDocs topDocs = searcher.search(knnFloatVectorQuery, k);
                 assertEquals(k, topDocs.totalHits.value());
                 assertEquals(9, topDocs.scoreDocs[0].doc);
@@ -200,7 +201,7 @@ public class KNNJVectorTests extends LuceneTestCase {
                 Assert.assertEquals(totalNumberOfDocs, reader.numDocs());
                 final Query filterQuery = new MatchAllDocsQuery();
                 final IndexSearcher searcher = newSearcher(reader);
-                KnnFloatVectorQuery knnFloatVectorQuery = new KnnFloatVectorQuery("test_field", target, k, filterQuery);
+                KnnFloatVectorQuery knnFloatVectorQuery = getJVectorKnnFloatVectorQuery("test_field", target, k, filterQuery);
                 TopDocs topDocs = searcher.search(knnFloatVectorQuery, k);
                 assertEquals(k, topDocs.totalHits.value());
                 Document doc = reader.storedFields().document(topDocs.scoreDocs[0].doc);
@@ -269,7 +270,7 @@ public class KNNJVectorTests extends LuceneTestCase {
                 Assert.assertEquals(totalNumberOfDocs, reader.numDocs());
                 final Query filterQuery = new MatchAllDocsQuery();
                 final IndexSearcher searcher = newSearcher(reader);
-                KnnFloatVectorQuery knnFloatVectorQuery = new KnnFloatVectorQuery("test_field", target, k, filterQuery);
+                KnnFloatVectorQuery knnFloatVectorQuery = getJVectorKnnFloatVectorQuery("test_field", target, k, filterQuery);
                 TopDocs topDocs = searcher.search(knnFloatVectorQuery, k);
                 assertEquals(k, topDocs.totalHits.value());
                 Document doc = reader.storedFields().document(topDocs.scoreDocs[0].doc);
@@ -349,7 +350,7 @@ public class KNNJVectorTests extends LuceneTestCase {
                 Assert.assertEquals(totalNumberOfDocs, reader.numDocs());
                 final Query filterQuery = new MatchAllDocsQuery();
                 final IndexSearcher searcher = newSearcher(reader);
-                KnnFloatVectorQuery knnFloatVectorQuery = new KnnFloatVectorQuery("test_field", target, k, filterQuery);
+                KnnFloatVectorQuery knnFloatVectorQuery = getJVectorKnnFloatVectorQuery("test_field", target, k, filterQuery);
                 TopDocs topDocs = searcher.search(knnFloatVectorQuery, k);
                 assertEquals(k, topDocs.totalHits.value());
 
@@ -439,7 +440,7 @@ public class KNNJVectorTests extends LuceneTestCase {
                 final int k = 1;
                 for (int docId = 0; docId < reader.maxDoc(); docId++) {
                     float[] query = new float[] { docId, 0 };
-                    TopDocs td = searcher.search(new KnnFloatVectorQuery("vec", query, k), k);
+                    TopDocs td = searcher.search(getJVectorKnnFloatVectorQuery("vec", query, k, new MatchAllDocsQuery()), k);
                     assertEquals(k, td.scoreDocs.length);
                 }
 
@@ -552,7 +553,7 @@ public class KNNJVectorTests extends LuceneTestCase {
                 for (int i = 0; i < totalNumberOfDocs; i += batchSize) {
                     final float[] target = { 0.0f, 1.0f * (i + docToDeleteInEachBatch) };
                     final IndexSearcher searcher = newSearcher(reader);
-                    final KnnFloatVectorQuery knnFloatVectorQuery = new KnnFloatVectorQuery(
+                    final KnnFloatVectorQuery knnFloatVectorQuery = getJVectorKnnFloatVectorQuery(
                         "test_field",
                         target,
                         k,
@@ -610,7 +611,7 @@ public class KNNJVectorTests extends LuceneTestCase {
                 Assert.assertEquals(totalNumberOfDocs, reader.numDocs());
                 final Query filterQuery = new MatchAllDocsQuery();
                 final IndexSearcher searcher = newSearcher(reader);
-                KnnFloatVectorQuery knnFloatVectorQuery = new KnnFloatVectorQuery("test_field", target, k, filterQuery);
+                KnnFloatVectorQuery knnFloatVectorQuery = getJVectorKnnFloatVectorQuery("test_field", target, k, filterQuery);
                 TopDocs topDocs = searcher.search(knnFloatVectorQuery, k);
                 assertEquals(k, topDocs.totalHits.value());
                 assertEquals(9, topDocs.scoreDocs[0].doc);
@@ -677,7 +678,7 @@ public class KNNJVectorTests extends LuceneTestCase {
                 Assert.assertEquals(totalNumberOfDocs, reader.numDocs());
                 final Query filterQuery = new MatchAllDocsQuery();
                 final IndexSearcher searcher = newSearcher(reader);
-                KnnFloatVectorQuery knnFloatVectorQuery = new KnnFloatVectorQuery("test_field", target, k, filterQuery);
+                KnnFloatVectorQuery knnFloatVectorQuery = getJVectorKnnFloatVectorQuery("test_field", target, k, filterQuery);
                 TopDocs topDocs = searcher.search(knnFloatVectorQuery, k);
                 assertEquals(k, topDocs.totalHits.value());
                 assertEquals(0, topDocs.scoreDocs[0].doc);
@@ -740,7 +741,7 @@ public class KNNJVectorTests extends LuceneTestCase {
         indexWriterConfig.setMergePolicy(new ForceMergesOnlyMergePolicy());
         final Path indexPath = createTempDir();
         log.info("Index path: {}", indexPath);
-        try (Directory dir = newFSDirectory(indexPath); RandomIndexWriter w = new RandomIndexWriter(random(), dir, indexWriterConfig)) {
+        try (Directory dir = newFSDirectory(indexPath); IndexWriter w = new IndexWriter(dir, indexWriterConfig)) {
             final float[] target = new float[] { 0.0f, 0.0f };
             for (int i = 1; i < totalNumberOfDocs + 1; i++) {
                 final float[] source = new float[] { 0.0f, 1.0f / i };
@@ -752,11 +753,11 @@ public class KNNJVectorTests extends LuceneTestCase {
             log.info("Flushing docs to make them discoverable on the file system");
             w.commit();
 
-            try (IndexReader reader = w.getReader()) {
+            try (IndexReader reader = DirectoryReader.open(w)) {
                 log.info("Applying filter to the KNN search");
                 final Query filterQuery = new TermQuery(new Term("filter_field", "even"));
                 final IndexSearcher searcher = newSearcher(reader);
-                KnnFloatVectorQuery knnFloatVectorQuery = new KnnFloatVectorQuery("test_field", target, k, filterQuery);
+                KnnFloatVectorQuery knnFloatVectorQuery = getJVectorKnnFloatVectorQuery("test_field", target, k, filterQuery);
                 TopDocs topDocs = searcher.search(knnFloatVectorQuery, k);
 
                 log.info("Validating filtered KNN results");
@@ -854,7 +855,7 @@ public class KNNJVectorTests extends LuceneTestCase {
 
                 final Query filterQuery = new MatchAllDocsQuery();
                 final IndexSearcher searcher = newSearcher(reader);
-                KnnFloatVectorQuery knnFloatVectorQuery = new KnnFloatVectorQuery("test_field", target, k, filterQuery);
+                KnnFloatVectorQuery knnFloatVectorQuery = getJVectorKnnFloatVectorQuery("test_field", target, k, filterQuery);
                 TopDocs topDocs = searcher.search(knnFloatVectorQuery, k);
                 assertEquals(k, topDocs.totalHits.value());
                 float expectedMinScoreInTopK = VectorSimilarityFunction.EUCLIDEAN.compare(
@@ -863,6 +864,101 @@ public class KNNJVectorTests extends LuceneTestCase {
                 );
                 final float recall = calculateRecall(topDocs, expectedMinScoreInTopK);
                 Assert.assertEquals(1.0f, recall, 0.05f);
+                log.info("successfully completed search tests");
+            }
+        }
+    }
+
+    /**
+     * Test recall with different types of rerank parameters
+     */
+    @Test
+    public void testJVectorKnnIndex_simpleCase_withQuantization_rerank() throws IOException {
+        int k = 1; // The number of nearest neighbours to gather
+        int totalNumberOfDocs = DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION;
+        IndexWriterConfig indexWriterConfig = LuceneTestCase.newIndexWriterConfig();
+        indexWriterConfig.setUseCompoundFile(false);
+        // quantization fails with mergeOnDisk, turning it off for now during quantization test
+        // TODO: turn mergeOnDisk back on with quantization
+        indexWriterConfig.setCodec(new JVectorCodec(DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION, true));
+        indexWriterConfig.setMergePolicy(new ForceMergesOnlyMergePolicy());
+        // We set the below parameters to make sure no permature flush will occur, this way we can have a single segment, and we can force
+        // test the quantization case
+        indexWriterConfig.setMaxBufferedDocs(10000); // force flush every 10000 docs, this way we make sure that we only have a single
+        // segment for a totalNumberOfDocs < 1000
+        indexWriterConfig.setRAMPerThreadHardLimitMB(1000); // 1000MB per thread, this way we make sure that no premature flush will occur
+        final Path indexPath = createTempDir();
+        log.info("Index path: {}", indexPath);
+        try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter w = new IndexWriter(dir, indexWriterConfig)) {
+            final float[] target = new float[] {
+                    0.0f,
+                    0.0f,
+                    0.0f,
+                    0.0f,
+                    0.0f,
+                    0.0f,
+                    0.0f,
+                    0.0f,
+                    0.0f,
+                    0.0f,
+                    0.0f,
+                    0.0f,
+                    0.0f,
+                    0.0f,
+                    0.0f,
+                    0.0f };
+            for (int i = 1; i < totalNumberOfDocs + 1; i++) {
+                final float[] source = new float[] {
+                        0.0f,
+                        0.0f,
+                        0.0f,
+                        0.0f,
+                        0.0f,
+                        0.0f,
+                        0.0f,
+                        0.0f,
+                        0.0f,
+                        0.0f,
+                        0.0f,
+                        0.0f,
+                        0.0f,
+                        0.0f,
+                        0.0f,
+                        i };
+                final Document doc = new Document();
+                doc.add(new KnnFloatVectorField("test_field", source, VectorSimilarityFunction.EUCLIDEAN));
+                w.addDocument(doc);
+            }
+            log.info("Flushing docs to make them discoverable on the file system");
+            w.commit();
+
+            try (IndexReader reader = DirectoryReader.open(w)) {
+                log.info("We should now have a single segment with {} documents", totalNumberOfDocs);
+                Assert.assertEquals(1, reader.getContext().leaves().size());
+                Assert.assertEquals(totalNumberOfDocs, reader.numDocs());
+
+                final Query filterQuery = new MatchAllDocsQuery();
+                final IndexSearcher searcher = newSearcher(reader);
+                float expectedMinScoreInTopK = VectorSimilarityFunction.EUCLIDEAN.compare(
+                        target,
+                        new float[] { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, k }
+                );
+
+                // Query with essentially no reranking and expect recall to be very low
+                KnnFloatVectorQuery knnFloatVectorQuery = getJVectorKnnFloatVectorQuery("test_field", target, k, filterQuery, 1);
+                TopDocs topDocs = searcher.search(knnFloatVectorQuery, k);
+                assertEquals(k, topDocs.totalHits.value());
+
+                float recall = calculateRecall(topDocs, expectedMinScoreInTopK);
+                Assert.assertTrue(0.90f > recall);
+
+                // Query with reranking and expect recall to be high
+                knnFloatVectorQuery = getJVectorKnnFloatVectorQuery("test_field", target, k, filterQuery, 5);
+                topDocs = searcher.search(knnFloatVectorQuery, k);
+                assertEquals(k, topDocs.totalHits.value());
+                recall = calculateRecall(topDocs, expectedMinScoreInTopK);
+                Assert.assertTrue(0.90f <= recall);
+
                 log.info("successfully completed search tests");
             }
         }
@@ -948,7 +1044,7 @@ public class KNNJVectorTests extends LuceneTestCase {
 
                 final Query filterQuery = new MatchAllDocsQuery();
                 final IndexSearcher searcher = newSearcher(reader);
-                KnnFloatVectorQuery knnFloatVectorQuery = new KnnFloatVectorQuery("test_field", target, k, filterQuery);
+                KnnFloatVectorQuery knnFloatVectorQuery = getJVectorKnnFloatVectorQuery("test_field", target, k, filterQuery);
                 TopDocs topDocs = searcher.search(knnFloatVectorQuery, k);
                 assertEquals(k, topDocs.totalHits.value());
                 float expectedMinScoreInTopK = VectorSimilarityFunction.EUCLIDEAN.compare(
@@ -1043,7 +1139,7 @@ public class KNNJVectorTests extends LuceneTestCase {
 
                 final Query filterQuery = new MatchAllDocsQuery();
                 final IndexSearcher searcher = newSearcher(reader);
-                KnnFloatVectorQuery knnFloatVectorQuery = new KnnFloatVectorQuery("test_field", target, k, filterQuery);
+                KnnFloatVectorQuery knnFloatVectorQuery = getJVectorKnnFloatVectorQuery("test_field", target, k, filterQuery);
                 TopDocs topDocs = searcher.search(knnFloatVectorQuery, k);
                 assertEquals(k, topDocs.totalHits.value());
                 float expectedMinScoreInTopK = VectorSimilarityFunction.EUCLIDEAN.compare(
@@ -1138,7 +1234,7 @@ public class KNNJVectorTests extends LuceneTestCase {
 
                 final Query filterQuery = new MatchAllDocsQuery();
                 final IndexSearcher searcher = newSearcher(reader);
-                KnnFloatVectorQuery knnFloatVectorQuery = new KnnFloatVectorQuery("test_field", target, k, filterQuery);
+                KnnFloatVectorQuery knnFloatVectorQuery = getJVectorKnnFloatVectorQuery("test_field", target, k, filterQuery);
                 TopDocs topDocs = searcher.search(knnFloatVectorQuery, k);
                 assertEquals(k, topDocs.totalHits.value());
                 float expectedMinScoreInTopK = VectorSimilarityFunction.EUCLIDEAN.compare(
@@ -1190,4 +1286,11 @@ public class KNNJVectorTests extends LuceneTestCase {
         return sb.toString();
     }
 
+    private JVectorKnnFloatVectorQuery getJVectorKnnFloatVectorQuery(String fieldName, float[] target, int k, Query filterQuery) {
+        return getJVectorKnnFloatVectorQuery(fieldName, target,k, filterQuery, KNNConstants.DEFAULT_OVER_QUERY_FACTOR);
+    }
+
+    private JVectorKnnFloatVectorQuery getJVectorKnnFloatVectorQuery(String fieldName, float[] target, int k, Query filterQuery, int overQueryFactor) {
+        return new JVectorKnnFloatVectorQuery(fieldName, target,k, filterQuery, overQueryFactor, KNNConstants.DEFAULT_QUERY_SIMILARITY_THRESHOLD.floatValue(), KNNConstants.DEFAULT_QUERY_RERANK_FLOOR.floatValue());
+    }
 }
