@@ -24,10 +24,24 @@ public class KNNVectorsFormatParams {
     private final SpaceType spaceType;
 
     public KNNVectorsFormatParams(final Map<String, Object> params, int defaultMaxConnections, int defaultBeamWidth) {
-        this(params, defaultMaxConnections, defaultBeamWidth, KNNSettings.DEFAULT_ALPHA_VALUE.floatValue(), KNNSettings.DEFAULT_NEIGHBOR_OVERFLOW_VALUE.floatValue(), SpaceType.UNDEFINED);
+        this(
+            params,
+            defaultMaxConnections,
+            defaultBeamWidth,
+            KNNSettings.DEFAULT_ALPHA_VALUE.floatValue(),
+            KNNSettings.DEFAULT_NEIGHBOR_OVERFLOW_VALUE.floatValue(),
+            SpaceType.UNDEFINED
+        );
     }
 
-    public KNNVectorsFormatParams(final Map<String, Object> params, int defaultMaxConnections, int defaultBeamWidth, float defaultAlpha, float defaultNeighborOverflow, SpaceType spaceType) {
+    public KNNVectorsFormatParams(
+        final Map<String, Object> params,
+        int defaultMaxConnections,
+        int defaultBeamWidth,
+        float defaultAlpha,
+        float defaultNeighborOverflow,
+        SpaceType spaceType
+    ) {
         initMaxConnections(params, defaultMaxConnections);
         initBeamWidth(params, defaultBeamWidth);
         initAlpha(params, defaultAlpha);

@@ -10,7 +10,6 @@ import org.apache.lucene.codecs.KnnVectorsReader;
 import org.apache.lucene.codecs.KnnVectorsWriter;
 import org.apache.lucene.index.SegmentReadState;
 import org.apache.lucene.index.SegmentWriteState;
-import org.opensearch.knn.common.KNNConstants;
 import org.opensearch.knn.index.KNNSettings;
 
 import java.io.IOException;
@@ -38,18 +37,49 @@ public class JVectorFormat extends KnnVectorsFormat {
     private final float neighborOverflow;
 
     public JVectorFormat() {
-        this(NAME, DEFAULT_MAX_CONN, DEFAULT_BEAM_WIDTH, KNNSettings.DEFAULT_NEIGHBOR_OVERFLOW_VALUE.floatValue(), KNNSettings.DEFAULT_ALPHA_VALUE.floatValue(), DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION, DEFAULT_MERGE_ON_DISK);
+        this(
+            NAME,
+            DEFAULT_MAX_CONN,
+            DEFAULT_BEAM_WIDTH,
+            KNNSettings.DEFAULT_NEIGHBOR_OVERFLOW_VALUE.floatValue(),
+            KNNSettings.DEFAULT_ALPHA_VALUE.floatValue(),
+            DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION,
+            DEFAULT_MERGE_ON_DISK
+        );
     }
 
     public JVectorFormat(int minBatchSizeForQuantization, boolean mergeOnDisk) {
-        this(NAME, DEFAULT_MAX_CONN, DEFAULT_BEAM_WIDTH, KNNSettings.DEFAULT_NEIGHBOR_OVERFLOW_VALUE.floatValue(), KNNSettings.DEFAULT_ALPHA_VALUE.floatValue(), minBatchSizeForQuantization, mergeOnDisk);
+        this(
+            NAME,
+            DEFAULT_MAX_CONN,
+            DEFAULT_BEAM_WIDTH,
+            KNNSettings.DEFAULT_NEIGHBOR_OVERFLOW_VALUE.floatValue(),
+            KNNSettings.DEFAULT_ALPHA_VALUE.floatValue(),
+            minBatchSizeForQuantization,
+            mergeOnDisk
+        );
     }
 
-    public JVectorFormat(int maxConn, int beamWidth,float neighborOverflow, float alpha, int minBatchSizeForQuantization, boolean mergeOnDisk) {
+    public JVectorFormat(
+        int maxConn,
+        int beamWidth,
+        float neighborOverflow,
+        float alpha,
+        int minBatchSizeForQuantization,
+        boolean mergeOnDisk
+    ) {
         this(NAME, maxConn, beamWidth, neighborOverflow, alpha, minBatchSizeForQuantization, mergeOnDisk);
     }
 
-    public JVectorFormat(String name, int maxConn, int beamWidth, float neighborOverflow, float alpha, int minBatchSizeForQuantization, boolean mergeOnDisk) {
+    public JVectorFormat(
+        String name,
+        int maxConn,
+        int beamWidth,
+        float neighborOverflow,
+        float alpha,
+        int minBatchSizeForQuantization,
+        boolean mergeOnDisk
+    ) {
         super(name);
         this.maxConn = maxConn;
         this.beamWidth = beamWidth;
@@ -61,15 +91,7 @@ public class JVectorFormat extends KnnVectorsFormat {
 
     @Override
     public KnnVectorsWriter fieldsWriter(SegmentWriteState state) throws IOException {
-        return new JVectorWriter(
-            state,
-            maxConn,
-            beamWidth,
-            neighborOverflow,
-            alpha,
-            minBatchSizeForQuantization,
-            mergeOnDisk
-        );
+        return new JVectorWriter(state, maxConn, beamWidth, neighborOverflow, alpha, minBatchSizeForQuantization, mergeOnDisk);
     }
 
     @Override

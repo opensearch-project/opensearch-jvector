@@ -95,19 +95,20 @@ public abstract class BasePerFieldKnnVectorsFormat extends PerFieldKnnVectorsFor
             // All Java engines to use Lucene extensions directly
             case JVECTOR:
                 knnVectorsFormatParams = new KNNVectorsFormatParams(
-                        params,
-                        defaultMaxConnections,
-                        defaultBeamWidth,
-                        defaultAlpha,
-                        defaultNeighborOverflow,
-                        knnMethodContext.getSpaceType());
+                    params,
+                    defaultMaxConnections,
+                    defaultBeamWidth,
+                    defaultAlpha,
+                    defaultNeighborOverflow,
+                    knnMethodContext.getSpaceType()
+                );
                 log.debug(
-                        "Initialize KNN vector format for field [{}] with params [{}] = \"{}\" and [{}] = \"{}\"",
-                        field,
-                        MAX_CONNECTIONS,
-                        knnVectorsFormatParams.getMaxConnections(),
-                        BEAM_WIDTH,
-                        knnVectorsFormatParams.getBeamWidth()
+                    "Initialize KNN vector format for field [{}] with params [{}] = \"{}\" and [{}] = \"{}\"",
+                    field,
+                    MAX_CONNECTIONS,
+                    knnVectorsFormatParams.getMaxConnections(),
+                    BEAM_WIDTH,
+                    knnVectorsFormatParams.getBeamWidth()
                 );
                 return vectorsFormatSupplier.apply(engine, knnVectorsFormatParams);
             case LUCENE:

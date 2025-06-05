@@ -11,7 +11,6 @@ import org.apache.logging.log4j.Logger;
 import org.opensearch.OpenSearchParseException;
 import org.opensearch.action.admin.cluster.settings.ClusterUpdateSettingsRequest;
 import org.opensearch.action.admin.cluster.settings.ClusterUpdateSettingsResponse;
-import org.opensearch.knn.common.KNNConstants;
 import org.opensearch.transport.client.Client;
 import org.opensearch.cluster.metadata.IndexMetadata;
 import org.opensearch.cluster.service.ClusterService;
@@ -199,20 +198,20 @@ public class KNNSettings {
 
     public static final Setting<Double> INDEX_KNN_ALPHA_SETTING = Setting.doubleSetting(
         KNN_ALGO_PARAMETER_ALHPA,
-            DEFAULT_ALPHA_VALUE,
-            0,
-            Float.MAX_VALUE,
-            IndexScope,
-            Dynamic
+        DEFAULT_ALPHA_VALUE,
+        0,
+        Float.MAX_VALUE,
+        IndexScope,
+        Dynamic
     );
 
     public static final Setting<Double> INDEX_KNN_NEIGHBOR_OVERFLOW_SETTING = Setting.doubleSetting(
-            KNN_ALGO_PARAMETER_NEIGHBOR_OVERFLOW,
-            DEFAULT_NEIGHBOR_OVERFLOW_VALUE,
-            0,
-            Float.MAX_VALUE,
-            IndexScope,
-            Dynamic
+        KNN_ALGO_PARAMETER_NEIGHBOR_OVERFLOW,
+        DEFAULT_NEIGHBOR_OVERFLOW_VALUE,
+        0,
+        Float.MAX_VALUE,
+        IndexScope,
+        Dynamic
     );
 
     /**

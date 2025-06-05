@@ -23,8 +23,8 @@ public class KNN950PerFieldKnnVectorsFormat extends BasePerFieldKnnVectorsFormat
             mapperService,
             Lucene95HnswVectorsFormat.DEFAULT_MAX_CONN,
             Lucene95HnswVectorsFormat.DEFAULT_BEAM_WIDTH,
-                KNNSettings.DEFAULT_ALPHA_VALUE.floatValue(),
-                KNNSettings.DEFAULT_NEIGHBOR_OVERFLOW_VALUE.floatValue(),
+            KNNSettings.DEFAULT_ALPHA_VALUE.floatValue(),
+            KNNSettings.DEFAULT_NEIGHBOR_OVERFLOW_VALUE.floatValue(),
             () -> new Lucene95HnswVectorsFormat(),
             (knnEngine, knnVectorsFormatParams) -> new Lucene95HnswVectorsFormat(
                 knnVectorsFormatParams.getMaxConnections(),
