@@ -11,7 +11,6 @@ import org.apache.lucene.codecs.KnnVectorsWriter;
 import org.apache.lucene.index.SegmentReadState;
 import org.apache.lucene.index.SegmentWriteState;
 import org.opensearch.knn.common.KNNConstants;
-import org.opensearch.knn.index.KNNSettings;
 
 import java.io.IOException;
 

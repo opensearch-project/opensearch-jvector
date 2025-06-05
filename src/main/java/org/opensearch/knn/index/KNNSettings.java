@@ -123,7 +123,6 @@ public class KNNSettings {
     public static final Integer KNN_DEFAULT_QUANTIZATION_STATE_CACHE_EXPIRY_TIME_MINUTES = 60;
     public static final boolean KNN_DISK_VECTOR_SHARD_LEVEL_RESCORING_DISABLED_VALUE = false;
 
-
     /**
      * Settings Definition
      */
@@ -513,8 +512,6 @@ public class KNNSettings {
             INDEX_KNN_SPACE_TYPE,
             INDEX_KNN_ADVANCED_APPROXIMATE_THRESHOLD_SETTING,
             INDEX_KNN_ALGO_PARAM_M_SETTING,
-            INDEX_KNN_NEIGHBOR_OVERFLOW_SETTING,
-            INDEX_KNN_ALPHA_SETTING,
             INDEX_KNN_ALGO_PARAM_EF_CONSTRUCTION_SETTING,
             INDEX_KNN_ALGO_PARAM_EF_SEARCH_SETTING,
             KNN_ALGO_PARAM_INDEX_THREAD_QTY_SETTING,

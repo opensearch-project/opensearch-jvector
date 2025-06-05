@@ -51,11 +51,7 @@ public class JVectorDiskANNMethod extends AbstractKNNMethod {
             )
             .addParameter(
                 METHOD_PARAMETER_ALPHA,
-                new Parameter.DoubleParameter(
-                    METHOD_PARAMETER_ALPHA,
-                    KNNConstants.DEFAULT_ALPHA_VALUE,
-                    (v, context) -> v > 0
-                )
+                new Parameter.DoubleParameter(METHOD_PARAMETER_ALPHA, KNNConstants.DEFAULT_ALPHA_VALUE, (v, context) -> v > 0)
             )
             .addParameter(
                 METHOD_PARAMETER_NEIGHBOR_OVERFLOW,
