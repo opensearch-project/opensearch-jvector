@@ -11,6 +11,7 @@ import org.apache.logging.log4j.Logger;
 import org.opensearch.OpenSearchParseException;
 import org.opensearch.action.admin.cluster.settings.ClusterUpdateSettingsRequest;
 import org.opensearch.action.admin.cluster.settings.ClusterUpdateSettingsResponse;
+import org.opensearch.knn.common.KNNConstants;
 import org.opensearch.transport.client.Client;
 import org.opensearch.cluster.metadata.IndexMetadata;
 import org.opensearch.cluster.service.ClusterService;
@@ -69,6 +70,8 @@ public class KNNSettings {
     public static final String KNN_SPACE_TYPE = "index.knn.space_type";
     public static final String INDEX_KNN_ADVANCED_APPROXIMATE_THRESHOLD = "index.knn.advanced.approximate_threshold";
     public static final String KNN_ALGO_PARAM_M = "index.knn.algo_param.m";
+    public static final String KNN_ALGO_PARAMETER_ALHPA = "index.knn.alpha";
+    public static final String KNN_ALGO_PARAMETER_NEIGHBOR_OVERFLOW = "index.knn.neighbor_overflow";
     public static final String KNN_ALGO_PARAM_EF_CONSTRUCTION = "index.knn.algo_param.ef_construction";
     public static final String KNN_ALGO_PARAM_EF_SEARCH = "index.knn.algo_param.ef_search";
     public static final String KNN_ALGO_PARAM_INDEX_THREAD_QTY = "knn.algo_param.index_thread_qty";
@@ -123,6 +126,8 @@ public class KNNSettings {
     public static final Integer KNN_DEFAULT_QUANTIZATION_STATE_CACHE_EXPIRY_TIME_MINUTES = 60;
     public static final boolean KNN_DISK_VECTOR_SHARD_LEVEL_RESCORING_DISABLED_VALUE = false;
 
+    public static final Double DEFAULT_ALPHA_VALUE = 1.2;
+    public static final Double DEFAULT_NEIGHBOR_OVERFLOW_VALUE = 1.2;
     /**
      * Settings Definition
      */
@@ -190,6 +195,24 @@ public class KNNSettings {
         2,
         IndexScope,
         Setting.Property.Deprecated
+    );
+
+    public static final Setting<Double> INDEX_KNN_ALPHA_SETTING = Setting.doubleSetting(
+        KNN_ALGO_PARAMETER_ALHPA,
+            DEFAULT_ALPHA_VALUE,
+            0,
+            Float.MAX_VALUE,
+            IndexScope,
+            Dynamic
+    );
+
+    public static final Setting<Double> INDEX_KNN_NEIGHBOR_OVERFLOW_SETTING = Setting.doubleSetting(
+            KNN_ALGO_PARAMETER_NEIGHBOR_OVERFLOW,
+            DEFAULT_NEIGHBOR_OVERFLOW_VALUE,
+            0,
+            Float.MAX_VALUE,
+            IndexScope,
+            Dynamic
     );
 
     /**
@@ -512,6 +535,8 @@ public class KNNSettings {
             INDEX_KNN_SPACE_TYPE,
             INDEX_KNN_ADVANCED_APPROXIMATE_THRESHOLD_SETTING,
             INDEX_KNN_ALGO_PARAM_M_SETTING,
+            INDEX_KNN_NEIGHBOR_OVERFLOW_SETTING,
+            INDEX_KNN_ALPHA_SETTING,
             INDEX_KNN_ALGO_PARAM_EF_CONSTRUCTION_SETTING,
             INDEX_KNN_ALGO_PARAM_EF_SEARCH_SETTING,
             KNN_ALGO_PARAM_INDEX_THREAD_QTY_SETTING,

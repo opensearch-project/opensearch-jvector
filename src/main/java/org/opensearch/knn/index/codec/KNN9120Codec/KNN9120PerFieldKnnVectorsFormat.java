@@ -30,6 +30,8 @@ public class KNN9120PerFieldKnnVectorsFormat extends BasePerFieldKnnVectorsForma
             mapperService,
             Lucene99HnswVectorsFormat.DEFAULT_MAX_CONN,
             Lucene99HnswVectorsFormat.DEFAULT_BEAM_WIDTH,
+            KNNSettings.DEFAULT_ALPHA_VALUE.floatValue(),
+            KNNSettings.DEFAULT_NEIGHBOR_OVERFLOW_VALUE.floatValue(),
             Lucene99HnswVectorsFormat::new,
             (knnEngine, knnVectorsFormatParams) -> {
                 final Tuple<Integer, ExecutorService> mergeThreadCountAndExecutorService = getMergeThreadCountAndExecutorService();
@@ -61,6 +63,8 @@ public class KNN9120PerFieldKnnVectorsFormat extends BasePerFieldKnnVectorsForma
                         return new JVectorFormat(
                             knnVectorsFormatParams.getMaxConnections(),
                             knnVectorsFormatParams.getBeamWidth(),
+                            knnVectorsFormatParams.getAlpha(),
+                            knnVectorsFormatParams.getNeighborOverflow(),
                             JVectorFormat.DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION,
                             true
                         );

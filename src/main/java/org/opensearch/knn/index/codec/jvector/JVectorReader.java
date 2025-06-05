@@ -118,10 +118,12 @@ public class JVectorReader extends KnnVectorsReader {
             jvectorKnnCollector = (JVectorKnnCollector) knnCollector;
         } else {
             log.warn("KnnCollector must be of type JVectorKnnCollector, for now we will re-wrap it but this is not ideal");
-            jvectorKnnCollector = new JVectorKnnCollector(knnCollector,
-                    KNNConstants.DEFAULT_QUERY_SIMILARITY_THRESHOLD.floatValue(),
-                    KNNConstants.DEFAULT_QUERY_RERANK_FLOOR.floatValue(),
-                    KNNConstants.DEFAULT_OVER_QUERY_FACTOR);
+            jvectorKnnCollector = new JVectorKnnCollector(
+                knnCollector,
+                KNNConstants.DEFAULT_QUERY_SIMILARITY_THRESHOLD.floatValue(),
+                KNNConstants.DEFAULT_QUERY_RERANK_FLOOR.floatValue(),
+                KNNConstants.DEFAULT_OVER_QUERY_FACTOR
+            );
 
         }
 
@@ -147,10 +149,10 @@ public class JVectorReader extends KnnVectorsReader {
             try (var graphSearcher = new GraphSearcher(index)) {
                 final var searchResults = graphSearcher.search(
                     ssp,
-                        jvectorKnnCollector.k(),
-                        jvectorKnnCollector.k() * jvectorKnnCollector.getOverQueryFactor(),
+                    jvectorKnnCollector.k(),
+                    jvectorKnnCollector.k() * jvectorKnnCollector.getOverQueryFactor(),
                     jvectorKnnCollector.getThreshold(),
-                        jvectorKnnCollector.getRerankFloor(),
+                    jvectorKnnCollector.getRerankFloor(),
                     compatibleBits
                 );
                 for (SearchResult.NodeScore ns : searchResults.getNodes()) {

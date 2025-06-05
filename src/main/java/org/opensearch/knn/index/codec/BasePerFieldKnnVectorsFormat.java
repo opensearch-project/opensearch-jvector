@@ -39,6 +39,8 @@ public abstract class BasePerFieldKnnVectorsFormat extends PerFieldKnnVectorsFor
     private final Optional<MapperService> mapperService;
     private final int defaultMaxConnections;
     private final int defaultBeamWidth;
+    private float defaultAlpha;
+    private float defaultNeighborOverflow;
     private final Supplier<KnnVectorsFormat> defaultFormatSupplier;
     private final BiFunction<KNNEngine, KNNVectorsFormatParams, KnnVectorsFormat> vectorsFormatSupplier;
     private Function<KNNScalarQuantizedVectorsFormatParams, KnnVectorsFormat> scalarQuantizedVectorsFormatSupplier;
@@ -49,6 +51,8 @@ public abstract class BasePerFieldKnnVectorsFormat extends PerFieldKnnVectorsFor
         Optional<MapperService> mapperService,
         int defaultMaxConnections,
         int defaultBeamWidth,
+        float defaultAlpha,
+        float defaultNeighborOverflow,
         Supplier<KnnVectorsFormat> defaultFormatSupplier,
         BiFunction<KNNEngine, KNNVectorsFormatParams, KnnVectorsFormat> vectorsFormatSupplier
     ) {
@@ -57,6 +61,8 @@ public abstract class BasePerFieldKnnVectorsFormat extends PerFieldKnnVectorsFor
         this.defaultBeamWidth = defaultBeamWidth;
         this.defaultFormatSupplier = defaultFormatSupplier;
         this.vectorsFormatSupplier = vectorsFormatSupplier;
+        this.defaultAlpha = defaultAlpha;
+        this.defaultNeighborOverflow = defaultNeighborOverflow;
     }
 
     @Override
@@ -84,9 +90,26 @@ public abstract class BasePerFieldKnnVectorsFormat extends PerFieldKnnVectorsFor
             .orElseThrow(() -> new IllegalArgumentException("KNN method context cannot be empty"));
         final KNNEngine engine = knnMethodContext.getKnnEngine();
         final Map<String, Object> params = knnMethodContext.getMethodComponentContext().getParameters();
+        KNNVectorsFormatParams knnVectorsFormatParams;
         switch (engine) {
             // All Java engines to use Lucene extensions directly
             case JVECTOR:
+                knnVectorsFormatParams = new KNNVectorsFormatParams(
+                        params,
+                        defaultMaxConnections,
+                        defaultBeamWidth,
+                        defaultAlpha,
+                        defaultNeighborOverflow,
+                        knnMethodContext.getSpaceType());
+                log.debug(
+                        "Initialize KNN vector format for field [{}] with params [{}] = \"{}\" and [{}] = \"{}\"",
+                        field,
+                        MAX_CONNECTIONS,
+                        knnVectorsFormatParams.getMaxConnections(),
+                        BEAM_WIDTH,
+                        knnVectorsFormatParams.getBeamWidth()
+                );
+                return vectorsFormatSupplier.apply(engine, knnVectorsFormatParams);
             case LUCENE:
                 if (params != null && params.containsKey(METHOD_ENCODER_PARAMETER)) {
                     KNNScalarQuantizedVectorsFormatParams knnScalarQuantizedVectorsFormatParams = new KNNScalarQuantizedVectorsFormatParams(
@@ -111,10 +134,12 @@ public abstract class BasePerFieldKnnVectorsFormat extends PerFieldKnnVectorsFor
                     }
                 }
 
-                KNNVectorsFormatParams knnVectorsFormatParams = new KNNVectorsFormatParams(
+                knnVectorsFormatParams = new KNNVectorsFormatParams(
                     params,
                     defaultMaxConnections,
                     defaultBeamWidth,
+                    defaultAlpha,
+                    defaultNeighborOverflow,
                     knnMethodContext.getSpaceType()
                 );
                 log.debug(

@@ -41,10 +41,7 @@ import org.opensearch.knn.index.engine.KNNLibrarySearchContext;
 import org.opensearch.knn.index.engine.KNNEngine;
 
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.opensearch.knn.common.KNNConstants.*;
@@ -553,10 +550,22 @@ public class KNNQueryBuilder extends AbstractQueryBuilder<KNNQueryBuilder> imple
                     final int overQueryFactor;
                     final float threshold;
                     final float rerankFloor;
-                    Map<String, Object> methodParameters = (Map<String, Object>) this.getMethodParameters();
-                    overQueryFactor = (Integer) methodParameters.get(METHOD_PARAMETER_OVERQUERY_FACTOR);
-                    threshold = (Float) methodParameters.get(METHOD_PARAMETER_THRESHOLD);
-                    rerankFloor = (Float) methodParameters.get(METHOD_PARAMETER_RERANK_FLOOR);
+                    if (this.getMethodParameters() != null) {
+                        Map<String, Object> methodParameters = (Map<String, Object>) this.getMethodParameters();
+                        overQueryFactor = (Integer) methodParameters.getOrDefault(
+                            METHOD_PARAMETER_OVERQUERY_FACTOR,
+                            DEFAULT_OVER_QUERY_FACTOR
+                        );
+                        threshold = ((Double) methodParameters.getOrDefault(METHOD_PARAMETER_THRESHOLD, DEFAULT_QUERY_SIMILARITY_THRESHOLD))
+                            .floatValue();
+                        rerankFloor = ((Double) methodParameters.getOrDefault(METHOD_PARAMETER_RERANK_FLOOR, DEFAULT_QUERY_RERANK_FLOOR))
+                            .floatValue();
+                    } else {
+                        overQueryFactor = DEFAULT_OVER_QUERY_FACTOR;
+                        threshold = DEFAULT_QUERY_SIMILARITY_THRESHOLD.floatValue();
+                        rerankFloor = DEFAULT_QUERY_RERANK_FLOOR.floatValue();
+                    }
+
                     if (byteVector.length > 0) {
                         throw new UnsupportedOperationException("JVECTOR queries are not supporting byte vectors at the moment");
                     }

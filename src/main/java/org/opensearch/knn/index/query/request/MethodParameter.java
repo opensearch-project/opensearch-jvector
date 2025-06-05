@@ -97,16 +97,15 @@ public enum MethodParameter {
         @Override
         public ValidationException validate(Object value) {
             final Double parsed = parse(value);
-            if (parsed != null && parsed > 0) {
+            if (parsed != null && parsed >= 0) {
                 return null;
             }
 
             ValidationException validationException = new ValidationException();
-            validationException.addValidationError(METHOD_PARAMETER_THRESHOLD + " should be greater than 0");
+            validationException.addValidationError(METHOD_PARAMETER_THRESHOLD + " should be greater than or equal to 0");
             return validationException;
         }
     },
-
 
     RERANK_FLOOR(METHOD_PARAMETER_RERANK_FLOOR, Version.V_3_0_0, REREANK_FLOOR_FIELD) {
         @Override
@@ -117,12 +116,12 @@ public enum MethodParameter {
         @Override
         public ValidationException validate(Object value) {
             final Double parsed = parse(value);
-            if (parsed != null && parsed > 0) {
+            if (parsed != null && parsed >= 0) {
                 return null;
             }
 
             ValidationException validationException = new ValidationException();
-            validationException.addValidationError(METHOD_PARAMETER_RERANK_FLOOR + " should be greater than 0");
+            validationException.addValidationError(METHOD_PARAMETER_RERANK_FLOOR + " should be greater than or equal to 0");
             return validationException;
         }
     },;

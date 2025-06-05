@@ -30,7 +30,15 @@ public class JVectorKnnFloatVectorQuery extends KnnFloatVectorQuery {
         this.rerankFloor = rerankFloor;
     }
 
-    public JVectorKnnFloatVectorQuery(String field, float[] target, int k, Query filter, int overQueryFactor, float threshold, float rerankFloor) {
+    public JVectorKnnFloatVectorQuery(
+        String field,
+        float[] target,
+        int k,
+        Query filter,
+        int overQueryFactor,
+        float threshold,
+        float rerankFloor
+    ) {
         super(field, target, k, filter);
         this.overQueryFactor = overQueryFactor;
         this.threshold = threshold;
@@ -39,10 +47,11 @@ public class JVectorKnnFloatVectorQuery extends KnnFloatVectorQuery {
 
     @Override
     protected TopDocs approximateSearch(
-            LeafReaderContext context,
-            Bits acceptDocs,
-            int visitedLimit,
-            KnnCollectorManager knnCollectorManager) throws IOException  {
+        LeafReaderContext context,
+        Bits acceptDocs,
+        int visitedLimit,
+        KnnCollectorManager knnCollectorManager
+    ) throws IOException {
         final KnnCollector delegateCollector = knnCollectorManager.newCollector(visitedLimit, context);
         final KnnCollector knnCollector = new JVectorKnnCollector(delegateCollector, threshold, rerankFloor, overQueryFactor);
         LeafReader reader = context.reader();

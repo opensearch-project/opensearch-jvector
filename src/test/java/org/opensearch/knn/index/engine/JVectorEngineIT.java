@@ -602,12 +602,12 @@ public class JVectorEngineIT extends KNNRestTestCase {
      */
     @Test
     public void testQuantizationWithOverQueryParameter() throws Exception {
-        int dimension = 16;
+        int dimension = 512;
         final SpaceType spaceType = SpaceType.L2;
         createKnnIndexMappingWithJVectorEngine(dimension, spaceType, VectorDataType.FLOAT);
 
         // Choosing a batch size that will trigger quantization
-        int batchSize = JVectorFormat.DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION;
+        int batchSize = JVectorFormat.DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION * 2;
 
         final float[][] vectors = new float[batchSize][dimension];
         for (int i = 0; i < vectors.length; i++) {
@@ -633,7 +633,7 @@ public class JVectorEngineIT extends KNNRestTestCase {
 
         // Perform search and verify recall
         float[] queryVector = randomFloatVector(dimension);
-        int k = 2;
+        int k = 10;
 
         // Calculate ground truth with brute force
         logger.info("Calculating ground truth");
@@ -641,7 +641,7 @@ public class JVectorEngineIT extends KNNRestTestCase {
         assertEquals(1, groundTruth.size());
         Set<String> expectedDocIds = groundTruth.getFirst();
 
-        logger.info("Searching");
+        logger.info("Searching with low overquery factor");
         // 1. Search with a low-overquery factor
         final Map<String, Object> methodParametersWithLowOverQuery = new HashMap<>();
         methodParametersWithLowOverQuery.put(KNNConstants.METHOD_PARAMETER_OVERQUERY_FACTOR, 1);
@@ -649,10 +649,11 @@ public class JVectorEngineIT extends KNNRestTestCase {
         methodParametersWithLowOverQuery.put(METHOD_PARAMETER_RERANK_FLOOR, DEFAULT_QUERY_RERANK_FLOOR);
 
         KNNQueryBuilder knnQueryBuilder = KNNQueryBuilder.builder()
-                .k(k)
-                .vector(queryVector)
-                .fieldName(FIELD_NAME)
-                .methodParameters(methodParametersWithLowOverQuery).build();
+            .k(k)
+            .vector(queryVector)
+            .fieldName(FIELD_NAME)
+            .methodParameters(methodParametersWithLowOverQuery)
+            .build();
         Response response = searchKNNIndex(INDEX_NAME, knnQueryBuilder, k);
         List<KNNResult> results = parseSearchResponse(EntityUtils.toString(response.getEntity()), FIELD_NAME);
 
@@ -665,16 +666,18 @@ public class JVectorEngineIT extends KNNRestTestCase {
         assertTrue("Expected recall to be lower than 0.7 but got " + recall, recall < 0.7);
 
         // 2. Search with a high-overquery factor
+        logger.info("Searching with high overquery factor");
         final Map<String, Object> methodParametersWithHighOverQuery = new HashMap<>();
-        methodParametersWithHighOverQuery.put(KNNConstants.METHOD_PARAMETER_OVERQUERY_FACTOR, DEFAULT_OVER_QUERY_FACTOR);
-        methodParametersWithLowOverQuery.put(KNNConstants.METHOD_PARAMETER_THRESHOLD, DEFAULT_QUERY_SIMILARITY_THRESHOLD);
-        methodParametersWithLowOverQuery.put(METHOD_PARAMETER_RERANK_FLOOR, DEFAULT_QUERY_RERANK_FLOOR);
+        methodParametersWithHighOverQuery.put(KNNConstants.METHOD_PARAMETER_OVERQUERY_FACTOR, 100);
+        methodParametersWithHighOverQuery.put(KNNConstants.METHOD_PARAMETER_THRESHOLD, DEFAULT_QUERY_SIMILARITY_THRESHOLD);
+        methodParametersWithHighOverQuery.put(METHOD_PARAMETER_RERANK_FLOOR, DEFAULT_QUERY_RERANK_FLOOR);
 
         knnQueryBuilder = KNNQueryBuilder.builder()
-                .k(k)
-                .vector(queryVector)
-                .fieldName(FIELD_NAME)
-                .methodParameters(methodParametersWithHighOverQuery).build();
+            .k(k)
+            .vector(queryVector)
+            .fieldName(FIELD_NAME)
+            .methodParameters(methodParametersWithHighOverQuery)
+            .build();
         response = searchKNNIndex(INDEX_NAME, knnQueryBuilder, k);
         results = parseSearchResponse(EntityUtils.toString(response.getEntity()), FIELD_NAME);
 

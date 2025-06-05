@@ -891,40 +891,40 @@ public class KNNJVectorTests extends LuceneTestCase {
         log.info("Index path: {}", indexPath);
         try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter w = new IndexWriter(dir, indexWriterConfig)) {
             final float[] target = new float[] {
-                    0.0f,
-                    0.0f,
-                    0.0f,
-                    0.0f,
-                    0.0f,
-                    0.0f,
-                    0.0f,
-                    0.0f,
-                    0.0f,
-                    0.0f,
-                    0.0f,
-                    0.0f,
-                    0.0f,
-                    0.0f,
-                    0.0f,
-                    0.0f };
+                0.0f,
+                0.0f,
+                0.0f,
+                0.0f,
+                0.0f,
+                0.0f,
+                0.0f,
+                0.0f,
+                0.0f,
+                0.0f,
+                0.0f,
+                0.0f,
+                0.0f,
+                0.0f,
+                0.0f,
+                0.0f };
             for (int i = 1; i < totalNumberOfDocs + 1; i++) {
                 final float[] source = new float[] {
-                        0.0f,
-                        0.0f,
-                        0.0f,
-                        0.0f,
-                        0.0f,
-                        0.0f,
-                        0.0f,
-                        0.0f,
-                        0.0f,
-                        0.0f,
-                        0.0f,
-                        0.0f,
-                        0.0f,
-                        0.0f,
-                        0.0f,
-                        i };
+                    0.0f,
+                    0.0f,
+                    0.0f,
+                    0.0f,
+                    0.0f,
+                    0.0f,
+                    0.0f,
+                    0.0f,
+                    0.0f,
+                    0.0f,
+                    0.0f,
+                    0.0f,
+                    0.0f,
+                    0.0f,
+                    0.0f,
+                    i };
                 final Document doc = new Document();
                 doc.add(new KnnFloatVectorField("test_field", source, VectorSimilarityFunction.EUCLIDEAN));
                 w.addDocument(doc);
@@ -940,8 +940,8 @@ public class KNNJVectorTests extends LuceneTestCase {
                 final Query filterQuery = new MatchAllDocsQuery();
                 final IndexSearcher searcher = newSearcher(reader);
                 float expectedMinScoreInTopK = VectorSimilarityFunction.EUCLIDEAN.compare(
-                        target,
-                        new float[] { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, k }
+                    target,
+                    new float[] { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, k }
                 );
 
                 // Query with essentially no reranking and expect recall to be very low
@@ -1287,10 +1287,24 @@ public class KNNJVectorTests extends LuceneTestCase {
     }
 
     private JVectorKnnFloatVectorQuery getJVectorKnnFloatVectorQuery(String fieldName, float[] target, int k, Query filterQuery) {
-        return getJVectorKnnFloatVectorQuery(fieldName, target,k, filterQuery, KNNConstants.DEFAULT_OVER_QUERY_FACTOR);
+        return getJVectorKnnFloatVectorQuery(fieldName, target, k, filterQuery, KNNConstants.DEFAULT_OVER_QUERY_FACTOR);
     }
 
-    private JVectorKnnFloatVectorQuery getJVectorKnnFloatVectorQuery(String fieldName, float[] target, int k, Query filterQuery, int overQueryFactor) {
-        return new JVectorKnnFloatVectorQuery(fieldName, target,k, filterQuery, overQueryFactor, KNNConstants.DEFAULT_QUERY_SIMILARITY_THRESHOLD.floatValue(), KNNConstants.DEFAULT_QUERY_RERANK_FLOOR.floatValue());
+    private JVectorKnnFloatVectorQuery getJVectorKnnFloatVectorQuery(
+        String fieldName,
+        float[] target,
+        int k,
+        Query filterQuery,
+        int overQueryFactor
+    ) {
+        return new JVectorKnnFloatVectorQuery(
+            fieldName,
+            target,
+            k,
+            filterQuery,
+            overQueryFactor,
+            KNNConstants.DEFAULT_QUERY_SIMILARITY_THRESHOLD.floatValue(),
+            KNNConstants.DEFAULT_QUERY_RERANK_FLOOR.floatValue()
+        );
     }
 }
