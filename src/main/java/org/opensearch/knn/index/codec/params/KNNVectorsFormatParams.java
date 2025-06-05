@@ -28,8 +28,8 @@ public class KNNVectorsFormatParams {
             params,
             defaultMaxConnections,
             defaultBeamWidth,
-            KNNSettings.DEFAULT_ALPHA_VALUE.floatValue(),
-            KNNSettings.DEFAULT_NEIGHBOR_OVERFLOW_VALUE.floatValue(),
+                KNNConstants.DEFAULT_ALPHA_VALUE.floatValue(),
+                KNNConstants.DEFAULT_NEIGHBOR_OVERFLOW_VALUE.floatValue(),
             SpaceType.UNDEFINED
         );
     }
@@ -70,16 +70,16 @@ public class KNNVectorsFormatParams {
     }
 
     private void initAlpha(final Map<String, Object> params, float defaultAlpha) {
-        if (params != null && params.containsKey(KNNSettings.KNN_ALGO_PARAMETER_ALHPA)) {
-            this.alpha = (int) params.get(KNNSettings.KNN_ALGO_PARAMETER_ALHPA);
+        if (params != null && params.containsKey(KNNConstants.METHOD_PARAMETER_ALPHA)) {
+            this.alpha = (int) params.get(KNNConstants.METHOD_PARAMETER_ALPHA);
             return;
         }
         this.alpha = defaultAlpha;
     }
 
     private void initNeighborOverflow(final Map<String, Object> params, float defaultNeighborOverflow) {
-        if (params != null && params.containsKey(KNNSettings.KNN_ALGO_PARAMETER_NEIGHBOR_OVERFLOW)) {
-            this.neighborOverflow = (int) params.get(KNNSettings.KNN_ALGO_PARAMETER_NEIGHBOR_OVERFLOW);
+        if (params != null && params.containsKey(KNNConstants.METHOD_PARAMETER_NEIGHBOR_OVERFLOW)) {
+            this.neighborOverflow = (int) params.get(KNNConstants.METHOD_PARAMETER_NEIGHBOR_OVERFLOW);
             return;
         }
         this.neighborOverflow = defaultNeighborOverflow;

@@ -9,6 +9,7 @@ import org.apache.lucene.codecs.lucene99.Lucene99HnswScalarQuantizedVectorsForma
 import org.apache.lucene.codecs.lucene99.Lucene99HnswVectorsFormat;
 import org.opensearch.common.collect.Tuple;
 import org.opensearch.index.mapper.MapperService;
+import org.opensearch.knn.common.KNNConstants;
 import org.opensearch.knn.index.KNNSettings;
 import org.opensearch.knn.index.SpaceType;
 import org.opensearch.knn.index.codec.BasePerFieldKnnVectorsFormat;
@@ -30,8 +31,8 @@ public class KNN9120PerFieldKnnVectorsFormat extends BasePerFieldKnnVectorsForma
             mapperService,
             Lucene99HnswVectorsFormat.DEFAULT_MAX_CONN,
             Lucene99HnswVectorsFormat.DEFAULT_BEAM_WIDTH,
-            KNNSettings.DEFAULT_ALPHA_VALUE.floatValue(),
-            KNNSettings.DEFAULT_NEIGHBOR_OVERFLOW_VALUE.floatValue(),
+                KNNConstants.DEFAULT_ALPHA_VALUE.floatValue(),
+                KNNConstants.DEFAULT_NEIGHBOR_OVERFLOW_VALUE.floatValue(),
             Lucene99HnswVectorsFormat::new,
             (knnEngine, knnVectorsFormatParams) -> {
                 final Tuple<Integer, ExecutorService> mergeThreadCountAndExecutorService = getMergeThreadCountAndExecutorService();

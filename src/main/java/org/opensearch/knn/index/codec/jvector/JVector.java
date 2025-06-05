@@ -75,7 +75,6 @@ public class JVector extends JVMLibrary {
         return score;
     }
 
-    // TODO: Implement this
     @Override
     public ResolvedMethodContext resolveMethod(
         KNNMethodContext knnMethodContext,

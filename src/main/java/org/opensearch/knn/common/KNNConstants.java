@@ -109,14 +109,20 @@ public class KNNConstants {
     public static final String FAISS_SIGNED_BYTE_SQ = "SQ8_direct_signed";
     public static final String FAISS_SQ_CLIP = "clip";
 
-    // JVector specific constants
+    /***** JVector specific constants *****/
     public static final String JVECTOR_NAME = "jvector";
+    // Query related params
     public static final String METHOD_PARAMETER_OVERQUERY_FACTOR = "overquery_factor";
     public static final String METHOD_PARAMETER_THRESHOLD = "threshold";
     public static final String METHOD_PARAMETER_RERANK_FLOOR = "rerank_floor";
     public static final int DEFAULT_OVER_QUERY_FACTOR = 5; // We will query 5x more than topKFor reranking
     public static final Double DEFAULT_QUERY_SIMILARITY_THRESHOLD = 0.0;
     public static final Double DEFAULT_QUERY_RERANK_FLOOR = 0.0;
+    // Construction related params
+    public static final String METHOD_PARAMETER_ALPHA = "alpha";
+    public static final String METHOD_PARAMETER_NEIGHBOR_OVERFLOW = "neighbor_overflow";
+    public static final Double DEFAULT_ALPHA_VALUE = 1.2;
+    public static final Double DEFAULT_NEIGHBOR_OVERFLOW_VALUE = 1.2;
 
     // Parameter defaults/limits
     public static final Integer ENCODER_PARAMETER_PQ_CODE_COUNT_DEFAULT = 1;

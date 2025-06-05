@@ -6,6 +6,7 @@
 package org.opensearch.knn.index.codec.jvector;
 
 import com.google.common.collect.ImmutableSet;
+import org.opensearch.knn.common.KNNConstants;
 import org.opensearch.knn.index.KNNSettings;
 import org.opensearch.knn.index.SpaceType;
 import org.opensearch.knn.index.VectorDataType;
@@ -45,6 +46,22 @@ public class JVectorDiskANNMethod extends AbstractKNNMethod {
                 new Parameter.IntegerParameter(
                     METHOD_PARAMETER_EF_CONSTRUCTION,
                     KNNSettings.INDEX_KNN_DEFAULT_ALGO_PARAM_EF_CONSTRUCTION,
+                    (v, context) -> v > 0
+                )
+            )
+            .addParameter(
+                METHOD_PARAMETER_ALPHA,
+                new Parameter.DoubleParameter(
+                    METHOD_PARAMETER_ALPHA,
+                    KNNConstants.DEFAULT_ALPHA_VALUE,
+                    (v, context) -> v > 0
+                )
+            )
+            .addParameter(
+                METHOD_PARAMETER_NEIGHBOR_OVERFLOW,
+                new Parameter.DoubleParameter(
+                    METHOD_PARAMETER_NEIGHBOR_OVERFLOW,
+                    KNNConstants.DEFAULT_NEIGHBOR_OVERFLOW_VALUE,
                     (v, context) -> v > 0
                 )
             )

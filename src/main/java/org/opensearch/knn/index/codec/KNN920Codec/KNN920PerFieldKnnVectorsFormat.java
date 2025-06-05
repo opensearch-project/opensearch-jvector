@@ -7,6 +7,7 @@ package org.opensearch.knn.index.codec.KNN920Codec;
 
 import org.apache.lucene.backward_codecs.lucene92.Lucene92HnswVectorsFormat;
 import org.opensearch.index.mapper.MapperService;
+import org.opensearch.knn.common.KNNConstants;
 import org.opensearch.knn.index.KNNSettings;
 import org.opensearch.knn.index.codec.BasePerFieldKnnVectorsFormat;
 
@@ -22,8 +23,8 @@ public class KNN920PerFieldKnnVectorsFormat extends BasePerFieldKnnVectorsFormat
             mapperService,
             Lucene92HnswVectorsFormat.DEFAULT_MAX_CONN,
             Lucene92HnswVectorsFormat.DEFAULT_BEAM_WIDTH,
-            KNNSettings.DEFAULT_ALPHA_VALUE.floatValue(),
-            KNNSettings.DEFAULT_NEIGHBOR_OVERFLOW_VALUE.floatValue(),
+                KNNConstants.DEFAULT_ALPHA_VALUE.floatValue(),
+                KNNConstants.DEFAULT_NEIGHBOR_OVERFLOW_VALUE.floatValue(),
             () -> new Lucene92HnswVectorsFormat(),
             (knnEngine, knnVectorsFormatParams) -> new Lucene92HnswVectorsFormat(
                 knnVectorsFormatParams.getMaxConnections(),

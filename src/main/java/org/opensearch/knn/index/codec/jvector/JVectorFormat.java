@@ -10,6 +10,7 @@ import org.apache.lucene.codecs.KnnVectorsReader;
 import org.apache.lucene.codecs.KnnVectorsWriter;
 import org.apache.lucene.index.SegmentReadState;
 import org.apache.lucene.index.SegmentWriteState;
+import org.opensearch.knn.common.KNNConstants;
 import org.opensearch.knn.index.KNNSettings;
 
 import java.io.IOException;
@@ -41,8 +42,8 @@ public class JVectorFormat extends KnnVectorsFormat {
             NAME,
             DEFAULT_MAX_CONN,
             DEFAULT_BEAM_WIDTH,
-            KNNSettings.DEFAULT_NEIGHBOR_OVERFLOW_VALUE.floatValue(),
-            KNNSettings.DEFAULT_ALPHA_VALUE.floatValue(),
+            KNNConstants.DEFAULT_NEIGHBOR_OVERFLOW_VALUE.floatValue(),
+            KNNConstants.DEFAULT_ALPHA_VALUE.floatValue(),
             DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION,
             DEFAULT_MERGE_ON_DISK
         );
@@ -53,8 +54,8 @@ public class JVectorFormat extends KnnVectorsFormat {
             NAME,
             DEFAULT_MAX_CONN,
             DEFAULT_BEAM_WIDTH,
-            KNNSettings.DEFAULT_NEIGHBOR_OVERFLOW_VALUE.floatValue(),
-            KNNSettings.DEFAULT_ALPHA_VALUE.floatValue(),
+            KNNConstants.DEFAULT_NEIGHBOR_OVERFLOW_VALUE.floatValue(),
+            KNNConstants.DEFAULT_ALPHA_VALUE.floatValue(),
             minBatchSizeForQuantization,
             mergeOnDisk
         );
