@@ -38,6 +38,7 @@ import org.apache.lucene.util.hnsw.CloseableRandomVectorScorerSupplier;
 import java.io.DataOutput;
 import java.io.IOException;
 import java.util.*;
+import java.util.function.Function;
 
 import static org.apache.lucene.codecs.lucene99.Lucene99HnswVectorsReader.readVectorEncoding;
 
@@ -59,7 +60,9 @@ public class JVectorWriter extends KnnVectorsWriter {
     private final int beamWidth;
     private final float degreeOverflow;
     private final float alpha;
-    private final int minimumBatchSizeForQuantization;
+    private final Function<Integer, Integer> numberOfSubspacesPerVectorSupplier; // Number of subspaces used per vector for PQ quantization
+                                                                                 // as a function of the original dimension
+    private final int minimumBatchSizeForQuantization; // Threshold for the vector count above which we will trigger PQ quantization
     private final boolean mergeOnDisk;
 
     private boolean finished = false;
@@ -70,6 +73,7 @@ public class JVectorWriter extends KnnVectorsWriter {
         int beamWidth,
         float degreeOverflow,
         float alpha,
+        Function<Integer, Integer> numberOfSubspacesPerVectorSupplier,
         int minimumBatchSizeForQuantization,
         boolean mergeOnDisk
     ) throws IOException {
@@ -78,6 +82,7 @@ public class JVectorWriter extends KnnVectorsWriter {
         this.beamWidth = beamWidth;
         this.degreeOverflow = degreeOverflow;
         this.alpha = alpha;
+        this.numberOfSubspacesPerVectorSupplier = numberOfSubspacesPerVectorSupplier;
         this.minimumBatchSizeForQuantization = minimumBatchSizeForQuantization;
         this.mergeOnDisk = mergeOnDisk;
         this.flatVectorWriter = FLAT_VECTORS_FORMAT.fieldsWriter(segmentWriteState);
@@ -298,11 +303,8 @@ public class JVectorWriter extends KnnVectorsWriter {
      * @param fieldData The field writer object providing access to the vector data to be compressed.
      * @throws IOException If an I/O error occurs during writing.
      */
-    private static void writePQCodebooksAndVectors(DataOutput out, FieldWriter<?> fieldData) throws IOException {
-
-        // TODO: should we make this configurable?
-        // Compress the original vectors using PQ. this represents a compression ratio of 128 * 4 / 16 = 32x
-        final var M = Math.min(fieldData.randomAccessVectorValues.dimension(), 16); // number of subspaces
+    private void writePQCodebooksAndVectors(DataOutput out, FieldWriter<?> fieldData) throws IOException {
+        final var M = numberOfSubspacesPerVectorSupplier.apply(fieldData.randomAccessVectorValues.dimension());
         final var numberOfClustersPerSubspace = Math.min(256, fieldData.randomAccessVectorValues.size()); // number of centroids per
                                                                                                           // subspace
         ProductQuantization pq = ProductQuantization.compute(

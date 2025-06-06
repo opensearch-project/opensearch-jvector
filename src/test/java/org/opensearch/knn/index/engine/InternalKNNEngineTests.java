@@ -9,13 +9,16 @@ import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.lucene.codecs.perfield.PerFieldKnnVectorsFormat;
 import org.apache.lucene.index.SegmentReader;
+import org.junit.Test;
 import org.opensearch.client.Request;
 import org.opensearch.client.Response;
 import org.opensearch.cluster.routing.ShardRouting;
 import org.opensearch.common.lucene.index.OpenSearchLeafReader;
 import org.opensearch.common.settings.Settings;
+import org.opensearch.common.xcontent.XContentFactory;
 import org.opensearch.core.rest.RestStatus;
 import org.opensearch.core.xcontent.MediaTypeRegistry;
+import org.opensearch.core.xcontent.XContentBuilder;
 import org.opensearch.index.engine.Engine;
 import org.opensearch.knn.common.KNNConstants;
 import org.opensearch.knn.index.SpaceType;
@@ -27,6 +30,7 @@ import org.opensearch.test.OpenSearchIntegTestCase;
 import org.opensearch.transport.Netty4ModulePlugin;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -63,6 +67,7 @@ public class InternalKNNEngineTests extends OpenSearchIntegTestCase {
      * Test to validate that the mapping to use JVector engine actually creates the right per field index format with JVector.
      * This test verifies that when JVector engine is specified in the mapping, the index files created use the JVector format.
      */
+    @Test
     public void testJVectorEngineCreatesJVectorFormat() throws Exception {
         // Create an index with JVector engine specified in the mapping
         createKnnIndexMappingWithJVectorEngine(CommonTestUtils.DIMENSION, SpaceType.L2, VectorDataType.FLOAT);
@@ -165,5 +170,122 @@ public class InternalKNNEngineTests extends OpenSearchIntegTestCase {
         Map<String, Object> responseMap = createParser(MediaTypeRegistry.getDefaultMediaType().xContent(), responseBody).map();
 
         return (Map<String, Object>) ((Map<String, Object>) responseMap.get(index)).get("mappings");
+    }
+
+    /**
+     * Test to validate that the JVector engine correctly applies the alpha and neighbor_overflow parameters.
+     * This test verifies that when these parameters are specified in the mapping, they are correctly
+     * applied to the index configuration.
+     */
+    @Test
+    public void testJVectorEngineWithConstructionParameters() throws Exception {
+        // We will use these custom values to verify the parameters are correctly applied
+        double alpha = 2.0;
+        double neighborOverflow = 1.5;
+
+        // Create an index with JVector engine and custom alpha and neighbor_overflow parameters
+        createKnnIndexMappingWithJVectorEngineAndConstructionParams(
+            CommonTestUtils.DIMENSION,
+            SpaceType.L2,
+            VectorDataType.FLOAT,
+            alpha, // Custom alpha value
+            neighborOverflow  // Custom neighbor_overflow value
+        );
+
+        // Add a document with a vector
+        Float[] vector = new Float[] { 1.0f, 2.0f, 3.0f };
+        client().prepareIndex(INDEX_NAME).setId(DOC_ID).setSource(FIELD_NAME, vector).get();
+
+        // Refresh the index to ensure the document is searchable
+        refresh(INDEX_NAME);
+        forceMerge(1);
+
+        // Verify the index mapping has the custom construction parameters
+        verifyJVectorConstructionParameters(alpha, neighborOverflow);
+        logger.info("JVector engine construction parameters verified");
+    }
+
+    private void createKnnIndexMappingWithJVectorEngineAndConstructionParams(
+        int dimension,
+        SpaceType spaceType,
+        VectorDataType vectorDataType,
+        double alpha,
+        double neighborOverflow
+    ) throws Exception {
+        String mapping = createIndexMappingWithConstructionParams(dimension, spaceType, vectorDataType, alpha, neighborOverflow);
+        Settings indexSettings = CommonTestUtils.getDefaultIndexSettings();
+        createKnnIndex(INDEX_NAME, indexSettings, mapping);
+    }
+
+    private String createIndexMappingWithConstructionParams(
+        int dimension,
+        SpaceType spaceType,
+        VectorDataType vectorDataType,
+        double alpha,
+        double neighborOverflow
+    ) throws IOException {
+        try (XContentBuilder builder = XContentFactory.jsonBuilder()) {
+            return builder.startObject()
+                .startObject(PROPERTIES_FIELD_NAME)
+                .startObject(FIELD_NAME)
+                .field(CommonTestUtils.TYPE_FIELD_NAME, CommonTestUtils.KNN_VECTOR_TYPE)
+                .field(CommonTestUtils.DIMENSION_FIELD_NAME, dimension)
+                .field(VECTOR_DATA_TYPE_FIELD, vectorDataType)
+                .startObject(KNN_METHOD)
+                .field(NAME, DISK_ANN)
+                .field(METHOD_PARAMETER_SPACE_TYPE, spaceType.getValue())
+                .field(KNN_ENGINE, KNNEngine.JVECTOR.getName())
+                .startObject(PARAMETERS)
+                .field(METHOD_PARAMETER_M, CommonTestUtils.M)
+                .field(METHOD_PARAMETER_EF_CONSTRUCTION, CommonTestUtils.EF_CONSTRUCTION)
+                .field(METHOD_PARAMETER_ALPHA, alpha)
+                .field(METHOD_PARAMETER_NEIGHBOR_OVERFLOW, neighborOverflow)
+                .endObject()
+                .endObject()
+                .endObject()
+                .endObject()
+                .endObject()
+                .toString();
+        }
+    }
+
+    /**
+     * Helper method to verify that the JVector engine construction parameters are correctly applied.
+     * This method checks the mapping to ensure the alpha and neighbor_overflow parameters are set correctly.
+     */
+    private void verifyJVectorConstructionParameters(double expectedAlpha, double expectedNeighborOverflow) throws Exception {
+        // Check the mapping to verify construction parameters
+        Map<String, Object> indexMapping = getIndexMappingAsMap(INDEX_NAME);
+        Map<String, Object> properties = (Map<String, Object>) indexMapping.get(PROPERTIES_FIELD_NAME);
+        Map<String, Object> fieldMapping = (Map<String, Object>) properties.get(FIELD_NAME);
+        Map<String, Object> methodMapping = (Map<String, Object>) fieldMapping.get(KNN_METHOD);
+        Map<String, Object> parameters = (Map<String, Object>) methodMapping.get(PARAMETERS);
+
+        // Verify the construction parameters are set correctly
+        assertEquals(expectedAlpha, parameters.get(METHOD_PARAMETER_ALPHA));
+        assertEquals(expectedNeighborOverflow, parameters.get(METHOD_PARAMETER_NEIGHBOR_OVERFLOW));
+
+        // Also verify we can search the index to ensure it's functional
+        Float[] queryVector = new Float[] { 1.0f, 2.0f, 3.0f };
+        Request searchRequest = new Request("GET", "/" + INDEX_NAME + "/_search");
+        searchRequest.setJsonEntity(
+            "{\n"
+                + "  \"query\": {\n"
+                + "    \"knn\": {\n"
+                + "      \""
+                + FIELD_NAME
+                + "\": {\n"
+                + "        \"vector\": "
+                + Arrays.toString(queryVector)
+                + ",\n"
+                + "        \"k\": 1\n"
+                + "      }\n"
+                + "    }\n"
+                + "  }\n"
+                + "}"
+        );
+
+        Response searchResponse = getRestClient().performRequest(searchRequest);
+        assertEquals(RestStatus.OK, RestStatus.fromCode(searchResponse.getStatusLine().getStatusCode()));
     }
 }

@@ -18,15 +18,33 @@ import java.util.Map;
 public class KNNVectorsFormatParams {
     private int maxConnections;
     private int beamWidth;
+    private float alpha;
+    private float neighborOverflow;
     private final SpaceType spaceType;
 
     public KNNVectorsFormatParams(final Map<String, Object> params, int defaultMaxConnections, int defaultBeamWidth) {
-        this(params, defaultMaxConnections, defaultBeamWidth, SpaceType.UNDEFINED);
+        this(
+            params,
+            defaultMaxConnections,
+            defaultBeamWidth,
+            KNNConstants.DEFAULT_ALPHA_VALUE.floatValue(),
+            KNNConstants.DEFAULT_NEIGHBOR_OVERFLOW_VALUE.floatValue(),
+            SpaceType.UNDEFINED
+        );
     }
 
-    public KNNVectorsFormatParams(final Map<String, Object> params, int defaultMaxConnections, int defaultBeamWidth, SpaceType spaceType) {
+    public KNNVectorsFormatParams(
+        final Map<String, Object> params,
+        int defaultMaxConnections,
+        int defaultBeamWidth,
+        float defaultAlpha,
+        float defaultNeighborOverflow,
+        SpaceType spaceType
+    ) {
         initMaxConnections(params, defaultMaxConnections);
         initBeamWidth(params, defaultBeamWidth);
+        initAlpha(params, defaultAlpha);
+        initNeighborOverflow(params, defaultNeighborOverflow);
         this.spaceType = spaceType;
     }
 
@@ -48,5 +66,21 @@ public class KNNVectorsFormatParams {
             return;
         }
         this.beamWidth = defaultBeamWidth;
+    }
+
+    private void initAlpha(final Map<String, Object> params, float defaultAlpha) {
+        if (params != null && params.containsKey(KNNConstants.METHOD_PARAMETER_ALPHA)) {
+            this.alpha = ((Double) params.get(KNNConstants.METHOD_PARAMETER_ALPHA)).floatValue();
+            return;
+        }
+        this.alpha = defaultAlpha;
+    }
+
+    private void initNeighborOverflow(final Map<String, Object> params, float defaultNeighborOverflow) {
+        if (params != null && params.containsKey(KNNConstants.METHOD_PARAMETER_NEIGHBOR_OVERFLOW)) {
+            this.neighborOverflow = ((Double) params.get(KNNConstants.METHOD_PARAMETER_NEIGHBOR_OVERFLOW)).floatValue();
+            return;
+        }
+        this.neighborOverflow = defaultNeighborOverflow;
     }
 }
