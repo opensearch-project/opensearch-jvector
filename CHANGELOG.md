@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * Clone instead of recreating index inputs [#83](https://github.com/opensearch-project/opensearch-jvector/issues/83)
 * Switch to using Lucene indexInput directly and fix integrity verification for vector index files
 * Make merges happen largely off heap [#87](https://github.com/opensearch-project/opensearch-jvector/issues/87)
+* Surface jVector index construction and query configuration [#74](https://github.com/opensearch-project/opensearch-jvector/issues/74)
 ### Bug Fixes
 * Fix the limitation of the 2 GB segment with backwards compatibility to JDK21 and move default build to 21 target
 * Fix file handle leak during queries

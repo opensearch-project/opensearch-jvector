@@ -24,6 +24,33 @@ curl -X PUT "localhost:9200/jvector-index?pretty" -H 'Content-Type: application/
   }
 }'
 
+# Alternatively you can create the index with advanced construction parameters
+curl -X PUT "localhost:9200/jvector-index?pretty" -H 'Content-Type: application/json' -d'
+{
+  "settings": {
+    "index": {
+      "knn": true
+    }
+  },
+  "mappings": {
+    "properties": {
+      "my_vector": {
+        "type": "knn_vector",
+        "method": {
+          "name": "disk_ann",
+          "space_type": "l2",
+          "engine": "jvector",
+          "parameters": {
+            "m": 16,
+            "ef_construction": 100
+          }
+        },
+        "dimension": 4
+      }
+    }
+  }
+}'
+
 # 2. Index 5 documents document with a vector
 curl -X PUT "localhost:9200/jvector-index/_doc/1?pretty" -H 'Content-Type: application/json' -d'
 {
@@ -57,6 +84,28 @@ curl -X GET "localhost:9200/jvector-index/_search?pretty" -H 'Content-Type: appl
 }'
 
 
+# 4. Search with advanced parameters such as overquery_factor, threshold, rerank_floor
+curl -X GET "localhost:9200/jvector-index/_search?pretty" -H 'Content-Type: application/json' -d'
+{
+  "size": 1,
+  "query": {
+    "knn": {
+      "my_vector": {
+        "vector": [1.0, 2.0, 3.0, 4.0],
+        "k": 3,
+        "method": {
+          "name": "jvector",
+          "space_type": "l2",
+          "parameters": {
+            "overquery_factor": 10,
+            "threshold": 0.0,
+            "rerank_floor": 0.0
+          }
+        }
+      }
+    }
+  }
+}'
 
-# 4. Get JVector stats after query
+# 5. Get JVector stats after query
 curl -X GET "localhost:9200/_plugins/_knn/stats?pretty&stat=knn_query_visited_nodes,knn_query_expanded_nodes,knn_query_expanded_base_layer_nodes" -H 'Content-Type: application/json'
