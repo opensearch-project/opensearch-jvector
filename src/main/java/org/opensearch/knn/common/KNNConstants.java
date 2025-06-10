@@ -113,16 +113,21 @@ public class KNNConstants {
     public static final String JVECTOR_NAME = "jvector";
     // Query related params
     public static final String METHOD_PARAMETER_OVERQUERY_FACTOR = "overquery_factor";
-    public static final String METHOD_PARAMETER_THRESHOLD = "threshold";
-    public static final String METHOD_PARAMETER_RERANK_FLOOR = "rerank_floor";
+    public static final String METHOD_PARAMETER_THRESHOLD = "advanced.threshold";
+    public static final String METHOD_PARAMETER_RERANK_FLOOR = "advanced.rerank_floor";
+    public static final String METHOD_PARAMETER_USE_PRUNING = "advanced.use_pruning"; // TODO: wire this after jvector upgrade
     public static final int DEFAULT_OVER_QUERY_FACTOR = 5; // We will query 5x more than topKFor reranking
     public static final Double DEFAULT_QUERY_SIMILARITY_THRESHOLD = 0.0;
     public static final Double DEFAULT_QUERY_RERANK_FLOOR = 0.0;
+    public static final Boolean DEFAULT_QUERY_USE_PRUNING = false; // TODO: wire this after jvector upgrade
+
     // Construction related params
-    public static final String METHOD_PARAMETER_ALPHA = "alpha";
-    public static final String METHOD_PARAMETER_NEIGHBOR_OVERFLOW = "neighbor_overflow";
+    public static final String METHOD_PARAMETER_ALPHA = "advanced.alpha";
+    public static final String METHOD_PARAMETER_NEIGHBOR_OVERFLOW = "advanced.neighbor_overflow";
+    public static final String METHOD_PARAMETER_HEIRARCHY_ENABLED = "heirarchy_enabled"; // TODO: wire this after jvector upgrade
     public static final Double DEFAULT_ALPHA_VALUE = 1.2;
     public static final Double DEFAULT_NEIGHBOR_OVERFLOW_VALUE = 1.2;
+    public static final Boolean DEFAULT_HEIRARCHY_ENABLED = true; // TODO: wire this after jvector upgrade
 
     // Parameter defaults/limits
     public static final Integer ENCODER_PARAMETER_PQ_CODE_COUNT_DEFAULT = 1;

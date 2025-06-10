@@ -22,12 +22,22 @@ public class JVectorKnnFloatVectorQuery extends KnnFloatVectorQuery {
     private final int overQueryFactor;
     private final float threshold;
     private final float rerankFloor;
+    private final boolean usePruning;
 
-    public JVectorKnnFloatVectorQuery(String field, float[] target, int k, int overQueryFactor, float threshold, float rerankFloor) {
+    public JVectorKnnFloatVectorQuery(
+        String field,
+        float[] target,
+        int k,
+        int overQueryFactor,
+        float threshold,
+        float rerankFloor,
+        boolean usePruning
+    ) {
         super(field, target, k);
         this.overQueryFactor = overQueryFactor;
         this.threshold = threshold;
         this.rerankFloor = rerankFloor;
+        this.usePruning = usePruning;
     }
 
     public JVectorKnnFloatVectorQuery(
@@ -37,12 +47,14 @@ public class JVectorKnnFloatVectorQuery extends KnnFloatVectorQuery {
         Query filter,
         int overQueryFactor,
         float threshold,
-        float rerankFloor
+        float rerankFloor,
+        boolean usePruning
     ) {
         super(field, target, k, filter);
         this.overQueryFactor = overQueryFactor;
         this.threshold = threshold;
         this.rerankFloor = rerankFloor;
+        this.usePruning = usePruning;
     }
 
     @Override
@@ -53,7 +65,7 @@ public class JVectorKnnFloatVectorQuery extends KnnFloatVectorQuery {
         KnnCollectorManager knnCollectorManager
     ) throws IOException {
         final KnnCollector delegateCollector = knnCollectorManager.newCollector(visitedLimit, context);
-        final KnnCollector knnCollector = new JVectorKnnCollector(delegateCollector, threshold, rerankFloor, overQueryFactor);
+        final KnnCollector knnCollector = new JVectorKnnCollector(delegateCollector, threshold, rerankFloor, overQueryFactor, usePruning);
         LeafReader reader = context.reader();
         FloatVectorValues floatVectorValues = reader.getFloatVectorValues(field);
         if (floatVectorValues == null) {

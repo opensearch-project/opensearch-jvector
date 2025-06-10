@@ -35,6 +35,10 @@ public final class JVectorDiskANNSearchContext implements KNNLibrarySearchContex
             MethodParameter.RERANK_FLOOR.getName(),
             new Parameter.DoubleParameter(MethodParameter.RERANK_FLOOR.getName(), DEFAULT_QUERY_RERANK_FLOOR, (value, context) -> true)
         )
+        .put(
+            MethodParameter.USE_PRUNING.getName(),
+            new Parameter.BooleanParameter(MethodParameter.USE_PRUNING.getName(), DEFAULT_QUERY_USE_PRUNING, (value, context) -> true)
+        )
         .build();
 
     @Override

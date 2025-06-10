@@ -72,6 +72,7 @@ public class KNNQueryBuilder extends AbstractQueryBuilder<KNNQueryBuilder> imple
     public static final ParseField OVERQUERY_FACTOR_FIELD = new ParseField(METHOD_PARAMETER_OVERQUERY_FACTOR);
     public static final ParseField THRESHOLD_FIELD = new ParseField(METHOD_PARAMETER_THRESHOLD);
     public static final ParseField REREANK_FLOOR_FIELD = new ParseField(METHOD_PARAMETER_RERANK_FLOOR);
+    public static final ParseField USE_PRUNING_FIELD = new ParseField(METHOD_PARAMETER_USE_PRUNING);
     public static final ParseField METHOD_PARAMS_FIELD = new ParseField(METHOD_PARAMETER);
     public static final ParseField RESCORE_FIELD = new ParseField(RESCORE_PARAMETER);
     public static final ParseField RESCORE_OVERSAMPLE_FIELD = new ParseField(RESCORE_OVERSAMPLE_PARAMETER);
@@ -550,6 +551,7 @@ public class KNNQueryBuilder extends AbstractQueryBuilder<KNNQueryBuilder> imple
                     final int overQueryFactor;
                     final float threshold;
                     final float rerankFloor;
+                    final boolean usePruning;
                     if (this.getMethodParameters() != null) {
                         Map<String, Object> methodParameters = (Map<String, Object>) this.getMethodParameters();
                         overQueryFactor = (Integer) methodParameters.getOrDefault(
@@ -560,10 +562,12 @@ public class KNNQueryBuilder extends AbstractQueryBuilder<KNNQueryBuilder> imple
                             .floatValue();
                         rerankFloor = ((Double) methodParameters.getOrDefault(METHOD_PARAMETER_RERANK_FLOOR, DEFAULT_QUERY_RERANK_FLOOR))
                             .floatValue();
+                        usePruning = (Boolean) methodParameters.getOrDefault(METHOD_PARAMETER_USE_PRUNING, DEFAULT_QUERY_USE_PRUNING);
                     } else {
                         overQueryFactor = DEFAULT_OVER_QUERY_FACTOR;
                         threshold = DEFAULT_QUERY_SIMILARITY_THRESHOLD.floatValue();
                         rerankFloor = DEFAULT_QUERY_RERANK_FLOOR.floatValue();
+                        usePruning = DEFAULT_QUERY_USE_PRUNING;
                     }
 
                     if (byteVector.length > 0) {
@@ -571,7 +575,16 @@ public class KNNQueryBuilder extends AbstractQueryBuilder<KNNQueryBuilder> imple
                     }
                     float[] target = getVectorForCreatingQueryRequest(vectorDataType, knnEngine);
                     assert target != null;
-                    return new JVectorKnnFloatVectorQuery(this.fieldName, target, k, filterQuery, overQueryFactor, threshold, rerankFloor);
+                    return new JVectorKnnFloatVectorQuery(
+                        this.fieldName,
+                        target,
+                        k,
+                        filterQuery,
+                        overQueryFactor,
+                        threshold,
+                        rerankFloor,
+                        usePruning
+                    );
                 default:
                     throw new RuntimeException("Unknown KNNEngine " + knnEngine);
             }

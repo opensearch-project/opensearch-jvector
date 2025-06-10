@@ -1304,7 +1304,8 @@ public class KNNJVectorTests extends LuceneTestCase {
             filterQuery,
             overQueryFactor,
             KNNConstants.DEFAULT_QUERY_SIMILARITY_THRESHOLD.floatValue(),
-            KNNConstants.DEFAULT_QUERY_RERANK_FLOOR.floatValue()
+            KNNConstants.DEFAULT_QUERY_RERANK_FLOOR.floatValue(),
+            KNNConstants.DEFAULT_QUERY_USE_PRUNING
         );
     }
 }

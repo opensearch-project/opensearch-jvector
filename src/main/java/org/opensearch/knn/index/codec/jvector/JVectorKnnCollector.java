@@ -17,6 +17,7 @@ public class JVectorKnnCollector implements KnnCollector {
     float threshold;
     float rerankFloor;
     int overQueryFactor;
+    boolean usePruning;
 
     @Override
     public boolean earlyTerminated() {

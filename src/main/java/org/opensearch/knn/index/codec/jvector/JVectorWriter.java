@@ -311,7 +311,7 @@ public class JVectorWriter extends KnnVectorsWriter {
             fieldData.randomAccessVectorValues,
             M, // number of subspaces
             numberOfClustersPerSubspace, // number of centroids per subspace
-            true
+            fieldData.fieldInfo.getVectorSimilarityFunction() == VectorSimilarityFunction.EUCLIDEAN
         ); // center the dataset
         var pqv = pq.encodeAll(fieldData.randomAccessVectorValues);
         // write the compressed vectors to disk
