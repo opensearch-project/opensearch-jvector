@@ -167,7 +167,7 @@ def getBreakerSetting() {
 
 allprojects {
     group = 'org.opensearch.knn'
-    version = opensearch_version.tokenize('-')[0] + '.1'
+    version = opensearch_version.tokenize('-')[0] + '.2'
     if (version_qualifier) {
         version += "-${version_qualifier}"
     }
