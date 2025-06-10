@@ -62,10 +62,10 @@ public class JVectorDiskANNMethod extends AbstractKNNMethod {
                 )
             )
             .addParameter(
-                METHOD_PARAMETER_HEIRARCHY_ENABLED,
+                    METHOD_PARAMETER_HIERARCHY_ENABLED,
                 new Parameter.BooleanParameter(
-                    METHOD_PARAMETER_HEIRARCHY_ENABLED,
-                    KNNConstants.DEFAULT_HEIRARCHY_ENABLED,
+                        METHOD_PARAMETER_HIERARCHY_ENABLED,
+                    KNNConstants.DEFAULT_HIERARCHY_ENABLED,
                     (v, context) -> true
                 )
             )
