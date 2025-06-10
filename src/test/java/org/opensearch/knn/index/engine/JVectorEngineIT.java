@@ -5,6 +5,7 @@
 
 package org.opensearch.knn.index.engine;
 
+import org.junit.Test;
 import org.opensearch.client.*;
 
 import com.google.common.collect.ImmutableList;
@@ -34,7 +35,7 @@ import java.util.stream.Collectors;
 
 import static org.opensearch.common.xcontent.XContentFactory.jsonBuilder;
 import static org.opensearch.index.engine.EngineConfig.INDEX_USE_COMPOUND_FILE;
-import static org.opensearch.knn.common.KNNConstants.DISK_ANN;
+import static org.opensearch.knn.common.KNNConstants.*;
 import static org.opensearch.knn.index.engine.CommonTestUtils.*;
 
 public class JVectorEngineIT extends KNNRestTestCase {
@@ -54,12 +55,12 @@ public class JVectorEngineIT extends KNNRestTestCase {
 
     public void testQuery_invalidVectorDimensionInQuery() throws Exception {
 
-        createKnnIndexMappingWithJVectorEngine(DIMENSION, SpaceType.L2, VectorDataType.FLOAT);
+        createKnnIndexMappingWithJVectorEngine(CommonTestUtils.DIMENSION, SpaceType.L2, VectorDataType.FLOAT);
         for (int j = 0; j < TEST_INDEX_VECTORS.length; j++) {
             addKnnDoc(INDEX_NAME, Integer.toString(j + 1), FIELD_NAME, TEST_INDEX_VECTORS[j]);
         }
 
-        float[] invalidQuery = new float[DIMENSION - 1];
+        float[] invalidQuery = new float[CommonTestUtils.DIMENSION - 1];
         int validK = 1;
         expectThrows(
             ResponseException.class,
@@ -71,7 +72,7 @@ public class JVectorEngineIT extends KNNRestTestCase {
 
         SpaceType spaceType = SpaceType.L2;
 
-        createKnnIndexMappingWithJVectorEngine(DIMENSION, spaceType, VectorDataType.FLOAT);
+        createKnnIndexMappingWithJVectorEngine(CommonTestUtils.DIMENSION, spaceType, VectorDataType.FLOAT);
         for (int j = 0; j < TEST_INDEX_VECTORS.length; j++) {
             addKnnDoc(INDEX_NAME, Integer.toString(j + 1), FIELD_NAME, TEST_INDEX_VECTORS[j]);
         }
@@ -91,7 +92,7 @@ public class JVectorEngineIT extends KNNRestTestCase {
             .startObject(PROPERTIES_FIELD_NAME)
             .startObject(FIELD_NAME)
             .field(TYPE_FIELD_NAME, KNN_VECTOR_TYPE)
-            .field(DIMENSION_FIELD_NAME, DIMENSION)
+            .field(DIMENSION_FIELD_NAME, CommonTestUtils.DIMENSION)
             .startObject(KNNConstants.KNN_METHOD)
             .field(KNNConstants.NAME, DISK_ANN)
             .field(KNNConstants.METHOD_PARAMETER_SPACE_TYPE, SpaceType.L2.getValue())
@@ -146,7 +147,7 @@ public class JVectorEngineIT extends KNNRestTestCase {
     }
 
     public void testQueryWithFilterUsingFloatVectorDataType() throws Exception {
-        createKnnIndexMappingWithJVectorEngine(DIMENSION, SpaceType.L2, VectorDataType.FLOAT);
+        createKnnIndexMappingWithJVectorEngine(CommonTestUtils.DIMENSION, SpaceType.L2, VectorDataType.FLOAT);
 
         addKnnDocWithAttributes(
             DOC_ID,
@@ -170,7 +171,7 @@ public class JVectorEngineIT extends KNNRestTestCase {
             .startObject(PROPERTIES_FIELD_NAME)
             .startObject(FIELD_NAME)
             .field(TYPE_FIELD_NAME, KNN_VECTOR_TYPE)
-            .field(DIMENSION_FIELD_NAME, DIMENSION)
+            .field(DIMENSION_FIELD_NAME, CommonTestUtils.DIMENSION)
             .startObject(KNNConstants.KNN_METHOD)
             .field(KNNConstants.NAME, DISK_ANN)
             .field(KNNConstants.METHOD_PARAMETER_SPACE_TYPE, SpaceType.L2.getValue())
@@ -214,7 +215,7 @@ public class JVectorEngineIT extends KNNRestTestCase {
             .startObject(PROPERTIES_FIELD_NAME)
             .startObject(FIELD_NAME)
             .field(TYPE_FIELD_NAME, KNN_VECTOR_TYPE)
-            .field(DIMENSION_FIELD_NAME, DIMENSION)
+            .field(DIMENSION_FIELD_NAME, CommonTestUtils.DIMENSION)
             .startObject(KNNConstants.KNN_METHOD)
             .field(KNNConstants.NAME, DISK_ANN)
             .field(KNNConstants.METHOD_PARAMETER_SPACE_TYPE, SpaceType.L2.getValue())
@@ -274,7 +275,7 @@ public class JVectorEngineIT extends KNNRestTestCase {
     }
 
     public void testIndexReopening() throws Exception {
-        createKnnIndexMappingWithJVectorEngine(DIMENSION, SpaceType.L2, VectorDataType.FLOAT);
+        createKnnIndexMappingWithJVectorEngine(CommonTestUtils.DIMENSION, SpaceType.L2, VectorDataType.FLOAT);
 
         for (int j = 0; j < TEST_INDEX_VECTORS.length; j++) {
             addKnnDoc(INDEX_NAME, Integer.toString(j + 1), FIELD_NAME, TEST_INDEX_VECTORS[j]);
@@ -484,7 +485,7 @@ public class JVectorEngineIT extends KNNRestTestCase {
 
     private void baseQueryTest(SpaceType spaceType) throws Exception {
 
-        createKnnIndexMappingWithJVectorEngine(DIMENSION, spaceType, VectorDataType.FLOAT);
+        createKnnIndexMappingWithJVectorEngine(CommonTestUtils.DIMENSION, spaceType, VectorDataType.FLOAT);
         for (int j = 0; j < TEST_INDEX_VECTORS.length; j++) {
             addKnnDoc(INDEX_NAME, Integer.toString(j + 1), FIELD_NAME, TEST_INDEX_VECTORS[j]);
         }
@@ -592,5 +593,100 @@ public class JVectorEngineIT extends KNNRestTestCase {
         logger.info("Calculating recall");
         float recall = ((float) results.stream().filter(r -> expectedDocIds.contains(r.getDocId())).count()) / ((float) k);
         assertTrue("Expected recall to be at least 0.9 but got " + recall, recall >= 0.9);
+    }
+
+    /**
+     * Test for recall with various overquery parameters.
+     * We expect the recall to be higher the more we increase the overquery parameter
+     * @throws Exception exception
+     */
+    @Test
+    public void testQuantizationWithOverQueryParameter() throws Exception {
+        int dimension = 512;
+        final SpaceType spaceType = SpaceType.L2;
+        createKnnIndexMappingWithJVectorEngine(dimension, spaceType, VectorDataType.FLOAT);
+
+        // Choosing a batch size that will trigger quantization
+        int batchSize = JVectorFormat.DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION * 2;
+
+        final float[][] vectors = new float[batchSize][dimension];
+        for (int i = 0; i < vectors.length; i++) {
+            for (int j = 0; j < dimension; j++) {
+                vectors[i][j] = randomFloat();
+            }
+        }
+        final int totalDocs = vectors.length;
+
+        logger.info("Adding batch of vectors with size {} that is expected to trigger quantization", totalDocs);
+        for (int i = 0; i < batchSize; i++) {
+            addKnnDoc(INDEX_NAME, Integer.toString(i, 10), FIELD_NAME, vectors[i]);
+        }
+        flushIndex(INDEX_NAME);
+
+        // Force merge to trigger quantization for all segments
+        logger.info("Force merging just in case quantization didn't happen because of segment fragmentation");
+        forceMergeKnnIndex(INDEX_NAME);
+
+        // Verify the total document count
+        int expectedTotalDocs = vectors.length;
+        assertEquals(expectedTotalDocs, getDocCount(INDEX_NAME));
+
+        // Perform search and verify recall
+        float[] queryVector = randomFloatVector(dimension);
+        int k = 10;
+
+        // Calculate ground truth with brute force
+        logger.info("Calculating ground truth");
+        List<Set<String>> groundTruth = TestUtils.computeGroundTruthValues(vectors, new float[][] { queryVector }, spaceType, k);
+        assertEquals(1, groundTruth.size());
+        Set<String> expectedDocIds = groundTruth.getFirst();
+
+        logger.info("Searching with low overquery factor");
+        // 1. Search with a low-overquery factor
+        final Map<String, Object> methodParametersWithLowOverQuery = new HashMap<>();
+        methodParametersWithLowOverQuery.put(KNNConstants.METHOD_PARAMETER_OVERQUERY_FACTOR, 1);
+        methodParametersWithLowOverQuery.put(KNNConstants.METHOD_PARAMETER_THRESHOLD, DEFAULT_QUERY_SIMILARITY_THRESHOLD);
+        methodParametersWithLowOverQuery.put(METHOD_PARAMETER_RERANK_FLOOR, DEFAULT_QUERY_RERANK_FLOOR);
+
+        KNNQueryBuilder knnQueryBuilder = KNNQueryBuilder.builder()
+            .k(k)
+            .vector(queryVector)
+            .fieldName(FIELD_NAME)
+            .methodParameters(methodParametersWithLowOverQuery)
+            .build();
+        Response response = searchKNNIndex(INDEX_NAME, knnQueryBuilder, k);
+        List<KNNResult> results = parseSearchResponse(EntityUtils.toString(response.getEntity()), FIELD_NAME);
+
+        // Verify we got k results (or all docs if less than k)
+        assertEquals(Math.min(k, expectedTotalDocs), results.size());
+
+        // calculate recall
+        logger.info("Calculating recall");
+        float recall = ((float) results.stream().filter(r -> expectedDocIds.contains(r.getDocId())).count()) / ((float) k);
+        assertTrue("Expected recall to be lower than 0.7 but got " + recall, recall < 0.7);
+
+        // 2. Search with a high-overquery factor
+        logger.info("Searching with high overquery factor");
+        final Map<String, Object> methodParametersWithHighOverQuery = new HashMap<>();
+        methodParametersWithHighOverQuery.put(KNNConstants.METHOD_PARAMETER_OVERQUERY_FACTOR, 100);
+        methodParametersWithHighOverQuery.put(KNNConstants.METHOD_PARAMETER_THRESHOLD, DEFAULT_QUERY_SIMILARITY_THRESHOLD);
+        methodParametersWithHighOverQuery.put(METHOD_PARAMETER_RERANK_FLOOR, DEFAULT_QUERY_RERANK_FLOOR);
+
+        knnQueryBuilder = KNNQueryBuilder.builder()
+            .k(k)
+            .vector(queryVector)
+            .fieldName(FIELD_NAME)
+            .methodParameters(methodParametersWithHighOverQuery)
+            .build();
+        response = searchKNNIndex(INDEX_NAME, knnQueryBuilder, k);
+        results = parseSearchResponse(EntityUtils.toString(response.getEntity()), FIELD_NAME);
+
+        // Verify we got k results (or all docs if less than k)
+        assertEquals(Math.min(k, expectedTotalDocs), results.size());
+
+        // calculate recall
+        logger.info("Calculating recall");
+        recall = ((float) results.stream().filter(r -> expectedDocIds.contains(r.getDocId())).count()) / ((float) k);
+        assertTrue("Expected recall to be at least 0.9 but got " + recall, recall >= 0.8);
     }
 }

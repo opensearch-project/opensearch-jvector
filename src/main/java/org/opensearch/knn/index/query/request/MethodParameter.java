@@ -20,10 +20,8 @@ import org.opensearch.core.ParseField;
 import java.util.HashMap;
 import java.util.Map;
 
-import static org.opensearch.knn.common.KNNConstants.METHOD_PARAMETER_EF_SEARCH;
-import static org.opensearch.knn.common.KNNConstants.METHOD_PARAMETER_NPROBES;
-import static org.opensearch.knn.index.query.KNNQueryBuilder.EF_SEARCH_FIELD;
-import static org.opensearch.knn.index.query.KNNQueryBuilder.NPROBE_FIELD;
+import static org.opensearch.knn.common.KNNConstants.*;
+import static org.opensearch.knn.index.query.KNNQueryBuilder.*;
 
 /**
  * MethodParameters are engine and algorithm related parameters that clients can pass in knn query
@@ -69,7 +67,75 @@ public enum MethodParameter {
             validationException.addValidationError(METHOD_PARAMETER_NPROBES + " should be greater than 0");
             return validationException;
         }
-    };
+    },
+
+    OVERQUERY_FACTOR(METHOD_PARAMETER_OVERQUERY_FACTOR, Version.V_3_0_0, OVERQUERY_FACTOR_FIELD) {
+        @Override
+        public Integer parse(Object value) {
+            return parseInteger(value, METHOD_PARAMETER_OVERQUERY_FACTOR);
+        }
+
+        @Override
+        public ValidationException validate(Object value) {
+            final Integer parsed = parse(value);
+            if (parsed != null && parsed > 0) {
+                return null;
+            }
+
+            ValidationException validationException = new ValidationException();
+            validationException.addValidationError(METHOD_PARAMETER_OVERQUERY_FACTOR + " should be greater than 0");
+            return validationException;
+        }
+    },
+
+    THRESHOLD(METHOD_PARAMETER_THRESHOLD, Version.V_3_0_0, THRESHOLD_FIELD) {
+        @Override
+        public Double parse(Object value) {
+            return parseDouble(value, METHOD_PARAMETER_THRESHOLD);
+        }
+
+        @Override
+        public ValidationException validate(Object value) {
+            final Double parsed = parse(value);
+            if (parsed != null && parsed >= 0) {
+                return null;
+            }
+
+            ValidationException validationException = new ValidationException();
+            validationException.addValidationError(METHOD_PARAMETER_THRESHOLD + " should be greater than or equal to 0");
+            return validationException;
+        }
+    },
+
+    RERANK_FLOOR(METHOD_PARAMETER_RERANK_FLOOR, Version.V_3_0_0, REREANK_FLOOR_FIELD) {
+        @Override
+        public Double parse(Object value) {
+            return parseDouble(value, METHOD_PARAMETER_RERANK_FLOOR);
+        }
+
+        @Override
+        public ValidationException validate(Object value) {
+            final Double parsed = parse(value);
+            if (parsed != null && parsed >= 0) {
+                return null;
+            }
+
+            ValidationException validationException = new ValidationException();
+            validationException.addValidationError(METHOD_PARAMETER_RERANK_FLOOR + " should be greater than or equal to 0");
+            return validationException;
+        }
+    },
+    USE_PRUNING(METHOD_PARAMETER_USE_PRUNING, Version.V_3_0_0, USE_PRUNING_FIELD) {
+        @Override
+        public Boolean parse(Object value) {
+            return parseBoolean(value, METHOD_PARAMETER_USE_PRUNING);
+        }
+
+        @Override
+        public ValidationException validate(Object value) {
+            return null;
+        }
+    },;
 
     private final String name;
     private final Version version;
@@ -98,5 +164,20 @@ public enum MethodParameter {
         } catch (final NumberFormatException e) {
             throw new IllegalArgumentException(name + " value must be an integer");
         }
+    }
+
+    private static Double parseDouble(Object value, String name) {
+        try {
+            return Double.parseDouble(String.valueOf(value));
+        } catch (final NumberFormatException e) {
+            throw new IllegalArgumentException(name + " value must be a double");
+        }
+    }
+
+    private static Boolean parseBoolean(Object value, String name) {
+        if (value instanceof Boolean) {
+            return (Boolean) value;
+        }
+        throw new IllegalArgumentException(name + " value must be a boolean");
     }
 }

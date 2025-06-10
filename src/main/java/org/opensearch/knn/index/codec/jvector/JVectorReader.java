@@ -28,6 +28,7 @@ import org.apache.lucene.store.*;
 import org.apache.lucene.util.Bits;
 import org.apache.lucene.util.IOUtils;
 import io.github.jbellis.jvector.vector.VectorSimilarityFunction;
+import org.opensearch.knn.common.KNNConstants;
 import org.opensearch.knn.plugin.stats.KNNCounter;
 
 import java.io.Closeable;
@@ -43,7 +44,6 @@ public class JVectorReader extends KnnVectorsReader {
     private static final FlatVectorsFormat FLAT_VECTORS_FORMAT = new Lucene99FlatVectorsFormat(
         FlatVectorScorerUtil.getLucene99FlatVectorsScorer()
     );
-    private static final int DEFAULT_OVER_QUERY_FACTOR = 5; // We will query 5x more than topKFor reranking
 
     private final FieldInfos fieldInfos;
     private final String baseDataFileName;
@@ -113,6 +113,20 @@ public class JVectorReader extends KnnVectorsReader {
     @Override
     public void search(String field, float[] target, KnnCollector knnCollector, Bits acceptDocs) throws IOException {
         final OnDiskGraphIndex index = fieldEntryMap.get(field).index;
+        final JVectorKnnCollector jvectorKnnCollector;
+        if (knnCollector instanceof JVectorKnnCollector) {
+            jvectorKnnCollector = (JVectorKnnCollector) knnCollector;
+        } else {
+            log.warn("KnnCollector must be of type JVectorKnnCollector, for now we will re-wrap it but this is not ideal");
+            jvectorKnnCollector = new JVectorKnnCollector(
+                knnCollector,
+                KNNConstants.DEFAULT_QUERY_SIMILARITY_THRESHOLD.floatValue(),
+                KNNConstants.DEFAULT_QUERY_RERANK_FLOOR.floatValue(),
+                KNNConstants.DEFAULT_OVER_QUERY_FACTOR,
+                KNNConstants.DEFAULT_QUERY_USE_PRUNING
+            );
+
+        }
 
         // search for a random vector using a GraphSearcher and SearchScoreProvider
         VectorFloat<?> q = VECTOR_TYPE_SUPPORT.createFloatVector(target);
@@ -136,14 +150,14 @@ public class JVectorReader extends KnnVectorsReader {
             try (var graphSearcher = new GraphSearcher(index)) {
                 final var searchResults = graphSearcher.search(
                     ssp,
-                    knnCollector.k(),
-                    knnCollector.k() * DEFAULT_OVER_QUERY_FACTOR,
-                    0.0f,
-                    0.0f,
+                    jvectorKnnCollector.k(),
+                    jvectorKnnCollector.k() * jvectorKnnCollector.getOverQueryFactor(),
+                    jvectorKnnCollector.getThreshold(),
+                    jvectorKnnCollector.getRerankFloor(),
                     compatibleBits
                 );
                 for (SearchResult.NodeScore ns : searchResults.getNodes()) {
-                    knnCollector.collect(ns.node, ns.score);
+                    jvectorKnnCollector.collect(ns.node, ns.score);
                 }
                 // Collect the below metrics about the search and somehow wire this back to {@link @KNNStats}
                 final int visitedNodesCount = searchResults.getVisitedCount();

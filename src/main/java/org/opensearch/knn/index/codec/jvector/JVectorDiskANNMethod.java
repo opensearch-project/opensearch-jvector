@@ -6,6 +6,7 @@
 package org.opensearch.knn.index.codec.jvector;
 
 import com.google.common.collect.ImmutableSet;
+import org.opensearch.knn.common.KNNConstants;
 import org.opensearch.knn.index.KNNSettings;
 import org.opensearch.knn.index.SpaceType;
 import org.opensearch.knn.index.VectorDataType;
@@ -31,10 +32,10 @@ public class JVectorDiskANNMethod extends AbstractKNNMethod {
         SpaceType.INNER_PRODUCT
     );
 
-    final static MethodComponent HNSW_METHOD_COMPONENT = initMethodComponent();
+    final static MethodComponent DISK_ANN_METHOD_COMPONENT = initMethodComponent();
 
     private static MethodComponent initMethodComponent() {
-        return MethodComponent.Builder.builder(METHOD_HNSW)
+        return MethodComponent.Builder.builder(DISK_ANN)
             .addSupportedDataTypes(SUPPORTED_DATA_TYPES)
             .addParameter(
                 METHOD_PARAMETER_M,
@@ -48,10 +49,30 @@ public class JVectorDiskANNMethod extends AbstractKNNMethod {
                     (v, context) -> v > 0
                 )
             )
+            .addParameter(
+                METHOD_PARAMETER_ALPHA,
+                new Parameter.DoubleParameter(METHOD_PARAMETER_ALPHA, KNNConstants.DEFAULT_ALPHA_VALUE, (v, context) -> v > 0)
+            )
+            .addParameter(
+                METHOD_PARAMETER_NEIGHBOR_OVERFLOW,
+                new Parameter.DoubleParameter(
+                    METHOD_PARAMETER_NEIGHBOR_OVERFLOW,
+                    KNNConstants.DEFAULT_NEIGHBOR_OVERFLOW_VALUE,
+                    (v, context) -> v > 0
+                )
+            )
+            .addParameter(
+                METHOD_PARAMETER_HIERARCHY_ENABLED,
+                new Parameter.BooleanParameter(
+                    METHOD_PARAMETER_HIERARCHY_ENABLED,
+                    KNNConstants.DEFAULT_HIERARCHY_ENABLED,
+                    (v, context) -> true
+                )
+            )
             .build();
     }
 
     public JVectorDiskANNMethod() {
-        super(HNSW_METHOD_COMPONENT, Set.copyOf(SUPPORTED_SPACES), new DefaultHnswSearchContext());
+        super(DISK_ANN_METHOD_COMPONENT, Set.copyOf(SUPPORTED_SPACES), new JVectorDiskANNSearchContext());
     }
 }
