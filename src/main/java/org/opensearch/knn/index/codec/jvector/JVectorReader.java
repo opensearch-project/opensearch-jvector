@@ -8,7 +8,6 @@ package org.opensearch.knn.index.codec.jvector;
 import io.github.jbellis.jvector.disk.ReaderSupplier;
 import io.github.jbellis.jvector.graph.GraphSearcher;
 import io.github.jbellis.jvector.graph.SearchResult;
-import io.github.jbellis.jvector.graph.disk.Header;
 import io.github.jbellis.jvector.graph.disk.OnDiskGraphIndex;
 import io.github.jbellis.jvector.graph.similarity.ScoreFunction;
 import io.github.jbellis.jvector.graph.similarity.SearchScoreProvider;
@@ -208,12 +207,10 @@ public class JVectorReader extends KnnVectorsReader {
         private final long pqCodebooksAndVectorsLength;
         private final long pqCodebooksAndVectorsOffset;
         private final String vectorIndexFieldDataFileName;
-        private final String vectorIndexFieldMetaFileName;
         private final ReaderSupplier indexReaderSupplier;
         private final ReaderSupplier pqCodebooksReaderSupplier;
         private final OnDiskGraphIndex index;
         private final PQVectors pqVectors; // The product quantized vectors with their codebooks
-        private final Header graphHeader;
 
         public FieldEntry(FieldInfo fieldInfo, JVectorWriter.VectorIndexFieldMetadata vectorIndexFieldMetadata) throws IOException {
             this.fieldInfo = fieldInfo;
@@ -226,17 +223,22 @@ public class JVectorReader extends KnnVectorsReader {
             this.pqCodebooksAndVectorsLength = vectorIndexFieldMetadata.getPqCodebooksAndVectorsLength();
             this.pqCodebooksAndVectorsOffset = vectorIndexFieldMetadata.getPqCodebooksAndVectorsOffset();
             this.dimension = vectorIndexFieldMetadata.getVectorDimension();
-            this.graphHeader = vectorIndexFieldMetadata.getGraphHeader();
 
             this.vectorIndexFieldDataFileName = baseDataFileName + "_" + fieldInfo.name + "." + JVectorFormat.VECTOR_INDEX_EXTENSION;
-            this.vectorIndexFieldMetaFileName = baseDataFileName + "_" + fieldInfo.name + "." + JVectorFormat.META_EXTENSION;
 
+            // For the slice we would like to include the Lucene header, unfortunately, we have to do this because jVector use global
+            // offsets instead of local offsets
+            final long sliceLength = vectorIndexLength + CodecUtil.indexHeaderLength(
+                JVectorFormat.VECTOR_INDEX_CODEC_NAME,
+                state.segmentSuffix
+            );
             // Load the graph index
             this.indexReaderSupplier = new JVectorRandomAccessReader.Supplier(
                 directory.openInput(vectorIndexFieldDataFileName, state.context),
-                vectorIndexOffset
+                0,
+                sliceLength
             );
-            this.index = new OnDiskGraphIndex(indexReaderSupplier, graphHeader, 0);
+            this.index = OnDiskGraphIndex.load(indexReaderSupplier, vectorIndexOffset);
 
             // If quantized load the compressed product quantized vectors with their codebooks
             if (pqCodebooksAndVectorsLength > 0) {
@@ -246,7 +248,8 @@ public class JVectorReader extends KnnVectorsReader {
                 }
                 this.pqCodebooksReaderSupplier = new JVectorRandomAccessReader.Supplier(
                     directory.openInput(vectorIndexFieldDataFileName, state.context),
-                    pqCodebooksAndVectorsOffset
+                    pqCodebooksAndVectorsOffset,
+                    pqCodebooksAndVectorsLength
                 );
                 log.debug(
                     "Loading PQ codebooks and vectors for field {}, with numbers of vectors: {}",
@@ -259,20 +262,6 @@ public class JVectorReader extends KnnVectorsReader {
             } else {
                 this.pqCodebooksReaderSupplier = null;
                 this.pqVectors = null;
-            }
-
-            // Check the footer
-            try (ChecksumIndexInput indexInput = directory.openChecksumInput(vectorIndexFieldDataFileName)) {
-                // If there are pq codebooks and vectors, then the footer is at the end of the pq codebooks and vectors
-                if (pqCodebooksAndVectorsOffset > 0) {
-                    indexInput.seek(pqCodebooksAndVectorsOffset + pqCodebooksAndVectorsLength);
-                    CodecUtil.checkFooter(indexInput);
-                } else {
-                    // If there are no pq codebooks and vectors, then the footer is at the end of the vector index
-                    // file
-                    indexInput.seek(vectorIndexOffset + vectorIndexLength);
-                    CodecUtil.checkFooter(indexInput);
-                }
             }
         }
 

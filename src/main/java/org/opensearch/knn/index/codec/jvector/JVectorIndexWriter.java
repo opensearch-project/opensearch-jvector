@@ -5,7 +5,7 @@
 
 package org.opensearch.knn.index.codec.jvector;
 
-import io.github.jbellis.jvector.disk.RandomAccessWriter;
+import io.github.jbellis.jvector.disk.IndexWriter;
 import lombok.extern.log4j.Log4j2;
 import org.apache.lucene.store.IndexOutput;
 
@@ -16,41 +16,16 @@ import java.io.IOException;
  * Note: This is not thread safe!
  */
 @Log4j2
-public class JVectorRandomAccessWriter implements RandomAccessWriter {
+public class JVectorIndexWriter implements IndexWriter {
     private final IndexOutput indexOutputDelegate;
 
-    public JVectorRandomAccessWriter(IndexOutput indexOutputDelegate) {
+    public JVectorIndexWriter(IndexOutput indexOutputDelegate) {
         this.indexOutputDelegate = indexOutputDelegate;
-    }
-
-    @Override
-    public void seek(long position) throws IOException {
-        log.warn("Pretending to be seeking to position {} in JVectorRandomAccessWriter, in practice it is not seeking anywhere.", position);
-        throw new UnsupportedOperationException(
-            "Lucene IndexOutput does not support seeking. It is only used to write data to disk. Make sure to use override jVector serialization functionalities that require seek during writes"
-        );
     }
 
     @Override
     public long position() throws IOException {
         return indexOutputDelegate.getFilePointer();
-    }
-
-    @Override
-    public void flush() throws IOException {
-        log.info(
-            "Pretending to be flushing JVectorRandomAccessWriter, in practice it is not flushing anything. It will be flushed when the IndexOutput is closed"
-        );
-    }
-
-    @Override
-    public long checksum(long startOffset, long endOffset) throws IOException {
-        log.info(
-            "Pretending to be computing checksum for range [{}, {}) in JVectorRandomAccessWriter, in practice it is not computing anything.",
-            startOffset,
-            endOffset
-        );
-        return 0;
     }
 
     @Override
@@ -115,16 +90,16 @@ public class JVectorRandomAccessWriter implements RandomAccessWriter {
 
     @Override
     public void writeBytes(String s) throws IOException {
-        throw new UnsupportedOperationException("JVectorRandomAccessWriter does not support writing bytes");
+        throw new UnsupportedOperationException("JVectorIndexWriter does not support writing String as bytes");
     }
 
     @Override
     public void writeChars(String s) throws IOException {
-        throw new UnsupportedOperationException("JVectorRandomAccessWriter does not support writing chars");
+        throw new UnsupportedOperationException("JVectorIndexWriter does not support writing chars");
     }
 
     @Override
     public void writeUTF(String s) throws IOException {
-        throw new UnsupportedOperationException("JVectorRandomAccessWriter does not support writing UTF strings");
+        throw new UnsupportedOperationException("JVectorIndexWriter does not support writing UTF strings");
     }
 }

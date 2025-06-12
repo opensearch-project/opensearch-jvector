@@ -117,22 +117,35 @@ public class JVectorRandomAccessReader implements RandomAccessReader {
         log.debug("Closed JVectorRandomAccessReader for file: {}", indexInputDelegate);
     }
 
+    @Override
+    public long length() throws IOException {
+        return indexInputDelegate.length();
+    }
+
+    /**
+     * Supplies readers which are actually slices of the original IndexInput.
+     * We will vend out slices in order for us to easily find the footer of the jVector graph index.
+     * This is useful because our logic that reads the graph that the footer is always at {@link IndexInput#length()} of the slice.
+     * Which is how {@link io.github.jbellis.jvector.graph.disk.OnDiskGraphIndex#load(ReaderSupplier, long)} is working behind the scenes.
+     * The header offset, on the other hand, is flexible because we can provide it as a parameter to {@link io.github.jbellis.jvector.graph.disk.OnDiskGraphIndex#load(ReaderSupplier, long)}
+     */
     public static class Supplier implements ReaderSupplier {
         private final AtomicInteger readerCount = new AtomicInteger(0);
         private final IndexInput currentInput;
+        private final long sliceStartOffset;
+        private final long sliceLength;
         private final ConcurrentHashMap<Integer, RandomAccessReader> readers = new ConcurrentHashMap<>();
 
-        public Supplier(IndexInput indexInput, long startOffset) throws IOException {
+        public Supplier(IndexInput indexInput, long sliceStartOffset, long sliceLength) throws IOException {
             this.currentInput = indexInput;
-            this.currentInput.seek(startOffset);
+            this.sliceStartOffset = sliceStartOffset;
+            this.sliceLength = sliceLength;
         }
 
         @Override
         public RandomAccessReader get() throws IOException {
             synchronized (this) {
-                final long startOffset = currentInput.getFilePointer();
-                final long remainingLength = currentInput.length() - startOffset;
-                final IndexInput input = currentInput.slice("Input Slice for the jVector graph or PQ", startOffset, remainingLength)
+                final IndexInput input = currentInput.slice("Input Slice for the jVector graph or PQ", sliceStartOffset, sliceLength)
                     .clone();
 
                 var reader = new JVectorRandomAccessReader(input);

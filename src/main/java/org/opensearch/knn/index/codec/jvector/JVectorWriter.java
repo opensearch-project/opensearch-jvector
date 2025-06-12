@@ -244,38 +244,39 @@ public class JVectorWriter extends KnnVectorsWriter {
             + JVectorFormat.VECTOR_INDEX_EXTENSION;
 
         try (
-            IndexOutput fieldDataOutput = segmentWriteState.directory.createOutput(vectorIndexFieldFileName, segmentWriteState.context);
-            final var randomAccessWriterForData = new JVectorRandomAccessWriter(fieldDataOutput)
+            IndexOutput indexOutput = segmentWriteState.directory.createOutput(vectorIndexFieldFileName, segmentWriteState.context);
+            final var jVectorIndexWriter = new JVectorIndexWriter(indexOutput)
         ) {
             // Header for the field data file
             CodecUtil.writeIndexHeader(
-                fieldDataOutput,
+                indexOutput,
                 JVectorFormat.VECTOR_INDEX_CODEC_NAME,
                 JVectorFormat.VERSION_CURRENT,
                 segmentWriteState.segmentInfo.getId(),
                 segmentWriteState.segmentSuffix
             );
-            final long startOffset = fieldDataOutput.getFilePointer();
+            final long startOffset = indexOutput.getFilePointer();
 
             log.info("Writing graph to {}", vectorIndexFieldFileName);
             var resultBuilder = VectorIndexFieldMetadata.builder()
                 .fieldNumber(fieldData.fieldInfo.number)
                 .vectorEncoding(fieldData.fieldInfo.getVectorEncoding())
-                .vectorSimilarityFunction(fieldData.fieldInfo.getVectorSimilarityFunction());
-            var dimension = fieldData.randomAccessVectorValues.dimension();
-            var feature = new InlineVectors(dimension);
-            EnumMap<FeatureId, Feature> features = new EnumMap<>(FeatureId.class);
-            features.put(feature.id(), feature);
-            try (var writer = JVectorGraphIndexWriter.create(fieldDataOutput, meta, startOffset, graph, dimension, features)) {
+                .vectorSimilarityFunction(fieldData.fieldInfo.getVectorSimilarityFunction())
+                .vectorDimension(fieldData.randomAccessVectorValues.dimension());
+
+            try (
+                var writer = new OnDiskSequentialGraphIndexWriter.Builder(graph, jVectorIndexWriter).with(
+                    new InlineVectors(fieldData.randomAccessVectorValues.dimension())
+                ).build()
+            ) {
                 var suppliers = Feature.singleStateFactory(
                     FeatureId.INLINE_VECTORS,
                     nodeId -> new InlineVectors.State(fieldData.randomAccessVectorValues.getVector(nodeId))
                 );
-                final Header graphHeader = writer.write(suppliers);
-                long endGraphOffset = randomAccessWriterForData.position();
+                writer.write(suppliers);
+                long endGraphOffset = jVectorIndexWriter.position();
                 resultBuilder.vectorIndexOffset(startOffset);
                 resultBuilder.vectorIndexLength(endGraphOffset - startOffset);
-                resultBuilder.graphHeader(graphHeader);
 
                 // If PQ is enabled and we have enough vectors, write the PQ codebooks and compressed vectors
                 if (fieldData.randomAccessVectorValues.size() >= minimumBatchSizeForQuantization) {
@@ -286,13 +287,13 @@ public class JVectorWriter extends KnnVectorsWriter {
                         minimumBatchSizeForQuantization
                     );
                     resultBuilder.pqCodebooksAndVectorsOffset(endGraphOffset);
-                    writePQCodebooksAndVectors(randomAccessWriterForData, fieldData);
-                    resultBuilder.pqCodebooksAndVectorsLength(randomAccessWriterForData.position() - endGraphOffset);
+                    writePQCodebooksAndVectors(jVectorIndexWriter, fieldData);
+                    resultBuilder.pqCodebooksAndVectorsLength(jVectorIndexWriter.position() - endGraphOffset);
                 } else {
                     resultBuilder.pqCodebooksAndVectorsOffset(0);
                     resultBuilder.pqCodebooksAndVectorsLength(0);
                 }
-                CodecUtil.writeFooter(fieldDataOutput);
+                CodecUtil.writeFooter(indexOutput);
             }
 
             return resultBuilder.build();
@@ -335,7 +336,6 @@ public class JVectorWriter extends KnnVectorsWriter {
         long vectorIndexLength;
         long pqCodebooksAndVectorsOffset;
         long pqCodebooksAndVectorsLength;
-        Header graphHeader;
 
         public void toOutput(IndexOutput out) throws IOException {
             out.writeInt(fieldNumber);
@@ -346,7 +346,6 @@ public class JVectorWriter extends KnnVectorsWriter {
             out.writeVLong(vectorIndexLength);
             out.writeVLong(pqCodebooksAndVectorsOffset);
             out.writeVLong(pqCodebooksAndVectorsLength);
-            graphHeader.write(new JVectorRandomAccessWriter(out));
         }
 
         public VectorIndexFieldMetadata(IndexInput in) throws IOException {
@@ -358,7 +357,6 @@ public class JVectorWriter extends KnnVectorsWriter {
             this.vectorIndexLength = in.readVLong();
             this.pqCodebooksAndVectorsOffset = in.readVLong();
             this.pqCodebooksAndVectorsLength = in.readVLong();
-            this.graphHeader = Header.load(new JVectorRandomAccessReader(in), in.getFilePointer());
         }
 
     }
