@@ -9,6 +9,9 @@ import io.github.jbellis.jvector.graph.GraphIndexBuilder;
 import io.github.jbellis.jvector.graph.OnHeapGraphIndex;
 import io.github.jbellis.jvector.graph.RandomAccessVectorValues;
 import io.github.jbellis.jvector.graph.disk.*;
+import io.github.jbellis.jvector.graph.disk.feature.Feature;
+import io.github.jbellis.jvector.graph.disk.feature.FeatureId;
+import io.github.jbellis.jvector.graph.disk.feature.InlineVectors;
 import io.github.jbellis.jvector.graph.similarity.BuildScoreProvider;
 import io.github.jbellis.jvector.quantization.ProductQuantization;
 import io.github.jbellis.jvector.vector.VectorizationProvider;
@@ -233,6 +236,7 @@ public class JVectorWriter extends KnnVectorsWriter {
      * @throws IOException IOException
      */
     private VectorIndexFieldMetadata writeGraph(OnHeapGraphIndex graph, FieldWriter<?> fieldData) throws IOException {
+        // field data file, which contains the graph
         final String vectorIndexFieldFileName = baseDataFileName
             + "_"
             + fieldData.fieldInfo.name
@@ -241,8 +245,9 @@ public class JVectorWriter extends KnnVectorsWriter {
 
         try (
             IndexOutput indexOutput = segmentWriteState.directory.createOutput(vectorIndexFieldFileName, segmentWriteState.context);
-            final var randomAccessWriter = new JVectorRandomAccessWriter(indexOutput)
+            final var jVectorIndexWriter = new JVectorIndexWriter(indexOutput)
         ) {
+            // Header for the field data file
             CodecUtil.writeIndexHeader(
                 indexOutput,
                 JVectorFormat.VECTOR_INDEX_CODEC_NAME,
@@ -256,19 +261,20 @@ public class JVectorWriter extends KnnVectorsWriter {
             var resultBuilder = VectorIndexFieldMetadata.builder()
                 .fieldNumber(fieldData.fieldInfo.number)
                 .vectorEncoding(fieldData.fieldInfo.getVectorEncoding())
-                .vectorSimilarityFunction(fieldData.fieldInfo.getVectorSimilarityFunction());
+                .vectorSimilarityFunction(fieldData.fieldInfo.getVectorSimilarityFunction())
+                .vectorDimension(fieldData.randomAccessVectorValues.dimension());
 
             try (
-                var writer = new OnDiskGraphIndexWriter.Builder(graph, randomAccessWriter).with(
+                var writer = new OnDiskSequentialGraphIndexWriter.Builder(graph, jVectorIndexWriter).with(
                     new InlineVectors(fieldData.randomAccessVectorValues.dimension())
-                ).withStartOffset(startOffset).build()
+                ).build()
             ) {
                 var suppliers = Feature.singleStateFactory(
                     FeatureId.INLINE_VECTORS,
                     nodeId -> new InlineVectors.State(fieldData.randomAccessVectorValues.getVector(nodeId))
                 );
                 writer.write(suppliers);
-                long endGraphOffset = randomAccessWriter.position();
+                long endGraphOffset = jVectorIndexWriter.position();
                 resultBuilder.vectorIndexOffset(startOffset);
                 resultBuilder.vectorIndexLength(endGraphOffset - startOffset);
 
@@ -281,8 +287,8 @@ public class JVectorWriter extends KnnVectorsWriter {
                         minimumBatchSizeForQuantization
                     );
                     resultBuilder.pqCodebooksAndVectorsOffset(endGraphOffset);
-                    writePQCodebooksAndVectors(randomAccessWriter, fieldData);
-                    resultBuilder.pqCodebooksAndVectorsLength(randomAccessWriter.position() - endGraphOffset);
+                    writePQCodebooksAndVectors(jVectorIndexWriter, fieldData);
+                    resultBuilder.pqCodebooksAndVectorsLength(jVectorIndexWriter.position() - endGraphOffset);
                 } else {
                     resultBuilder.pqCodebooksAndVectorsOffset(0);
                     resultBuilder.pqCodebooksAndVectorsLength(0);
@@ -429,7 +435,8 @@ public class JVectorWriter extends KnnVectorsWriter {
                 maxConn,
                 beamWidth,
                 degreeOverflow,
-                alpha
+                alpha,
+                true
             );
         }
 
@@ -452,7 +459,8 @@ public class JVectorWriter extends KnnVectorsWriter {
                 maxConn,
                 beamWidth,
                 degreeOverflow,
-                alpha
+                alpha,
+                true
             );
         }
 
