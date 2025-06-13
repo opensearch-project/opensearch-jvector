@@ -9,6 +9,7 @@ import io.github.jbellis.jvector.disk.ReaderSupplier;
 import io.github.jbellis.jvector.graph.GraphSearcher;
 import io.github.jbellis.jvector.graph.SearchResult;
 import io.github.jbellis.jvector.graph.disk.OnDiskGraphIndex;
+import io.github.jbellis.jvector.graph.similarity.DefaultSearchScoreProvider;
 import io.github.jbellis.jvector.graph.similarity.ScoreFunction;
 import io.github.jbellis.jvector.graph.similarity.SearchScoreProvider;
 import io.github.jbellis.jvector.quantization.PQVectors;
@@ -142,9 +143,9 @@ public class JVectorReader extends KnnVectorsReader {
                     fieldEntryMap.get(field).similarityFunction
                 );
                 ScoreFunction.ExactScoreFunction reranker = view.rerankerFor(q, fieldEntryMap.get(field).similarityFunction);
-                ssp = new SearchScoreProvider(asf, reranker);
+                ssp = new DefaultSearchScoreProvider(asf, reranker);
             } else { // Not quantized, used typical searcher
-                ssp = SearchScoreProvider.exact(q, fieldEntryMap.get(field).similarityFunction, view);
+                ssp = DefaultSearchScoreProvider.exact(q, fieldEntryMap.get(field).similarityFunction, view);
             }
             io.github.jbellis.jvector.util.Bits compatibleBits = doc -> acceptDocs == null || acceptDocs.get(doc);
             try (var graphSearcher = new GraphSearcher(index)) {
