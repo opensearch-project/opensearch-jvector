@@ -138,7 +138,7 @@ If you want to build the plugin to later use with a different plugin such as neu
 ./gradlew build
 
 # Install the plugin locally to your local maven repository
-PLUGIN_VERSION="3.0.0.0-alpha1-SNAPSHOT"
+PLUGIN_VERSION="3.0.0.3-SNAPSHOT"
 LOCAL_DISTRIBUTION_DIR="build/distributions"
 # Install the plugin jar files
 mvn install:install-file \
