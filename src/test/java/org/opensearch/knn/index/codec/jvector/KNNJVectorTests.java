@@ -1235,30 +1235,4 @@ public class KNNJVectorTests extends LuceneTestCase {
         vector[vectorDimension - 1] = lastValue;
         return vector;
     }
-
-    private static float[][] generateRandomVectors(int numVectors, int vectorDimension) {
-        float[][] vectors = new float[numVectors][vectorDimension];
-        for (int i = 0; i < numVectors; i++) {
-            vectors[i] = generateRandomVector(vectorDimension);
-        }
-        return vectors;
-    }
-
-    private static float[] generateRandomVector(int vectorDimension) {
-        float[] vector = new float[vectorDimension];
-        for (int i = 0; i < vectorDimension; i++) {
-            vector[i] = random().nextFloat();
-        }
-        return vector;
-    }
-
-    private static float calculateRecall(TopDocs topDocs, float[] target, float[][] vectors, int k) {
-        int totalRelevantDocs = 0;
-        for (int i = 0; i < topDocs.scoreDocs.length; i++) {
-            if (VectorSimilarityFunction.EUCLIDEAN.compare(target, vectors[topDocs.scoreDocs[i].doc]) >= topDocs.scoreDocs[i].score) {
-                totalRelevantDocs++;
-            }
-        }
-        return ((float) totalRelevantDocs) / ((float) k);
-    }
 }

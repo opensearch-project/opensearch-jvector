@@ -230,8 +230,6 @@ public class JVectorWriter extends KnnVectorsWriter {
             log.info("Calculating codebooks and compressed vectors for field {}", fieldData.fieldInfo.name);
             pqVectors = getPQVectors(fieldData);
             buildScoreProvider = BuildScoreProvider.pqBuildScoreProvider(getVectorSimilarityFunction(fieldData.fieldInfo), pqVectors);
-            // buildScoreProvider = BuildScoreProvider.randomAccessScoreProvider(fieldData.randomAccessVectorValues,
-            // getVectorSimilarityFunction(fieldData.fieldInfo));
         } else {
             log.info(
                 "Not enough vectors to trigger PQ quantization for field {}, will use full precision vectors instead.",
