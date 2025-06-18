@@ -251,7 +251,7 @@ In case remote cluster is secured it's possible to pass username and password wi
 ```
 
 ### Install jVector KNN within your existing OpenSearch cluster installation
-The jvector plugin can be downloaded from [here](https://aws.oss.sonatype.org/content/repositories/snapshots/org/opensearch/plugin/opensearch-jvector-plugin/3.0.0.0-alpha1-SNAPSHOT/)
+The jvector plugin can be downloaded from [here](https://central.sonatype.com/service/rest/repository/browse/maven-snapshots/org/opensearch/knn/opensearch-jvector/3.0.0.0-SNAPSHOT/)
 ```bash
 # Go into the OpenSearch directory
 cd opensearch
