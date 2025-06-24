@@ -171,7 +171,13 @@ public class JVectorReader extends KnnVectorsReader {
                 KNNCounter.KNN_QUERY_RERANKED_COUNT.add(rerankedCount);
                 KNNCounter.KNN_QUERY_EXPANDED_NODES.add(expandedCount);
                 KNNCounter.KNN_QUERY_EXPANDED_BASE_LAYER_NODES.add(expandedBaseLayerCount);
-                log.debug("rerankedCount: {}, visitedNodesCount: {}, expandedCount: {}, expandedBaseLayerCount: {}", rerankedCount, visitedNodesCount, expandedCount, expandedBaseLayerCount);
+                log.debug(
+                    "rerankedCount: {}, visitedNodesCount: {}, expandedCount: {}, expandedBaseLayerCount: {}",
+                    rerankedCount,
+                    visitedNodesCount,
+                    expandedCount,
+                    expandedBaseLayerCount
+                );
 
             }
         }

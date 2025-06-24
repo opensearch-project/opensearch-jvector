@@ -6,8 +6,6 @@
 package org.opensearch.knn.index.codec.jvector;
 
 import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters;
-import io.github.jbellis.jvector.vector.VectorizationProvider;
-import io.github.jbellis.jvector.vector.types.VectorTypeSupport;
 import lombok.extern.log4j.Log4j2;
 import org.apache.lucene.document.*;
 import org.apache.lucene.index.*;
@@ -28,7 +26,6 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.ToDoubleFunction;
 
 import static org.opensearch.knn.index.codec.jvector.JVectorFormat.DEFAULT_MERGE_ON_DISK;
 import static org.opensearch.knn.index.codec.jvector.JVectorFormat.DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION;
@@ -1210,7 +1207,8 @@ public class KNNJVectorTests extends LuceneTestCase {
         return vector;
     }
 
-    private static float calculateRecall(IndexReader reader, Set<Integer> groundTruthVectorsIds, TopDocs topDocs, int k) throws IOException {
+    private static float calculateRecall(IndexReader reader, Set<Integer> groundTruthVectorsIds, TopDocs topDocs, int k)
+        throws IOException {
         final ScoreDoc[] scoreDocs = topDocs.scoreDocs;
         Assert.assertEquals(groundTruthVectorsIds.size(), scoreDocs.length);
         int totalRelevantDocs = 0;
@@ -1230,7 +1228,12 @@ public class KNNJVectorTests extends LuceneTestCase {
      * @param k the number of expected results
      * @return the IDs of the ground truth vectors in the dataset
      */
-    private static Set<Integer> calculateGroundTruthVectorsIds(float[] query, final float[][] dataset, int k, VectorSimilarityFunction vectorSimilarityFunction) {
+    private static Set<Integer> calculateGroundTruthVectorsIds(
+        float[] query,
+        final float[][] dataset,
+        int k,
+        VectorSimilarityFunction vectorSimilarityFunction
+    ) {
         final Set<Integer> groundTruthVectorsIds = new HashSet<>();
         final PriorityQueue<ScoreDoc> priorityQueue = new PriorityQueue<>(k, (o1, o2) -> Float.compare(o1.score, o2.score));
         for (int i = 0; i < dataset.length; i++) {
@@ -1252,6 +1255,5 @@ public class KNNJVectorTests extends LuceneTestCase {
 
         return groundTruthVectorsIds;
     }
-
 
 }

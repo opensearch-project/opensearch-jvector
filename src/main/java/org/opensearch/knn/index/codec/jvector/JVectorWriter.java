@@ -41,7 +41,6 @@ import org.apache.lucene.util.hnsw.CloseableRandomVectorScorerSupplier;
 
 import java.io.IOException;
 import java.util.*;
-import java.util.concurrent.ForkJoinPool;
 import java.util.function.Function;
 
 import static org.apache.lucene.codecs.lucene99.Lucene99HnswVectorsReader.readVectorEncoding;
