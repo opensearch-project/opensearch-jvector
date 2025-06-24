@@ -1602,15 +1602,15 @@ public class KNNRestTestCase extends ODFERestTestCase {
 
         for (int i = 0; i < docCount; i++) {
             sb.append("{ \"index\" : { \"_index\" : \"")
-                    .append(index)
-                    .append("\", \"_id\" : \"")
-                    .append(baseDocId + i)
-                    .append("\" } }\n")
-                    .append("{ \"")
-                    .append(fieldName)
-                    .append("\" : ")
-                    .append(Arrays.toString(indexVectors[i]))
-                    .append(" }\n");
+                .append(index)
+                .append("\", \"_id\" : \"")
+                .append(baseDocId + i)
+                .append("\" } }\n")
+                .append("{ \"")
+                .append(fieldName)
+                .append("\" : ")
+                .append(Arrays.toString(indexVectors[i]))
+                .append(" }\n");
         }
 
         request.setJsonEntity(sb.toString());

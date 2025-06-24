@@ -186,7 +186,7 @@ public class RecallTestsIT extends KNNRestTestCase {
     @SneakyThrows
     private void createIndexAndIngestDocs(String indexName, String fieldName, Settings settings, String mapping) {
         createKnnIndex(indexName, settings, mapping);
-        for (int i = 0; i < DOC_COUNT; i+=BATCH_SIZE) {
+        for (int i = 0; i < DOC_COUNT; i += BATCH_SIZE) {
             logger.info("Ingesting batch {}/{}", i, DOC_COUNT);
             final float[][] indexVectors = new float[BATCH_SIZE][TEST_DIMENSION];
             System.arraycopy(INDEX_VECTORS, i, indexVectors, 0, BATCH_SIZE);
