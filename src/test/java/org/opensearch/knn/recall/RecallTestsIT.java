@@ -50,7 +50,7 @@ public class RecallTestsIT extends KNNRestTestCase {
     private static final String PROPERTIES_FIELD = "properties";
     private final static String TEST_INDEX_PREFIX_NAME = "test_index";
     private final static String TEST_FIELD_NAME = "test_field";
-    private final static int TEST_DIMENSION = 32;
+    private final static int TEST_DIMENSION = 128;
     private final static int DOC_COUNT = 10000;
     private final static int BATCH_SIZE = 1000;
     private final static int QUERY_COUNT = 100;
@@ -119,7 +119,9 @@ public class RecallTestsIT extends KNNRestTestCase {
                 .endObject()
                 .endObject();
             createIndexAndIngestDocs(indexName, TEST_FIELD_NAME, getSettings(), builder.toString());
-            assertRecall(indexName, spaceType, 0.25f);
+            assertRecall(indexName, spaceType, "pre-merge", 0.25f);
+            forceMergeKnnIndex(indexName, MAX_SEGMENT_COUNT);
+            assertRecall(indexName, spaceType, "post-merge", 0.25f);
         }
     }
 
@@ -167,15 +169,17 @@ public class RecallTestsIT extends KNNRestTestCase {
                 .endObject()
                 .endObject();
             createIndexAndIngestDocs(indexName, TEST_FIELD_NAME, getSettings(), builder.toString());
-            assertRecall(indexName, spaceType, 0.25f);
+            assertRecall(indexName, spaceType, "pre-merge", 0.25f);
+            forceMergeKnnIndex(indexName, MAX_SEGMENT_COUNT);
+            assertRecall(indexName, spaceType, "post-merge", 0.25f);
         }
     }
 
     @SneakyThrows
-    private void assertRecall(String testIndexName, SpaceType spaceType, float acceptableRecallFromPerfect) {
+    private void assertRecall(String testIndexName, SpaceType spaceType, String testType, float acceptableRecallFromPerfect) {
         List<List<String>> searchResults = bulkSearch(testIndexName, TEST_FIELD_NAME, QUERY_VECTORS, TEST_K);
         double recallValue = TestUtils.calculateRecallValue(searchResults, GROUND_TRUTH.get(spaceType), TEST_K);
-        logger.info("Recall value = {}", recallValue);
+        logger.info("Recall value ({}/{}) = {}", spaceType, testType, recallValue);
         assertEquals(PERFECT_RECALL, recallValue, acceptableRecallFromPerfect);
     }
 
@@ -186,13 +190,22 @@ public class RecallTestsIT extends KNNRestTestCase {
     @SneakyThrows
     private void createIndexAndIngestDocs(String indexName, String fieldName, Settings settings, String mapping) {
         createKnnIndex(indexName, settings, mapping);
-        for (int i = 0; i < DOC_COUNT; i += BATCH_SIZE) {
+        int i = 0;
+        for (; i < DOC_COUNT; i += BATCH_SIZE) {
             logger.info("Ingesting batch {}/{}", i, DOC_COUNT);
             final float[][] indexVectors = new float[BATCH_SIZE][TEST_DIMENSION];
             System.arraycopy(INDEX_VECTORS, i, indexVectors, 0, BATCH_SIZE);
-            bulkAddKnnDocs(indexName, fieldName, indexVectors, i, BATCH_SIZE);
+            bulkAddKnnDocs(indexName, fieldName, indexVectors, i, BATCH_SIZE, false);
         }
-        forceMergeKnnIndex(indexName, MAX_SEGMENT_COUNT);
+
+        if (i < DOC_COUNT) {
+            logger.info("Ingesting final batch {}/{}", i, DOC_COUNT);
+            final float[][] indexVectors = new float[DOC_COUNT - i][TEST_DIMENSION];
+            System.arraycopy(INDEX_VECTORS, i, indexVectors, 0, DOC_COUNT - i);
+            bulkAddKnnDocs(indexName, fieldName, indexVectors, i, DOC_COUNT - i, false);
+        }
+
+        refreshIndex(indexName);
     }
 
     private Settings getSettings() {

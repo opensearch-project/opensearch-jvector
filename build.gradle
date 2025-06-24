@@ -351,6 +351,7 @@ test {
             '--add-opens', 'java.base/java.nio=ALL-UNNAMED',
             '--add-opens', 'java.base/sun.nio.ch=ALL-UNNAMED',
             '-Djdk.incubator.foreign.restricted=permit',
+            '-Djdk.incubator.vector.VECTOR_ACCESS_OOB_CHECK=0',
             '--enable-native-access=ALL-UNNAMED',
             '-Dio.netty.tryReflectionSetAccessible=true',
             '--enable-preview'
@@ -396,6 +397,19 @@ integTest {
         systemProperty 'cluster.debug', isDebuggingCluster
         // Set number of nodes system property to be used in tests
         systemProperty 'cluster.number_of_nodes', "${_numNodes}"
+
+        systemProperty 'jdk.incubator.vector.VECTOR_ACCESS_OOB_CHECK', "0"
+        jvmArgs = [
+                '--add-modules', 'jdk.incubator.vector',
+                '--add-opens', 'java.base/java.nio=ALL-UNNAMED',
+                '--add-opens', 'java.base/sun.nio.ch=ALL-UNNAMED',
+                '-Djdk.incubator.foreign.restricted=permit',
+                '-Djdk.incubator.vector.VECTOR_ACCESS_OOB_CHECK=0',
+                '--enable-native-access=ALL-UNNAMED',
+                '-Dio.netty.tryReflectionSetAccessible=true',
+                '--enable-preview'
+        ]
+
         // There seems to be an issue when running multi node run or integ tasks with unicast_hosts
         // not being written, the waitForAllConditions ensures it's written
         getClusters().forEach { cluster ->
@@ -414,6 +428,7 @@ testClusters.integTest {
     testDistribution = "ARCHIVE"
     systemProperty "java.security.policy", "file://${project.rootDir}/src/main/plugin-metadata/plugin-security.policy"
     systemProperty 'log4j.configurationFile', "${project.rootDir}/src/test/resources/log4j2.properties"
+
     // Optionally install security
     if (System.getProperty("security.enabled") != null) {
         configureSecurityPlugin(testClusters.integTest)
@@ -435,6 +450,7 @@ testClusters.integTest {
         }
     }
     systemProperty propertyKeys.breaker.useRealMemory, getBreakerSetting()
+    systemProperty 'jdk.incubator.vector.VECTOR_ACCESS_OOB_CHECK', "0"
 }
 
 task integTestRemote(type: RestIntegTestTask) {
@@ -466,7 +482,9 @@ run {
     testClusters.integTest.nodes.each { node ->
         node.jvmArgs(
                 '-Xms2g',  // Initial heap size
-                '-Xmx2g'   // Maximum heap size
+                '-Xmx2g',   // Maximum heap size
+                '-XX:+UnlockDiagnosticVMOptions',
+                "-XX:CompilerDirectivesFile=${project.rootDir}/src/main/resources/hotspot_compiler"
         )
     }
 

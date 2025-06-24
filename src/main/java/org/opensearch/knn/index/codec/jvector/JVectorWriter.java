@@ -321,7 +321,7 @@ public class JVectorWriter extends KnnVectorsWriter {
     }
 
     private PQVectors getPQVectors(FieldWriter<?> fieldData) throws IOException {
-        log.info("Computing PQ codebooks for field {}", fieldData.fieldInfo.name);
+        log.info("Computing PQ codebooks for field {} for {} vectors", fieldData.fieldInfo.name, fieldData.randomAccessVectorValues.size());
         final var M = numberOfSubspacesPerVectorSupplier.apply(fieldData.randomAccessVectorValues.dimension());
         final var numberOfClustersPerSubspace = Math.min(256, fieldData.randomAccessVectorValues.size()); // number of centroids per
         // subspace

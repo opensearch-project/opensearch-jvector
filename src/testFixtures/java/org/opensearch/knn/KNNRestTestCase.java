@@ -1589,15 +1589,16 @@ public class KNNRestTestCase extends ODFERestTestCase {
     }
 
     // Method that adds multiple documents into the index using Bulk API
-    public void bulkAddKnnDocs(String index, String fieldName, float[][] indexVectors, int docCount) throws IOException {
-        bulkAddKnnDocs(index, fieldName, indexVectors, 0, docCount);
+    public void bulkAddKnnDocs(String index, String fieldName, float[][] indexVectors, int docCount, boolean refresh) throws IOException {
+        bulkAddKnnDocs(index, fieldName, indexVectors, 0, docCount, refresh);
     }
 
     // Method that adds multiple documents into the index using Bulk API
-    public void bulkAddKnnDocs(String index, String fieldName, float[][] indexVectors, int baseDocId, int docCount) throws IOException {
+    public void bulkAddKnnDocs(String index, String fieldName, float[][] indexVectors, int baseDocId, int docCount, boolean refresh)
+        throws IOException {
         Request request = new Request("POST", "/_bulk");
 
-        request.addParameter("refresh", "true");
+        request.addParameter("refresh", Boolean.toString(refresh));
         StringBuilder sb = new StringBuilder();
 
         for (int i = 0; i < docCount; i++) {
