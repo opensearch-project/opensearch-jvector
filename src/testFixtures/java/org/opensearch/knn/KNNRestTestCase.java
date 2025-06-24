@@ -1590,6 +1590,11 @@ public class KNNRestTestCase extends ODFERestTestCase {
 
     // Method that adds multiple documents into the index using Bulk API
     public void bulkAddKnnDocs(String index, String fieldName, float[][] indexVectors, int docCount) throws IOException {
+        bulkAddKnnDocs(index, fieldName, indexVectors, 0, docCount);
+    }
+
+    // Method that adds multiple documents into the index using Bulk API
+    public void bulkAddKnnDocs(String index, String fieldName, float[][] indexVectors, int baseDocId, int docCount) throws IOException {
         Request request = new Request("POST", "/_bulk");
 
         request.addParameter("refresh", "true");
@@ -1597,15 +1602,15 @@ public class KNNRestTestCase extends ODFERestTestCase {
 
         for (int i = 0; i < docCount; i++) {
             sb.append("{ \"index\" : { \"_index\" : \"")
-                .append(index)
-                .append("\", \"_id\" : \"")
-                .append(i)
-                .append("\" } }\n")
-                .append("{ \"")
-                .append(fieldName)
-                .append("\" : ")
-                .append(Arrays.toString(indexVectors[i]))
-                .append(" }\n");
+                    .append(index)
+                    .append("\", \"_id\" : \"")
+                    .append(baseDocId + i)
+                    .append("\" } }\n")
+                    .append("{ \"")
+                    .append(fieldName)
+                    .append("\" : ")
+                    .append(Arrays.toString(indexVectors[i]))
+                    .append(" }\n");
         }
 
         request.setJsonEntity(sb.toString());

@@ -52,6 +52,7 @@ public class RecallTestsIT extends KNNRestTestCase {
     private final static String TEST_FIELD_NAME = "test_field";
     private final static int TEST_DIMENSION = 32;
     private final static int DOC_COUNT = 10000;
+    private final static int BATCH_SIZE = 1000;
     private final static int QUERY_COUNT = 100;
     private final static int TEST_K = 100;
     private final static double PERFECT_RECALL = 1.0;
@@ -185,7 +186,12 @@ public class RecallTestsIT extends KNNRestTestCase {
     @SneakyThrows
     private void createIndexAndIngestDocs(String indexName, String fieldName, Settings settings, String mapping) {
         createKnnIndex(indexName, settings, mapping);
-        bulkAddKnnDocs(indexName, fieldName, INDEX_VECTORS, DOC_COUNT);
+        for (int i = 0; i < DOC_COUNT; i+=BATCH_SIZE) {
+            logger.info("Ingesting batch {}/{}", i, DOC_COUNT);
+            final float[][] indexVectors = new float[BATCH_SIZE][TEST_DIMENSION];
+            System.arraycopy(INDEX_VECTORS, i, indexVectors, 0, BATCH_SIZE);
+            bulkAddKnnDocs(indexName, fieldName, indexVectors, i, BATCH_SIZE);
+        }
         forceMergeKnnIndex(indexName, MAX_SEGMENT_COUNT);
     }
 
