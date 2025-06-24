@@ -338,12 +338,7 @@ public class JVectorWriter extends KnnVectorsWriter {
             fieldData.fieldInfo.name,
             fieldData.randomAccessVectorValues.size()
         );
-        var pqVectors = PQVectors.encodeAndBuild(
-            pq,
-            fieldData.randomAccessVectorValues.size(),
-            fieldData.randomAccessVectorValues,
-            ForkJoinPool.commonPool()
-        );
+        PQVectors pqVectors = (PQVectors) pq.encodeAll(fieldData.randomAccessVectorValues);
         log.info(
             "Encoded and built PQ vectors for field {}, original size: {} bytes, compressed size: {} bytes",
             fieldData.fieldInfo.name,
