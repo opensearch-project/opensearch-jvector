@@ -102,7 +102,7 @@ jmh {
     iterations = 5
     warmupIterations = 2
     fork = 1
-    jvmArgs = ['-Xms2G', '-Xmx2G']
+    jvmArgs = ['-Xms20G', '-Xmx20G']
     resultFormat = 'JSON'
     resultsFile = file("${buildDir}/reports/jmh/results.json")
     humanOutputFile = file("${buildDir}/reports/jmh/human.txt")  // human readable output

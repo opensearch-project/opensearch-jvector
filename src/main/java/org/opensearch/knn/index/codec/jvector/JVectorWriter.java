@@ -40,6 +40,7 @@ import org.apache.lucene.util.RamUsageEstimator;
 import org.apache.lucene.util.hnsw.CloseableRandomVectorScorerSupplier;
 
 import java.io.IOException;
+import java.time.Clock;
 import java.util.*;
 import java.util.function.Function;
 
@@ -222,7 +223,7 @@ public class JVectorWriter extends KnnVectorsWriter {
     }
 
     private void writeField(FieldWriter<?> fieldData) throws IOException {
-        log.info("Writing field {}", fieldData.fieldInfo.name);
+        log.info("Writing field {} with vector count: {}, for segment: {}", fieldData.fieldInfo.name, fieldData.randomAccessVectorValues.size(), segmentWriteState.segmentInfo.name);
         final PQVectors pqVectors;
         final BuildScoreProvider buildScoreProvider;
         if (fieldData.randomAccessVectorValues.size() >= minimumBatchSizeForQuantization) {
@@ -231,7 +232,9 @@ public class JVectorWriter extends KnnVectorsWriter {
             buildScoreProvider = BuildScoreProvider.pqBuildScoreProvider(getVectorSimilarityFunction(fieldData.fieldInfo), pqVectors);
         } else {
             log.info(
-                "Not enough vectors to trigger PQ quantization for field {}, will use full precision vectors instead.",
+                "Vector count: {}, less than limit to trigger PQ quantization: {}, for field {}, will use full precision vectors instead.",
+                fieldData.randomAccessVectorValues.size(),
+                minimumBatchSizeForQuantization,
                 fieldData.fieldInfo.name
             );
             pqVectors = null;
@@ -322,6 +325,7 @@ public class JVectorWriter extends KnnVectorsWriter {
 
     private PQVectors getPQVectors(FieldWriter<?> fieldData) throws IOException {
         log.info("Computing PQ codebooks for field {} for {} vectors", fieldData.fieldInfo.name, fieldData.randomAccessVectorValues.size());
+        final long start = Clock.systemDefaultZone().millis();
         final var M = numberOfSubspacesPerVectorSupplier.apply(fieldData.randomAccessVectorValues.dimension());
         final var numberOfClustersPerSubspace = Math.min(256, fieldData.randomAccessVectorValues.size()); // number of centroids per
         // subspace
@@ -331,7 +335,8 @@ public class JVectorWriter extends KnnVectorsWriter {
             numberOfClustersPerSubspace, // number of centroids per subspace
             fieldData.fieldInfo.getVectorSimilarityFunction() == VectorSimilarityFunction.EUCLIDEAN // center the dataset
         );
-        log.info("Computed PQ codebooks for field {}", fieldData.fieldInfo.name);
+        final long end = Clock.systemDefaultZone().millis();
+        log.info("Computed PQ codebooks for field {}, in {} millis", fieldData.fieldInfo.name, end - start);
         log.info(
             "Encoding and building PQ vectors for field {} for {} vectors",
             fieldData.fieldInfo.name,
@@ -516,21 +521,25 @@ public class JVectorWriter extends KnnVectorsWriter {
              * To have the right mapping from docId to vector ordinal we need to use the mergedFloatVector.
              * This is the case when we are merging segments and we might have more documents than vectors.
              */
+            final long start = Clock.systemDefaultZone().millis();
+            final OnHeapGraphIndex graphIndex;
             if (mergedFloatVector != null) {
                 log.info("Building graph from merged float vector");
                 var itr = mergedFloatVector.iterator();
                 for (int doc = itr.nextDoc(); doc != DocIdSetIterator.NO_MORE_DOCS; doc = itr.nextDoc()) {
                     graphIndexBuilder.addGraphNode(doc, randomAccessVectorValues.getVector(doc));
                 }
+                graphIndexBuilder.cleanup();
+                graphIndex = graphIndexBuilder.getGraph();
             } else {
                 log.info("Building graph from random access vector values");
-                for (int i = 0; i < randomAccessVectorValues.size(); i++) {
-                    graphIndexBuilder.addGraphNode(i, randomAccessVectorValues.getVector(i));
-                }
+                graphIndex = graphIndexBuilder.build(randomAccessVectorValues);
             }
+            final long end = Clock.systemDefaultZone().millis();
 
-            graphIndexBuilder.cleanup();
-            return graphIndexBuilder.getGraph();
+
+            log.info("Built graph for field {} in segment {} in {} millis", fieldInfo.name, segmentName, end - start);
+            return graphIndex;
         }
     }
 
