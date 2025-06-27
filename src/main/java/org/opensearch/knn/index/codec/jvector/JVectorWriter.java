@@ -15,6 +15,7 @@ import io.github.jbellis.jvector.graph.disk.feature.InlineVectors;
 import io.github.jbellis.jvector.graph.similarity.BuildScoreProvider;
 import io.github.jbellis.jvector.quantization.PQVectors;
 import io.github.jbellis.jvector.quantization.ProductQuantization;
+import io.github.jbellis.jvector.util.PhysicalCoreExecutor;
 import io.github.jbellis.jvector.vector.VectorizationProvider;
 import io.github.jbellis.jvector.vector.types.VectorFloat;
 import io.github.jbellis.jvector.vector.types.VectorTypeSupport;
@@ -223,7 +224,12 @@ public class JVectorWriter extends KnnVectorsWriter {
     }
 
     private void writeField(FieldWriter<?> fieldData) throws IOException {
-        log.info("Writing field {} with vector count: {}, for segment: {}", fieldData.fieldInfo.name, fieldData.randomAccessVectorValues.size(), segmentWriteState.segmentInfo.name);
+        log.info(
+            "Writing field {} with vector count: {}, for segment: {}",
+            fieldData.fieldInfo.name,
+            fieldData.randomAccessVectorValues.size(),
+            segmentWriteState.segmentInfo.name
+        );
         final PQVectors pqVectors;
         final BuildScoreProvider buildScoreProvider;
         if (fieldData.randomAccessVectorValues.size() >= minimumBatchSizeForQuantization) {
@@ -526,9 +532,20 @@ public class JVectorWriter extends KnnVectorsWriter {
             if (mergedFloatVector != null) {
                 log.info("Building graph from merged float vector");
                 var itr = mergedFloatVector.iterator();
-                for (int doc = itr.nextDoc(); doc != DocIdSetIterator.NO_MORE_DOCS; doc = itr.nextDoc()) {
-                    graphIndexBuilder.addGraphNode(doc, randomAccessVectorValues.getVector(doc));
+                // Gather a list of valid document Ids to be streamed later for parallel graph construction
+                final List<Integer> docIds = new ArrayList<>();
+                int doc;
+                while ((doc = itr.nextDoc()) != DocIdSetIterator.NO_MORE_DOCS) {
+                    docIds.add(doc);
                 }
+
+                // parallel graph construction from the merge documents Ids
+                var vv = randomAccessVectorValues.threadLocalSupplier();
+
+                PhysicalCoreExecutor.pool().submit(() -> {
+                    docIds.stream().parallel().forEach(node -> { graphIndexBuilder.addGraphNode(node, vv.get().getVector(node)); });
+                }).join();
+
                 graphIndexBuilder.cleanup();
                 graphIndex = graphIndexBuilder.getGraph();
             } else {
@@ -536,7 +553,6 @@ public class JVectorWriter extends KnnVectorsWriter {
                 graphIndex = graphIndexBuilder.build(randomAccessVectorValues);
             }
             final long end = Clock.systemDefaultZone().millis();
-
 
             log.info("Built graph for field {} in segment {} in {} millis", fieldInfo.name, segmentName, end - start);
             return graphIndex;

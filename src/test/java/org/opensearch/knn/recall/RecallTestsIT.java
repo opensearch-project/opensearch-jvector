@@ -75,6 +75,7 @@ public class RecallTestsIT extends KNNRestTestCase {
         SpaceType.INNER_PRODUCT,
         TestUtils.computeGroundTruthValues(INDEX_VECTORS, QUERY_VECTORS, SpaceType.INNER_PRODUCT, TEST_K)
     );
+    private static final List<SpaceType> SPACE_TYPE_LIST = List.of(SpaceType.L2, SpaceType.COSINESIMIL);
 
     /**
      * {
@@ -97,8 +98,7 @@ public class RecallTestsIT extends KNNRestTestCase {
      */
     @SneakyThrows
     public void testRecall_whenLuceneHnswFP32_thenRecallAbove75percent() {
-        List<SpaceType> spaceTypes = List.of(SpaceType.L2, SpaceType.COSINESIMIL);
-        for (SpaceType spaceType : spaceTypes) {
+        for (SpaceType spaceType : SPACE_TYPE_LIST) {
             String indexName = createIndexName(KNNEngine.LUCENE, spaceType);
             XContentBuilder builder = XContentFactory.jsonBuilder()
                 .startObject()
@@ -147,8 +147,7 @@ public class RecallTestsIT extends KNNRestTestCase {
      */
     @SneakyThrows
     public void testRecall_whenJVectorDiskANN_thenRecallAbove75percent() {
-        List<SpaceType> spaceTypes = List.of(SpaceType.L2, SpaceType.COSINESIMIL);
-        for (SpaceType spaceType : spaceTypes) {
+        for (SpaceType spaceType : SPACE_TYPE_LIST) {
             String indexName = createIndexName(KNNEngine.JVECTOR, spaceType);
             XContentBuilder builder = XContentFactory.jsonBuilder()
                 .startObject()

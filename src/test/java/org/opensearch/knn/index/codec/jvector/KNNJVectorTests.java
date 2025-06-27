@@ -796,11 +796,12 @@ public class KNNJVectorTests extends LuceneTestCase {
     @Test
     public void testJVectorKnnIndex_simpleCase_withQuantization() throws IOException {
         int k = 50; // The number of nearest neighbours to gather
+        int dimension = 16;
         int totalNumberOfDocs = DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION;
+        final VectorSimilarityFunction vectorSimilarityFunction = VectorSimilarityFunction.EUCLIDEAN;
+
         IndexWriterConfig indexWriterConfig = LuceneTestCase.newIndexWriterConfig();
         indexWriterConfig.setUseCompoundFile(false);
-        // quantization fails with mergeOnDisk, turning it off for now during quantization test
-        // TODO: turn mergeOnDisk back on with quantization
         indexWriterConfig.setCodec(new JVectorCodec(DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION, true));
         indexWriterConfig.setMergePolicy(new ForceMergesOnlyMergePolicy());
         // We set the below parameters to make sure no permature flush will occur, this way we can have a single segment, and we can force
@@ -811,43 +812,13 @@ public class KNNJVectorTests extends LuceneTestCase {
         final Path indexPath = createTempDir();
         log.info("Index path: {}", indexPath);
         try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter w = new IndexWriter(dir, indexWriterConfig)) {
-            final float[] target = new float[] {
-                0.0f,
-                0.0f,
-                0.0f,
-                0.0f,
-                0.0f,
-                0.0f,
-                0.0f,
-                0.0f,
-                0.0f,
-                0.0f,
-                0.0f,
-                0.0f,
-                0.0f,
-                0.0f,
-                0.0f,
-                0.0f };
-            for (int i = 1; i < totalNumberOfDocs + 1; i++) {
-                final float[] source = new float[] {
-                    0.0f,
-                    0.0f,
-                    0.0f,
-                    0.0f,
-                    0.0f,
-                    0.0f,
-                    0.0f,
-                    0.0f,
-                    0.0f,
-                    0.0f,
-                    0.0f,
-                    0.0f,
-                    0.0f,
-                    0.0f,
-                    0.0f,
-                    i };
+            final float[] target = generateZerosVectorWithLastValue(dimension, 0);
+            final float[][] vectors = TestUtils.generateRandomVectors(totalNumberOfDocs, dimension);
+            final Set<Integer> groundTruthVectorsIds = calculateGroundTruthVectorsIds(target, vectors, k, vectorSimilarityFunction);
+            for (int i = 0; i < vectors.length; i++) {
                 final Document doc = new Document();
-                doc.add(new KnnFloatVectorField("test_field", source, VectorSimilarityFunction.EUCLIDEAN));
+                doc.add(new KnnFloatVectorField(TEST_FIELD, vectors[i], vectorSimilarityFunction));
+                doc.add(new IntField(TEST_ID_FIELD, i, Field.Store.YES));
                 w.addDocument(doc);
             }
             log.info("Flushing docs to make them discoverable on the file system");
@@ -860,14 +831,10 @@ public class KNNJVectorTests extends LuceneTestCase {
 
                 final Query filterQuery = new MatchAllDocsQuery();
                 final IndexSearcher searcher = newSearcher(reader);
-                KnnFloatVectorQuery knnFloatVectorQuery = getJVectorKnnFloatVectorQuery("test_field", target, k, filterQuery);
+                KnnFloatVectorQuery knnFloatVectorQuery = getJVectorKnnFloatVectorQuery(TEST_FIELD, target, k, filterQuery);
                 TopDocs topDocs = searcher.search(knnFloatVectorQuery, k);
                 assertEquals(k, topDocs.totalHits.value());
-                float expectedMinScoreInTopK = VectorSimilarityFunction.EUCLIDEAN.compare(
-                    target,
-                    new float[] { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, k }
-                );
-                final float recall = calculateRecall(topDocs, expectedMinScoreInTopK);
+                final float recall = calculateRecall(reader, groundTruthVectorsIds, topDocs, k);
                 Assert.assertEquals(1.0f, recall, 0.05f);
                 log.info("successfully completed search tests");
             }
@@ -884,8 +851,6 @@ public class KNNJVectorTests extends LuceneTestCase {
         int totalNumberOfDocs = DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION;
         IndexWriterConfig indexWriterConfig = LuceneTestCase.newIndexWriterConfig();
         indexWriterConfig.setUseCompoundFile(false);
-        // quantization fails with mergeOnDisk, turning it off for now during quantization test
-        // TODO: turn mergeOnDisk back on with quantization
         indexWriterConfig.setCodec(new JVectorCodec(DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION, true));
         indexWriterConfig.setMergePolicy(new ForceMergesOnlyMergePolicy());
         // We set the below parameters to make sure no permature flush will occur, this way we can have a single segment, and we can force
@@ -955,8 +920,6 @@ public class KNNJVectorTests extends LuceneTestCase {
 
         IndexWriterConfig indexWriterConfig = LuceneTestCase.newIndexWriterConfig();
         indexWriterConfig.setUseCompoundFile(false);
-        // quantization fails with mergeOnDisk, turning it off for now during quantization test
-        // TODO: turn mergeOnDisk back on with quantization
         indexWriterConfig.setCodec(new JVectorCodec(DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION, true));
         indexWriterConfig.setMergePolicy(new ForceMergesOnlyMergePolicy());
         // We set the below parameters to make sure no permature flush will occur, this way we can have a single segment, and we can force

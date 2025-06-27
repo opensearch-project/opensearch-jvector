@@ -78,6 +78,6 @@ public class RecallIT extends AbstractRestartUpgradeTestCase {
         // Updating index thread qty to 2 to speed up data ingestion
         updateClusterSettings(KNN_ALGO_PARAM_INDEX_THREAD_QTY, INDEX_THREAD_QTY);
 
-        bulkAddKnnDocs(testIndex, testField, TestUtils.getIndexVectors(docCount, dimensions, isStandard), docCount);
+        bulkAddKnnDocs(testIndex, testField, TestUtils.getIndexVectors(docCount, dimensions, isStandard), docCount, true);
     }
 }
