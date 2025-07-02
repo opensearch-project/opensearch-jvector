@@ -50,7 +50,8 @@ public class RecallTestsIT extends KNNRestTestCase {
     private static final String PROPERTIES_FIELD = "properties";
     private final static String TEST_INDEX_PREFIX_NAME = "test_index";
     private final static String TEST_FIELD_NAME = "test_field";
-    private final static int TEST_DIMENSION = 128;
+    // For more extensive real world scenarios increase the vector dimensions
+    private final static int TEST_DIMENSION = 32;
     private final static int DOC_COUNT = 10000;
     private final static int BATCH_SIZE = 1000;
     private final static int QUERY_COUNT = 100;

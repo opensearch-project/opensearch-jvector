@@ -15,7 +15,6 @@ import io.github.jbellis.jvector.graph.disk.feature.InlineVectors;
 import io.github.jbellis.jvector.graph.similarity.BuildScoreProvider;
 import io.github.jbellis.jvector.quantization.PQVectors;
 import io.github.jbellis.jvector.quantization.ProductQuantization;
-import io.github.jbellis.jvector.util.PhysicalCoreExecutor;
 import io.github.jbellis.jvector.vector.VectorizationProvider;
 import io.github.jbellis.jvector.vector.types.VectorFloat;
 import io.github.jbellis.jvector.vector.types.VectorTypeSupport;
@@ -46,6 +45,7 @@ import java.util.*;
 import java.util.function.Function;
 
 import static org.apache.lucene.codecs.lucene99.Lucene99HnswVectorsReader.readVectorEncoding;
+import static org.opensearch.knn.index.codec.jvector.JVectorFormat.SIMD_POOL;
 
 @Log4j2
 public class JVectorWriter extends KnnVectorsWriter {
@@ -542,9 +542,11 @@ public class JVectorWriter extends KnnVectorsWriter {
                 // parallel graph construction from the merge documents Ids
                 var vv = randomAccessVectorValues.threadLocalSupplier();
 
-                PhysicalCoreExecutor.pool().submit(() -> {
-                    docIds.stream().parallel().forEach(node -> { graphIndexBuilder.addGraphNode(node, vv.get().getVector(node)); });
-                }).join();
+                SIMD_POOL.submit(
+                    () -> {
+                        docIds.stream().parallel().forEach(node -> { graphIndexBuilder.addGraphNode(node, vv.get().getVector(node)); });
+                    }
+                ).join();
 
                 graphIndexBuilder.cleanup();
                 graphIndex = graphIndexBuilder.getGraph();

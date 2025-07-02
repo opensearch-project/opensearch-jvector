@@ -5,6 +5,7 @@
 
 package org.opensearch.knn.index.codec.jvector;
 
+import io.github.jbellis.jvector.util.PhysicalCoreExecutor;
 import org.apache.lucene.codecs.KnnVectorsFormat;
 import org.apache.lucene.codecs.KnnVectorsReader;
 import org.apache.lucene.codecs.KnnVectorsWriter;
@@ -13,6 +14,7 @@ import org.apache.lucene.index.SegmentWriteState;
 import org.opensearch.knn.common.KNNConstants;
 
 import java.io.IOException;
+import java.util.concurrent.ForkJoinPool;
 import java.util.function.Function;
 
 public class JVectorFormat extends KnnVectorsFormat {
@@ -26,9 +28,11 @@ public class JVectorFormat extends KnnVectorsFormat {
                                                                                 // quantization
     public static final int VERSION_START = 0;
     public static final int VERSION_CURRENT = VERSION_START;
-    private static final int DEFAULT_MAX_CONN = 32;
-    private static final int DEFAULT_BEAM_WIDTH = 100;
+    public static final int DEFAULT_MAX_CONN = 32;
+    public static final int DEFAULT_BEAM_WIDTH = 100;
     public static final boolean DEFAULT_MERGE_ON_DISK = true;
+    // Unfortunately, this can't be managed yet by the OpenSearch ThreadPool because it's not supporting {@link ForkJoinPool} types
+    public static final ForkJoinPool SIMD_POOL = PhysicalCoreExecutor.pool();
 
     private final int maxConn;
     private final int beamWidth;
