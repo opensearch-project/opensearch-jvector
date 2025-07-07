@@ -43,6 +43,7 @@ import java.io.IOException;
 import java.time.Clock;
 import java.util.*;
 import java.util.function.Function;
+import java.util.stream.IntStream;
 
 import static org.apache.lucene.codecs.lucene99.Lucene99HnswVectorsReader.readVectorEncoding;
 import static org.opensearch.knn.index.codec.jvector.JVectorFormat.SIMD_POOL;
@@ -529,6 +530,7 @@ public class JVectorWriter extends KnnVectorsWriter {
              */
             final long start = Clock.systemDefaultZone().millis();
             final OnHeapGraphIndex graphIndex;
+            var vv = randomAccessVectorValues.threadLocalSupplier();
             if (mergedFloatVector != null) {
                 log.info("Building graph from merged float vector");
                 var itr = mergedFloatVector.iterator();
@@ -540,20 +542,21 @@ public class JVectorWriter extends KnnVectorsWriter {
                 }
 
                 // parallel graph construction from the merge documents Ids
-                var vv = randomAccessVectorValues.threadLocalSupplier();
-
                 SIMD_POOL.submit(
-                    () -> {
-                        docIds.stream().parallel().forEach(node -> { graphIndexBuilder.addGraphNode(node, vv.get().getVector(node)); });
-                    }
+                    () -> docIds.stream().parallel().forEach(node -> { graphIndexBuilder.addGraphNode(node, vv.get().getVector(node)); })
                 ).join();
-
-                graphIndexBuilder.cleanup();
-                graphIndex = graphIndexBuilder.getGraph();
             } else {
                 log.info("Building graph from random access vector values");
-                graphIndex = graphIndexBuilder.build(randomAccessVectorValues);
+                int size = randomAccessVectorValues.size();
+
+                SIMD_POOL.submit(() -> {
+                    IntStream.range(0, size)
+                        .parallel()
+                        .forEach(node -> { graphIndexBuilder.addGraphNode(node, vv.get().getVector(node)); });
+                }).join();
             }
+            graphIndexBuilder.cleanup();
+            graphIndex = graphIndexBuilder.getGraph();
             final long end = Clock.systemDefaultZone().millis();
 
             log.info("Built graph for field {} in segment {} in {} millis", fieldInfo.name, segmentName, end - start);

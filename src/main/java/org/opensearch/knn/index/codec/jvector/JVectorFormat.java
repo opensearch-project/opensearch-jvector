@@ -5,7 +5,7 @@
 
 package org.opensearch.knn.index.codec.jvector;
 
-import io.github.jbellis.jvector.util.PhysicalCoreExecutor;
+import lombok.extern.log4j.Log4j2;
 import org.apache.lucene.codecs.KnnVectorsFormat;
 import org.apache.lucene.codecs.KnnVectorsReader;
 import org.apache.lucene.codecs.KnnVectorsWriter;
@@ -15,8 +15,10 @@ import org.opensearch.knn.common.KNNConstants;
 
 import java.io.IOException;
 import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ForkJoinWorkerThread;
 import java.util.function.Function;
 
+@Log4j2
 public class JVectorFormat extends KnnVectorsFormat {
     public static final String NAME = "JVectorFormat";
     public static final String META_CODEC_NAME = "JVectorVectorsFormatMeta";
@@ -32,7 +34,7 @@ public class JVectorFormat extends KnnVectorsFormat {
     public static final int DEFAULT_BEAM_WIDTH = 100;
     public static final boolean DEFAULT_MERGE_ON_DISK = true;
     // Unfortunately, this can't be managed yet by the OpenSearch ThreadPool because it's not supporting {@link ForkJoinPool} types
-    public static final ForkJoinPool SIMD_POOL = PhysicalCoreExecutor.pool();
+    public static final ForkJoinPool SIMD_POOL = getPhysicalCoreExecutor();
 
     private final int maxConn;
     private final int beamWidth;
@@ -171,5 +173,22 @@ public class JVectorFormat extends KnnVectorsFormat {
             compressedBytes = (int) (originalDimension * 0.125);
         }
         return compressedBytes;
+    }
+
+    public static ForkJoinPool getPhysicalCoreExecutor() {
+        final int estimatedPhysicalCoreCount = Integer.getInteger(
+            "jvector.physical_core_count",
+            Math.max(1, Runtime.getRuntime().availableProcessors() / 2)
+        );
+        assert estimatedPhysicalCoreCount > 0 && estimatedPhysicalCoreCount <= Runtime.getRuntime().availableProcessors()
+            : "Invalid core count: " + estimatedPhysicalCoreCount;
+        final ForkJoinPool.ForkJoinWorkerThreadFactory factory = pool -> {
+            ForkJoinWorkerThread thread = ForkJoinPool.defaultForkJoinWorkerThreadFactory.newThread(pool);
+            thread.setPriority(Thread.NORM_PRIORITY - 2);
+            return thread;
+        };
+
+        log.info("Creating SIMD ForkJoinPool with {} physical cores for JVector SIMD operations", estimatedPhysicalCoreCount);
+        return new ForkJoinPool(estimatedPhysicalCoreCount, factory, null, true);
     }
 }
