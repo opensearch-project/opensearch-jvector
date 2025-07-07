@@ -38,11 +38,11 @@ import java.util.concurrent.TimeUnit;
 @State(Scope.Thread)
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
-@Warmup(iterations = 1)
-@Measurement(iterations = 3)
+@Warmup(iterations = 2)
+@Measurement(iterations = 5)
 @Fork(1)
-public class FormatBenchmarkRandomVectors {
-    private static final Logger log = LogManager.getLogger(FormatBenchmarkRandomVectors.class);
+public class FormatBenchmarkQueryWithRandomVectors {
+    private static final Logger log = LogManager.getLogger(FormatBenchmarkQueryWithRandomVectors.class);
     private static final String JVECTOR_NOT_QUANTIZED = "jvector_not_quantized";
     private static final String JVECTOR_QUANTIZED = "jvector_quantized";
     private static final String LUCENE101 = "Lucene101";
@@ -51,9 +51,9 @@ public class FormatBenchmarkRandomVectors {
     private static final VectorSimilarityFunction SIMILARITY_FUNCTION = VectorSimilarityFunction.EUCLIDEAN;
     @Param({ JVECTOR_NOT_QUANTIZED, JVECTOR_QUANTIZED, LUCENE101 })  // This will run the benchmark each codec type
     private String codecType;
-    @Param({ "1000", "10000", "100000" })
+    @Param({ /*"1000", "10000",*/ "100000" })
     private int numDocs;
-    @Param({ "128", /*"256", "512", "1024"*/ })
+    @Param({ /*"128", "256",*/ "768", /*"1024"*/ })
     private int dimension;
 
     private float[][] vectors;

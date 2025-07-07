@@ -13,6 +13,7 @@ import io.github.jbellis.jvector.graph.disk.feature.Feature;
 import io.github.jbellis.jvector.graph.disk.feature.FeatureId;
 import io.github.jbellis.jvector.graph.disk.feature.InlineVectors;
 import io.github.jbellis.jvector.graph.similarity.BuildScoreProvider;
+import io.github.jbellis.jvector.quantization.PQVectors;
 import io.github.jbellis.jvector.quantization.ProductQuantization;
 import io.github.jbellis.jvector.vector.VectorizationProvider;
 import io.github.jbellis.jvector.vector.types.VectorFloat;
@@ -38,12 +39,16 @@ import org.apache.lucene.util.IOUtils;
 import org.apache.lucene.util.RamUsageEstimator;
 import org.apache.lucene.util.hnsw.CloseableRandomVectorScorerSupplier;
 
-import java.io.DataOutput;
 import java.io.IOException;
+import java.time.Clock;
 import java.util.*;
+import java.util.concurrent.ForkJoinPool;
 import java.util.function.Function;
+import java.util.stream.IntStream;
 
+import static io.github.jbellis.jvector.quantization.KMeansPlusPlusClusterer.UNWEIGHTED;
 import static org.apache.lucene.codecs.lucene99.Lucene99HnswVectorsReader.readVectorEncoding;
+import static org.opensearch.knn.index.codec.jvector.JVectorFormat.SIMD_POOL;
 
 @Log4j2
 public class JVectorWriter extends KnnVectorsWriter {
@@ -208,9 +213,9 @@ public class JVectorWriter extends KnnVectorsWriter {
     public void flush(int maxDoc, Sorter.DocMap sortMap) throws IOException {
         log.info("Flushing {} fields", fields.size());
 
-        log.info("Writing flat vectors");
+        log.info("Flushing flat vectors");
         flatVectorWriter.flush(maxDoc, sortMap);
-        log.info("Writing jVector graph index");
+        log.info("Flushing jVector graph index");
         for (FieldWriter<?> field : fields) {
             if (sortMap == null) {
                 writeField(field);
@@ -222,20 +227,46 @@ public class JVectorWriter extends KnnVectorsWriter {
     }
 
     private void writeField(FieldWriter<?> fieldData) throws IOException {
-        OnHeapGraphIndex graph = fieldData.getGraph();
-        final var vectorIndexFieldMetadata = writeGraph(graph, fieldData);
+        log.info(
+            "Writing field {} with vector count: {}, for segment: {}",
+            fieldData.fieldInfo.name,
+            fieldData.randomAccessVectorValues.size(),
+            segmentWriteState.segmentInfo.name
+        );
+        final PQVectors pqVectors;
+        final BuildScoreProvider buildScoreProvider;
+        if (fieldData.randomAccessVectorValues.size() >= minimumBatchSizeForQuantization) {
+            log.info("Calculating codebooks and compressed vectors for field {}", fieldData.fieldInfo.name);
+            pqVectors = getPQVectors(fieldData);
+            buildScoreProvider = BuildScoreProvider.pqBuildScoreProvider(getVectorSimilarityFunction(fieldData.fieldInfo), pqVectors);
+        } else {
+            log.info(
+                "Vector count: {}, less than limit to trigger PQ quantization: {}, for field {}, will use full precision vectors instead.",
+                fieldData.randomAccessVectorValues.size(),
+                minimumBatchSizeForQuantization,
+                fieldData.fieldInfo.name
+            );
+            pqVectors = null;
+            buildScoreProvider = BuildScoreProvider.randomAccessScoreProvider(
+                fieldData.randomAccessVectorValues,
+                getVectorSimilarityFunction(fieldData.fieldInfo)
+            );
+        }
+
+        OnHeapGraphIndex graph = fieldData.getGraph(buildScoreProvider);
+        final var vectorIndexFieldMetadata = writeGraph(graph, fieldData, pqVectors);
         meta.writeInt(fieldData.fieldInfo.number);
         vectorIndexFieldMetadata.toOutput(meta);
     }
 
     /**
-     * Writes the graph to the vector index file
+     * Writes the graph and PQ codebooks and compressed vectors to the vector index file
      * @param graph graph
      * @param fieldData fieldData
      * @return Tuple of start offset and length of the graph
      * @throws IOException IOException
      */
-    private VectorIndexFieldMetadata writeGraph(OnHeapGraphIndex graph, FieldWriter<?> fieldData) throws IOException {
+    private VectorIndexFieldMetadata writeGraph(OnHeapGraphIndex graph, FieldWriter<?> fieldData, PQVectors pqVectors) throws IOException {
         // field data file, which contains the graph
         final String vectorIndexFieldFileName = baseDataFileName
             + "_"
@@ -279,7 +310,7 @@ public class JVectorWriter extends KnnVectorsWriter {
                 resultBuilder.vectorIndexLength(endGraphOffset - startOffset);
 
                 // If PQ is enabled and we have enough vectors, write the PQ codebooks and compressed vectors
-                if (fieldData.randomAccessVectorValues.size() >= minimumBatchSizeForQuantization) {
+                if (pqVectors != null) {
                     log.info(
                         "Writing PQ codebooks and vectors for field {} since the size is {} >= {}",
                         fieldData.fieldInfo.name,
@@ -287,7 +318,8 @@ public class JVectorWriter extends KnnVectorsWriter {
                         minimumBatchSizeForQuantization
                     );
                     resultBuilder.pqCodebooksAndVectorsOffset(endGraphOffset);
-                    writePQCodebooksAndVectors(jVectorIndexWriter, fieldData);
+                    // write the compressed vectors and codebooks to disk
+                    pqVectors.write(jVectorIndexWriter);
                     resultBuilder.pqCodebooksAndVectorsLength(jVectorIndexWriter.position() - endGraphOffset);
                 } else {
                     resultBuilder.pqCodebooksAndVectorsOffset(0);
@@ -300,28 +332,37 @@ public class JVectorWriter extends KnnVectorsWriter {
         }
     }
 
-    /**
-     * Writes the product quantization (PQ) codebooks and encoded vectors to a DataOutput stream.
-     * This method compresses the original vector data using product quantization and encodes
-     * all vector values into a smaller, compressed form for storage or transfer.
-     *
-     * @param out The DataOutput stream where the compressed PQ codebooks and encoded vectors will be written.
-     * @param fieldData The field writer object providing access to the vector data to be compressed.
-     * @throws IOException If an I/O error occurs during writing.
-     */
-    private void writePQCodebooksAndVectors(DataOutput out, FieldWriter<?> fieldData) throws IOException {
+    private PQVectors getPQVectors(FieldWriter<?> fieldData) throws IOException {
+        log.info("Computing PQ codebooks for field {} for {} vectors", fieldData.fieldInfo.name, fieldData.randomAccessVectorValues.size());
+        final long start = Clock.systemDefaultZone().millis();
         final var M = numberOfSubspacesPerVectorSupplier.apply(fieldData.randomAccessVectorValues.dimension());
         final var numberOfClustersPerSubspace = Math.min(256, fieldData.randomAccessVectorValues.size()); // number of centroids per
-                                                                                                          // subspace
+        // subspace
         ProductQuantization pq = ProductQuantization.compute(
             fieldData.randomAccessVectorValues,
             M, // number of subspaces
             numberOfClustersPerSubspace, // number of centroids per subspace
-            fieldData.fieldInfo.getVectorSimilarityFunction() == VectorSimilarityFunction.EUCLIDEAN
-        ); // center the dataset
-        var pqv = pq.encodeAll(fieldData.randomAccessVectorValues);
-        // write the compressed vectors to disk
-        pqv.write(out);
+            fieldData.fieldInfo.getVectorSimilarityFunction() == VectorSimilarityFunction.EUCLIDEAN, // center the dataset
+            UNWEIGHTED,
+            SIMD_POOL,
+            ForkJoinPool.commonPool()
+        );
+
+        final long end = Clock.systemDefaultZone().millis();
+        log.info("Computed PQ codebooks for field {}, in {} millis", fieldData.fieldInfo.name, end - start);
+        log.info(
+            "Encoding and building PQ vectors for field {} for {} vectors",
+            fieldData.fieldInfo.name,
+            fieldData.randomAccessVectorValues.size()
+        );
+        PQVectors pqVectors = (PQVectors) pq.encodeAll(fieldData.randomAccessVectorValues);
+        log.info(
+            "Encoded and built PQ vectors for field {}, original size: {} bytes, compressed size: {} bytes",
+            fieldData.fieldInfo.name,
+            pqVectors.getOriginalSize(),
+            pqVectors.getCompressedSize()
+        );
+        return pqVectors;
     }
 
     @Value
@@ -410,12 +451,10 @@ public class JVectorWriter extends KnnVectorsWriter {
         @Getter
         private final FieldInfo fieldInfo;
         private int lastDocID = -1;
-        private final GraphIndexBuilder graphIndexBuilder;
         private final String segmentName;
         private final RandomAccessVectorValues randomAccessVectorValues;
         private final FloatVectorValues mergedFloatVector;
         private final FlatFieldVectorsWriter<T> flatFieldVectorsWriter;
-        private final BuildScoreProvider buildScoreProvider;
 
         // For merge fields only
         FieldWriter(FieldInfo fieldInfo, String segmentName, FloatVectorValues mergedFloatVector, RandomAccessVectorValues ravv) {
@@ -425,19 +464,6 @@ public class JVectorWriter extends KnnVectorsWriter {
             // This unmodifiable list makes sure that the addition of values outside what's already in ravv will fail.
             this.fieldInfo = fieldInfo;
             this.segmentName = segmentName;
-            this.buildScoreProvider = BuildScoreProvider.randomAccessScoreProvider(
-                randomAccessVectorValues,
-                getVectorSimilarityFunction(fieldInfo)
-            );
-            this.graphIndexBuilder = new GraphIndexBuilder(
-                buildScoreProvider,
-                fieldInfo.getVectorDimension(),
-                maxConn,
-                beamWidth,
-                degreeOverflow,
-                alpha,
-                true
-            );
         }
 
         FieldWriter(FieldInfo fieldInfo, String segmentName, FlatFieldVectorsWriter<T> flatFieldVectorsWriter) {
@@ -449,19 +475,6 @@ public class JVectorWriter extends KnnVectorsWriter {
             this.mergedFloatVector = null;
             this.fieldInfo = fieldInfo;
             this.segmentName = segmentName;
-            this.buildScoreProvider = BuildScoreProvider.randomAccessScoreProvider(
-                randomAccessVectorValues,
-                getVectorSimilarityFunction(fieldInfo)
-            );
-            this.graphIndexBuilder = new GraphIndexBuilder(
-                buildScoreProvider,
-                randomAccessVectorValues.dimension(),
-                maxConn,
-                beamWidth,
-                degreeOverflow,
-                alpha,
-                true
-            );
         }
 
         @Override
@@ -499,48 +512,72 @@ public class JVectorWriter extends KnnVectorsWriter {
             return SHALLOW_SIZE + flatFieldVectorsWriter.ramBytesUsed();
         }
 
-        io.github.jbellis.jvector.vector.VectorSimilarityFunction getVectorSimilarityFunction(FieldInfo fieldInfo) {
-            log.info("Matching vector similarity function {} for field {}", fieldInfo.getVectorSimilarityFunction(), fieldInfo.name);
-            switch (fieldInfo.getVectorSimilarityFunction()) {
-                case EUCLIDEAN:
-                    return io.github.jbellis.jvector.vector.VectorSimilarityFunction.EUCLIDEAN;
-                case COSINE:
-                    return io.github.jbellis.jvector.vector.VectorSimilarityFunction.COSINE;
-                case DOT_PRODUCT:
-                    return io.github.jbellis.jvector.vector.VectorSimilarityFunction.DOT_PRODUCT;
-                default:
-                    throw new IllegalArgumentException("Unsupported similarity function: " + fieldInfo.getVectorSimilarityFunction());
-            }
-        }
-
         /**
          * This method will return the graph index for the field
          * @return OnHeapGraphIndex
          * @throws IOException IOException
          */
-        public OnHeapGraphIndex getGraph() throws IOException {
+        public OnHeapGraphIndex getGraph(BuildScoreProvider buildScoreProvider) throws IOException {
+            final GraphIndexBuilder graphIndexBuilder = new GraphIndexBuilder(
+                buildScoreProvider,
+                fieldInfo.getVectorDimension(),
+                maxConn,
+                beamWidth,
+                degreeOverflow,
+                alpha,
+                true
+            );
+
             /*
              * We cannot always use randomAccessVectorValues for the graph building
              * because it's size will not always correspond to the document count.
              * To have the right mapping from docId to vector ordinal we need to use the mergedFloatVector.
              * This is the case when we are merging segments and we might have more documents than vectors.
              */
+            final long start = Clock.systemDefaultZone().millis();
+            final OnHeapGraphIndex graphIndex;
+            var vv = randomAccessVectorValues.threadLocalSupplier();
             if (mergedFloatVector != null) {
                 log.info("Building graph from merged float vector");
                 var itr = mergedFloatVector.iterator();
-                for (int doc = itr.nextDoc(); doc != DocIdSetIterator.NO_MORE_DOCS; doc = itr.nextDoc()) {
-                    graphIndexBuilder.addGraphNode(doc, randomAccessVectorValues.getVector(doc));
+                // Gather a list of valid document Ids to be streamed later for parallel graph construction
+                final List<Integer> docIds = new ArrayList<>();
+                int doc;
+                while ((doc = itr.nextDoc()) != DocIdSetIterator.NO_MORE_DOCS) {
+                    docIds.add(doc);
                 }
+
+                // parallel graph construction from the merge documents Ids
+                SIMD_POOL.submit(
+                    () -> docIds.stream().parallel().forEach(node -> { graphIndexBuilder.addGraphNode(node, vv.get().getVector(node)); })
+                ).join();
             } else {
                 log.info("Building graph from random access vector values");
-                for (int i = 0; i < randomAccessVectorValues.size(); i++) {
-                    graphIndexBuilder.addGraphNode(i, randomAccessVectorValues.getVector(i));
-                }
-            }
+                int size = randomAccessVectorValues.size();
 
+                SIMD_POOL.submit(() -> {
+                    IntStream.range(0, size)
+                        .parallel()
+                        .forEach(node -> { graphIndexBuilder.addGraphNode(node, vv.get().getVector(node)); });
+                }).join();
+            }
             graphIndexBuilder.cleanup();
-            return graphIndexBuilder.getGraph();
+            graphIndex = graphIndexBuilder.getGraph();
+            final long end = Clock.systemDefaultZone().millis();
+
+            log.info("Built graph for field {} in segment {} in {} millis", fieldInfo.name, segmentName, end - start);
+            return graphIndex;
         }
+    }
+
+    static io.github.jbellis.jvector.vector.VectorSimilarityFunction getVectorSimilarityFunction(FieldInfo fieldInfo) {
+        log.info("Matching vector similarity function {} for field {}", fieldInfo.getVectorSimilarityFunction(), fieldInfo.name);
+        return switch (fieldInfo.getVectorSimilarityFunction()) {
+            case EUCLIDEAN -> io.github.jbellis.jvector.vector.VectorSimilarityFunction.EUCLIDEAN;
+            case COSINE -> io.github.jbellis.jvector.vector.VectorSimilarityFunction.COSINE;
+            case DOT_PRODUCT -> io.github.jbellis.jvector.vector.VectorSimilarityFunction.DOT_PRODUCT;
+            default -> throw new IllegalArgumentException("Unsupported similarity function: " + fieldInfo.getVectorSimilarityFunction());
+        };
     }
 
     /**

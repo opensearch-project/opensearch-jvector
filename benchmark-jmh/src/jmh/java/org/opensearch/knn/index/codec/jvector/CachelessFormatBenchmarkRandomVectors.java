@@ -30,7 +30,7 @@ import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Benchmark to compare the performance of JVector and Lucene codecs with random vectors similar to {@link FormatBenchmarkRandomVectors}.
+ * Benchmark to compare the performance of JVector and Lucene codecs with random vectors similar to {@link FormatBenchmarkQueryWithRandomVectors}.
  * The difference is that this benchmark is a single shot time benchmark and cleans the filesystem cache between each iteration to measure the impact of operating system cache misses.
  * Note: this benchmark is only for qualitative analysis and not meant to reproduce the already existing benchmarks of either Lucene or JVector.
  */

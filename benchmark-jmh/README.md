@@ -11,5 +11,9 @@ To run the benchmarks, use the following command:
 Replace `<benchmark_class_name>` with the name of the benchmark class you want to run. For example, to run the `FormatBenchmarkRandomVectors` benchmark, use the following command:
 
 ```shell
-./gradlew benchmark-jmh:jmh -PjmhInclude=org.opensearch.knn.index.codec.jvector.FormatBenchmarkRandomVectors
+./gradlew benchmark-jmh:jmh -PjmhInclude=org.opensearch.knn.index.codec.jvector.FormatBenchmarkQueryWithRandomVectors
+```
+
+```shell
+./gradlew benchmark-jmh:jmh -PjmhInclude=org.opensearch.knn.index.codec.jvector.FormatBenchmarkConstructionWithRandomVectors
 ```

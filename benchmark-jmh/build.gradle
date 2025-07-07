@@ -102,7 +102,7 @@ jmh {
     iterations = 5
     warmupIterations = 2
     fork = 1
-    jvmArgs = ['-Xms2G', '-Xmx2G']
+    jvmArgs = ['-Xms20G', '-Xmx20G', '--add-modules=jdk.incubator.vector', '-Djvector.experimental.enable_native_vectorization=true', '--enable-native-access=ALL-UNNAMED']
     resultFormat = 'JSON'
     resultsFile = file("${buildDir}/reports/jmh/results.json")
     humanOutputFile = file("${buildDir}/reports/jmh/human.txt")  // human readable output

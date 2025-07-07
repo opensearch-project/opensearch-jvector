@@ -42,8 +42,8 @@ import static org.opensearch.knn.index.codec.jvector.BenchmarkCommon.*;
 @Warmup(iterations = 2)
 @Measurement(iterations = 5)
 @Fork(1)
-public class FormatBenchmarkWithKnownDatasets {
-    Logger log = LogManager.getLogger(FormatBenchmarkWithKnownDatasets.class);
+public class FormatBenchmarkQueryWithKnownDatasets {
+    Logger log = LogManager.getLogger(FormatBenchmarkQueryWithKnownDatasets.class);
     // large embeddings calculated by Neighborhood Watch. 100k files by default; 1M also available
     private static final List<String> LARGE_DATASETS = List.of(
         "ada002-100k",
