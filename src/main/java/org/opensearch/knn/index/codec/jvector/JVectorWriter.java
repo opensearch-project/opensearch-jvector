@@ -42,9 +42,11 @@ import org.apache.lucene.util.hnsw.CloseableRandomVectorScorerSupplier;
 import java.io.IOException;
 import java.time.Clock;
 import java.util.*;
+import java.util.concurrent.ForkJoinPool;
 import java.util.function.Function;
 import java.util.stream.IntStream;
 
+import static io.github.jbellis.jvector.quantization.KMeansPlusPlusClusterer.UNWEIGHTED;
 import static org.apache.lucene.codecs.lucene99.Lucene99HnswVectorsReader.readVectorEncoding;
 import static org.opensearch.knn.index.codec.jvector.JVectorFormat.SIMD_POOL;
 
@@ -340,8 +342,12 @@ public class JVectorWriter extends KnnVectorsWriter {
             fieldData.randomAccessVectorValues,
             M, // number of subspaces
             numberOfClustersPerSubspace, // number of centroids per subspace
-            fieldData.fieldInfo.getVectorSimilarityFunction() == VectorSimilarityFunction.EUCLIDEAN // center the dataset
+            fieldData.fieldInfo.getVectorSimilarityFunction() == VectorSimilarityFunction.EUCLIDEAN, // center the dataset
+            UNWEIGHTED,
+            SIMD_POOL,
+            ForkJoinPool.commonPool()
         );
+
         final long end = Clock.systemDefaultZone().millis();
         log.info("Computed PQ codebooks for field {}, in {} millis", fieldData.fieldInfo.name, end - start);
         log.info(
