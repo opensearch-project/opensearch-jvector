@@ -93,14 +93,10 @@ curl -X GET "localhost:9200/jvector-index/_search?pretty" -H 'Content-Type: appl
       "my_vector": {
         "vector": [1.0, 2.0, 3.0, 4.0],
         "k": 3,
-        "method": {
-          "name": "jvector",
-          "space_type": "l2",
-          "parameters": {
-            "overquery_factor": 10,
-            "threshold": 0.0,
-            "rerank_floor": 0.0
-          }
+        "method_parameters": {
+          "overquery_factor": 10,
+          "advanced.threshold": 0.0,
+          "advanced.rerank_floor": 0.0
         }
       }
     }
