@@ -30,7 +30,10 @@ public enum KNNCounter {
     KNN_QUERY_VISITED_NODES("knn_query_visited_nodes"),
     KNN_QUERY_RERANKED_COUNT("knn_query_reranked_count"),
     KNN_QUERY_EXPANDED_NODES("knn_query_expanded_nodes"),
-    KNN_QUERY_EXPANDED_BASE_LAYER_NODES("knn_query_expanded_base_layer_nodes");
+    KNN_QUERY_EXPANDED_BASE_LAYER_NODES("knn_query_expanded_base_layer_nodes"),
+    KNN_QUERY_GRAPH_SEARCH_TIME("knn_query_graph_search_time"), // The query time portion that is spent on scanning the vector graph
+    KNN_QUANTIZATION_TRAINING_TIME("knn_indexing_quantization_training_time"), // The time in indexing/merges that is spent on training the quantization parameters
+    KNN_GRAPH_MERGE_TIME("knn_graph_merge_time"); // The time taken for jVector graph merges
 
     private final String name;
     private final AtomicLong count;

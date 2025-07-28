@@ -322,7 +322,10 @@ public class JVectorEngineIT extends KNNRestTestCase {
             StatNames.KNN_QUERY_VISITED_NODES.getName(),
             StatNames.KNN_QUERY_RERANKED_COUNT.getName(),
             StatNames.KNN_QUERY_EXPANDED_NODES.getName(),
-            StatNames.KNN_QUERY_EXPANDED_BASE_LAYER_NODES.getName()
+            StatNames.KNN_QUERY_EXPANDED_BASE_LAYER_NODES.getName(),
+            StatNames.KNN_QUERY_GRAPH_SEARCH_TIME.getName(),
+            StatNames.KNN_QUANTIZATION_TRAINING_TIME.getName(),
+            StatNames.KNN_GRAPH_MERGE_TIME.getName()
         );
 
         var parsedBefore = parseNodeStatsResponse(EntityUtils.toString(getKnnStats(Collections.emptyList(), metrics).getEntity()));
@@ -352,33 +355,11 @@ public class JVectorEngineIT extends KNNRestTestCase {
 
         assertNotNull(after);
 
-        assertTrue(
-            "Visited-nodes counter did not increase",
-            ((Number) after.get(StatNames.KNN_QUERY_VISITED_NODES.getName())).longValue() > ((Number) before.get(
-                StatNames.KNN_QUERY_VISITED_NODES.getName()
-            )).longValue()
-        );
-
-        assertTrue(
-            "Reranked counter did not increase",
-            ((Number) after.get(StatNames.KNN_QUERY_RERANKED_COUNT.getName())).longValue() > ((Number) before.get(
-                StatNames.KNN_QUERY_RERANKED_COUNT.getName()
-            )).longValue()
-        );
-
-        assertTrue(
-            "Expanded-nodes counter did not increase",
-            ((Number) after.get(StatNames.KNN_QUERY_EXPANDED_NODES.getName())).longValue() > ((Number) before.get(
-                StatNames.KNN_QUERY_EXPANDED_NODES.getName()
-            )).longValue()
-        );
-
-        assertTrue(
-            "Expanded-base-layer counter did not increase",
-            ((Number) after.get(StatNames.KNN_QUERY_EXPANDED_BASE_LAYER_NODES.getName())).longValue() > ((Number) before.get(
-                StatNames.KNN_QUERY_EXPANDED_BASE_LAYER_NODES.getName()
-            )).longValue()
-        );
+        for (String metric : metrics) {
+            assertNotNull(after.get(metric));
+            // Check that our metrics increased
+            assertTrue(String.format("Metric %s, didn't increase", metric), ((Number)after.get(metric)).longValue() > ((Number)before.get(metric)).longValue());
+        }
     }
 
     /**

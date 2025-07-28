@@ -149,6 +149,7 @@ public class JVectorReader extends KnnVectorsReader {
         final SearchScoreProvider ssp;
 
         try (var view = index.getView()) {
+            final long graphSearchStart = System.currentTimeMillis();
             if (fieldEntryMap.get(field).pqVectors != null) { // Quantized, use the precomputed score function
                 final PQVectors pqVectors = fieldEntryMap.get(field).pqVectors;
                 // SearchScoreProvider that does a first pass with the loaded-in-memory PQVectors,
@@ -175,6 +176,10 @@ public class JVectorReader extends KnnVectorsReader {
                 for (SearchResult.NodeScore ns : searchResults.getNodes()) {
                     jvectorKnnCollector.collect(ns.node, ns.score);
                 }
+                final long graphSearchEnd = System.currentTimeMillis();
+                final long searchTime = graphSearchEnd - graphSearchStart;
+                log.debug("Search (including acquiring view) took {} ms", searchTime);
+
                 // Collect the below metrics about the search and somehow wire this back to {@link @KNNStats}
                 final int visitedNodesCount = searchResults.getVisitedCount();
                 final int rerankedCount = searchResults.getRerankedCount();
@@ -186,6 +191,7 @@ public class JVectorReader extends KnnVectorsReader {
                 KNNCounter.KNN_QUERY_RERANKED_COUNT.add(rerankedCount);
                 KNNCounter.KNN_QUERY_EXPANDED_NODES.add(expandedCount);
                 KNNCounter.KNN_QUERY_EXPANDED_BASE_LAYER_NODES.add(expandedBaseLayerCount);
+                KNNCounter.KNN_QUERY_GRAPH_SEARCH_TIME.add(searchTime);
                 log.debug(
                     "rerankedCount: {}, visitedNodesCount: {}, expandedCount: {}, expandedBaseLayerCount: {}",
                     rerankedCount,
@@ -201,6 +207,7 @@ public class JVectorReader extends KnnVectorsReader {
     @Override
     public void search(String field, byte[] target, KnnCollector knnCollector, Bits acceptDocs) throws IOException {
         // TODO: implement this
+        throw new UnsupportedOperationException("Byte vector search is not supported yet with jVector");
     }
 
     @Override

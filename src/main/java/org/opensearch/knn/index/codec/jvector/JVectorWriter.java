@@ -39,6 +39,7 @@ import org.apache.lucene.store.*;
 import org.apache.lucene.util.IOUtils;
 import org.apache.lucene.util.RamUsageEstimator;
 import org.apache.lucene.util.hnsw.CloseableRandomVectorScorerSupplier;
+import org.opensearch.knn.plugin.stats.KNNCounter;
 
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
@@ -356,7 +357,9 @@ public class JVectorWriter extends KnnVectorsWriter {
         );
 
         final long end = Clock.systemDefaultZone().millis();
-        log.info("Computed PQ codebooks for field {}, in {} millis", fieldName, end - start);
+        final long trainingTime = end - start;
+        log.info("Computed PQ codebooks for field {}, in {} millis", fieldName, trainingTime);
+        KNNCounter.KNN_QUANTIZATION_TRAINING_TIME.add(trainingTime);
         log.info("Encoding and building PQ vectors for field {} for {} vectors", fieldName, randomAccessVectorValues.size());
         PQVectors pqVectors = (PQVectors) pq.encodeAll(randomAccessVectorValues, SIMD_POOL);
         log.info(
@@ -456,7 +459,6 @@ public class JVectorWriter extends KnnVectorsWriter {
         private int lastDocID = -1;
         private final String segmentName;
         private final RandomAccessVectorValues randomAccessVectorValues;
-        private final FloatVectorValues mergedFloatVector;
         private final FlatFieldVectorsWriter<T> flatFieldVectorsWriter;
 
         FieldWriter(FieldInfo fieldInfo, String segmentName, FlatFieldVectorsWriter<T> flatFieldVectorsWriter) {
@@ -465,7 +467,6 @@ public class JVectorWriter extends KnnVectorsWriter {
              */
             this.flatFieldVectorsWriter = flatFieldVectorsWriter;
             this.randomAccessVectorValues = new RandomAccessVectorValuesOverFlatFields(flatFieldVectorsWriter, fieldInfo);
-            this.mergedFloatVector = null;
             this.fieldInfo = fieldInfo;
             this.segmentName = segmentName;
         }
@@ -505,62 +506,6 @@ public class JVectorWriter extends KnnVectorsWriter {
             return SHALLOW_SIZE + flatFieldVectorsWriter.ramBytesUsed();
         }
 
-        /**
-         * This method will return the graph index for the field
-         * @return OnHeapGraphIndex
-         * @throws IOException IOException
-         */
-        public OnHeapGraphIndex getGraph(BuildScoreProvider buildScoreProvider) throws IOException {
-            final GraphIndexBuilder graphIndexBuilder = new GraphIndexBuilder(
-                buildScoreProvider,
-                fieldInfo.getVectorDimension(),
-                maxConn,
-                beamWidth,
-                degreeOverflow,
-                alpha,
-                true
-            );
-
-            /*
-             * We cannot always use randomAccessVectorValues for the graph building
-             * because it's size will not always correspond to the document count.
-             * To have the right mapping from docId to vector ordinal we need to use the mergedFloatVector.
-             * This is the case when we are merging segments and we might have more documents than vectors.
-             */
-            final long start = Clock.systemDefaultZone().millis();
-            final OnHeapGraphIndex graphIndex;
-            var vv = randomAccessVectorValues.threadLocalSupplier();
-            if (mergedFloatVector != null) {
-                log.info("Building graph from merged float vector");
-                var itr = mergedFloatVector.iterator();
-                // Gather a list of valid document Ids to be streamed later for parallel graph construction
-                final List<Integer> docIds = new ArrayList<>();
-                int doc;
-                while ((doc = itr.nextDoc()) != DocIdSetIterator.NO_MORE_DOCS) {
-                    docIds.add(doc);
-                }
-
-                // parallel graph construction from the merge documents Ids
-                SIMD_POOL.submit(
-                    () -> docIds.stream().parallel().forEach(node -> { graphIndexBuilder.addGraphNode(node, vv.get().getVector(node)); })
-                ).join();
-            } else {
-                log.info("Building graph from random access vector values");
-                int size = randomAccessVectorValues.size();
-
-                SIMD_POOL.submit(() -> {
-                    IntStream.range(0, size)
-                        .parallel()
-                        .forEach(node -> { graphIndexBuilder.addGraphNode(node, vv.get().getVector(node)); });
-                }).join();
-            }
-            graphIndexBuilder.cleanup();
-            graphIndex = graphIndexBuilder.getGraph();
-            final long end = Clock.systemDefaultZone().millis();
-
-            log.info("Built graph for field {} in segment {} in {} millis", fieldInfo.name, segmentName, end - start);
-            return graphIndex;
-        }
     }
 
     static io.github.jbellis.jvector.vector.VectorSimilarityFunction getVectorSimilarityFunction(FieldInfo fieldInfo) {
@@ -756,6 +701,7 @@ public class JVectorWriter extends KnnVectorsWriter {
                     fieldName,
                     mergeState.segmentInfo.name
                 );
+                final long start = Clock.systemDefaultZone().millis();
                 ProductQuantization leadingCompressor = leadingReader.getProductQuantizationForField(fieldName).get();
                 // Refine the leadingCompressor with the remaining vectors in the merge
                 for (int i = 0; i < readers.length; i++) {
@@ -766,6 +712,9 @@ public class JVectorWriter extends KnnVectorsWriter {
                         leadingCompressor.refine(randomAccessVectorValues);
                     }
                 }
+                final long end = Clock.systemDefaultZone().millis();
+                final long trainingTime = end - start;
+                KNNCounter.KNN_QUANTIZATION_TRAINING_TIME.add(trainingTime);
                 pqVectors = (PQVectors) leadingCompressor.encodeAll(this, SIMD_POOL);
             }
 
