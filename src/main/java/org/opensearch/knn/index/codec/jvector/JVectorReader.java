@@ -13,6 +13,7 @@ import io.github.jbellis.jvector.graph.similarity.DefaultSearchScoreProvider;
 import io.github.jbellis.jvector.graph.similarity.ScoreFunction;
 import io.github.jbellis.jvector.graph.similarity.SearchScoreProvider;
 import io.github.jbellis.jvector.quantization.PQVectors;
+import io.github.jbellis.jvector.quantization.ProductQuantization;
 import io.github.jbellis.jvector.vector.VectorizationProvider;
 import io.github.jbellis.jvector.vector.types.VectorFloat;
 import io.github.jbellis.jvector.vector.types.VectorTypeSupport;
@@ -38,6 +39,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Log4j2
 public class JVectorReader extends KnnVectorsReader {
@@ -109,6 +111,15 @@ public class JVectorReader extends KnnVectorsReader {
          * Byte vector values are not supported in jVector library. Instead use PQ.
          */
         return null;
+    }
+
+    public Optional<ProductQuantization> getProductQuantizationForField(String field) throws IOException {
+        final FieldEntry fieldEntry = fieldEntryMap.get(field);
+        if (fieldEntry.pqVectors == null) {
+            return Optional.empty();
+        }
+
+        return Optional.of(fieldEntry.pqVectors.getCompressor());
     }
 
     @Override
