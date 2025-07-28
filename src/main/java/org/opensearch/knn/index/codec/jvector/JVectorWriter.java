@@ -32,6 +32,7 @@ import org.apache.lucene.codecs.hnsw.FlatVectorScorerUtil;
 import org.apache.lucene.codecs.hnsw.FlatVectorsFormat;
 import org.apache.lucene.codecs.hnsw.FlatVectorsWriter;
 import org.apache.lucene.codecs.lucene99.Lucene99FlatVectorsFormat;
+import org.apache.lucene.codecs.perfield.PerFieldKnnVectorsFormat;
 import org.apache.lucene.index.*;
 import org.apache.lucene.search.DocIdSetIterator;
 import org.apache.lucene.store.*;
@@ -45,7 +46,6 @@ import java.time.Clock;
 import java.util.*;
 import java.util.concurrent.ForkJoinPool;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import static io.github.jbellis.jvector.quantization.KMeansPlusPlusClusterer.UNWEIGHTED;
@@ -213,7 +213,12 @@ public class JVectorWriter extends KnnVectorsWriter {
         }
     }
 
-    private void writeField(FieldInfo fieldInfo, RandomAccessVectorValues randomAccessVectorValues, List<Integer> docIds, PQVectors pqVectors) throws IOException {
+    private void writeField(
+        FieldInfo fieldInfo,
+        RandomAccessVectorValues randomAccessVectorValues,
+        List<Integer> docIds,
+        PQVectors pqVectors
+    ) throws IOException {
         log.info(
             "Writing field {} with vector count: {}, for segment: {}",
             fieldInfo.name,
@@ -237,14 +242,21 @@ public class JVectorWriter extends KnnVectorsWriter {
                 getVectorSimilarityFunction(fieldInfo)
             );
         }
-        // If we haven't provided ord to docId map we will assume will just generate one based on the ordering of the vectors in the RandomAccessVectorValues
+        // If we haven't provided ord to docId map we will assume will just generate one based on the ordering of the vectors in the
+        // RandomAccessVectorValues
         if (docIds == null) {
             docIds = new ArrayList<>();
             for (int i = 0; i < randomAccessVectorValues.size(); i++) {
                 docIds.add(i);
             }
         }
-        OnHeapGraphIndex graph = getGraph(buildScoreProvider, randomAccessVectorValues, docIds, fieldInfo, segmentWriteState.segmentInfo.name);
+        OnHeapGraphIndex graph = getGraph(
+            buildScoreProvider,
+            randomAccessVectorValues,
+            docIds,
+            fieldInfo,
+            segmentWriteState.segmentInfo.name
+        );
         final var vectorIndexFieldMetadata = writeGraph(graph, randomAccessVectorValues, fieldInfo, pqVectors);
         meta.writeInt(fieldInfo.number);
         vectorIndexFieldMetadata.toOutput(meta);
@@ -258,13 +270,14 @@ public class JVectorWriter extends KnnVectorsWriter {
      * @return Tuple of start offset and length of the graph
      * @throws IOException IOException
      */
-    private VectorIndexFieldMetadata writeGraph(OnHeapGraphIndex graph, RandomAccessVectorValues randomAccessVectorValues, FieldInfo fieldInfo, PQVectors pqVectors) throws IOException {
+    private VectorIndexFieldMetadata writeGraph(
+        OnHeapGraphIndex graph,
+        RandomAccessVectorValues randomAccessVectorValues,
+        FieldInfo fieldInfo,
+        PQVectors pqVectors
+    ) throws IOException {
         // field data file, which contains the graph
-        final String vectorIndexFieldFileName = baseDataFileName
-            + "_"
-            + fieldInfo.name
-            + "."
-            + JVectorFormat.VECTOR_INDEX_EXTENSION;
+        final String vectorIndexFieldFileName = baseDataFileName + "_" + fieldInfo.name + "." + JVectorFormat.VECTOR_INDEX_EXTENSION;
 
         try (
             IndexOutput indexOutput = segmentWriteState.directory.createOutput(vectorIndexFieldFileName, segmentWriteState.context);
@@ -336,7 +349,7 @@ public class JVectorWriter extends KnnVectorsWriter {
             randomAccessVectorValues,
             M, // number of subspaces
             numberOfClustersPerSubspace, // number of centroids per subspace
-                vectorSimilarityFunction == VectorSimilarityFunction.EUCLIDEAN, // center the dataset
+            vectorSimilarityFunction == VectorSimilarityFunction.EUCLIDEAN, // center the dataset
             UNWEIGHTED,
             SIMD_POOL,
             ForkJoinPool.commonPool()
@@ -344,11 +357,7 @@ public class JVectorWriter extends KnnVectorsWriter {
 
         final long end = Clock.systemDefaultZone().millis();
         log.info("Computed PQ codebooks for field {}, in {} millis", fieldName, end - start);
-        log.info(
-            "Encoding and building PQ vectors for field {} for {} vectors",
-            fieldName,
-            randomAccessVectorValues.size()
-        );
+        log.info("Encoding and building PQ vectors for field {} for {} vectors", fieldName, randomAccessVectorValues.size());
         PQVectors pqVectors = (PQVectors) pq.encodeAll(randomAccessVectorValues, SIMD_POOL);
         log.info(
             "Encoded and built PQ vectors for field {}, original size: {} bytes, compressed size: {} bytes",
@@ -594,19 +603,14 @@ public class JVectorWriter extends KnnVectorsWriter {
         private final FieldInfo fieldInfo;
         private final MergeState mergeState;
 
-
-
         /**
          * Creates a random access view over merged float vector values.
          *
          * @param fieldInfo Field info for the vector field
          * @param mergeState Merge state containing readers and doc maps
          */
-        public RandomAccessMergedFloatVectorValues(
-            FieldInfo fieldInfo,
-            MergeState mergeState,
-            FloatVectorValues mergedFlatFloatVectors
-        ) throws IOException {
+        public RandomAccessMergedFloatVectorValues(FieldInfo fieldInfo, MergeState mergeState, FloatVectorValues mergedFlatFloatVectors)
+            throws IOException {
             this.totalDocsCount = Math.toIntExact(Arrays.stream(mergeState.maxDocs).asLongStream().sum());
             this.fieldInfo = fieldInfo;
             this.mergeState = mergeState;
@@ -620,7 +624,6 @@ public class JVectorWriter extends KnnVectorsWriter {
             int tempLeadingReaderId = -1;
             int vectorsCountInLeadingReader = -1;
             List<KnnVectorsReader> allReaders = new ArrayList<>();
-
 
             for (int i = 0; i < mergeState.knnVectorsReaders.length; i++) {
                 FieldInfos fieldInfos = mergeState.fieldInfos[i];
@@ -722,18 +725,37 @@ public class JVectorWriter extends KnnVectorsWriter {
             final int totalVectorsCount = size;
             final String fieldName = fieldInfo.name;
             final PQVectors pqVectors;
-            JVectorReader leadingReader = (JVectorReader)readers[leadingReaderId];
+            PerFieldKnnVectorsFormat.FieldsReader fieldsReader = (PerFieldKnnVectorsFormat.FieldsReader) readers[leadingReaderId];
+            JVectorReader leadingReader = (JVectorReader) fieldsReader.getFieldReader(fieldName);
             if (leadingReader.getProductQuantizationForField(fieldInfo.name).isEmpty()) {
-                log.info("No Pre-existing PQ codebooks found in this merge for field {} in segment {}, will check if a new codebooks is necessary", fieldName, mergeState.segmentInfo.name);
+                log.info(
+                    "No Pre-existing PQ codebooks found in this merge for field {} in segment {}, will check if a new codebooks is necessary",
+                    fieldName,
+                    mergeState.segmentInfo.name
+                );
                 if (this.size() >= minimumBatchSizeForQuantization) {
-                    log.info("Calculating new codebooks and compressed vectors for field: {}, with totalVectorCount: {}, above minimumBatchSizeForQuantization: {}", fieldName, totalVectorsCount, minimumBatchSizeForQuantization);
+                    log.info(
+                        "Calculating new codebooks and compressed vectors for field: {}, with totalVectorCount: {}, above minimumBatchSizeForQuantization: {}",
+                        fieldName,
+                        totalVectorsCount,
+                        minimumBatchSizeForQuantization
+                    );
                     pqVectors = getPQVectors(this, fieldInfo);
                 } else {
-                    log.info("Not enough vectors found for field: {}, totalVectorCount: {}, is below minimumBatchSizeForQuantization: {}", fieldName, totalVectorsCount, minimumBatchSizeForQuantization);
+                    log.info(
+                        "Not enough vectors found for field: {}, totalVectorCount: {}, is below minimumBatchSizeForQuantization: {}",
+                        fieldName,
+                        totalVectorsCount,
+                        minimumBatchSizeForQuantization
+                    );
                     pqVectors = null;
                 }
             } else {
-                log.info("Pre-existing PQ codebooks found in this merge for field {} in segment {}, will refine the codebooks from the leading reader with the remaining vectors", fieldName, mergeState.segmentInfo.name);
+                log.info(
+                    "Pre-existing PQ codebooks found in this merge for field {} in segment {}, will refine the codebooks from the leading reader with the remaining vectors",
+                    fieldName,
+                    mergeState.segmentInfo.name
+                );
                 ProductQuantization leadingCompressor = leadingReader.getProductQuantizationForField(fieldName).get();
                 // Refine the leadingCompressor with the remaining vectors in the merge
                 for (int i = 0; i < readers.length; i++) {
@@ -807,15 +829,21 @@ public class JVectorWriter extends KnnVectorsWriter {
      * @return OnHeapGraphIndex
      * @throws IOException IOException
      */
-    public OnHeapGraphIndex getGraph(BuildScoreProvider buildScoreProvider, RandomAccessVectorValues randomAccessVectorValues, List<Integer> docIds, FieldInfo fieldInfo, String segmentName) throws IOException {
+    public OnHeapGraphIndex getGraph(
+        BuildScoreProvider buildScoreProvider,
+        RandomAccessVectorValues randomAccessVectorValues,
+        List<Integer> docIds,
+        FieldInfo fieldInfo,
+        String segmentName
+    ) throws IOException {
         final GraphIndexBuilder graphIndexBuilder = new GraphIndexBuilder(
-                buildScoreProvider,
-                fieldInfo.getVectorDimension(),
-                maxConn,
-                beamWidth,
-                degreeOverflow,
-                alpha,
-                true
+            buildScoreProvider,
+            fieldInfo.getVectorDimension(),
+            maxConn,
+            beamWidth,
+            degreeOverflow,
+            alpha,
+            true
         );
 
         /*
@@ -831,7 +859,7 @@ public class JVectorWriter extends KnnVectorsWriter {
         log.info("Building graph from merged float vector");
         // parallel graph construction from the merge documents Ids
         SIMD_POOL.submit(
-                () -> docIds.stream().parallel().forEach(node -> { graphIndexBuilder.addGraphNode(node, vv.get().getVector(node)); })
+            () -> docIds.stream().parallel().forEach(node -> { graphIndexBuilder.addGraphNode(node, vv.get().getVector(node)); })
         ).join();
         graphIndexBuilder.cleanup();
         graphIndex = graphIndexBuilder.getGraph();

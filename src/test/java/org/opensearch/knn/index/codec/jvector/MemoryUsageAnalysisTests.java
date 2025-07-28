@@ -18,6 +18,7 @@ import org.apache.lucene.tests.util.LuceneTestCase;
 import org.junit.Assert;
 import org.junit.Test;
 import org.opensearch.knn.index.ThreadLeakFiltersForTests;
+import org.opensearch.knn.index.engine.CommonTestUtils;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -63,7 +64,7 @@ public class MemoryUsageAnalysisTests extends LuceneTestCase {
         Path indexPath = createTempDir("memory-test-index");
 
         // Configure the JVector codec
-        var codec = new JVectorCodec();
+        var codec = CommonTestUtils.getCodec();
 
         // Setup index writer with the JVector codec
         IndexWriterConfig config = new IndexWriterConfig().setCodec(codec)

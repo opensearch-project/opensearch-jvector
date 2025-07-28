@@ -6,12 +6,19 @@
 package org.opensearch.knn.index.engine;
 
 import com.google.common.collect.ImmutableMap;
+import org.apache.lucene.codecs.Codec;
+import org.apache.lucene.codecs.FilterCodec;
+import org.apache.lucene.codecs.KnnVectorsFormat;
+import org.apache.lucene.codecs.lucene101.Lucene101Codec;
+import org.apache.lucene.codecs.perfield.PerFieldKnnVectorsFormat;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.core.xcontent.XContentBuilder;
 import org.opensearch.knn.common.KNNConstants;
 import org.opensearch.knn.index.KNNVectorSimilarityFunction;
 import org.opensearch.knn.index.SpaceType;
 import org.opensearch.knn.index.VectorDataType;
+import org.opensearch.knn.index.codec.KNN10010Codec.KNN10010Codec;
+import org.opensearch.knn.index.codec.jvector.JVectorFormat;
 
 import java.io.IOException;
 import java.util.Map;
@@ -22,6 +29,7 @@ import static org.opensearch.knn.KNNRestTestCase.FIELD_NAME;
 import static org.opensearch.knn.common.KNNConstants.DISK_ANN;
 import static org.opensearch.knn.common.KNNConstants.VECTOR_DATA_TYPE_FIELD;
 import static org.opensearch.knn.index.KNNSettings.KNN_INDEX;
+import static org.opensearch.knn.index.codec.jvector.JVectorFormat.DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION;
 
 public class CommonTestUtils {
     public static final int DIMENSION = 3;
@@ -88,5 +96,24 @@ public class CommonTestUtils {
             .endObject();
 
         return builder.toString();
+    }
+
+    public static Codec getCodec() {
+        return getCodec(DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION);
+    }
+
+    public static Codec getCodec(int minBatchSizeForQuantization) {
+        return new FilterCodec(KNN10010Codec.getDefault().getName(), new Lucene101Codec()) {
+            @Override
+            public KnnVectorsFormat knnVectorsFormat() {
+                return new PerFieldKnnVectorsFormat() {
+
+                    @Override
+                    public KnnVectorsFormat getKnnVectorsFormatForField(String field) {
+                        return new JVectorFormat(minBatchSizeForQuantization, true);
+                    }
+                };
+            }
+        };
     }
 }
