@@ -161,6 +161,7 @@ public class JVectorWriter extends KnnVectorsWriter {
         CloseableRandomVectorScorerSupplier scorerSupplier = flatVectorWriter.mergeOneFieldToIndex(fieldInfo, mergeState);
         var success = false;
         try {
+            final long mergeStart = Clock.systemDefaultZone().millis();
             switch (fieldInfo.getVectorEncoding()) {
                 case BYTE:
                     throw new UnsupportedEncodingException("Byte vectors are not supported in JVector.");
@@ -184,6 +185,9 @@ public class JVectorWriter extends KnnVectorsWriter {
                     }
                     break;
             }
+            final long mergeEnd = Clock.systemDefaultZone().millis();
+            final long mergeTime = mergeEnd - mergeStart;
+            KNNCounter.KNN_GRAPH_MERGE_TIME.add(mergeTime);
             success = true;
             log.info("Completed Merge field {} into segment {}", fieldInfo.name, segmentWriteState.segmentInfo.name);
         } finally {
@@ -204,9 +208,27 @@ public class JVectorWriter extends KnnVectorsWriter {
         flatVectorWriter.flush(maxDoc, sortMap);
         log.info("Flushing jVector graph index");
         for (FieldWriter<?> field : fields) {
+            final RandomAccessVectorValues randomAccessVectorValues = field.randomAccessVectorValues;
+            final PQVectors pqVectors;
+            final FieldInfo fieldInfo = field.fieldInfo;
+            if (randomAccessVectorValues.size() >= minimumBatchSizeForQuantization) {
+                log.info("Calculating codebooks and compressed vectors for field {}", fieldInfo.name);
+                pqVectors = getPQVectors(randomAccessVectorValues, fieldInfo);
+            } else {
+                log.info(
+                        "Vector count: {}, less than limit to trigger PQ quantization: {}, for field {}, will use full precision vectors instead.",
+                        randomAccessVectorValues.size(),
+                        minimumBatchSizeForQuantization,
+                        fieldInfo.name
+                );
+                pqVectors = null;
+            }
             if (sortMap == null) {
-                final List<Integer> docIds = IntStream.range(0, field.randomAccessVectorValues.size()).boxed().toList();
-                writeField(field.fieldInfo, field.randomAccessVectorValues, docIds, null);
+                final List<Integer> docIds = new ArrayList<>(field.randomAccessVectorValues.size());
+                for (int doc = 0; doc < field.randomAccessVectorValues.size(); doc++) {
+                    docIds.add(doc);
+                }
+                writeField(field.fieldInfo, field.randomAccessVectorValues, docIds, pqVectors);
             } else {
                 throw new UnsupportedOperationException("Not implemented yet");
                 // writeSortingField(field, sortMap);
@@ -227,22 +249,15 @@ public class JVectorWriter extends KnnVectorsWriter {
             segmentWriteState.segmentInfo.name
         );
         final BuildScoreProvider buildScoreProvider;
-        if (pqVectors == null && randomAccessVectorValues.size() >= minimumBatchSizeForQuantization) {
-            log.info("Calculating codebooks and compressed vectors for field {}", fieldInfo.name);
-            pqVectors = getPQVectors(randomAccessVectorValues, fieldInfo);
-            buildScoreProvider = BuildScoreProvider.pqBuildScoreProvider(getVectorSimilarityFunction(fieldInfo), pqVectors);
-        } else {
-            log.info(
-                "Vector count: {}, less than limit to trigger PQ quantization: {}, for field {}, will use full precision vectors instead.",
-                randomAccessVectorValues.size(),
-                minimumBatchSizeForQuantization,
-                fieldInfo.name
-            );
+        if (pqVectors == null) {
             buildScoreProvider = BuildScoreProvider.randomAccessScoreProvider(
-                randomAccessVectorValues,
-                getVectorSimilarityFunction(fieldInfo)
+                    randomAccessVectorValues,
+                    getVectorSimilarityFunction(fieldInfo)
             );
+        } else {
+            buildScoreProvider = BuildScoreProvider.pqBuildScoreProvider(getVectorSimilarityFunction(fieldInfo), pqVectors);
         }
+
         // If we haven't provided ord to docId map we will assume will just generate one based on the ordering of the vectors in the
         // RandomAccessVectorValues
         if (docIds == null) {
@@ -714,6 +729,7 @@ public class JVectorWriter extends KnnVectorsWriter {
                 }
                 final long end = Clock.systemDefaultZone().millis();
                 final long trainingTime = end - start;
+                log.info("Refined PQ codebooks for field {}, in {} millis", fieldName, trainingTime);
                 KNNCounter.KNN_QUANTIZATION_TRAINING_TIME.add(trainingTime);
                 pqVectors = (PQVectors) leadingCompressor.encodeAll(this, SIMD_POOL);
             }

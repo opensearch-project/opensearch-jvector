@@ -19,6 +19,7 @@ import org.junit.Test;
 import org.opensearch.knn.TestUtils;
 import org.opensearch.knn.common.KNNConstants;
 import org.opensearch.knn.index.ThreadLeakFiltersForTests;
+import org.opensearch.knn.plugin.stats.KNNCounter;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -1089,6 +1090,9 @@ public class KNNJVectorTests extends LuceneTestCase {
                 log.info("successfully completed search tests");
             }
         }
+
+        Assert.assertTrue("No quantization time recorded", KNNCounter.KNN_QUANTIZATION_TRAINING_TIME.getCount() > 0);
+        Assert.assertTrue("No graph merge time recorded", KNNCounter.KNN_GRAPH_MERGE_TIME.getCount() > 0);
     }
 
     /**
