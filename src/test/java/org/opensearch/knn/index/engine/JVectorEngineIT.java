@@ -307,13 +307,13 @@ public class JVectorEngineIT extends KNNRestTestCase {
          * 1.  Read initial stats
          * --------------------------------------------------- */
         List<String> metrics = List.of(
-                StatNames.KNN_QUERY_VISITED_NODES.getName(),
-                StatNames.KNN_QUERY_RERANKED_COUNT.getName(),
-                StatNames.KNN_QUERY_EXPANDED_NODES.getName(),
-                StatNames.KNN_QUERY_EXPANDED_BASE_LAYER_NODES.getName(),
-                StatNames.KNN_QUERY_GRAPH_SEARCH_TIME.getName(),
-                StatNames.KNN_QUANTIZATION_TRAINING_TIME.getName(),
-                StatNames.KNN_GRAPH_MERGE_TIME.getName()
+            StatNames.KNN_QUERY_VISITED_NODES.getName(),
+            StatNames.KNN_QUERY_RERANKED_COUNT.getName(),
+            StatNames.KNN_QUERY_EXPANDED_NODES.getName(),
+            StatNames.KNN_QUERY_EXPANDED_BASE_LAYER_NODES.getName(),
+            StatNames.KNN_QUERY_GRAPH_SEARCH_TIME.getName(),
+            StatNames.KNN_QUANTIZATION_TRAINING_TIME.getName(),
+            StatNames.KNN_GRAPH_MERGE_TIME.getName()
         );
 
         var parsedBefore = parseNodeStatsResponse(EntityUtils.toString(getKnnStats(Collections.emptyList(), metrics).getEntity()));
@@ -364,7 +364,10 @@ public class JVectorEngineIT extends KNNRestTestCase {
         for (String metric : metrics) {
             assertNotNull(after.get(metric));
             // Check that our metrics increased
-            assertTrue(String.format("Metric %s, didn't increase", metric), ((Number)after.get(metric)).longValue() > ((Number)before.get(metric)).longValue());
+            assertTrue(
+                String.format("Metric %s, didn't increase", metric),
+                ((Number) after.get(metric)).longValue() > ((Number) before.get(metric)).longValue()
+            );
         }
     }
 

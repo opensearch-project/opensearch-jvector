@@ -104,11 +104,10 @@ public class KNNStats {
             );
 
         // K-NN search, indexing and merge stats
-        builder
-            .put(
-                StatNames.KNN_QUERY_VISITED_NODES.getName(),
-                new KNNStat<>(false, new KNNCounterSupplier(KNNCounter.KNN_QUERY_VISITED_NODES))
-            )
+        builder.put(
+            StatNames.KNN_QUERY_VISITED_NODES.getName(),
+            new KNNStat<>(false, new KNNCounterSupplier(KNNCounter.KNN_QUERY_VISITED_NODES))
+        )
             .put(
                 StatNames.KNN_QUERY_RERANKED_COUNT.getName(),
                 new KNNStat<>(false, new KNNCounterSupplier(KNNCounter.KNN_QUERY_RERANKED_COUNT))
@@ -122,17 +121,14 @@ public class KNNStats {
                 new KNNStat<>(false, new KNNCounterSupplier(KNNCounter.KNN_QUERY_EXPANDED_BASE_LAYER_NODES))
             )
             .put(
-                    StatNames.KNN_QUERY_GRAPH_SEARCH_TIME.getName(),
-                    new KNNStat<>(false, new KNNCounterSupplier(KNNCounter.KNN_QUERY_GRAPH_SEARCH_TIME))
+                StatNames.KNN_QUERY_GRAPH_SEARCH_TIME.getName(),
+                new KNNStat<>(false, new KNNCounterSupplier(KNNCounter.KNN_QUERY_GRAPH_SEARCH_TIME))
             )
             .put(
-                    StatNames.KNN_QUANTIZATION_TRAINING_TIME.getName(),
-                    new KNNStat<>(false, new KNNCounterSupplier(KNNCounter.KNN_QUANTIZATION_TRAINING_TIME))
+                StatNames.KNN_QUANTIZATION_TRAINING_TIME.getName(),
+                new KNNStat<>(false, new KNNCounterSupplier(KNNCounter.KNN_QUANTIZATION_TRAINING_TIME))
             )
-            .put(
-                    StatNames.KNN_GRAPH_MERGE_TIME.getName(),
-                    new KNNStat<>(false, new KNNCounterSupplier(KNNCounter.KNN_GRAPH_MERGE_TIME))
-            );
+            .put(StatNames.KNN_GRAPH_MERGE_TIME.getName(), new KNNStat<>(false, new KNNCounterSupplier(KNNCounter.KNN_GRAPH_MERGE_TIME)));
     }
 
     private void addEngineStats(ImmutableMap.Builder<String, KNNStat<?>> builder) {

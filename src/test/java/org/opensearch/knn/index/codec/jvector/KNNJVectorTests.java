@@ -1095,7 +1095,6 @@ public class KNNJVectorTests extends LuceneTestCase {
         Assert.assertTrue("No graph merge time recorded", KNNCounter.KNN_GRAPH_MERGE_TIME.getCount() > 0);
     }
 
-
     /**
      * We will use multiple batches, each can trigger a quantization and later merge them in an appending order to keep track
      * of refinement

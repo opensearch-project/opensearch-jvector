@@ -47,7 +47,6 @@ import java.time.Clock;
 import java.util.*;
 import java.util.concurrent.ForkJoinPool;
 import java.util.function.Function;
-import java.util.stream.IntStream;
 
 import static io.github.jbellis.jvector.quantization.KMeansPlusPlusClusterer.UNWEIGHTED;
 import static org.apache.lucene.codecs.lucene99.Lucene99HnswVectorsReader.readVectorEncoding;
@@ -216,10 +215,10 @@ public class JVectorWriter extends KnnVectorsWriter {
                 pqVectors = getPQVectors(randomAccessVectorValues, fieldInfo);
             } else {
                 log.info(
-                        "Vector count: {}, less than limit to trigger PQ quantization: {}, for field {}, will use full precision vectors instead.",
-                        randomAccessVectorValues.size(),
-                        minimumBatchSizeForQuantization,
-                        fieldInfo.name
+                    "Vector count: {}, less than limit to trigger PQ quantization: {}, for field {}, will use full precision vectors instead.",
+                    randomAccessVectorValues.size(),
+                    minimumBatchSizeForQuantization,
+                    fieldInfo.name
                 );
                 pqVectors = null;
             }
@@ -251,8 +250,8 @@ public class JVectorWriter extends KnnVectorsWriter {
         final BuildScoreProvider buildScoreProvider;
         if (pqVectors == null) {
             buildScoreProvider = BuildScoreProvider.randomAccessScoreProvider(
-                    randomAccessVectorValues,
-                    getVectorSimilarityFunction(fieldInfo)
+                randomAccessVectorValues,
+                getVectorSimilarityFunction(fieldInfo)
             );
         } else {
             buildScoreProvider = BuildScoreProvider.pqBuildScoreProvider(getVectorSimilarityFunction(fieldInfo), pqVectors);
