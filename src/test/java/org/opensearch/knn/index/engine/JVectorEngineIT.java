@@ -354,8 +354,6 @@ public class JVectorEngineIT extends KNNRestTestCase {
         /* ---------------------------------------------------
          * 4.  Read stats again and assert they have increased
          * --------------------------------------------------- */
-        // Wait a little bit to make sure stats are properly collected (reduce flakiness of the test)
-        Thread.sleep(2000);
 
         var parsedAfter = parseNodeStatsResponse(EntityUtils.toString(getKnnStats(Collections.emptyList(), metrics).getEntity()));
         assertNotNull(parsedAfter);
