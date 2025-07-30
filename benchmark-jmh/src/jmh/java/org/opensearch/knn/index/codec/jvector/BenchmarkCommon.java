@@ -11,7 +11,6 @@ import org.apache.lucene.codecs.lucene101.Lucene101Codec;
 import org.apache.lucene.codecs.perfield.PerFieldKnnVectorsFormat;
 import org.apache.lucene.index.VectorSimilarityFunction;
 import org.apache.lucene.search.TopDocs;
-import org.opensearch.knn.index.codec.KNN10010Codec.KNN10010Codec;
 import org.opensearch.knn.index.codec.KNNCodecVersion;
 
 import java.util.PriorityQueue;
