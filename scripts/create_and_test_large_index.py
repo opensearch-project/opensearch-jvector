@@ -88,7 +88,18 @@ def index_vectors(host, index_name, num_vectors, dimension, batch_size=1000, for
 
 def force_merge(host, index_name, max_segments=1):
     """Force merge the index to consolidate segments"""
-    url = f"http://{host}/{index_name}/_forcemerge?max_num_segments={max_segments}"
+    # Get initial KNN stats
+    initial_stats = get_knn_stats(host)
+    initial_graph_merge_time = get_knn_stat_value(initial_stats, "knn_graph_merge_time")
+    initial_quantization_time = get_knn_stat_value(initial_stats, "knn_quantization_training_time")
+
+    # Refresh first to ensure all documents are searchable
+    refresh_url = f"http://{host}/{index_name}/_refresh"
+    refresh_response = requests.post(refresh_url)
+    if refresh_response.status_code != 200:
+        print(f"Refresh failed: {refresh_response.text}")
+
+    url = f"http://{host}/{index_name}/_forcemerge?max_num_segments={max_segments}&flush=true"
     
     print(f"Starting force merge to {max_segments} segments...")
     start_time = time.time()
@@ -100,6 +111,19 @@ def force_merge(host, index_name, max_segments=1):
     
     duration = time.time() - start_time
     print(f"Force merge completed in {duration:.2f} seconds")
+
+    # Get final KNN stats
+    final_stats = get_knn_stats(host)
+    final_graph_merge_time = get_knn_stat_value(final_stats, "knn_graph_merge_time")
+    final_quantization_time = get_knn_stat_value(final_stats, "knn_quantization_training_time")
+
+    # Calculate and display the differences
+    graph_merge_diff = final_graph_merge_time - initial_graph_merge_time
+    quantization_diff = final_quantization_time - initial_quantization_time
+
+    print(f"KNN Graph Merge Time: +{graph_merge_diff} ms")
+    print(f"KNN Quantization Training Time: +{quantization_diff} ms")
+
     return True
 
 def get_index_stats(host, index_name):
@@ -295,12 +319,21 @@ def test_search_with_stats(host, index_name, dimension, k=10, num_searches=5):
     
     return True
 
+def get_knn_stat_value(stats, stat_name):
+    """Extract a specific KNN stat value from all nodes"""
+    total = 0
+    if stats and "nodes" in stats:
+        for node_id, node_stats in stats["nodes"].items():
+            if stat_name in node_stats:
+                total += int(node_stats[stat_name])
+    return total
+
 def main():
     parser = argparse.ArgumentParser(description="Create and test a large JVector index in OpenSearch")
     parser.add_argument("--host", default="localhost:9200", help="OpenSearch host:port")
     parser.add_argument("--index", default="large-jvector-index", help="Index name")
     parser.add_argument("--dimension", type=int, default=768, help="Vector dimension")
-    parser.add_argument("--num-vectors", type=int, default=3000000, 
+    parser.add_argument("--num-vectors", type=int, default=3000000,
                         help="Number of vectors to index (3M vectors with dim=768 should exceed 2GB)")
     parser.add_argument("--batch-size", type=int, default=1000, help="Batch size for indexing")
     parser.add_argument("--shards", type=int, default=1, help="Number of shards")
