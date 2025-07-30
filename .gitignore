@@ -23,4 +23,8 @@ lib
 fvec
 hdf5
 
+# ignore benchmark script output
+merge_times.csv
+merge_times_plot.png
+
 .DS_store

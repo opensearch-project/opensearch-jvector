@@ -7,6 +7,9 @@ import time
 import numpy as np
 import argparse
 import sys
+import csv
+import matplotlib.pyplot as plt
+import os
 
 def create_index(host, index_name, dimension, shards=1):
     """Create a knn index with jvector engine"""
@@ -44,12 +47,20 @@ def create_index(host, index_name, dimension, shards=1):
     print(f"Successfully created index {index_name}")
     return response.json()
 
-def index_vectors(host, index_name, num_vectors, dimension, batch_size=1000, force_merge_frequency=0):
+def index_vectors(host, index_name, num_vectors, dimension, batch_size=1000, force_merge_frequency=0, csv_file=None):
     """Index vectors in batches"""
     url = f"http://{host}/{index_name}/_bulk"
     headers = {"Content-Type": "application/x-ndjson"}
     
     total_batches = (num_vectors + batch_size - 1) // batch_size
+    
+    # Initialize CSV file if provided
+    csv_writer = None
+    csv_file_handle = None
+    if csv_file:
+        csv_file_handle = open(csv_file, 'w', newline='')
+        csv_writer = csv.writer(csv_file_handle)
+        csv_writer.writerow(['num_documents', 'graph_merge_time_ms', 'quantization_training_time_ms', 'force_merge_duration_sec', 'index_size_bytes'])
     
     for batch in range(total_batches):
         start_idx = batch * batch_size
@@ -80,9 +91,24 @@ def index_vectors(host, index_name, num_vectors, dimension, batch_size=1000, for
         # Force merge if frequency is set and we've reached the threshold
         if force_merge_frequency > 0 and (end_idx % force_merge_frequency < batch_size):
             print(f"\nPerforming intermediate force merge after {end_idx} documents...")
-            force_merge(host, index_name)
+            merge_result = force_merge(host, index_name)
             print(f"Index stats after intermediate force merge:")
-            get_index_stats(host, index_name)
+            stats = get_index_stats(host, index_name)
+            
+            # Write to CSV if enabled
+            if csv_writer and merge_result:
+                index_size = stats["indices"][index_name]["total"]["store"]["size_in_bytes"] if stats else 0
+                csv_writer.writerow([
+                    end_idx,
+                    merge_result['graph_merge_time'],
+                    merge_result['quantization_time'],
+                    merge_result['duration'],
+                    index_size
+                ])
+                csv_file_handle.flush()
+    
+    if csv_file_handle:
+        csv_file_handle.close()
     
     return True
 
@@ -124,7 +150,11 @@ def force_merge(host, index_name, max_segments=1):
     print(f"KNN Graph Merge Time: +{graph_merge_diff} ms")
     print(f"KNN Quantization Training Time: +{quantization_diff} ms")
 
-    return True
+    return {
+        'graph_merge_time': graph_merge_diff,
+        'quantization_time': quantization_diff,
+        'duration': duration
+    }
 
 def get_index_stats(host, index_name):
     """Get index stats including size"""
@@ -328,6 +358,55 @@ def get_knn_stat_value(stats, stat_name):
                 total += int(node_stats[stat_name])
     return total
 
+def plot_merge_times(csv_file):
+    """Plot graph merge time and quantization training time vs number of documents"""
+    if not os.path.exists(csv_file):
+        print(f"CSV file {csv_file} not found")
+        return
+    
+    # Read CSV data
+    num_docs = []
+    graph_merge_times = []
+    quantization_times = []
+    
+    with open(csv_file, 'r') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            num_docs.append(int(row['num_documents']))
+            graph_merge_times.append(int(row['graph_merge_time_ms']))
+            quantization_times.append(int(row['quantization_training_time_ms']))
+    
+    if not num_docs:
+        print("No data found in CSV file")
+        return
+    
+    # Create plots
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8))
+    
+    # Graph merge time plot
+    ax1.plot(num_docs, graph_merge_times, 'b-o', linewidth=2, markersize=6)
+    ax1.set_xlabel('Number of Documents')
+    ax1.set_ylabel('Graph Merge Time (ms)')
+    ax1.set_title('JVector Graph Merge Time vs Number of Documents')
+    ax1.grid(True, alpha=0.3)
+    
+    # Quantization training time plot
+    ax2.plot(num_docs, quantization_times, 'r-o', linewidth=2, markersize=6)
+    ax2.set_xlabel('Number of Documents')
+    ax2.set_ylabel('Quantization Training Time (ms)')
+    ax2.set_title('JVector Quantization Training Time vs Number of Documents')
+    ax2.grid(True, alpha=0.3)
+    
+    plt.tight_layout()
+    
+    # Save plot
+    plot_file = csv_file.replace('.csv', '_plot.png')
+    plt.savefig(plot_file, dpi=300, bbox_inches='tight')
+    print(f"Plot saved to {plot_file}")
+    
+    # Show plot
+    plt.show()
+
 def main():
     parser = argparse.ArgumentParser(description="Create and test a large JVector index in OpenSearch")
     parser.add_argument("--host", default="localhost:9200", help="OpenSearch host:port")
@@ -341,8 +420,14 @@ def main():
     parser.add_argument("--skip-indexing", action="store_true", help="Skip index creation and indexing, only run searches")
     parser.add_argument("--force-merge-frequency", type=int, default=0, 
                         help="Force merge after every N documents (0 to disable intermediate merges)")
+    parser.add_argument("--csv-output", type=str, help="CSV file to save merge time data")
+    parser.add_argument("--plot", action="store_true", help="Generate plots from CSV data")
     
     args = parser.parse_args()
+    
+    if args.plot and args.csv_output:
+        plot_merge_times(args.csv_output)
+        return
     
     if not args.skip_indexing:
         print(f"Creating large JVector index with {args.num_vectors} vectors of dimension {args.dimension}")
@@ -352,7 +437,7 @@ def main():
         create_index(args.host, args.index, args.dimension, args.shards)
         
         # Index vectors
-        index_vectors(args.host, args.index, args.num_vectors, args.dimension, args.batch_size, args.force_merge_frequency)
+        index_vectors(args.host, args.index, args.num_vectors, args.dimension, args.batch_size, args.force_merge_frequency, args.csv_output)
         
         # Get stats before final force merge
         print("\nIndex stats before final force merge:")
@@ -375,6 +460,11 @@ def main():
     test_search_with_stats(args.host, args.index, args.dimension, k=10, num_searches=args.num_searches)
     
     print("\nTest completed successfully!")
+    
+    # Generate plots if CSV output was specified
+    if args.csv_output and os.path.exists(args.csv_output):
+        print(f"\nCSV data saved to {args.csv_output}")
+        plot_merge_times(args.csv_output)
 
 if __name__ == "__main__":
     main()

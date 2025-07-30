@@ -90,14 +90,18 @@ python create_and_test_large_index.py --dimension 1024 --num-vectors 5000000 --b
 - Adjust the parameters based on your available system resources
 - The script requires sufficient memory and disk space to handle large indices
 
-#### JVector Search Statistics
+#### JVector Statistics
 
-The script collects and reports JVector-specific search statistics:
+The script collects and reports JVector-specific search and indexing statistics:
 
 - `knn_query_visited_nodes`: Number of nodes visited during graph search
 - `knn_query_expanded_nodes`: Number of nodes expanded during graph search
 - `knn_query_expanded_base_layer_nodes`: Number of base layer nodes expanded
+- `knn_query_graph_search_time`: Time spent on graph search (ms)
+- `knn_quantization_training_time`: Time spent on quantization training (ms)
+- `knn_graph_merge_time`: Time spent on graph merge (ms)
 
+##### Search Testing
 For each search iteration, the script:
 1. Performs a kNN search
 2. Collects the JVector stats
@@ -115,4 +119,22 @@ You can control the number of test searches with the `--num-searches` parameter:
 
 ```bash
 python create_and_test_large_index.py --num-searches 10
+```
+
+#### CSV Output And Plotting
+
+You can save the merge time data to a CSV file using the `--csv-output` option. The CSV file will contain the following columns:
+
+- `num_documents`: Number of documents indexed
+- `graph_merge_time_ms`: Time taken for graph merge (in milliseconds)
+- `quantization_training_time_ms`: Time taken for quantization training (in milliseconds)
+- `force_merge_duration_sec`: Duration of force merge (in seconds)
+- `index_size_bytes`: Size of the index after force merge (in bytes)
+
+```shell
+# Run with CSV output
+python create_and_test_large_index.py --batch-size 1000 --force-merge-frequency 1000 --num-vectors 100000 --csv-output merge_times.csv
+
+# Generate plots from existing CSV
+python create_and_test_large_index.py --csv-output merge_times.csv --plot
 ```
