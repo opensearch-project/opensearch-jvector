@@ -17,7 +17,6 @@ import org.opensearch.knn.common.KNNConstants;
 import org.opensearch.knn.index.KNNVectorSimilarityFunction;
 import org.opensearch.knn.index.SpaceType;
 import org.opensearch.knn.index.VectorDataType;
-import org.opensearch.knn.index.codec.KNN10010Codec.KNN10010Codec;
 import org.opensearch.knn.index.codec.KNNCodecVersion;
 import org.opensearch.knn.index.codec.jvector.JVectorFormat;
 
