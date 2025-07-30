@@ -12,6 +12,7 @@ import org.apache.lucene.codecs.perfield.PerFieldKnnVectorsFormat;
 import org.apache.lucene.index.VectorSimilarityFunction;
 import org.apache.lucene.search.TopDocs;
 import org.opensearch.knn.index.codec.KNN10010Codec.KNN10010Codec;
+import org.opensearch.knn.index.codec.KNNCodecVersion;
 
 import java.util.PriorityQueue;
 
@@ -77,7 +78,7 @@ public class BenchmarkCommon {
     }
 
     private static Codec getFilterJvectorCodec(int minBatchSizeForQuantization) {
-        return new FilterCodec(KNN10010Codec.getDefault().getName(), new Lucene101Codec()) {
+        return new FilterCodec(KNNCodecVersion.V_10_01_0.getCodecName(), new Lucene101Codec()) {
             @Override
             public KnnVectorsFormat knnVectorsFormat() {
                 return new PerFieldKnnVectorsFormat() {

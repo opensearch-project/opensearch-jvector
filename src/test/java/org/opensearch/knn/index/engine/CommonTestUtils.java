@@ -18,6 +18,7 @@ import org.opensearch.knn.index.KNNVectorSimilarityFunction;
 import org.opensearch.knn.index.SpaceType;
 import org.opensearch.knn.index.VectorDataType;
 import org.opensearch.knn.index.codec.KNN10010Codec.KNN10010Codec;
+import org.opensearch.knn.index.codec.KNNCodecVersion;
 import org.opensearch.knn.index.codec.jvector.JVectorFormat;
 
 import java.io.IOException;
@@ -103,7 +104,7 @@ public class CommonTestUtils {
     }
 
     public static Codec getCodec(int minBatchSizeForQuantization) {
-        return new FilterCodec(KNN10010Codec.getDefault().getName(), new Lucene101Codec()) {
+        return new FilterCodec(KNNCodecVersion.V_10_01_0.getCodecName(), new Lucene101Codec()) {
             @Override
             public KnnVectorsFormat knnVectorsFormat() {
                 return new PerFieldKnnVectorsFormat() {
