@@ -19,6 +19,7 @@ import org.junit.Test;
 import org.opensearch.knn.TestUtils;
 import org.opensearch.knn.common.KNNConstants;
 import org.opensearch.knn.index.ThreadLeakFiltersForTests;
+import org.opensearch.knn.plugin.stats.KNNCounter;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -27,8 +28,8 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static org.opensearch.knn.index.codec.jvector.JVectorFormat.DEFAULT_MERGE_ON_DISK;
 import static org.opensearch.knn.index.codec.jvector.JVectorFormat.DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION;
+import static org.opensearch.knn.index.engine.CommonTestUtils.getCodec;
 
 /**
  * Test used specifically for JVector
@@ -57,7 +58,7 @@ public class KNNJVectorTests extends LuceneTestCase {
         int totalNumberOfDocs = 10;
         IndexWriterConfig indexWriterConfig = LuceneTestCase.newIndexWriterConfig();
         indexWriterConfig.setUseCompoundFile(false);
-        indexWriterConfig.setCodec(new JVectorCodec());
+        indexWriterConfig.setCodec(getCodec());
         indexWriterConfig.setMergePolicy(new ForceMergesOnlyMergePolicy());
         final Path indexPath = createTempDir();
         log.info("Index path: {}", indexPath);
@@ -120,7 +121,7 @@ public class KNNJVectorTests extends LuceneTestCase {
         int totalNumberOfDocs = 10;
         IndexWriterConfig indexWriterConfig = LuceneTestCase.newIndexWriterConfig();
         indexWriterConfig.setUseCompoundFile(false);
-        indexWriterConfig.setCodec(new JVectorCodec());
+        indexWriterConfig.setCodec(getCodec());
         indexWriterConfig.setMergePolicy(new ForceMergesOnlyMergePolicy(false));
         final Path indexPath = createTempDir();
         log.info("Index path: {}", indexPath);
@@ -181,7 +182,7 @@ public class KNNJVectorTests extends LuceneTestCase {
         int totalNumberOfDocs = 10;
         IndexWriterConfig indexWriterConfig = LuceneTestCase.newIndexWriterConfig();
         indexWriterConfig.setUseCompoundFile(false);
-        indexWriterConfig.setCodec(new JVectorCodec());
+        indexWriterConfig.setCodec(getCodec());
         indexWriterConfig.setMergePolicy(new ForceMergesOnlyMergePolicy());
         indexWriterConfig.setMergeScheduler(new SerialMergeScheduler());
         final Path indexPath = createTempDir();
@@ -249,7 +250,7 @@ public class KNNJVectorTests extends LuceneTestCase {
         int totalNumberOfDocs = 10;
         IndexWriterConfig indexWriterConfig = LuceneTestCase.newIndexWriterConfig();
         indexWriterConfig.setUseCompoundFile(false);
-        indexWriterConfig.setCodec(new JVectorCodec());
+        indexWriterConfig.setCodec(getCodec());
         indexWriterConfig.setMergePolicy(new ForceMergesOnlyMergePolicy());
         indexWriterConfig.setMergeScheduler(new SerialMergeScheduler());
         final Path indexPath = createTempDir();
@@ -322,7 +323,7 @@ public class KNNJVectorTests extends LuceneTestCase {
 
         IndexWriterConfig indexWriterConfig = LuceneTestCase.newIndexWriterConfig();
         indexWriterConfig.setUseCompoundFile(true);
-        indexWriterConfig.setCodec(new JVectorCodec(Integer.MAX_VALUE, DEFAULT_MERGE_ON_DISK)); // effectively without quantization
+        indexWriterConfig.setCodec(getCodec(Integer.MAX_VALUE)); // effectively without quantization
         indexWriterConfig.setMergePolicy(new ForceMergesOnlyMergePolicy(true));
         indexWriterConfig.setMergeScheduler(new SerialMergeScheduler());
         // We set the below parameters to make sure no permature flush will occur, this way we can have a single segment, and we can force
@@ -404,7 +405,7 @@ public class KNNJVectorTests extends LuceneTestCase {
         final Path indexPath = createTempDir();
         try (Directory dir = newFSDirectory(indexPath)) {
             IndexWriterConfig cfg = newIndexWriterConfig();
-            cfg.setCodec(new JVectorCodec());
+            cfg.setCodec(getCodec());
             cfg.setUseCompoundFile(false);
             cfg.setMergePolicy(new ForceMergesOnlyMergePolicy(false));
             cfg.setMergeScheduler(new SerialMergeScheduler());
@@ -515,7 +516,7 @@ public class KNNJVectorTests extends LuceneTestCase {
         final IndexWriterConfig iwc = newIndexWriterConfig();
         // JVector codec requires compound files to be disabled at the moment
         iwc.setUseCompoundFile(false);
-        iwc.setCodec(new JVectorCodec());
+        iwc.setCodec(getCodec());
         iwc.setMergePolicy(new ForceMergesOnlyMergePolicy(false));
 
         try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter writer = new IndexWriter(dir, iwc)) {
@@ -592,7 +593,7 @@ public class KNNJVectorTests extends LuceneTestCase {
         int totalNumberOfDocs = 10;
         IndexWriterConfig indexWriterConfig = LuceneTestCase.newIndexWriterConfig();
         indexWriterConfig.setUseCompoundFile(true);
-        indexWriterConfig.setCodec(new JVectorCodec());
+        indexWriterConfig.setCodec(getCodec());
         indexWriterConfig.setMergePolicy(new ForceMergesOnlyMergePolicy(true));
         indexWriterConfig.setMergeScheduler(new SerialMergeScheduler());
         final Path indexPath = createTempDir();
@@ -659,7 +660,7 @@ public class KNNJVectorTests extends LuceneTestCase {
         int totalNumberOfDocs = 10;
         IndexWriterConfig indexWriterConfig = LuceneTestCase.newIndexWriterConfig();
         indexWriterConfig.setUseCompoundFile(true);
-        indexWriterConfig.setCodec(new JVectorCodec());
+        indexWriterConfig.setCodec(getCodec());
         indexWriterConfig.setMergePolicy(new ForceMergesOnlyMergePolicy(true));
         indexWriterConfig.setMergeScheduler(new SerialMergeScheduler());
         final Path indexPath = createTempDir();
@@ -720,7 +721,7 @@ public class KNNJVectorTests extends LuceneTestCase {
         IndexWriterConfig indexWriterConfig = LuceneTestCase.newIndexWriterConfig();
         // TODO: re-enable this after fixing the compound file augmentation for JVector
         indexWriterConfig.setUseCompoundFile(false);
-        indexWriterConfig.setCodec(new JVectorCodec());
+        indexWriterConfig.setCodec(getCodec());
         indexWriterConfig.setMergePolicy(new ForceMergesOnlyMergePolicy());
         final Path indexPath = createTempDir();
         log.info("Index path: {}", indexPath);
@@ -742,7 +743,7 @@ public class KNNJVectorTests extends LuceneTestCase {
         int totalNumberOfDocs = 10;
         IndexWriterConfig indexWriterConfig = LuceneTestCase.newIndexWriterConfig();
         indexWriterConfig.setUseCompoundFile(false);
-        indexWriterConfig.setCodec(new JVectorCodec());
+        indexWriterConfig.setCodec(getCodec());
         indexWriterConfig.setMergePolicy(new ForceMergesOnlyMergePolicy());
         final Path indexPath = createTempDir();
         log.info("Index path: {}", indexPath);
@@ -802,7 +803,7 @@ public class KNNJVectorTests extends LuceneTestCase {
 
         IndexWriterConfig indexWriterConfig = LuceneTestCase.newIndexWriterConfig();
         indexWriterConfig.setUseCompoundFile(false);
-        indexWriterConfig.setCodec(new JVectorCodec(DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION, true));
+        indexWriterConfig.setCodec(getCodec(DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION));
         indexWriterConfig.setMergePolicy(new ForceMergesOnlyMergePolicy());
         // We set the below parameters to make sure no permature flush will occur, this way we can have a single segment, and we can force
         // test the quantization case
@@ -851,7 +852,7 @@ public class KNNJVectorTests extends LuceneTestCase {
         int totalNumberOfDocs = DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION;
         IndexWriterConfig indexWriterConfig = LuceneTestCase.newIndexWriterConfig();
         indexWriterConfig.setUseCompoundFile(false);
-        indexWriterConfig.setCodec(new JVectorCodec(DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION, true));
+        indexWriterConfig.setCodec(getCodec(DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION));
         indexWriterConfig.setMergePolicy(new ForceMergesOnlyMergePolicy());
         // We set the below parameters to make sure no permature flush will occur, this way we can have a single segment, and we can force
         // test the quantization case
@@ -920,7 +921,7 @@ public class KNNJVectorTests extends LuceneTestCase {
 
         IndexWriterConfig indexWriterConfig = LuceneTestCase.newIndexWriterConfig();
         indexWriterConfig.setUseCompoundFile(false);
-        indexWriterConfig.setCodec(new JVectorCodec(DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION, true));
+        indexWriterConfig.setCodec(getCodec(DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION));
         indexWriterConfig.setMergePolicy(new ForceMergesOnlyMergePolicy());
         // We set the below parameters to make sure no permature flush will occur, this way we can have a single segment, and we can force
         // test the quantization case
@@ -981,7 +982,7 @@ public class KNNJVectorTests extends LuceneTestCase {
 
         IndexWriterConfig indexWriterConfig = LuceneTestCase.newIndexWriterConfig();
         indexWriterConfig.setUseCompoundFile(false);
-        indexWriterConfig.setCodec(new JVectorCodec(DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION, true));
+        indexWriterConfig.setCodec(getCodec(DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION));
         indexWriterConfig.setMergePolicy(new ForceMergesOnlyMergePolicy());
         // We set the below parameters to make sure no permature flush will occur, this way we can have a single segment, and we can force
         // test the quantization case
@@ -1046,7 +1047,7 @@ public class KNNJVectorTests extends LuceneTestCase {
         boolean useCompoundFile = true;
         IndexWriterConfig indexWriterConfig = LuceneTestCase.newIndexWriterConfig();
         indexWriterConfig.setUseCompoundFile(useCompoundFile);
-        indexWriterConfig.setCodec(new JVectorCodec(DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION, true));
+        indexWriterConfig.setCodec(getCodec(DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION));
         indexWriterConfig.setMergePolicy(new ForceMergesOnlyMergePolicy(useCompoundFile));
         // We set the below parameters to make sure no premature flush will occur, this way we can have a single segment, and we can force
         // test the quantization case
@@ -1089,6 +1090,81 @@ public class KNNJVectorTests extends LuceneTestCase {
                 log.info("successfully completed search tests");
             }
         }
+
+        Assert.assertTrue("No quantization time recorded", KNNCounter.KNN_QUANTIZATION_TRAINING_TIME.getCount() > 0);
+        Assert.assertTrue("No graph merge time recorded", KNNCounter.KNN_GRAPH_MERGE_TIME.getCount() > 0);
+    }
+
+    /**
+     * We will use multiple batches, each can trigger a quantization and later merge them in an appending order to keep track
+     * of refinement
+     * @throws IOException
+     */
+    @Test
+    public void testJVectorKnnIndex_withQuantization_withCompoundFile_with_refinement() throws IOException {
+        final int k = 50; // The number of nearest neighbours to gather, we set a high number here to avoid an inaccurate result and
+        // jittery tests
+        final int dimension = 16;
+        final int idealBatchSize = DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION; // Batch size that is not ideal for quantization and
+        // shouldn't trigger it
+        final int totalNumberOfDocs = idealBatchSize * 10; // 10 batches, each batch on it's own will trigger quantization
+        final VectorSimilarityFunction vectorSimilarityFunction = VectorSimilarityFunction.EUCLIDEAN;
+
+        boolean useCompoundFile = true;
+        IndexWriterConfig indexWriterConfig = LuceneTestCase.newIndexWriterConfig();
+        indexWriterConfig.setUseCompoundFile(useCompoundFile);
+        indexWriterConfig.setCodec(getCodec(DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION));
+        indexWriterConfig.setMergePolicy(new ForceMergesOnlyMergePolicy(useCompoundFile));
+        // We set the below parameters to make sure no premature flush will occur, this way we can have a single segment, and we can force
+        // test the quantization case
+        indexWriterConfig.setMaxBufferedDocs(10000); // force flush every 10000 docs, this way we make sure that we only have a single
+        // segment for a totalNumberOfDocs < 1000
+        indexWriterConfig.setRAMPerThreadHardLimitMB(1000); // 1000MB per thread, this way we make sure that no premature flush will occur
+        final Path indexPath = createTempDir();
+        log.info("Index path: {}", indexPath);
+        try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter w = new IndexWriter(dir, indexWriterConfig)) {
+            final float[] target = generateZerosVectorWithLastValue(dimension, 0);
+            // We will use random vectors because otherwise PQ will have a correlated subspaces which will result in a broken linear graph
+            final float[][] vectors = TestUtils.generateRandomVectors(totalNumberOfDocs, dimension);
+            final Set<Integer> groundTruthVectorsIds = calculateGroundTruthVectorsIds(target, vectors, k, vectorSimilarityFunction);
+            for (int i = 0; i < totalNumberOfDocs; i++) {
+                final float[] source = vectors[i];
+                final Document doc = new Document();
+                doc.add(new KnnFloatVectorField(TEST_FIELD, source, vectorSimilarityFunction));
+                doc.add(new IntField(TEST_ID_FIELD, i, Field.Store.YES));
+                w.addDocument(doc);
+                if (i % idealBatchSize == 0) {
+                    final long beforeTrainingTime = KNNCounter.KNN_QUANTIZATION_TRAINING_TIME.getCount();
+                    w.commit();
+                    w.forceMerge(1); // force merge will trigger PQ refinement if other segments are present
+                    final long afterTrainingTime = KNNCounter.KNN_QUANTIZATION_TRAINING_TIME.getCount();
+                    Assert.assertTrue(
+                        "Expected to have a training time of at least " + beforeTrainingTime + " but got " + afterTrainingTime,
+                        afterTrainingTime >= beforeTrainingTime
+                    );
+                }
+            }
+            w.commit();
+            log.info("Flushing docs to make them discoverable on the file system");
+            w.forceMerge(1);
+
+            try (IndexReader reader = DirectoryReader.open(w)) {
+                log.info("We should now have a single segment with {} documents", totalNumberOfDocs);
+                Assert.assertEquals(1, reader.getContext().leaves().size());
+                Assert.assertEquals(totalNumberOfDocs, reader.numDocs());
+
+                final Query filterQuery = new MatchAllDocsQuery();
+                final IndexSearcher searcher = newSearcher(reader);
+                KnnFloatVectorQuery knnFloatVectorQuery = getJVectorKnnFloatVectorQuery("test_field", target, k, filterQuery, 1000);
+                TopDocs topDocs = searcher.search(knnFloatVectorQuery, k);
+                assertEquals(k, topDocs.totalHits.value());
+                final float recall = calculateRecall(reader, groundTruthVectorsIds, topDocs, k);
+                Assert.assertEquals("Expected to have recall of 1.0+/-0.05 but got " + recall, 1.0f, recall, 0.05f);
+                log.info("successfully completed search tests");
+            }
+        }
+
+        Assert.assertTrue("No graph merge time recorded", KNNCounter.KNN_GRAPH_MERGE_TIME.getCount() > 0);
     }
 
     /**
@@ -1218,5 +1294,4 @@ public class KNNJVectorTests extends LuceneTestCase {
 
         return groundTruthVectorsIds;
     }
-
 }

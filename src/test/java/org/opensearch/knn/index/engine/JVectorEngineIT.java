@@ -302,27 +302,18 @@ public class JVectorEngineIT extends KNNRestTestCase {
      * and increase after a KNN search is executed.
      */
     public void testJVectorSearchStatsIncrement() throws Exception {
-        /* ---------------------------------------------------
-         * 1.  Create index and docs
-         * --------------------------------------------------- */
-        int dimension = 128;
-        int vectorsCount = 2050; // we create 2050 docs to have PQ and re-rank kick in
-        createKnnIndexMappingWithJVectorEngine(dimension, SpaceType.L2, VectorDataType.FLOAT);
-
-        for (int j = 0; j < vectorsCount; j++) {
-            addKnnDoc(INDEX_NAME, Integer.toString(j + 1), FIELD_NAME, randomFloatVector(dimension));
-        }
-        flushIndex(INDEX_NAME);
-        forceMergeKnnIndex(INDEX_NAME);
 
         /* ---------------------------------------------------
-         * 2.  Read initial stats
+         * 1.  Read initial stats
          * --------------------------------------------------- */
         List<String> metrics = List.of(
             StatNames.KNN_QUERY_VISITED_NODES.getName(),
             StatNames.KNN_QUERY_RERANKED_COUNT.getName(),
             StatNames.KNN_QUERY_EXPANDED_NODES.getName(),
-            StatNames.KNN_QUERY_EXPANDED_BASE_LAYER_NODES.getName()
+            StatNames.KNN_QUERY_EXPANDED_BASE_LAYER_NODES.getName(),
+            StatNames.KNN_QUERY_GRAPH_SEARCH_TIME.getName(),
+            StatNames.KNN_QUANTIZATION_TRAINING_TIME.getName(),
+            StatNames.KNN_GRAPH_MERGE_TIME.getName()
         );
 
         var parsedBefore = parseNodeStatsResponse(EntityUtils.toString(getKnnStats(Collections.emptyList(), metrics).getEntity()));
@@ -330,6 +321,24 @@ public class JVectorEngineIT extends KNNRestTestCase {
         assertEquals(1, parsedBefore.size());
         Map<String, Object> before = parsedBefore.get(0);
         assertNotNull(before);
+
+        /* ---------------------------------------------------
+         * 2.  Create index and docs
+         * --------------------------------------------------- */
+        int dimension = 128;
+        int vectorsCount = 2050; // we create 2050 docs to have PQ and re-rank kick in
+        createKnnIndexMappingWithJVectorEngine(dimension, SpaceType.L2, VectorDataType.FLOAT);
+        final float[][] vectors = TestUtils.generateRandomVectors(vectorsCount, dimension);
+        // We will split the vectors into two batches so we can actually force a merge
+        int baseDocId = 0;
+        final float[][] vectorsForBatch = new float[vectorsCount / 2][dimension];
+        System.arraycopy(vectors, 0, vectorsForBatch, 0, vectorsCount / 2);
+        bulkAddKnnDocs(INDEX_NAME, FIELD_NAME, vectorsForBatch, baseDocId, vectorsForBatch.length, true);
+        flushIndex(INDEX_NAME);
+        baseDocId += vectorsForBatch.length;
+        System.arraycopy(vectors, baseDocId, vectorsForBatch, 0, vectorsCount / 2);
+        bulkAddKnnDocs(INDEX_NAME, FIELD_NAME, vectorsForBatch, baseDocId, vectorsForBatch.length, true);
+        forceMergeKnnIndex(INDEX_NAME);
 
         /* ---------------------------------------------------
          * 3.  Execute a KNN query
@@ -345,6 +354,7 @@ public class JVectorEngineIT extends KNNRestTestCase {
         /* ---------------------------------------------------
          * 4.  Read stats again and assert they have increased
          * --------------------------------------------------- */
+
         var parsedAfter = parseNodeStatsResponse(EntityUtils.toString(getKnnStats(Collections.emptyList(), metrics).getEntity()));
         assertNotNull(parsedAfter);
         assertEquals(1, parsedAfter.size());
@@ -352,33 +362,14 @@ public class JVectorEngineIT extends KNNRestTestCase {
 
         assertNotNull(after);
 
-        assertTrue(
-            "Visited-nodes counter did not increase",
-            ((Number) after.get(StatNames.KNN_QUERY_VISITED_NODES.getName())).longValue() > ((Number) before.get(
-                StatNames.KNN_QUERY_VISITED_NODES.getName()
-            )).longValue()
-        );
-
-        assertTrue(
-            "Reranked counter did not increase",
-            ((Number) after.get(StatNames.KNN_QUERY_RERANKED_COUNT.getName())).longValue() > ((Number) before.get(
-                StatNames.KNN_QUERY_RERANKED_COUNT.getName()
-            )).longValue()
-        );
-
-        assertTrue(
-            "Expanded-nodes counter did not increase",
-            ((Number) after.get(StatNames.KNN_QUERY_EXPANDED_NODES.getName())).longValue() > ((Number) before.get(
-                StatNames.KNN_QUERY_EXPANDED_NODES.getName()
-            )).longValue()
-        );
-
-        assertTrue(
-            "Expanded-base-layer counter did not increase",
-            ((Number) after.get(StatNames.KNN_QUERY_EXPANDED_BASE_LAYER_NODES.getName())).longValue() > ((Number) before.get(
-                StatNames.KNN_QUERY_EXPANDED_BASE_LAYER_NODES.getName()
-            )).longValue()
-        );
+        for (String metric : metrics) {
+            assertNotNull(after.get(metric));
+            // Check that our metrics increased
+            assertTrue(
+                String.format("Metric %s, didn't increase", metric),
+                ((Number) after.get(metric)).longValue() > ((Number) before.get(metric)).longValue()
+            );
+        }
     }
 
     /**

@@ -13,6 +13,7 @@ import io.github.jbellis.jvector.graph.similarity.DefaultSearchScoreProvider;
 import io.github.jbellis.jvector.graph.similarity.ScoreFunction;
 import io.github.jbellis.jvector.graph.similarity.SearchScoreProvider;
 import io.github.jbellis.jvector.quantization.PQVectors;
+import io.github.jbellis.jvector.quantization.ProductQuantization;
 import io.github.jbellis.jvector.vector.VectorizationProvider;
 import io.github.jbellis.jvector.vector.types.VectorFloat;
 import io.github.jbellis.jvector.vector.types.VectorTypeSupport;
@@ -38,6 +39,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Log4j2
 public class JVectorReader extends KnnVectorsReader {
@@ -61,7 +63,11 @@ public class JVectorReader extends KnnVectorsReader {
         this.flatVectorsReader = FLAT_VECTORS_FORMAT.fieldsReader(state);
         this.fieldInfos = state.fieldInfos;
         this.baseDataFileName = state.segmentInfo.name + "_" + state.segmentSuffix;
-        String metaFileName = IndexFileNames.segmentFileName(state.segmentInfo.name, state.segmentSuffix, JVectorFormat.META_EXTENSION);
+        final String metaFileName = IndexFileNames.segmentFileName(
+            state.segmentInfo.name,
+            state.segmentSuffix,
+            JVectorFormat.META_EXTENSION
+        );
         this.directory = state.directory;
         boolean success = false;
         try (ChecksumIndexInput meta = state.directory.openChecksumInput(metaFileName)) {
@@ -111,6 +117,15 @@ public class JVectorReader extends KnnVectorsReader {
         return null;
     }
 
+    public Optional<ProductQuantization> getProductQuantizationForField(String field) throws IOException {
+        final FieldEntry fieldEntry = fieldEntryMap.get(field);
+        if (fieldEntry.pqVectors == null) {
+            return Optional.empty();
+        }
+
+        return Optional.of(fieldEntry.pqVectors.getCompressor());
+    }
+
     @Override
     public void search(String field, float[] target, KnnCollector knnCollector, Bits acceptDocs) throws IOException {
         final OnDiskGraphIndex index = fieldEntryMap.get(field).index;
@@ -134,6 +149,7 @@ public class JVectorReader extends KnnVectorsReader {
         final SearchScoreProvider ssp;
 
         try (var view = index.getView()) {
+            final long graphSearchStart = System.currentTimeMillis();
             if (fieldEntryMap.get(field).pqVectors != null) { // Quantized, use the precomputed score function
                 final PQVectors pqVectors = fieldEntryMap.get(field).pqVectors;
                 // SearchScoreProvider that does a first pass with the loaded-in-memory PQVectors,
@@ -160,6 +176,10 @@ public class JVectorReader extends KnnVectorsReader {
                 for (SearchResult.NodeScore ns : searchResults.getNodes()) {
                     jvectorKnnCollector.collect(ns.node, ns.score);
                 }
+                final long graphSearchEnd = System.currentTimeMillis();
+                final long searchTime = graphSearchEnd - graphSearchStart;
+                log.debug("Search (including acquiring view) took {} ms", searchTime);
+
                 // Collect the below metrics about the search and somehow wire this back to {@link @KNNStats}
                 final int visitedNodesCount = searchResults.getVisitedCount();
                 final int rerankedCount = searchResults.getRerankedCount();
@@ -171,6 +191,7 @@ public class JVectorReader extends KnnVectorsReader {
                 KNNCounter.KNN_QUERY_RERANKED_COUNT.add(rerankedCount);
                 KNNCounter.KNN_QUERY_EXPANDED_NODES.add(expandedCount);
                 KNNCounter.KNN_QUERY_EXPANDED_BASE_LAYER_NODES.add(expandedBaseLayerCount);
+                KNNCounter.KNN_QUERY_GRAPH_SEARCH_TIME.add(searchTime);
                 log.debug(
                     "rerankedCount: {}, visitedNodesCount: {}, expandedCount: {}, expandedBaseLayerCount: {}",
                     rerankedCount,
@@ -186,6 +207,7 @@ public class JVectorReader extends KnnVectorsReader {
     @Override
     public void search(String field, byte[] target, KnnCollector knnCollector, Bits acceptDocs) throws IOException {
         // TODO: implement this
+        throw new UnsupportedOperationException("Byte vector search is not supported yet with jVector");
     }
 
     @Override

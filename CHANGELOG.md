@@ -7,7 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [Unreleased 3.0](https://github.com/opensearch-project/k-NN/compare/2.x...HEAD)
 ### Features
 ### Enhancements
-* Index construction using PQ scoring [#110](https://github.com/opensearch-project/opensearch-jvector/issues/110)
+* PQ refinement during merge [109](https://github.com/opensearch-project/opensearch-jvector/issues/109)
 ### Bug Fixes
 ### Infrastructure
 ### Documentation

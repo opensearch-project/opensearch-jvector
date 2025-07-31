@@ -5,9 +5,13 @@
 package org.opensearch.knn.index.codec.jvector;
 
 import org.apache.lucene.codecs.Codec;
+import org.apache.lucene.codecs.FilterCodec;
+import org.apache.lucene.codecs.KnnVectorsFormat;
 import org.apache.lucene.codecs.lucene101.Lucene101Codec;
+import org.apache.lucene.codecs.perfield.PerFieldKnnVectorsFormat;
 import org.apache.lucene.index.VectorSimilarityFunction;
 import org.apache.lucene.search.TopDocs;
+import org.opensearch.knn.index.codec.KNNCodecVersion;
 
 import java.util.PriorityQueue;
 
@@ -21,8 +25,8 @@ public class BenchmarkCommon {
 
     public static Codec getCodec(String codecType) {
         return switch (codecType) {
-            case JVECTOR_NOT_QUANTIZED -> new JVectorCodec(Integer.MAX_VALUE, true);
-            case JVECTOR_QUANTIZED -> new JVectorCodec(DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION, true);
+            case JVECTOR_NOT_QUANTIZED -> getFilterJvectorCodec(Integer.MAX_VALUE);
+            case JVECTOR_QUANTIZED -> getFilterJvectorCodec(DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION);
             case LUCENE101 -> new Lucene101Codec();
             default -> throw new IllegalStateException("Unexpected codec type: " + codecType);
         };
@@ -70,5 +74,20 @@ public class BenchmarkCommon {
         }
 
         return topK.peek();
+    }
+
+    private static Codec getFilterJvectorCodec(int minBatchSizeForQuantization) {
+        return new FilterCodec(KNNCodecVersion.V_10_01_0.getCodecName(), new Lucene101Codec()) {
+            @Override
+            public KnnVectorsFormat knnVectorsFormat() {
+                return new PerFieldKnnVectorsFormat() {
+
+                    @Override
+                    public KnnVectorsFormat getKnnVectorsFormatForField(String field) {
+                        return new JVectorFormat(minBatchSizeForQuantization, true);
+                    }
+                };
+            }
+        };
     }
 }
