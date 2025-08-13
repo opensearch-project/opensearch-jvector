@@ -182,6 +182,7 @@ public class InternalKNNEngineTests extends OpenSearchIntegTestCase {
         // We will use these custom values to verify the parameters are correctly applied
         double alpha = 2.0;
         double neighborOverflow = 1.5;
+        int numPQSubspaces = 2;
 
         // Create an index with JVector engine and custom alpha and neighbor_overflow parameters
         createKnnIndexMappingWithJVectorEngineAndConstructionParams(
@@ -189,7 +190,8 @@ public class InternalKNNEngineTests extends OpenSearchIntegTestCase {
             SpaceType.L2,
             VectorDataType.FLOAT,
             alpha, // Custom alpha value
-            neighborOverflow  // Custom neighbor_overflow value
+            neighborOverflow,  // Custom neighbor_overflow value
+            numPQSubspaces
         );
 
         // Add a document with a vector
@@ -201,7 +203,7 @@ public class InternalKNNEngineTests extends OpenSearchIntegTestCase {
         forceMerge(1);
 
         // Verify the index mapping has the custom construction parameters
-        verifyJVectorConstructionParameters(alpha, neighborOverflow);
+        verifyJVectorConstructionParameters(alpha, neighborOverflow, numPQSubspaces);
         logger.info("JVector engine construction parameters verified");
     }
 
@@ -210,9 +212,17 @@ public class InternalKNNEngineTests extends OpenSearchIntegTestCase {
         SpaceType spaceType,
         VectorDataType vectorDataType,
         double alpha,
-        double neighborOverflow
+        double neighborOverflow,
+        int numPQSubspaces
     ) throws Exception {
-        String mapping = createIndexMappingWithConstructionParams(dimension, spaceType, vectorDataType, alpha, neighborOverflow);
+        String mapping = createIndexMappingWithConstructionParams(
+            dimension,
+            spaceType,
+            vectorDataType,
+            alpha,
+            neighborOverflow,
+            numPQSubspaces
+        );
         Settings indexSettings = CommonTestUtils.getDefaultIndexSettings();
         createKnnIndex(INDEX_NAME, indexSettings, mapping);
     }
@@ -222,7 +232,8 @@ public class InternalKNNEngineTests extends OpenSearchIntegTestCase {
         SpaceType spaceType,
         VectorDataType vectorDataType,
         double alpha,
-        double neighborOverflow
+        double neighborOverflow,
+        int numPQSubspaces
     ) throws IOException {
         try (XContentBuilder builder = XContentFactory.jsonBuilder()) {
             return builder.startObject()
@@ -240,6 +251,7 @@ public class InternalKNNEngineTests extends OpenSearchIntegTestCase {
                 .field(METHOD_PARAMETER_EF_CONSTRUCTION, CommonTestUtils.EF_CONSTRUCTION)
                 .field(METHOD_PARAMETER_ALPHA, alpha)
                 .field(METHOD_PARAMETER_NEIGHBOR_OVERFLOW, neighborOverflow)
+                .field(METHOD_PARAMETER_NUM_PQ_SUBSPACES, numPQSubspaces)
                 .endObject()
                 .endObject()
                 .endObject()
@@ -253,7 +265,8 @@ public class InternalKNNEngineTests extends OpenSearchIntegTestCase {
      * Helper method to verify that the JVector engine construction parameters are correctly applied.
      * This method checks the mapping to ensure the alpha and neighbor_overflow parameters are set correctly.
      */
-    private void verifyJVectorConstructionParameters(double expectedAlpha, double expectedNeighborOverflow) throws Exception {
+    private void verifyJVectorConstructionParameters(double expectedAlpha, double expectedNeighborOverflow, int expectedNumPQSubspaces)
+        throws Exception {
         // Check the mapping to verify construction parameters
         Map<String, Object> indexMapping = getIndexMappingAsMap(INDEX_NAME);
         Map<String, Object> properties = (Map<String, Object>) indexMapping.get(PROPERTIES_FIELD_NAME);
@@ -264,6 +277,7 @@ public class InternalKNNEngineTests extends OpenSearchIntegTestCase {
         // Verify the construction parameters are set correctly
         assertEquals(expectedAlpha, parameters.get(METHOD_PARAMETER_ALPHA));
         assertEquals(expectedNeighborOverflow, parameters.get(METHOD_PARAMETER_NEIGHBOR_OVERFLOW));
+        assertEquals(expectedNumPQSubspaces, parameters.get(METHOD_PARAMETER_NUM_PQ_SUBSPACES));
 
         // Also verify we can search the index to ensure it's functional
         Float[] queryVector = new Float[] { 1.0f, 2.0f, 3.0f };

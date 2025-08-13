@@ -125,6 +125,7 @@ public class KNNConstants {
     public static final String METHOD_PARAMETER_ALPHA = "advanced.alpha";
     public static final String METHOD_PARAMETER_NEIGHBOR_OVERFLOW = "advanced.neighbor_overflow";
     public static final String METHOD_PARAMETER_HIERARCHY_ENABLED = "hierarchy_enabled"; // TODO: wire this after jvector upgrade
+    public static final String METHOD_PARAMETER_NUM_PQ_SUBSPACES = "advanced.num_pq_subspaces";
     public static final Double DEFAULT_ALPHA_VALUE = 1.2;
     public static final Double DEFAULT_NEIGHBOR_OVERFLOW_VALUE = 1.2;
     public static final Boolean DEFAULT_HIERARCHY_ENABLED = true; // TODO: wire this after jvector upgrade
