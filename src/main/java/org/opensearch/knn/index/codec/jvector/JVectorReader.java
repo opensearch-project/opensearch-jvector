@@ -277,7 +277,7 @@ public class JVectorReader extends KnnVectorsReader {
                     throw new IllegalArgumentException("pqCodebooksAndVectorsOffset must be greater than vectorIndexOffset");
                 }
                 this.pqCodebooksReaderSupplier = new JVectorRandomAccessReader.Supplier(
-                    directory.openInput(vectorIndexFieldDataFileName, state.context),
+                    directory.openInput(vectorIndexFieldDataFileName, IOContext.READONCE),
                     pqCodebooksAndVectorsOffset,
                     pqCodebooksAndVectorsLength
                 );
