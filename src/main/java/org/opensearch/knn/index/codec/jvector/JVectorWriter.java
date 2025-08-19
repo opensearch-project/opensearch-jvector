@@ -157,7 +157,7 @@ public class JVectorWriter extends KnnVectorsWriter {
     @Override
     public void mergeOneField(FieldInfo fieldInfo, MergeState mergeState) throws IOException {
         log.info("Merging field {} into segment {}", fieldInfo.name, segmentWriteState.segmentInfo.name);
-        CloseableRandomVectorScorerSupplier scorerSupplier = flatVectorWriter.mergeOneFieldToIndex(fieldInfo, mergeState);
+        flatVectorWriter.mergeOneField(fieldInfo, mergeState);
         var success = false;
         try {
             final long mergeStart = Clock.systemDefaultZone().millis();
@@ -190,12 +190,7 @@ public class JVectorWriter extends KnnVectorsWriter {
             success = true;
             log.info("Completed Merge field {} into segment {}", fieldInfo.name, segmentWriteState.segmentInfo.name);
         } finally {
-            IOUtils.close(scorerSupplier);
-            if (success) {
-                // IOUtils.close(scorerSupplier);
-            } else {
-                // IOUtils.closeWhileHandlingException(scorerSupplier);
-            }
+
         }
     }
 
