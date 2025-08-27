@@ -22,7 +22,6 @@ import org.apache.lucene.codecs.CodecUtil;
 import org.apache.lucene.codecs.KnnVectorsReader;
 import org.apache.lucene.codecs.hnsw.FlatVectorScorerUtil;
 import org.apache.lucene.codecs.hnsw.FlatVectorsFormat;
-import org.apache.lucene.codecs.hnsw.FlatVectorsReader;
 import org.apache.lucene.codecs.lucene99.Lucene99FlatVectorsFormat;
 import org.apache.lucene.index.*;
 import org.apache.lucene.search.KnnCollector;
@@ -54,13 +53,9 @@ public class JVectorReader extends KnnVectorsReader {
     private final Map<String, FieldEntry> fieldEntryMap = new HashMap<>(1);
     private final Directory directory;
     private final SegmentReadState state;
-    private final FlatVectorsReader flatVectorsReader;
-    private final boolean mergeOnDisk;
 
-    public JVectorReader(SegmentReadState state, boolean mergeOnDisk) throws IOException {
+    public JVectorReader(SegmentReadState state) throws IOException {
         this.state = state;
-        this.mergeOnDisk = mergeOnDisk;
-        this.flatVectorsReader = FLAT_VECTORS_FORMAT.fieldsReader(state);
         this.fieldInfos = state.fieldInfos;
         this.baseDataFileName = state.segmentInfo.name + "_" + state.segmentSuffix;
         final String metaFileName = IndexFileNames.segmentFileName(
@@ -92,7 +87,6 @@ public class JVectorReader extends KnnVectorsReader {
 
     @Override
     public void checkIntegrity() throws IOException {
-        flatVectorsReader.checkIntegrity();
         for (FieldEntry fieldEntry : fieldEntryMap.values()) {
             try (var indexInput = state.directory.openInput(fieldEntry.vectorIndexFieldDataFileName, state.context)) {
                 CodecUtil.checksumEntireFile(indexInput);
@@ -102,9 +96,6 @@ public class JVectorReader extends KnnVectorsReader {
 
     @Override
     public FloatVectorValues getFloatVectorValues(String field) throws IOException {
-        if (mergeOnDisk) {
-            return flatVectorsReader.getFloatVectorValues(field);
-        }
         final FieldEntry fieldEntry = fieldEntryMap.get(field);
         return new JVectorFloatVectorValues(fieldEntry.index, fieldEntry.similarityFunction);
     }
@@ -212,7 +203,6 @@ public class JVectorReader extends KnnVectorsReader {
 
     @Override
     public void close() throws IOException {
-        IOUtils.close(flatVectorsReader);
         for (FieldEntry fieldEntry : fieldEntryMap.values()) {
             IOUtils.close(fieldEntry);
         }
