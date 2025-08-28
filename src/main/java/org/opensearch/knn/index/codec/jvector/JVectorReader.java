@@ -216,6 +216,7 @@ public class JVectorReader extends KnnVectorsReader {
         for (FieldEntry fieldEntry : fieldEntryMap.values()) {
             IOUtils.close(fieldEntry);
         }
+        fieldEntryMap.clear();
     }
 
     private void readFields(ChecksumIndexInput meta) throws IOException {
