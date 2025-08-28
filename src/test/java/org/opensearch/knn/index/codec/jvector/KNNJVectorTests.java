@@ -482,7 +482,7 @@ public class KNNJVectorTests extends LuceneTestCase {
                                 }
                             } finally {
                                 latch.countDown();
-                                log.warn("Ran " + i + " queries");
+                                log.warn("Ran {} queries", i);
                             }
                         });
                     }
