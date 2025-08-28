@@ -461,9 +461,11 @@ public class KNNJVectorTests extends LuceneTestCase {
                 try {
                     for (int t = 0; t < numThreads; t++) {
                         executor.submit(() -> {
+                            int i = 0;
+
                             try {
                                 ThreadLocalRandom random = ThreadLocalRandom.current();
-                                for (int i = 0; i < queriesPerThread && !failureDetected.get(); i++) {
+                                for (i = 0; i < queriesPerThread && !failureDetected.get(); i++) {
                                     // Choose a random docId to search for
                                     int randomDocId = random.nextInt(reader.maxDoc());
                                     float[] query = new float[] { randomDocId, 0 };
@@ -472,13 +474,15 @@ public class KNNJVectorTests extends LuceneTestCase {
                                         assertEquals("Search should return correct number of results", k, td.scoreDocs.length);
                                         assertEquals("Search should return the correct document", randomDocId, td.scoreDocs[0].doc);
                                         totalQueries.incrementAndGet();
-                                    } catch (Exception e) {
-                                        failureDetected.set(true);
+                                    } catch (Throwable e) {
+                                        failureDetected.compareAndSet(false, true);
+                                        log.error("Exception encountered", e);
                                         fail("Exception during concurrent search: " + e.getMessage());
                                     }
                                 }
                             } finally {
                                 latch.countDown();
+                                log.warn("Ran {} queries", i);
                             }
                         });
                     }
@@ -487,9 +491,10 @@ public class KNNJVectorTests extends LuceneTestCase {
                     boolean completed = latch.await(30, TimeUnit.SECONDS);
                     assertTrue("Test timed out while waiting for concurrent searches", completed);
                     assertFalse("Test encountered failures during concurrent searches", failureDetected.get());
+                    assertEquals("Incorrect number of queries executed", numThreads * queriesPerThread, totalQueries.get());
 
                     // Log the number of successful queries
-                    log.info("Successfully completed {} concurrent kNN search queries", totalQueries.get());
+                    log.info("Successfully completed {} concurrent kNN search queries!", totalQueries.get());
 
                 } finally {
                     executor.shutdownNow();
