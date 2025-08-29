@@ -38,7 +38,6 @@ import org.apache.lucene.search.DocIdSetIterator;
 import org.apache.lucene.store.*;
 import org.apache.lucene.util.IOUtils;
 import org.apache.lucene.util.RamUsageEstimator;
-import org.apache.lucene.util.hnsw.CloseableRandomVectorScorerSupplier;
 import org.opensearch.knn.plugin.stats.KNNCounter;
 
 import java.io.IOException;
