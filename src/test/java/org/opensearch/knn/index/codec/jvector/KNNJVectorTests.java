@@ -403,6 +403,9 @@ public class KNNJVectorTests extends LuceneTestCase {
         final String floatVectorField = "vec";
         final String expectedDocIdField = "expectedDocId";
         final Path indexPath = createTempDir();
+        final float[][] sourceVectors = TestUtils.generateRandomVectors(numDocs, 2);
+        final VectorSimilarityFunction vectorSimilarityFunction = VectorSimilarityFunction.EUCLIDEAN;
+
         try (Directory dir = newFSDirectory(indexPath)) {
             IndexWriterConfig cfg = newIndexWriterConfig();
             cfg.setCodec(getCodec());
@@ -415,7 +418,7 @@ public class KNNJVectorTests extends LuceneTestCase {
                 for (int i = 0; i < numDocs; i++) {
                     Document doc = new Document();
                     // vector whose first component encodes the future (segment-local) docID
-                    doc.add(new KnnFloatVectorField(floatVectorField, new float[] { i, 0 }, VectorSimilarityFunction.EUCLIDEAN));
+                    doc.add(new KnnFloatVectorField(floatVectorField, sourceVectors[i], vectorSimilarityFunction));
                     doc.add(new StoredField(expectedDocIdField, i));
                     w.addDocument(doc);
                 }
@@ -435,14 +438,24 @@ public class KNNJVectorTests extends LuceneTestCase {
                 for (LeafReaderContext context : reader.leaves()) {
                     FloatVectorValues vectorValues = context.reader().getFloatVectorValues("vec");
                     for (int docId = 0; docId < context.reader().maxDoc(); docId++) {
-                        int actualDocId = context.docBase + docId;
+                        final int luceneDocId = context.docBase + docId;
+                        final int globalDocId = reader.storedFields()
+                            .document(luceneDocId)
+                            .getField(expectedDocIdField)
+                            .storedValue()
+                            .getIntValue();
                         float[] vectorValue = vectorValues.vectorValue(docId);
-                        assertEquals("vector[0] should encode docId", (float) actualDocId, vectorValue[0], 0.0f);
+                        float[] expectedVectorValue = sourceVectors[globalDocId];
+                        Assert.assertArrayEquals("vectors in source and index should match", expectedVectorValue, vectorValue, 0.0f);
                     }
                 }
 
                 // (b) search with the same vector and confirm we are not exhausting the file handles with each search
                 IndexSearcher searcher = newSearcher(reader);
+                LeafReaderContext context = reader.leaves().get(0); // we only have one leaf at this point so we can use it to obtain the
+                                                                    // vector values
+                final int baseDocId = context.docBase;
+                final FloatVectorValues vectorValues = context.reader().getFloatVectorValues("vec");
                 final int k = 1;
                 for (int docId = 0; docId < reader.maxDoc(); docId++) {
                     float[] query = new float[] { docId, 0 };
@@ -464,15 +477,25 @@ public class KNNJVectorTests extends LuceneTestCase {
                             int i = 0;
 
                             try {
-                                ThreadLocalRandom random = ThreadLocalRandom.current();
                                 for (i = 0; i < queriesPerThread && !failureDetected.get(); i++) {
-                                    // Choose a random docId to search for
-                                    int randomDocId = random.nextInt(reader.maxDoc());
-                                    float[] query = new float[] { randomDocId, 0 };
+                                    float[] query = TestUtils.generateRandomVectors(1, 2)[0];
                                     try {
                                         TopDocs td = searcher.search(new KnnFloatVectorQuery("vec", query, k), k);
                                         assertEquals("Search should return correct number of results", k, td.scoreDocs.length);
-                                        assertEquals("Search should return the correct document", randomDocId, td.scoreDocs[0].doc);
+                                        final int localDocId = td.scoreDocs[0].doc;
+                                        final int globalDocId = reader.storedFields()
+                                            .document(localDocId)
+                                            .getField(expectedDocIdField)
+                                            .storedValue()
+                                            .getIntValue();
+                                        float[] vectorValue = vectorValues.vectorValue(localDocId - baseDocId);
+                                        float[] expectedVectorValue = sourceVectors[globalDocId];
+                                        Assert.assertArrayEquals(
+                                            "vectors in source and index should match",
+                                            expectedVectorValue,
+                                            vectorValue,
+                                            0.0f
+                                        );
                                         totalQueries.incrementAndGet();
                                     } catch (Throwable e) {
                                         failureDetected.compareAndSet(false, true);
