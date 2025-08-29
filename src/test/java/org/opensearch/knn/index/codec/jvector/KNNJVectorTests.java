@@ -457,10 +457,12 @@ public class KNNJVectorTests extends LuceneTestCase {
                 final int baseDocId = context.docBase;
                 final FloatVectorValues vectorValues = context.reader().getFloatVectorValues("vec");
                 final int k = 1;
-                for (int docId = 0; docId < reader.maxDoc(); docId++) {
-                    float[] query = new float[] { docId, 0 };
+                for (int i = 0; i < reader.maxDoc(); i++) {
+                    float[] query = TestUtils.generateRandomVectors(1, 2)[0];
                     TopDocs td = searcher.search(getJVectorKnnFloatVectorQuery("vec", query, k, new MatchAllDocsQuery()), k);
                     assertEquals(k, td.scoreDocs.length);
+
+                    compareSearchResults(td, sourceVectors, reader, expectedDocIdField, baseDocId, vectorValues);
                 }
 
                 // (c) search with the same vector and this time add concurrency to make sure we are still not exhausting the file handles
@@ -482,20 +484,7 @@ public class KNNJVectorTests extends LuceneTestCase {
                                     try {
                                         TopDocs td = searcher.search(new KnnFloatVectorQuery("vec", query, k), k);
                                         assertEquals("Search should return correct number of results", k, td.scoreDocs.length);
-                                        final int localDocId = td.scoreDocs[0].doc;
-                                        final int globalDocId = reader.storedFields()
-                                            .document(localDocId)
-                                            .getField(expectedDocIdField)
-                                            .storedValue()
-                                            .getIntValue();
-                                        float[] vectorValue = vectorValues.vectorValue(localDocId - baseDocId);
-                                        float[] expectedVectorValue = sourceVectors[globalDocId];
-                                        Assert.assertArrayEquals(
-                                            "vectors in source and index should match",
-                                            expectedVectorValue,
-                                            vectorValue,
-                                            0.0f
-                                        );
+                                        compareSearchResults(td, sourceVectors, reader, expectedDocIdField, baseDocId, vectorValues);
                                         totalQueries.incrementAndGet();
                                     } catch (Throwable e) {
                                         failureDetected.compareAndSet(false, true);
@@ -525,6 +514,28 @@ public class KNNJVectorTests extends LuceneTestCase {
             }
         }
 
+    }
+
+    private void compareSearchResults(
+        TopDocs topDocs,
+        float[][] sourceVectors,
+        DirectoryReader reader,
+        String expectedDocIdField,
+        int baseDocId,
+        FloatVectorValues vectorValues
+    ) throws IOException {
+        for (int resultIdx = 0; resultIdx < topDocs.scoreDocs.length; resultIdx++) {
+            final int localDocId = topDocs.scoreDocs[resultIdx].doc;
+            final int globalDocId = reader.storedFields().document(localDocId).getField(expectedDocIdField).storedValue().getIntValue();
+
+            // Access to float values is not thread safe
+            final float[] vectorValue;
+            synchronized (vectorValues) {
+                vectorValue = vectorValues.vectorValue(localDocId - baseDocId);
+            }
+            float[] expectedVectorValue = sourceVectors[globalDocId];
+            Assert.assertArrayEquals("vectors in source and index should match", expectedVectorValue, vectorValue, 0.0f);
+        }
     }
 
     /**
