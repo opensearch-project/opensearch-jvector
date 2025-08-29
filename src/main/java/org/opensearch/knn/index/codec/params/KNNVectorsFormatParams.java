@@ -8,8 +8,10 @@ package org.opensearch.knn.index.codec.params;
 import lombok.Getter;
 import org.opensearch.knn.common.KNNConstants;
 import org.opensearch.knn.index.SpaceType;
+import org.opensearch.knn.index.codec.jvector.JVectorFormat;
 
 import java.util.Map;
+import java.util.function.Function;
 
 /**
  * Class provides params for LuceneHNSWVectorsFormat
@@ -20,6 +22,7 @@ public class KNNVectorsFormatParams {
     private int beamWidth;
     private float alpha;
     private float neighborOverflow;
+    private Function<Integer, Integer> numberOfSubspacesPerVectorSupplier;
     private final SpaceType spaceType;
 
     public KNNVectorsFormatParams(final Map<String, Object> params, int defaultMaxConnections, int defaultBeamWidth) {
@@ -45,6 +48,7 @@ public class KNNVectorsFormatParams {
         initBeamWidth(params, defaultBeamWidth);
         initAlpha(params, defaultAlpha);
         initNeighborOverflow(params, defaultNeighborOverflow);
+        initNumberOfSubspacesPerVectorSupplier(params);
         this.spaceType = spaceType;
     }
 
@@ -82,5 +86,14 @@ public class KNNVectorsFormatParams {
             return;
         }
         this.neighborOverflow = defaultNeighborOverflow;
+    }
+
+    private void initNumberOfSubspacesPerVectorSupplier(final Map<String, Object> params) {
+        if (params != null && params.containsKey(KNNConstants.METHOD_PARAMETER_NUM_PQ_SUBSPACES)) {
+            int numPQSubspaces = (int) params.get(KNNConstants.METHOD_PARAMETER_NUM_PQ_SUBSPACES);
+            this.numberOfSubspacesPerVectorSupplier = (originalDimension) -> numPQSubspaces;
+            return;
+        }
+        this.numberOfSubspacesPerVectorSupplier = JVectorFormat::getDefaultNumberOfSubspacesPerVector;
     }
 }

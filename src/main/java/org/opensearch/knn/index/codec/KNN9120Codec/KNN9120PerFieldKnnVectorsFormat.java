@@ -66,6 +66,7 @@ public class KNN9120PerFieldKnnVectorsFormat extends BasePerFieldKnnVectorsForma
                             knnVectorsFormatParams.getBeamWidth(),
                             knnVectorsFormatParams.getAlpha(),
                             knnVectorsFormatParams.getNeighborOverflow(),
+                            knnVectorsFormatParams.getNumberOfSubspacesPerVectorSupplier(),
                             JVectorFormat.DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION,
                             true
                         );
