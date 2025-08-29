@@ -439,7 +439,11 @@ public class KNNJVectorTests extends LuceneTestCase {
                     FloatVectorValues vectorValues = context.reader().getFloatVectorValues("vec");
                     for (int docId = 0; docId < context.reader().maxDoc(); docId++) {
                         final int luceneDocId = context.docBase + docId;
-                        final int globalDocId = reader.storedFields().document(luceneDocId).getField(expectedDocIdField).storedValue().getIntValue();
+                        final int globalDocId = reader.storedFields()
+                            .document(luceneDocId)
+                            .getField(expectedDocIdField)
+                            .storedValue()
+                            .getIntValue();
                         float[] vectorValue = vectorValues.vectorValue(docId);
                         float[] expectedVectorValue = sourceVectors[globalDocId];
                         Assert.assertArrayEquals("vectors in source and index should match", expectedVectorValue, vectorValue, 0.0f);
@@ -448,7 +452,8 @@ public class KNNJVectorTests extends LuceneTestCase {
 
                 // (b) search with the same vector and confirm we are not exhausting the file handles with each search
                 IndexSearcher searcher = newSearcher(reader);
-                LeafReaderContext context = reader.leaves().get(0); // we only have one leaf at this point so we can use it to obtain the vector values
+                LeafReaderContext context = reader.leaves().get(0); // we only have one leaf at this point so we can use it to obtain the
+                                                                    // vector values
                 final int baseDocId = context.docBase;
                 final FloatVectorValues vectorValues = context.reader().getFloatVectorValues("vec");
                 final int k = 1;
@@ -478,10 +483,19 @@ public class KNNJVectorTests extends LuceneTestCase {
                                         TopDocs td = searcher.search(new KnnFloatVectorQuery("vec", query, k), k);
                                         assertEquals("Search should return correct number of results", k, td.scoreDocs.length);
                                         final int localDocId = td.scoreDocs[0].doc;
-                                        final int globalDocId = reader.storedFields().document(localDocId).getField(expectedDocIdField).storedValue().getIntValue();
+                                        final int globalDocId = reader.storedFields()
+                                            .document(localDocId)
+                                            .getField(expectedDocIdField)
+                                            .storedValue()
+                                            .getIntValue();
                                         float[] vectorValue = vectorValues.vectorValue(localDocId - baseDocId);
                                         float[] expectedVectorValue = sourceVectors[globalDocId];
-                                        Assert.assertArrayEquals("vectors in source and index should match", expectedVectorValue, vectorValue, 0.0f);
+                                        Assert.assertArrayEquals(
+                                            "vectors in source and index should match",
+                                            expectedVectorValue,
+                                            vectorValue,
+                                            0.0f
+                                        );
                                         totalQueries.incrementAndGet();
                                     } catch (Throwable e) {
                                         failureDetected.compareAndSet(false, true);
