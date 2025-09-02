@@ -88,7 +88,7 @@ public class JVectorReader extends KnnVectorsReader {
     @Override
     public void checkIntegrity() throws IOException {
         for (FieldEntry fieldEntry : fieldEntryMap.values()) {
-            try (var indexInput = state.directory.openInput(fieldEntry.vectorIndexFieldDataFileName, state.context)) {
+            try (var indexInput = state.directory.openInput(fieldEntry.vectorIndexFieldDataFileName, IOContext.READONCE)) {
                 CodecUtil.checksumEntireFile(indexInput);
             }
         }
@@ -268,7 +268,7 @@ public class JVectorReader extends KnnVectorsReader {
                     throw new IllegalArgumentException("pqCodebooksAndVectorsOffset must be greater than vectorIndexOffset");
                 }
                 this.pqCodebooksReaderSupplier = new JVectorRandomAccessReader.Supplier(
-                    directory.openInput(vectorIndexFieldDataFileName, state.context),
+                    directory.openInput(vectorIndexFieldDataFileName, IOContext.READONCE),
                     pqCodebooksAndVectorsOffset,
                     pqCodebooksAndVectorsLength
                 );

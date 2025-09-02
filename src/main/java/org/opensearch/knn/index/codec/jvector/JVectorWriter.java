@@ -178,12 +178,7 @@ public class JVectorWriter extends KnnVectorsWriter {
             success = true;
             log.info("Completed Merge field {} into segment {}", fieldInfo.name, segmentWriteState.segmentInfo.name);
         } finally {
-            IOUtils.close(scorerSupplier);
-            if (success) {
-                // IOUtils.close(scorerSupplier);
-            } else {
-                // IOUtils.closeWhileHandlingException(scorerSupplier);
-            }
+
         }
     }
 

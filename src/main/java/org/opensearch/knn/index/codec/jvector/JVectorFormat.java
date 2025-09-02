@@ -75,6 +75,7 @@ public class JVectorFormat extends KnnVectorsFormat {
         int beamWidth,
         float neighborOverflow,
         float alpha,
+        Function<Integer, Integer> numberOfSubspacesPerVectorSupplier,
         int minBatchSizeForQuantization,
         boolean mergeOnDisk
     ) {
@@ -84,7 +85,7 @@ public class JVectorFormat extends KnnVectorsFormat {
             beamWidth,
             neighborOverflow,
             alpha,
-            JVectorFormat::getDefaultNumberOfSubspacesPerVector,
+            numberOfSubspacesPerVectorSupplier,
             minBatchSizeForQuantization,
             mergeOnDisk
         );
@@ -143,6 +144,7 @@ public class JVectorFormat extends KnnVectorsFormat {
      * @return default number of subspaces per vector
      */
     public static int getDefaultNumberOfSubspacesPerVector(int originalDimension) {
+
         // the idea here is that higher dimensions compress well, but not so well that we should use fewer bits
         // than a lower-dimension vector, which is what you could get with cutoff points to switch between (e.g.)
         // D*0.5 and D*0.25. Thus, the following ensures that bytes per vector is strictly increasing with D.
