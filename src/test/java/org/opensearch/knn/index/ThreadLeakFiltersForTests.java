@@ -15,8 +15,9 @@ public class ThreadLeakFiltersForTests implements ThreadFilter {
     @Override
     public boolean reject(Thread thread) {
         ThreadGroup threadGroup = thread.getThreadGroup();
-        return thread.getName().startsWith("ForkJoinPool") && threadGroup != null
-                && (threadGroup.getName().contains("InternalKNNEngineTests")
+        return thread.getName().startsWith("ForkJoinPool")
+            && threadGroup != null
+            && (threadGroup.getName().contains("InternalKNNEngineTests")
                 || threadGroup.getName().startsWith("TGRP-KNNJVectorTests")
                 || threadGroup.getName().startsWith("TGRP-JVectorConcurrentQueryTests")
                 || threadGroup.getName().startsWith("TGRP-MemoryUsageAnalysisTests"));
