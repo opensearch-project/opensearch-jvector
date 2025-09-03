@@ -332,7 +332,7 @@ public class InternalKNNEngineTests extends OpenSearchIntegTestCase {
         assertTrue("Expected at least one node", parsedBefore.size() >= 1);
 
         // Aggregate stats across all nodes
-        Map<String, Long> before = new HashMap<>();
+        final Map<String, Long> before = new HashMap<>();
         for (String metric : metrics) {
             long totalValue = 0;
             for (Map<String, Object> nodeStats : parsedBefore) {
@@ -362,15 +362,18 @@ public class InternalKNNEngineTests extends OpenSearchIntegTestCase {
         forceMerge();
 
         /* ---------------------------------------------------
-         * 3.  Execute a KNN query
+         * 3.  Execute KNN queries
          * --------------------------------------------------- */
-        final float[] searchVector = TestUtils.generateRandomVectors(1, dimension)[0];
-        int k = 5;
-        var response = CommonTestUtils.searchKNNIndex(getRestClient(), INDEX_NAME, new KNNQueryBuilder(FIELD_NAME, searchVector, k), k);
-        final String responseBody = EntityUtils.toString(response.getEntity());
-        final List<KNNResult> knnResults = CommonTestUtils.parseSearchResponse(responseBody, FIELD_NAME);
-        assertNotNull(knnResults);
-        assertEquals(k, knnResults.size());
+        // We will execute 100 KNN queries to make sure we are not just looking at race conditions or cache effects
+        for (int i = 0; i < 100; i++) {
+            final float[] searchVector = TestUtils.generateRandomVectors(1, dimension)[0];
+            int k = 5;
+            var response = CommonTestUtils.searchKNNIndex(getRestClient(), INDEX_NAME, new KNNQueryBuilder(FIELD_NAME, searchVector, k), k);
+            final String responseBody = EntityUtils.toString(response.getEntity());
+            final List<KNNResult> knnResults = CommonTestUtils.parseSearchResponse(responseBody, FIELD_NAME);
+            assertNotNull(knnResults);
+            assertEquals(k, knnResults.size());
+        }
 
         /* ---------------------------------------------------
          * 4.  Read stats again and assert they have increased
