@@ -6,23 +6,39 @@
 package org.opensearch.knn.index.engine;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.primitives.Floats;
 import org.apache.lucene.codecs.Codec;
 import org.apache.lucene.codecs.FilterCodec;
 import org.apache.lucene.codecs.KnnVectorsFormat;
 import org.apache.lucene.codecs.lucene101.Lucene101Codec;
 import org.apache.lucene.codecs.perfield.PerFieldKnnVectorsFormat;
+import org.junit.Assert;
+import org.opensearch.client.Request;
+import org.opensearch.client.Response;
+import org.opensearch.client.RestClient;
+import org.opensearch.cluster.ClusterModule;
 import org.opensearch.common.settings.Settings;
-import org.opensearch.core.xcontent.XContentBuilder;
+import org.opensearch.common.xcontent.LoggingDeprecationHandler;
+import org.opensearch.common.xcontent.XContentFactory;
+import org.opensearch.core.rest.RestStatus;
+import org.opensearch.core.xcontent.*;
+import org.opensearch.knn.KNNResult;
 import org.opensearch.knn.common.KNNConstants;
 import org.opensearch.knn.index.KNNVectorSimilarityFunction;
 import org.opensearch.knn.index.SpaceType;
 import org.opensearch.knn.index.VectorDataType;
 import org.opensearch.knn.index.codec.KNNCodecVersion;
 import org.opensearch.knn.index.codec.jvector.JVectorFormat;
+import org.opensearch.knn.index.query.KNNQueryBuilder;
+import org.opensearch.knn.plugin.JVectorKNNPlugin;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import static org.opensearch.common.xcontent.XContentFactory.jsonBuilder;
 import static org.opensearch.knn.KNNRestTestCase.FIELD_NAME;
@@ -32,6 +48,10 @@ import static org.opensearch.knn.index.KNNSettings.KNN_INDEX;
 import static org.opensearch.knn.index.codec.jvector.JVectorFormat.DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION;
 
 public class CommonTestUtils {
+    private static final NamedXContentRegistry DEFAULT_NAMED_X_CONTENT_REGISTRY = new NamedXContentRegistry(
+        ClusterModule.getNamedXWriteables()
+    );
+
     public static final int DIMENSION = 3;
     public static final String DOC_ID = "doc1";
     public static final String DOC_ID_2 = "doc2";
@@ -115,5 +135,175 @@ public class CommonTestUtils {
                 };
             }
         };
+    }
+
+    /**
+     * Get Stats from KNN Plugin
+     */
+    public static Response getKnnStats(RestClient restClient, List<String> nodeIds, List<String> stats) throws IOException {
+        return executeKnnStatRequest(restClient, nodeIds, stats, JVectorKNNPlugin.KNN_BASE_URI);
+    }
+
+    public static Response executeKnnStatRequest(RestClient restClient, List<String> nodeIds, List<String> stats, final String baseURI)
+        throws IOException {
+        String nodePrefix = "";
+        if (!nodeIds.isEmpty()) {
+            nodePrefix = "/" + String.join(",", nodeIds);
+        }
+
+        String statsSuffix = "";
+        if (!stats.isEmpty()) {
+            statsSuffix = "/" + String.join(",", stats);
+        }
+
+        Request request = new Request("GET", baseURI + nodePrefix + "/stats" + statsSuffix);
+
+        Response response = restClient.performRequest(request);
+        Assert.assertEquals(RestStatus.OK, RestStatus.fromCode(response.getStatusLine().getStatusCode()));
+        return response;
+    }
+
+    /**
+     * Parse KNN Node stats from response
+     */
+    public static List<Map<String, Object>> parseNodeStatsResponse(String responseBody) throws IOException {
+        @SuppressWarnings("unchecked")
+        Map<String, Object> responseMap = (Map<String, Object>) createParser(
+            MediaTypeRegistry.getDefaultMediaType().xContent(),
+            responseBody
+        ).map().get("nodes");
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> nodeResponses = responseMap.keySet()
+            .stream()
+            .map(key -> (Map<String, Object>) responseMap.get(key))
+            .collect(Collectors.toList());
+
+        return nodeResponses;
+    }
+
+    /**
+     * Deprecated
+     * To better simulate user request, use {@link #searchKNNIndex(RestClient, String, XContentBuilder, int)} instead
+     */
+    @Deprecated
+    public static Response searchKNNIndex(RestClient restClient, String index, KNNQueryBuilder knnQueryBuilder, int resultSize)
+        throws IOException {
+        XContentBuilder builder = XContentFactory.jsonBuilder().startObject().startObject("query");
+        knnQueryBuilder.doXContent(builder, ToXContent.EMPTY_PARAMS);
+        builder.endObject().endObject();
+        return searchKNNIndex(restClient, index, builder, resultSize);
+    }
+
+    /**
+     * Run KNN Search on Index with XContentBuilder query
+     */
+    public static Response searchKNNIndex(RestClient restClient, String index, XContentBuilder xContentBuilder, int resultSize)
+        throws IOException {
+        return searchKNNIndex(restClient, index, xContentBuilder.toString(), resultSize);
+    }
+
+    /**
+     * Run KNN Search on Index with json string query
+     */
+    public static Response searchKNNIndex(RestClient restClient, String index, String query, int resultSize) throws IOException {
+        Request request = new Request("POST", "/" + index + "/_search");
+        request.setJsonEntity(query);
+
+        request.addParameter("size", Integer.toString(resultSize));
+        request.addParameter("search_type", "query_then_fetch");
+        // Nested field does not support explain parameter and the request is rejected if we set explain parameter
+        // request.addParameter("explain", Boolean.toString(true));
+
+        Response response = restClient.performRequest(request);
+        Assert.assertEquals(
+            request.getEndpoint() + ": failed",
+            RestStatus.OK,
+            RestStatus.fromCode(response.getStatusLine().getStatusCode())
+        );
+
+        return response;
+    }
+
+    /**
+     * Parse the response of KNN search into a List of KNNResults
+     */
+    public static List<KNNResult> parseSearchResponse(String responseBody, String fieldName) throws IOException {
+        @SuppressWarnings("unchecked")
+        List<Object> hits = (List<Object>) ((Map<String, Object>) createParser(
+            MediaTypeRegistry.getDefaultMediaType().xContent(),
+            responseBody
+        ).map().get("hits")).get("hits");
+
+        @SuppressWarnings("unchecked")
+        List<KNNResult> knnSearchResponses = hits.stream().map(hit -> {
+            @SuppressWarnings("unchecked")
+            final float[] vector = Floats.toArray(
+                Arrays.stream(
+                    ((ArrayList<Float>) ((Map<String, Object>) ((Map<String, Object>) hit).get("_source")).get(fieldName)).toArray()
+                ).map(Object::toString).map(Float::valueOf).collect(Collectors.toList())
+            );
+            return new KNNResult(
+                (String) ((Map<String, Object>) hit).get("_id"),
+                vector,
+                ((Double) ((Map<String, Object>) hit).get("_score")).floatValue()
+            );
+        }).collect(Collectors.toList());
+
+        return knnSearchResponses;
+    }
+
+    // Method that adds multiple documents into the index using Bulk API
+    public static void bulkAddKnnDocs(
+        RestClient restClient,
+        String index,
+        String fieldName,
+        float[][] indexVectors,
+        int docCount,
+        boolean refresh
+    ) throws IOException {
+        bulkAddKnnDocs(restClient, index, fieldName, indexVectors, 0, docCount, refresh);
+    }
+
+    // Method that adds multiple documents into the index using Bulk API
+    public static void bulkAddKnnDocs(
+        RestClient restClient,
+        String index,
+        String fieldName,
+        float[][] indexVectors,
+        int baseDocId,
+        int docCount,
+        boolean refresh
+    ) throws IOException {
+        Request request = new Request("POST", "/_bulk");
+
+        request.addParameter("refresh", Boolean.toString(refresh));
+        StringBuilder sb = new StringBuilder();
+
+        for (int i = 0; i < docCount; i++) {
+            sb.append("{ \"index\" : { \"_index\" : \"")
+                .append(index)
+                .append("\", \"_id\" : \"")
+                .append(baseDocId + i)
+                .append("\" } }\n")
+                .append("{ \"")
+                .append(fieldName)
+                .append("\" : ")
+                .append(Arrays.toString(indexVectors[i]))
+                .append(" }\n");
+        }
+
+        request.setJsonEntity(sb.toString());
+
+        Response response = restClient.performRequest(request);
+        Assert.assertEquals(200, response.getStatusLine().getStatusCode());
+    }
+
+    private static NamedXContentRegistry xContentRegistry() {
+        return DEFAULT_NAMED_X_CONTENT_REGISTRY;
+    }
+
+    private static XContentParser createParser(XContent xContent, String data) throws IOException {
+        return xContent.createParser(xContentRegistry(), LoggingDeprecationHandler.INSTANCE, data);
     }
 }
