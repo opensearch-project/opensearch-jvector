@@ -14,10 +14,12 @@ import com.carrotsearch.randomizedtesting.ThreadFilter;
 public class ThreadLeakFiltersForTests implements ThreadFilter {
     @Override
     public boolean reject(Thread thread) {
+        ThreadGroup threadGroup = thread.getThreadGroup();
         return thread.getName().startsWith("ForkJoinPool")
-            && (thread.getThreadGroup().getName().contains("InternalKNNEngineTests")
-                || thread.getThreadGroup().getName().startsWith("TGRP-KNNJVectorTests")
-                || thread.getThreadGroup().getName().startsWith("TGRP-JVectorConcurrentQueryTests")
-                || thread.getThreadGroup().getName().startsWith("TGRP-MemoryUsageAnalysisTests"));
+            && threadGroup != null
+            && (threadGroup.getName().contains("InternalKNNEngineTests")
+                || threadGroup.getName().startsWith("TGRP-KNNJVectorTests")
+                || threadGroup.getName().startsWith("TGRP-JVectorConcurrentQueryTests")
+                || threadGroup.getName().startsWith("TGRP-MemoryUsageAnalysisTests"));
     }
 }
