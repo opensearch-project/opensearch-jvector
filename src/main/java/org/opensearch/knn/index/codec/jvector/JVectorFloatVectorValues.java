@@ -23,12 +23,14 @@ public class JVectorFloatVectorValues extends FloatVectorValues {
     private final VectorSimilarityFunction similarityFunction;
     private final int dimension;
     private final int size;
+    private final VectorFloat<?> value;
 
     public JVectorFloatVectorValues(OnDiskGraphIndex onDiskGraphIndex, VectorSimilarityFunction similarityFunction) throws IOException {
         this.dimension = onDiskGraphIndex.getDimension();
         this.size = onDiskGraphIndex.size();
         this.view = onDiskGraphIndex.getView();
         this.similarityFunction = similarityFunction;
+        this.value = VECTOR_TYPE_SUPPORT.createFloatVector(dimension);
     }
 
     @Override
@@ -42,7 +44,8 @@ public class JVectorFloatVectorValues extends FloatVectorValues {
     }
 
     public VectorFloat<?> vectorFloatValue(int ord) {
-        return view.getVector(ord);
+        view.getVectorInto(ord, value, 0);
+        return value;
     }
 
     public DocIndexIterator iterator() {
