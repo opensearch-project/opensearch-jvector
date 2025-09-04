@@ -28,12 +28,13 @@ import org.opensearch.knn.plugin.JVectorKNNPlugin;
 import org.opensearch.plugins.Plugin;
 import org.opensearch.test.OpenSearchIntegTestCase;
 import org.opensearch.transport.Netty4ModulePlugin;
+import org.opensearch.knn.plugin.stats.StatNames;
+import org.opensearch.knn.index.query.KNNQueryBuilder;
+import org.opensearch.knn.KNNResult;
+import org.opensearch.knn.TestUtils;
 
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import static org.opensearch.knn.KNNRestTestCase.FIELD_NAME;
 import static org.opensearch.knn.KNNRestTestCase.INDEX_NAME;
@@ -301,5 +302,107 @@ public class InternalKNNEngineTests extends OpenSearchIntegTestCase {
 
         Response searchResponse = getRestClient().performRequest(searchRequest);
         assertEquals(RestStatus.OK, RestStatus.fromCode(searchResponse.getStatusLine().getStatusCode()));
+    }
+
+    /**
+     * Verify that the jVector-specific KNN stats counters
+     * (visited, expanded, expanded-base-layer nodes) are present
+     * and increase after a KNN search is executed.
+     */
+    @Test
+    public void testJVectorSearchStatsIncrement() throws Exception {
+
+        /* ---------------------------------------------------
+         * 1.  Read initial stats
+         * --------------------------------------------------- */
+        List<String> metrics = List.of(
+            StatNames.KNN_QUERY_VISITED_NODES.getName(),
+            StatNames.KNN_QUERY_RERANKED_COUNT.getName(),
+            StatNames.KNN_QUERY_EXPANDED_NODES.getName(),
+            StatNames.KNN_QUERY_EXPANDED_BASE_LAYER_NODES.getName(),
+            StatNames.KNN_QUERY_GRAPH_SEARCH_TIME.getName(),
+            StatNames.KNN_QUANTIZATION_TRAINING_TIME.getName(),
+            StatNames.KNN_GRAPH_MERGE_TIME.getName()
+        );
+
+        var parsedBefore = CommonTestUtils.parseNodeStatsResponse(
+            EntityUtils.toString(CommonTestUtils.getKnnStats(getRestClient(), Collections.emptyList(), metrics).getEntity())
+        );
+        assertNotNull(parsedBefore);
+        assertTrue("Expected at least one node", parsedBefore.size() >= 1);
+
+        // Aggregate stats across all nodes
+        final Map<String, Long> before = new HashMap<>();
+        for (String metric : metrics) {
+            long totalValue = 0;
+            for (Map<String, Object> nodeStats : parsedBefore) {
+                if (nodeStats.containsKey(metric)) {
+                    totalValue += ((Number) nodeStats.get(metric)).longValue();
+                }
+            }
+            before.put(metric, totalValue);
+        }
+
+        /* ---------------------------------------------------
+         * 2.  Create index and docs
+         * --------------------------------------------------- */
+        int dimension = 128;
+        int vectorsCount = 2050; // we create 2050 docs to have PQ and re-rank kick in
+        createKnnIndexMappingWithJVectorEngine(dimension, SpaceType.L2, VectorDataType.FLOAT);
+        final float[][] vectors = TestUtils.generateRandomVectors(vectorsCount, dimension);
+        // We will split the vectors into two batches so we can actually force a merge
+        int baseDocId = 0;
+        final float[][] vectorsForBatch = new float[vectorsCount / 2][dimension];
+        System.arraycopy(vectors, 0, vectorsForBatch, 0, vectorsCount / 2);
+        CommonTestUtils.bulkAddKnnDocs(getRestClient(), INDEX_NAME, FIELD_NAME, vectorsForBatch, baseDocId, vectorsForBatch.length, true);
+        flush(INDEX_NAME);
+        baseDocId += vectorsForBatch.length;
+        System.arraycopy(vectors, baseDocId, vectorsForBatch, 0, vectorsCount / 2);
+        CommonTestUtils.bulkAddKnnDocs(getRestClient(), INDEX_NAME, FIELD_NAME, vectorsForBatch, baseDocId, vectorsForBatch.length, true);
+        forceMerge();
+
+        /* ---------------------------------------------------
+         * 3.  Execute KNN queries
+         * --------------------------------------------------- */
+        // We will execute 10 KNN queries to make sure we are not just looking at race conditions or cache effects
+        for (int i = 0; i < 10; i++) {
+            final float[] searchVector = TestUtils.generateRandomVectors(1, dimension)[0];
+            int k = 5;
+            var response = CommonTestUtils.searchKNNIndex(getRestClient(), INDEX_NAME, new KNNQueryBuilder(FIELD_NAME, searchVector, k), k);
+            final String responseBody = EntityUtils.toString(response.getEntity());
+            final List<KNNResult> knnResults = CommonTestUtils.parseSearchResponse(responseBody, FIELD_NAME);
+            assertNotNull(knnResults);
+            assertEquals(k, knnResults.size());
+        }
+
+        /* ---------------------------------------------------
+         * 4.  Read stats again and assert they have increased
+         * --------------------------------------------------- */
+
+        var parsedAfter = CommonTestUtils.parseNodeStatsResponse(
+            EntityUtils.toString(CommonTestUtils.getKnnStats(getRestClient(), Collections.emptyList(), metrics).getEntity())
+        );
+        assertNotNull(parsedAfter);
+        assertTrue("Expected at least one node", parsedAfter.size() >= 1);
+
+        // Aggregate stats across all nodes
+        Map<String, Long> after = new HashMap<>();
+        for (String metric : metrics) {
+            long totalValue = 0;
+            for (Map<String, Object> nodeStats : parsedAfter) {
+                if (nodeStats.containsKey(metric)) {
+                    totalValue += ((Number) nodeStats.get(metric)).longValue();
+                }
+            }
+            after.put(metric, totalValue);
+        }
+
+        for (String metric : metrics) {
+            // Check that our metrics increased
+            assertTrue(
+                String.format("Metric %s, didn't increase. Before: %d, After: %d", metric, before.get(metric), after.get(metric)),
+                after.get(metric) > before.get(metric)
+            );
+        }
     }
 }
