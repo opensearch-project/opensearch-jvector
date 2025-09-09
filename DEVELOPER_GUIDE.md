@@ -256,10 +256,10 @@ The jvector plugin can be downloaded from [here](https://central.sonatype.com/se
 # Go into the OpenSearch directory
 cd opensearch
 # First remove the KNN plugin
-bin/opensearch-plugins remove opensearch-knn-plugin
-# Then install the jVector plugin
-curl -O https://aws.oss.sonatype.org/content/repositories/snapshots/org/opensearch/plugin/opensearch-jvector-plugin/3.0.0.0-alpha1-SNAPSHOT/opensearch-jvector-plugin-3.0.0.0-alpha1-SNAPSHOT.zip opensearch-jvector-plugin.zip
-bin/opensearch-plugins install opensearch-jvector-plugin.zip
+bin/opensearch-plugin remove opensearch-knn-plugin
+# Then download the jvector plugin
+curl https://repo1.maven.org/maven2/org/opensearch/plugin/opensearch-jvector-plugin/3.0.0.4/opensearch-jvector-plugin-3.0.0.4.zip -o opensearch-jvector-plugin.zip
+./bin/opensearch-plugin install file://`pwd`/opensearch-jvector-plugin.zip
 # Start OpenSearch
 ./bin/opensearch
 ```
