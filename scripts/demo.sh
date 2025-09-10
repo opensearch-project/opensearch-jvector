@@ -72,7 +72,7 @@ curl -X PUT "localhost:9200/jvector-index/_doc/4?pretty" -H 'Content-Type: appli
 # 3. Search for the nearest neighbor of a vector
 curl -X GET "localhost:9200/jvector-index/_search?pretty" -H 'Content-Type: application/json' -d'
 {
-  "size": 1,
+  "size": 3,
   "query": {
     "knn": {
       "my_vector": {
@@ -87,7 +87,7 @@ curl -X GET "localhost:9200/jvector-index/_search?pretty" -H 'Content-Type: appl
 # 4. Search with advanced parameters such as overquery_factor, threshold, rerank_floor
 curl -X GET "localhost:9200/jvector-index/_search?pretty" -H 'Content-Type: application/json' -d'
 {
-  "size": 1,
+  "size": 3,
   "query": {
     "knn": {
       "my_vector": {
