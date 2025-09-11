@@ -1,18 +1,12 @@
 - [Developer Guide](#developer-guide)
   - [Getting Started](#getting-started)
-    - [Fork OpenSearch k-NN Repo](#fork-opensearch-k-nn-repo)
+    - [Fork opensearch-jvector Repo](#fork-opensearch-jvector-repo)
     - [Install Prerequisites](#install-prerequisites)
       - [JDK 21](#jdk-21)
-      - [CMake](#cmake)
-      - [Faiss Dependencies](#Faiss-Dependencies)
       - [Environment](#Environment)
   - [Use an Editor](#use-an-editor)
     - [IntelliJ IDEA](#intellij-idea)
   - [Build](#build)
-    - [JNI Library](#jni-library)
-    - [JNI Library Artifacts](#jni-library-artifacts)
-    - [Parallelize make](#parallelize-make)
-    - [Enable SIMD Optimization](#enable-simd-optimization)
   - [Run OpenSearch k-NN](#run-opensearch-k-nn)
     - [Run Single-node Cluster Locally](#run-single-node-cluster-locally)
     - [Run Multi-node Cluster Locally](#run-multi-node-cluster-locally)
@@ -28,7 +22,7 @@ So you want to contribute code to OpenSearch k-NN? Excellent! We're glad you're 
 
 ## Getting Started
 
-### Fork OpenSearch k-NN Repo
+### Fork opensearch-jvector Repo
 
 Fork [opensearch-project/OpenSearch k-NN](https://github.com/opensearch-project/k-NN) and clone locally.
 
