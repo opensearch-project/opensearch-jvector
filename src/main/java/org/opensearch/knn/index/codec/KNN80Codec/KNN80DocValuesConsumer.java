@@ -36,16 +36,15 @@ class KNN80DocValuesConsumer extends DocValuesConsumer {
     private final Logger logger = LogManager.getLogger(KNN80DocValuesConsumer.class);
 
     private final DocValuesConsumer delegatee;
-    private final SegmentWriteState state;
 
     KNN80DocValuesConsumer(DocValuesConsumer delegatee, SegmentWriteState state) {
         this.delegatee = delegatee;
-        this.state = state;
     }
 
     @Override
     public void addBinaryField(FieldInfo field, DocValuesProducer valuesProducer) throws IOException {
-        delegatee.addBinaryField(field, valuesProducer);
+        if (!(field.hasVectorValues() && extractKNNEngine(field) == KNNEngine.JVECTOR))
+            delegatee.addBinaryField(field, valuesProducer);
         if (isKNNBinaryFieldRequired(field)) {
             StopWatch stopWatch = new StopWatch();
             stopWatch.start();
@@ -77,9 +76,38 @@ class KNN80DocValuesConsumer extends DocValuesConsumer {
     @Override
     public void merge(MergeState mergeState) {
         try {
-            delegatee.merge(mergeState);
             assert mergeState != null;
             assert mergeState.mergeFieldInfos != null;
+
+            for (DocValuesProducer docValuesProducer : mergeState.docValuesProducers) {
+                if (docValuesProducer != null) {
+                    docValuesProducer.checkIntegrity();
+                }
+            }
+
+            for (FieldInfo mergeFieldInfo : mergeState.mergeFieldInfos) {
+                if (mergeFieldInfo.hasVectorValues() && extractKNNEngine(mergeFieldInfo) == KNNEngine.JVECTOR) {
+                    continue;
+                }
+
+                DocValuesType type = mergeFieldInfo.getDocValuesType();
+                if (type != DocValuesType.NONE) {
+                    if (type == DocValuesType.NUMERIC) {
+                        delegatee.mergeNumericField(mergeFieldInfo, mergeState);
+                    } else if (type == DocValuesType.BINARY) {
+                        delegatee.mergeBinaryField(mergeFieldInfo, mergeState);
+                    } else if (type == DocValuesType.SORTED) {
+                        delegatee.mergeSortedField(mergeFieldInfo, mergeState);
+                    } else if (type == DocValuesType.SORTED_SET) {
+                        delegatee.mergeSortedSetField(mergeFieldInfo, mergeState);
+                    } else if (type == DocValuesType.SORTED_NUMERIC) {
+                        delegatee.mergeSortedNumericField(mergeFieldInfo, mergeState);
+                    } else {
+                        throw new AssertionError("type=" + type);
+                    }
+                }
+            }
+
             for (FieldInfo fieldInfo : mergeState.mergeFieldInfos) {
                 DocValuesType type = fieldInfo.getDocValuesType();
                 if (type == DocValuesType.BINARY && fieldInfo.attributes().containsKey(KNNVectorFieldMapper.KNN_FIELD)) {
