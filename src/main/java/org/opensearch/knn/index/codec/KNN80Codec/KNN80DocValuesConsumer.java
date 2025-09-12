@@ -43,8 +43,7 @@ class KNN80DocValuesConsumer extends DocValuesConsumer {
 
     @Override
     public void addBinaryField(FieldInfo field, DocValuesProducer valuesProducer) throws IOException {
-        if (!(field.hasVectorValues() && extractKNNEngine(field) == KNNEngine.JVECTOR))
-            delegatee.addBinaryField(field, valuesProducer);
+        if (!(field.hasVectorValues() && extractKNNEngine(field) == KNNEngine.JVECTOR)) delegatee.addBinaryField(field, valuesProducer);
         if (isKNNBinaryFieldRequired(field)) {
             StopWatch stopWatch = new StopWatch();
             stopWatch.start();

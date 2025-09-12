@@ -19,8 +19,6 @@ import org.opensearch.knn.index.codec.jvector.JVectorReader;
 import org.opensearch.knn.index.engine.KNNEngine;
 
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
 
 import static org.opensearch.knn.common.FieldInfoExtractor.extractKNNEngine;
 
@@ -39,9 +37,8 @@ public class KNN80DocValuesProducer extends DocValuesProducer {
     @Override
     public BinaryDocValues getBinary(FieldInfo field) throws IOException {
         if (field.hasVectorValues() && extractKNNEngine(field) == KNNEngine.JVECTOR) {
-            if (openReader == null)
-                openReader = new JVectorReader(state);
-            return ((JVectorFloatVectorValues)openReader.getFloatVectorValues(field.name)).asBinaryDocValues();
+            if (openReader == null) openReader = new JVectorReader(state);
+            return ((JVectorFloatVectorValues) openReader.getFloatVectorValues(field.name)).asBinaryDocValues();
         }
 
         return delegate.getBinary(field);
@@ -91,7 +88,7 @@ public class KNN80DocValuesProducer extends DocValuesProducer {
             openReader.close();
             openReader = null;
         }
-        
+
         delegate.close();
     }
 }
