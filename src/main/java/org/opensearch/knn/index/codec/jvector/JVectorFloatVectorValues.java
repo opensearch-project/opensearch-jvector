@@ -11,10 +11,15 @@ import io.github.jbellis.jvector.vector.VectorSimilarityFunction;
 import io.github.jbellis.jvector.vector.VectorizationProvider;
 import io.github.jbellis.jvector.vector.types.VectorFloat;
 import io.github.jbellis.jvector.vector.types.VectorTypeSupport;
+import org.apache.lucene.index.BinaryDocValues;
 import org.apache.lucene.index.FloatVectorValues;
+import org.apache.lucene.search.DocIdSetIterator;
 import org.apache.lucene.search.VectorScorer;
+import org.apache.lucene.util.BytesRef;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 public class JVectorFloatVectorValues extends FloatVectorValues {
     private static final VectorTypeSupport VECTOR_TYPE_SUPPORT = VectorizationProvider.getInstance().getVectorTypeSupport();
@@ -26,7 +31,7 @@ public class JVectorFloatVectorValues extends FloatVectorValues {
 
     public JVectorFloatVectorValues(OnDiskGraphIndex onDiskGraphIndex, VectorSimilarityFunction similarityFunction) throws IOException {
         this.dimension = onDiskGraphIndex.getDimension();
-        this.size = onDiskGraphIndex.size();
+        this.size = onDiskGraphIndex.getIdUpperBound();
         this.view = onDiskGraphIndex.getView();
         this.similarityFunction = similarityFunction;
     }
@@ -42,7 +47,9 @@ public class JVectorFloatVectorValues extends FloatVectorValues {
     }
 
     public VectorFloat<?> vectorFloatValue(int ord) {
-        return view.getVector(ord);
+        VectorFloat<?> value = VECTOR_TYPE_SUPPORT.createFloatVector(dimension);
+        view.getVectorInto(ord, value, 0);
+        return value;
     }
 
     public DocIndexIterator iterator() {
@@ -105,6 +112,49 @@ public class JVectorFloatVectorValues extends FloatVectorValues {
     @Override
     public VectorScorer scorer(float[] query) throws IOException {
         return new JVectorVectorScorer(this, VECTOR_TYPE_SUPPORT.createFloatVector(query), similarityFunction);
+    }
+
+    public BinaryDocValues asBinaryDocValues() {
+
+        final DocIdSetIterator it = iterator();
+        final BytesRef bytes = new BytesRef(dimension * Float.BYTES);
+
+        return new BinaryDocValues() {
+            @Override
+            public BytesRef binaryValue() throws IOException {
+                float[] f = vectorValue(docID());
+                ByteBuffer bb = ByteBuffer.wrap(bytes.bytes).order(ByteOrder.LITTLE_ENDIAN);
+                for (int i = 0; i < f.length; i++)
+                    bb.putFloat(f[i]);
+
+                return bytes;
+            }
+
+            @Override
+            public boolean advanceExact(int target) throws IOException {
+                return it.advance(target) == target;
+            }
+
+            @Override
+            public int docID() {
+                return it.docID();
+            }
+
+            @Override
+            public int nextDoc() throws IOException {
+                return it.nextDoc();
+            }
+
+            @Override
+            public int advance(int target) throws IOException {
+                return it.advance(target);
+            }
+
+            @Override
+            public long cost() {
+                return it.cost();
+            }
+        };
     }
 
 }

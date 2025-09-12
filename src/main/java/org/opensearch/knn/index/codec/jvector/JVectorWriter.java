@@ -27,11 +27,6 @@ import org.apache.lucene.codecs.CodecUtil;
 import org.apache.lucene.codecs.KnnFieldVectorsWriter;
 import org.apache.lucene.codecs.KnnVectorsReader;
 import org.apache.lucene.codecs.KnnVectorsWriter;
-import org.apache.lucene.codecs.hnsw.FlatFieldVectorsWriter;
-import org.apache.lucene.codecs.hnsw.FlatVectorScorerUtil;
-import org.apache.lucene.codecs.hnsw.FlatVectorsFormat;
-import org.apache.lucene.codecs.hnsw.FlatVectorsWriter;
-import org.apache.lucene.codecs.lucene99.Lucene99FlatVectorsFormat;
 import org.apache.lucene.codecs.perfield.PerFieldKnnVectorsFormat;
 import org.apache.lucene.index.*;
 import org.apache.lucene.search.DocIdSetIterator;
@@ -54,14 +49,12 @@ import static org.opensearch.knn.index.codec.jvector.JVectorFormat.SIMD_POOL;
 @Log4j2
 public class JVectorWriter extends KnnVectorsWriter {
     private static final long SHALLOW_RAM_BYTES_USED = RamUsageEstimator.shallowSizeOfInstance(JVectorWriter.class);
-    private static final FlatVectorsFormat FLAT_VECTORS_FORMAT = new Lucene99FlatVectorsFormat(
-        FlatVectorScorerUtil.getLucene99FlatVectorsScorer()
-    );
+    private static final VectorTypeSupport VECTOR_TYPE_SUPPORT = VectorizationProvider.getInstance().getVectorTypeSupport();
+
     private final List<FieldWriter<?>> fields = new ArrayList<>();
 
     private final IndexOutput meta;
     private final IndexOutput vectorIndex;
-    private final FlatVectorsWriter flatVectorWriter;
     private final String indexDataFileName;
     private final String baseDataFileName;
     private final SegmentWriteState segmentWriteState;
@@ -73,7 +66,6 @@ public class JVectorWriter extends KnnVectorsWriter {
                                                                                  // as a function of the original dimension
     private final int minimumBatchSizeForQuantization; // Threshold for the vector count above which we will trigger PQ quantization
     private final boolean mergeOnDisk;
-
     private boolean finished = false;
 
     public JVectorWriter(
@@ -94,7 +86,6 @@ public class JVectorWriter extends KnnVectorsWriter {
         this.numberOfSubspacesPerVectorSupplier = numberOfSubspacesPerVectorSupplier;
         this.minimumBatchSizeForQuantization = minimumBatchSizeForQuantization;
         this.mergeOnDisk = mergeOnDisk;
-        this.flatVectorWriter = FLAT_VECTORS_FORMAT.fieldsWriter(segmentWriteState);
         String metaFileName = IndexFileNames.segmentFileName(
             segmentWriteState.segmentInfo.name,
             segmentWriteState.segmentSuffix,
@@ -146,8 +137,7 @@ public class JVectorWriter extends KnnVectorsWriter {
             log.error(errorMessage);
             throw new UnsupportedOperationException(errorMessage);
         }
-        final FlatFieldVectorsWriter<?> flatFieldVectorsWriter = flatVectorWriter.addField(fieldInfo);
-        FieldWriter<?> newField = new FieldWriter<>(fieldInfo, segmentWriteState.segmentInfo.name, flatFieldVectorsWriter);
+        FieldWriter<?> newField = new FieldWriter<>(fieldInfo, segmentWriteState.segmentInfo.name);
 
         fields.add(newField);
         return newField;
@@ -156,7 +146,6 @@ public class JVectorWriter extends KnnVectorsWriter {
     @Override
     public void mergeOneField(FieldInfo fieldInfo, MergeState mergeState) throws IOException {
         log.info("Merging field {} into segment {}", fieldInfo.name, segmentWriteState.segmentInfo.name);
-        flatVectorWriter.mergeOneField(fieldInfo, mergeState);
         var success = false;
         try {
             final long mergeStart = Clock.systemDefaultZone().millis();
@@ -197,8 +186,6 @@ public class JVectorWriter extends KnnVectorsWriter {
     public void flush(int maxDoc, Sorter.DocMap sortMap) throws IOException {
         log.info("Flushing {} fields", fields.size());
 
-        log.info("Flushing flat vectors");
-        flatVectorWriter.flush(maxDoc, sortMap);
         log.info("Flushing jVector graph index");
         for (FieldWriter<?> field : fields) {
             final RandomAccessVectorValues randomAccessVectorValues = field.randomAccessVectorValues;
@@ -249,6 +236,8 @@ public class JVectorWriter extends KnnVectorsWriter {
             );
         } else {
             buildScoreProvider = BuildScoreProvider.pqBuildScoreProvider(getVectorSimilarityFunction(fieldInfo), pqVectors);
+            // Pre-init the diversity provider here to avoid doing it lazily (as it could block the SIMD threads)
+            buildScoreProvider.diversityProviderFor(0);
         }
 
         // If we haven't provided ord to docId map we will assume will just generate one based on the ordering of the vectors in the
@@ -433,13 +422,11 @@ public class JVectorWriter extends KnnVectorsWriter {
         if (vectorIndex != null) {
             CodecUtil.writeFooter(vectorIndex);
         }
-
-        flatVectorWriter.finish();
     }
 
     @Override
     public void close() throws IOException {
-        IOUtils.close(meta, vectorIndex, flatVectorWriter);
+        IOUtils.close(meta, vectorIndex);
     }
 
     @Override
@@ -467,14 +454,14 @@ public class JVectorWriter extends KnnVectorsWriter {
         private int lastDocID = -1;
         private final String segmentName;
         private final RandomAccessVectorValues randomAccessVectorValues;
-        private final FlatFieldVectorsWriter<T> flatFieldVectorsWriter;
+        private final List<VectorFloat<?>> flatVectors;
 
-        FieldWriter(FieldInfo fieldInfo, String segmentName, FlatFieldVectorsWriter<T> flatFieldVectorsWriter) {
+        FieldWriter(FieldInfo fieldInfo, String segmentName) {
             /**
              * For creating a new field from a flat field vectors writer.
              */
-            this.flatFieldVectorsWriter = flatFieldVectorsWriter;
-            this.randomAccessVectorValues = new RandomAccessVectorValuesOverFlatFields(flatFieldVectorsWriter, fieldInfo);
+            this.flatVectors = new ArrayList<>();
+            this.randomAccessVectorValues = new RandomAccessVectorValuesOverFlatFields(flatVectors, fieldInfo);
             this.fieldInfo = fieldInfo;
             this.segmentName = segmentName;
         }
@@ -490,7 +477,7 @@ public class JVectorWriter extends KnnVectorsWriter {
                 );
             }
             if (vectorValue instanceof float[]) {
-                flatFieldVectorsWriter.addValue(docID, vectorValue);
+                flatVectors.add(JVectorWriter.VECTOR_TYPE_SUPPORT.createFloatVector(vectorValue));
             } else if (vectorValue instanceof byte[]) {
                 final String errorMessage = "byte[] vectors are not supported in JVector. "
                     + "Instead you should only use float vectors and leverage product quantization during indexing."
@@ -511,7 +498,9 @@ public class JVectorWriter extends KnnVectorsWriter {
 
         @Override
         public long ramBytesUsed() {
-            return SHALLOW_SIZE + flatFieldVectorsWriter.ramBytesUsed();
+            return SHALLOW_SIZE + (flatVectors.isEmpty()
+                ? 0
+                : +(long) flatVectors.size() * flatVectors.getFirst().ramBytesUsed() + (long) flatVectors.size());
         }
 
     }
@@ -534,7 +523,6 @@ public class JVectorWriter extends KnnVectorsWriter {
         private static final int READER_ID = 0;
         private static final int READER_ORD = 1;
 
-        private final VectorTypeSupport VECTOR_TYPE_SUPPORT = VectorizationProvider.getInstance().getVectorTypeSupport();
         private final FloatVectorValues mergedFlatFloatVectors;
 
         // Array of sub-readers
@@ -724,7 +712,7 @@ public class JVectorWriter extends KnnVectorsWriter {
                 final long trainingTime = end - start;
                 log.info("Refined PQ codebooks for field {}, in {} millis", fieldName, trainingTime);
                 KNNCounter.KNN_QUANTIZATION_TRAINING_TIME.add(trainingTime);
-                pqVectors = (PQVectors) leadingCompressor.encodeAll(this, SIMD_POOL);
+                pqVectors = leadingCompressor.encodeAll(this, SIMD_POOL);
             }
 
             // Generate the ord to doc mapping
@@ -752,33 +740,24 @@ public class JVectorWriter extends KnnVectorsWriter {
                 throw new IllegalArgumentException("Ordinal out of bounds: " + ord);
             }
 
-            try {
+            final int readerIdx = ordMapping[ord][READER_ID];
+            final int readerOrd = ordMapping[ord][READER_ORD];
 
-                final int readerIdx = ordMapping[ord][READER_ID];
-                final int readerOrd = ordMapping[ord][READER_ORD];
-
-                // Access to float values is not thread safe
-                synchronized (this) {
-                    final FloatVectorValues values = perReaderFloatVectorValues[readerIdx];
-                    final float[] vector = values.vectorValue(readerOrd);
-                    final float[] copy = new float[vector.length];
-                    System.arraycopy(vector, 0, copy, 0, vector.length);
-                    return VECTOR_TYPE_SUPPORT.createFloatVector(copy);
-                }
-            } catch (IOException e) {
-                log.error("Error retrieving vector at ordinal {}", ord, e);
-                throw new RuntimeException(e);
+            // Access to float values is not thread safe
+            synchronized (this) {
+                final JVectorFloatVectorValues values = (JVectorFloatVectorValues) perReaderFloatVectorValues[readerIdx];
+                return values.vectorFloatValue(readerOrd);
             }
         }
 
         @Override
         public boolean isValueShared() {
-            return false;
+            return true;
         }
 
         @Override
         public RandomAccessVectorValues copy() {
-            throw new UnsupportedOperationException("Copy not supported");
+            return this;
         }
     }
 
@@ -813,7 +792,6 @@ public class JVectorWriter extends KnnVectorsWriter {
         final long start = Clock.systemDefaultZone().millis();
         final OnHeapGraphIndex graphIndex;
         var vv = randomAccessVectorValues.threadLocalSupplier();
-
         log.info("Building graph from merged float vector");
         // parallel graph construction from the merge documents Ids
         SIMD_POOL.submit(
@@ -828,19 +806,18 @@ public class JVectorWriter extends KnnVectorsWriter {
     }
 
     static class RandomAccessVectorValuesOverFlatFields implements RandomAccessVectorValues {
-        private final VectorTypeSupport VECTOR_TYPE_SUPPORT = VectorizationProvider.getInstance().getVectorTypeSupport();
 
-        private final FlatFieldVectorsWriter<?> flatFieldVectorsWriter;
+        private final List<VectorFloat<?>> flatVectors;
         private final int dimension;
 
-        RandomAccessVectorValuesOverFlatFields(FlatFieldVectorsWriter<?> flatFieldVectorsWriter, FieldInfo fieldInfo) {
-            this.flatFieldVectorsWriter = flatFieldVectorsWriter;
+        RandomAccessVectorValuesOverFlatFields(List<VectorFloat<?>> flatVectors, FieldInfo fieldInfo) {
+            this.flatVectors = flatVectors;
             this.dimension = fieldInfo.getVectorDimension();
         }
 
         @Override
         public int size() {
-            return flatFieldVectorsWriter.getVectors().size();
+            return flatVectors.size();
         }
 
         @Override
@@ -850,8 +827,7 @@ public class JVectorWriter extends KnnVectorsWriter {
 
         @Override
         public VectorFloat<?> getVector(int nodeId) {
-            final float[] vector = (float[]) flatFieldVectorsWriter.getVectors().get(nodeId);
-            return VECTOR_TYPE_SUPPORT.createFloatVector(vector);
+            return flatVectors.get(nodeId);
         }
 
         @Override
@@ -861,16 +837,16 @@ public class JVectorWriter extends KnnVectorsWriter {
 
         @Override
         public RandomAccessVectorValues copy() {
-            throw new UnsupportedOperationException("Copy not supported");
+            // only used internally
+            return this;
         }
     }
 
     static class RandomAccessVectorValuesOverVectorValues implements RandomAccessVectorValues {
-        private final VectorTypeSupport VECTOR_TYPE_SUPPORT = VectorizationProvider.getInstance().getVectorTypeSupport();
-        private final FloatVectorValues values;
+        private final JVectorFloatVectorValues values;
 
         public RandomAccessVectorValuesOverVectorValues(FloatVectorValues values) {
-            this.values = values;
+            this.values = (JVectorFloatVectorValues) values;
         }
 
         @Override
@@ -885,28 +861,21 @@ public class JVectorWriter extends KnnVectorsWriter {
 
         @Override
         public VectorFloat<?> getVector(int nodeId) {
-            try {
-                // Access to float values is not thread safe
-                synchronized (this) {
-                    final float[] vector = values.vectorValue(nodeId);
-                    final float[] copy = new float[vector.length];
-                    System.arraycopy(vector, 0, copy, 0, vector.length);
-                    return VECTOR_TYPE_SUPPORT.createFloatVector(copy);
-                }
-            } catch (IOException e) {
-                log.error("Error retrieving vector at ordinal {}", nodeId, e);
-                throw new RuntimeException(e);
+            // Access to float values is not thread safe
+            synchronized (this) {
+                return values.vectorFloatValue(nodeId);
             }
         }
 
         @Override
         public boolean isValueShared() {
-            return false;
+            return true;
         }
 
         @Override
         public RandomAccessVectorValues copy() {
-            throw new UnsupportedOperationException("Copy not supported");
+            // Only used internally
+            return this;
         }
     }
 }
