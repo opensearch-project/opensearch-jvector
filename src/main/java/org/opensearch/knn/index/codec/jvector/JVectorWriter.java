@@ -236,7 +236,7 @@ public class JVectorWriter extends KnnVectorsWriter {
             );
         } else {
             buildScoreProvider = BuildScoreProvider.pqBuildScoreProvider(getVectorSimilarityFunction(fieldInfo), pqVectors);
-            //Pre-init the diversity provider here to avoid doing it lazily (as it could block the SIMD threads)
+            // Pre-init the diversity provider here to avoid doing it lazily (as it could block the SIMD threads)
             buildScoreProvider.diversityProviderFor(0);
         }
 
