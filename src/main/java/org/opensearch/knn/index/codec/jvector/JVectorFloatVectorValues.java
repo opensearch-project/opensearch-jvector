@@ -20,6 +20,7 @@ import org.opensearch.common.lucene.BytesRefs;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
 
 public class JVectorFloatVectorValues extends FloatVectorValues {
@@ -125,7 +126,7 @@ public class JVectorFloatVectorValues extends FloatVectorValues {
             @Override
             public BytesRef binaryValue() throws IOException {
                 float[] f = vectorValue(docID());
-                ByteBuffer bb = ByteBuffer.wrap(bytes.bytes);
+                ByteBuffer bb = ByteBuffer.wrap(bytes.bytes).order(ByteOrder.LITTLE_ENDIAN);
                 for (int i = 0; i < f.length; i++)
                     bb.putFloat(f[i]);
 
