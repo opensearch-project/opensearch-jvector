@@ -236,6 +236,8 @@ public class JVectorWriter extends KnnVectorsWriter {
             );
         } else {
             buildScoreProvider = BuildScoreProvider.pqBuildScoreProvider(getVectorSimilarityFunction(fieldInfo), pqVectors);
+            //Pre-init the diversity provider here to avoid doing it lazily (as it could block the SIMD threads)
+            buildScoreProvider.diversityProviderFor(0);
         }
 
         // If we haven't provided ord to docId map we will assume will just generate one based on the ordering of the vectors in the
@@ -790,7 +792,6 @@ public class JVectorWriter extends KnnVectorsWriter {
         final long start = Clock.systemDefaultZone().millis();
         final OnHeapGraphIndex graphIndex;
         var vv = randomAccessVectorValues.threadLocalSupplier();
-
         log.info("Building graph from merged float vector");
         // parallel graph construction from the merge documents Ids
         SIMD_POOL.submit(
