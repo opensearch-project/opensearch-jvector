@@ -10,6 +10,8 @@
   - [Run OpenSearch k-NN](#run-opensearch-k-nn)
     - [Run Single-node Cluster Locally](#run-single-node-cluster-locally)
     - [Run Multi-node Cluster Locally](#run-multi-node-cluster-locally)
+    - [Install jVector KNN within your existing OpenSearch cluster installation](#install-jvector-knn-within-your-existing-opensearch-cluster-installation)
+    - [Bundle jVector KNN in Docker image](#bundle-jvector-knn-in-docker-image)
   - [Debugging](#debugging)
   - [Backwards Compatibility Testing](#backwards-compatibility-testing)
     - [Adding new tests](#adding-new-tests)
@@ -257,6 +259,22 @@ curl https://repo1.maven.org/maven2/org/opensearch/plugin/opensearch-jvector-plu
 # Start OpenSearch
 ./bin/opensearch
 ```
+
+### Bundle jVector KNN in Docker image
+
+You can build a Docker image with the jVector KNN plugin installed using the following Dockerfile:
+
+```Dockerfile
+FROM opensearchproject/opensearch:3.0.0
+
+# Remove the KNN plugin
+RUN /usr/share/opensearch/bin/opensearch-plugin remove opensearch-neural-search && \
+    /usr/share/opensearch/bin/opensearch-plugin remove opensearch-knn
+# Install JVector plugin
+RUN curl https://repo1.maven.org/maven2/org/opensearch/plugin/opensearch-jvector-plugin/3.0.0.4/opensearch-jvector-plugin-3.0.0.4.zip -o opensearch-jvector-plugin.zip && \
+    /usr/share/opensearch/bin/opensearch-plugin install --batch file://`pwd`/opensearch-jvector-plugin.zip
+```
+
 
 ### Debugging
 
