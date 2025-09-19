@@ -264,7 +264,7 @@ public abstract class KNNVectorFieldMapper extends ParametrizedFieldMapper {
                     .copyTo(copyToBuilder)
                     .ignoreMalformed(ignoreMalformed)
                     .stored(stored.getValue())
-                    .hasDocValues(hasDocValues.getValue())
+                    .hasDocValues(false)
                     .originalKnnMethodContext(knnMethodContext.get())
                     .build();
                 return LuceneFieldMapper.createFieldMapper(

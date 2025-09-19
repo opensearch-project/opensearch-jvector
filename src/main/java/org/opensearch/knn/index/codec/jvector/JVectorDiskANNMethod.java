@@ -70,6 +70,14 @@ public class JVectorDiskANNMethod extends AbstractKNNMethod {
                 )
             )
             .addParameter(
+                METHOD_PARAMETER_MIN_BATCH_SIZE_FOR_QUANTIZATION,
+                new Parameter.IntegerParameter(
+                    METHOD_PARAMETER_MIN_BATCH_SIZE_FOR_QUANTIZATION,
+                    KNNConstants.DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION,
+                    (v, context) -> v > 0
+                )
+            )
+            .addParameter(
                 METHOD_PARAMETER_NUM_PQ_SUBSPACES,
                 new Parameter.IntegerParameter(
                     METHOD_PARAMETER_NUM_PQ_SUBSPACES,

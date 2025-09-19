@@ -24,6 +24,8 @@ public class KNN940PerFieldKnnVectorsFormat extends BasePerFieldKnnVectorsFormat
             Lucene94HnswVectorsFormat.DEFAULT_BEAM_WIDTH,
             KNNConstants.DEFAULT_ALPHA_VALUE.floatValue(),
             KNNConstants.DEFAULT_NEIGHBOR_OVERFLOW_VALUE.floatValue(),
+            KNNConstants.DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION,
+            KNNConstants.DEFAULT_HIERARCHY_ENABLED,
             () -> new Lucene94HnswVectorsFormat(),
             (knnEngine, knnVectorsFormatParams) -> new Lucene94HnswVectorsFormat(
                 knnVectorsFormatParams.getMaxConnections(),

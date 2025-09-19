@@ -124,11 +124,14 @@ public class KNNConstants {
     // Construction related params
     public static final String METHOD_PARAMETER_ALPHA = "advanced.alpha";
     public static final String METHOD_PARAMETER_NEIGHBOR_OVERFLOW = "advanced.neighbor_overflow";
-    public static final String METHOD_PARAMETER_HIERARCHY_ENABLED = "hierarchy_enabled"; // TODO: wire this after jvector upgrade
+    public static final String METHOD_PARAMETER_MIN_BATCH_SIZE_FOR_QUANTIZATION = "advanced.min_batch_size_for_quantization";
+    public static final String METHOD_PARAMETER_HIERARCHY_ENABLED = "advanced.hierarchy_enabled";
     public static final String METHOD_PARAMETER_NUM_PQ_SUBSPACES = "advanced.num_pq_subspaces";
     public static final Double DEFAULT_ALPHA_VALUE = 1.2;
     public static final Double DEFAULT_NEIGHBOR_OVERFLOW_VALUE = 1.2;
-    public static final Boolean DEFAULT_HIERARCHY_ENABLED = true; // TODO: wire this after jvector upgrade
+    public static final int DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION = 1024; // above this batch size we will trigger quantization by
+                                                                                // default
+    public static final Boolean DEFAULT_HIERARCHY_ENABLED = false;
 
     // Parameter defaults/limits
     public static final Integer ENCODER_PARAMETER_PQ_CODE_COUNT_DEFAULT = 1;

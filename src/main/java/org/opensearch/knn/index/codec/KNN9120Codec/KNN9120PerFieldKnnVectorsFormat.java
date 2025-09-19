@@ -33,6 +33,8 @@ public class KNN9120PerFieldKnnVectorsFormat extends BasePerFieldKnnVectorsForma
             Lucene99HnswVectorsFormat.DEFAULT_BEAM_WIDTH,
             KNNConstants.DEFAULT_ALPHA_VALUE.floatValue(),
             KNNConstants.DEFAULT_NEIGHBOR_OVERFLOW_VALUE.floatValue(),
+            KNNConstants.DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION,
+            KNNConstants.DEFAULT_HIERARCHY_ENABLED,
             Lucene99HnswVectorsFormat::new,
             (knnEngine, knnVectorsFormatParams) -> {
                 final Tuple<Integer, ExecutorService> mergeThreadCountAndExecutorService = getMergeThreadCountAndExecutorService();
@@ -67,8 +69,8 @@ public class KNN9120PerFieldKnnVectorsFormat extends BasePerFieldKnnVectorsForma
                             knnVectorsFormatParams.getAlpha(),
                             knnVectorsFormatParams.getNeighborOverflow(),
                             knnVectorsFormatParams.getNumberOfSubspacesPerVectorSupplier(),
-                            JVectorFormat.DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION,
-                            true
+                            knnVectorsFormatParams.getMinBatchSizeForQuantization(),
+                            knnVectorsFormatParams.isHierarchyEnabled()
                         );
                     default:
                         throw new IllegalArgumentException("Unsupported java engine: " + knnEngine);

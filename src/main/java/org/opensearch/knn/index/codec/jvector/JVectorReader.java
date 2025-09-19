@@ -5,6 +5,7 @@
 
 package org.opensearch.knn.index.codec.jvector;
 
+import io.github.jbellis.jvector.disk.RandomAccessReader;
 import io.github.jbellis.jvector.disk.ReaderSupplier;
 import io.github.jbellis.jvector.graph.GraphSearcher;
 import io.github.jbellis.jvector.graph.SearchResult;
@@ -20,10 +21,6 @@ import io.github.jbellis.jvector.vector.types.VectorTypeSupport;
 import lombok.extern.log4j.Log4j2;
 import org.apache.lucene.codecs.CodecUtil;
 import org.apache.lucene.codecs.KnnVectorsReader;
-import org.apache.lucene.codecs.hnsw.FlatVectorScorerUtil;
-import org.apache.lucene.codecs.hnsw.FlatVectorsFormat;
-import org.apache.lucene.codecs.hnsw.FlatVectorsReader;
-import org.apache.lucene.codecs.lucene99.Lucene99FlatVectorsFormat;
 import org.apache.lucene.index.*;
 import org.apache.lucene.search.KnnCollector;
 import org.apache.lucene.store.*;
@@ -44,9 +41,6 @@ import java.util.Optional;
 @Log4j2
 public class JVectorReader extends KnnVectorsReader {
     private static final VectorTypeSupport VECTOR_TYPE_SUPPORT = VectorizationProvider.getInstance().getVectorTypeSupport();
-    private static final FlatVectorsFormat FLAT_VECTORS_FORMAT = new Lucene99FlatVectorsFormat(
-        FlatVectorScorerUtil.getLucene99FlatVectorsScorer()
-    );
 
     private final FieldInfos fieldInfos;
     private final String baseDataFileName;
@@ -54,13 +48,9 @@ public class JVectorReader extends KnnVectorsReader {
     private final Map<String, FieldEntry> fieldEntryMap = new HashMap<>(1);
     private final Directory directory;
     private final SegmentReadState state;
-    private final FlatVectorsReader flatVectorsReader;
-    private final boolean mergeOnDisk;
 
-    public JVectorReader(SegmentReadState state, boolean mergeOnDisk) throws IOException {
+    public JVectorReader(SegmentReadState state) throws IOException {
         this.state = state;
-        this.mergeOnDisk = mergeOnDisk;
-        this.flatVectorsReader = FLAT_VECTORS_FORMAT.fieldsReader(state);
         this.fieldInfos = state.fieldInfos;
         this.baseDataFileName = state.segmentInfo.name + "_" + state.segmentSuffix;
         final String metaFileName = IndexFileNames.segmentFileName(
@@ -92,9 +82,14 @@ public class JVectorReader extends KnnVectorsReader {
 
     @Override
     public void checkIntegrity() throws IOException {
-        flatVectorsReader.checkIntegrity();
         for (FieldEntry fieldEntry : fieldEntryMap.values()) {
+            // Verify the vector index file
             try (var indexInput = state.directory.openInput(fieldEntry.vectorIndexFieldDataFileName, IOContext.READONCE)) {
+                CodecUtil.checksumEntireFile(indexInput);
+            }
+
+            // Verify the neighbors score cache file
+            try (var indexInput = state.directory.openInput(fieldEntry.neighborsScoreCacheIndexFieldFileName, IOContext.READONCE)) {
                 CodecUtil.checksumEntireFile(indexInput);
             }
         }
@@ -102,11 +97,8 @@ public class JVectorReader extends KnnVectorsReader {
 
     @Override
     public FloatVectorValues getFloatVectorValues(String field) throws IOException {
-        if (mergeOnDisk) {
-            return flatVectorsReader.getFloatVectorValues(field);
-        }
         final FieldEntry fieldEntry = fieldEntryMap.get(field);
-        return new JVectorFloatVectorValues(fieldEntry.index, fieldEntry.similarityFunction);
+        return new JVectorFloatVectorValues(fieldEntry.index, fieldEntry.similarityFunction, fieldEntry.graphNodeIdToDocMap);
     }
 
     @Override
@@ -124,6 +116,15 @@ public class JVectorReader extends KnnVectorsReader {
         }
 
         return Optional.of(fieldEntry.pqVectors.getCompressor());
+    }
+
+    public RandomAccessReader getNeighborsScoreCacheForField(String field) throws IOException {
+        final FieldEntry fieldEntry = fieldEntryMap.get(field);
+        return fieldEntry.neighborsScoreCacheIndexReaderSupplier.get();
+    }
+
+    public OnDiskGraphIndex getOnDiskGraphIndex(String field) throws IOException {
+        return fieldEntryMap.get(field).index;
     }
 
     @Override
@@ -163,7 +164,13 @@ public class JVectorReader extends KnnVectorsReader {
             } else { // Not quantized, used typical searcher
                 ssp = DefaultSearchScoreProvider.exact(q, fieldEntryMap.get(field).similarityFunction, view);
             }
-            io.github.jbellis.jvector.util.Bits compatibleBits = doc -> acceptDocs == null || acceptDocs.get(doc);
+            final GraphNodeIdToDocMap jvectorLuceneDocMap = fieldEntryMap.get(field).graphNodeIdToDocMap;
+            // Convert the acceptDocs bitmap from Lucene to jVector ordinal bitmap filter
+            // Logic works as follows: if acceptDocs is null, we accept all ordinals. Otherwise, we check if the jVector ordinal has a
+            // corresponding Lucene doc ID accepted by acceptDocs filter.
+            io.github.jbellis.jvector.util.Bits compatibleBits = ord -> acceptDocs == null
+                || acceptDocs.get(jvectorLuceneDocMap.getLuceneDocId(ord));
+
             try (var graphSearcher = new GraphSearcher(index)) {
                 final var searchResults = graphSearcher.search(
                     ssp,
@@ -174,7 +181,7 @@ public class JVectorReader extends KnnVectorsReader {
                     compatibleBits
                 );
                 for (SearchResult.NodeScore ns : searchResults.getNodes()) {
-                    jvectorKnnCollector.collect(ns.node, ns.score);
+                    jvectorKnnCollector.collect(jvectorLuceneDocMap.getLuceneDocId(ns.node), ns.score);
                 }
                 final long graphSearchEnd = System.currentTimeMillis();
                 final long searchTime = graphSearchEnd - graphSearchStart;
@@ -212,7 +219,6 @@ public class JVectorReader extends KnnVectorsReader {
 
     @Override
     public void close() throws IOException {
-        IOUtils.close(flatVectorsReader);
         for (FieldEntry fieldEntry : fieldEntryMap.values()) {
             IOUtils.close(fieldEntry);
         }
@@ -238,8 +244,11 @@ public class JVectorReader extends KnnVectorsReader {
         private final long pqCodebooksAndVectorsLength;
         private final long pqCodebooksAndVectorsOffset;
         private final String vectorIndexFieldDataFileName;
+        private final String neighborsScoreCacheIndexFieldFileName;
+        private final GraphNodeIdToDocMap graphNodeIdToDocMap;
         private final ReaderSupplier indexReaderSupplier;
         private final ReaderSupplier pqCodebooksReaderSupplier;
+        private final ReaderSupplier neighborsScoreCacheIndexReaderSupplier;
         private final OnDiskGraphIndex index;
         private final PQVectors pqVectors; // The product quantized vectors with their codebooks
 
@@ -254,8 +263,14 @@ public class JVectorReader extends KnnVectorsReader {
             this.pqCodebooksAndVectorsLength = vectorIndexFieldMetadata.getPqCodebooksAndVectorsLength();
             this.pqCodebooksAndVectorsOffset = vectorIndexFieldMetadata.getPqCodebooksAndVectorsOffset();
             this.dimension = vectorIndexFieldMetadata.getVectorDimension();
+            this.graphNodeIdToDocMap = vectorIndexFieldMetadata.getGraphNodeIdToDocMap();
 
             this.vectorIndexFieldDataFileName = baseDataFileName + "_" + fieldInfo.name + "." + JVectorFormat.VECTOR_INDEX_EXTENSION;
+            this.neighborsScoreCacheIndexFieldFileName = baseDataFileName
+                + "_"
+                + fieldInfo.name
+                + "."
+                + JVectorFormat.NEIGHBORS_SCORE_CACHE_EXTENSION;
 
             // For the slice we would like to include the Lucene header, unfortunately, we have to do this because jVector use global
             // offsets instead of local offsets
@@ -294,6 +309,11 @@ public class JVectorReader extends KnnVectorsReader {
                 this.pqCodebooksReaderSupplier = null;
                 this.pqVectors = null;
             }
+
+            final IndexInput indexInput = directory.openInput(neighborsScoreCacheIndexFieldFileName, state.context);
+            CodecUtil.readIndexHeader(indexInput);
+
+            this.neighborsScoreCacheIndexReaderSupplier = new JVectorRandomAccessReader.Supplier(indexInput);
         }
 
         @Override
@@ -303,6 +323,9 @@ public class JVectorReader extends KnnVectorsReader {
             }
             if (pqCodebooksReaderSupplier != null) {
                 IOUtils.close(pqCodebooksReaderSupplier::close);
+            }
+            if (neighborsScoreCacheIndexReaderSupplier != null) {
+                IOUtils.close(neighborsScoreCacheIndexReaderSupplier::close);
             }
         }
     }
