@@ -99,7 +99,7 @@ public class KNN9120BinaryVectorScorer implements FlatVectorsScorer {
 
         @Override
         public UpdateableRandomVectorScorer scorer() throws IOException {
-            byte[] queryVector = new byte[vectorValues.dimension()];            
+            byte[] queryVector = new byte[vectorValues.dimension()];
             return new BinaryRandomVectorScorer(vectorValues, queryVector);
         }
 
