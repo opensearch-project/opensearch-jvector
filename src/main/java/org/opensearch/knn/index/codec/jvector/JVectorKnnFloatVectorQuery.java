@@ -9,6 +9,7 @@ import org.apache.lucene.index.LeafReader;
 import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.search.*;
 import org.apache.lucene.search.knn.KnnCollectorManager;
+import org.apache.lucene.search.knn.KnnSearchStrategy;
 import org.apache.lucene.util.Bits;
 
 import java.io.IOException;
@@ -64,7 +65,7 @@ public class JVectorKnnFloatVectorQuery extends KnnFloatVectorQuery {
         int visitedLimit,
         KnnCollectorManager knnCollectorManager
     ) throws IOException {
-        final KnnCollector delegateCollector = knnCollectorManager.newCollector(visitedLimit, context);
+        final KnnCollector delegateCollector = knnCollectorManager.newCollector(visitedLimit, KnnSearchStrategy.Hnsw.DEFAULT, context);
         final KnnCollector knnCollector = new JVectorKnnCollector(delegateCollector, threshold, rerankFloor, overQueryFactor, usePruning);
         LeafReader reader = context.reader();
         FloatVectorValues floatVectorValues = reader.getFloatVectorValues(field);

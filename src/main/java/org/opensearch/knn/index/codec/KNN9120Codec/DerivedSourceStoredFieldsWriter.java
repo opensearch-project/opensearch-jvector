@@ -9,7 +9,6 @@ import lombok.RequiredArgsConstructor;
 import org.apache.lucene.codecs.StoredFieldsWriter;
 import org.apache.lucene.index.FieldInfo;
 import org.apache.lucene.index.MergeState;
-import org.apache.lucene.store.DataInput;
 import org.apache.lucene.util.BytesRef;
 import org.opensearch.common.collect.Tuple;
 import org.opensearch.common.io.stream.BytesStreamOutput;
@@ -56,11 +55,6 @@ public class DerivedSourceStoredFieldsWriter extends StoredFieldsWriter {
     @Override
     public void writeField(FieldInfo fieldInfo, double v) throws IOException {
         delegate.writeField(fieldInfo, v);
-    }
-
-    @Override
-    public void writeField(FieldInfo info, DataInput value, int length) throws IOException {
-        delegate.writeField(info, value, length);
     }
 
     @Override

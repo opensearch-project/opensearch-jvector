@@ -6,6 +6,7 @@ package org.opensearch.knn.index.codec.jvector;
 
 import lombok.Value;
 import org.apache.lucene.search.KnnCollector;
+import org.apache.lucene.search.knn.KnnSearchStrategy;
 import org.apache.lucene.search.TopDocs;
 
 /**
@@ -57,5 +58,10 @@ public class JVectorKnnCollector implements KnnCollector {
     @Override
     public TopDocs topDocs() {
         return delegate.topDocs();
+    }
+
+    @Override
+    public KnnSearchStrategy getSearchStrategy() {
+        return delegate.getSearchStrategy();
     }
 }
