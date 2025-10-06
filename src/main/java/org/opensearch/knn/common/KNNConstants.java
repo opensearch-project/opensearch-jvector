@@ -41,6 +41,9 @@ public class KNNConstants {
     public static final Integer BYTES_PER_KILOBYTES = 1024;
     public static final String PREFERENCE_PARAMETER = "preference";
 
+    // unused, needed for parity with knn on neural-search plugin code.
+    public static final String MODEL_INDEX_NAME = ".opensearch-knn-models";
+
     public static final String MODEL_STATE = "state";
     public static final String MODEL_TIMESTAMP = "timestamp";
     public static final String MODEL_DESCRIPTION = "description";
