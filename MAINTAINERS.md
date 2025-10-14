@@ -6,9 +6,10 @@ This document contains a list of maintainers in this repo. See [opensearch-proje
 
 | Maintainer    | GitHub ID                             | Affiliation |
 |---------------|---------------------------------------|-------------|
-| Samuel Herman | [sam-herman](https://github.com/sam-herman) | DataStax    |
-| Jake Luciani  | [tjake](https://github.com/tjake)          | DataStax      |
-| Jim Dickinson | [jimdickinson](https://github.com/jimdickinson)            | DataStax      |
-| Chris Mills   | [sandoichi](https://github.com/sandoichi)            | DataStax      |
+| Samuel Herman | [sam-herman](https://github.com/sam-herman) | IBM         |
+| Jake Luciani  | [tjake](https://github.com/tjake)          | DataStax    |
+| Jim Dickinson | [jimdickinson](https://github.com/jimdickinson)            | IBM         |
+| Chris Mills   | [sandoichi](https://github.com/sandoichi)            | IBM         |
+| Akash Shankaran | [akash-shankaran](https://github.com/akash-shankaran) | IBM         |
 
 
