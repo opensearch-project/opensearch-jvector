@@ -46,9 +46,7 @@ public class JVectorRandomAccessReader implements RandomAccessReader {
 
     @Override
     public float readFloat() throws IOException {
-        indexInputDelegate.readBytes(internalFloatBuffer, 0, Float.BYTES);
-        FloatBuffer buffer = ByteBuffer.wrap(internalFloatBuffer).asFloatBuffer();
-        return buffer.get();
+        return Float.intBitsToFloat(indexInputDelegate.readInt());
     }
 
     // TODO: bring back to override when upgrading jVector again
@@ -135,6 +133,10 @@ public class JVectorRandomAccessReader implements RandomAccessReader {
         private final long sliceStartOffset;
         private final long sliceLength;
         private final ConcurrentHashMap<Integer, RandomAccessReader> readers = new ConcurrentHashMap<>();
+
+        public Supplier(IndexInput indexInput) throws IOException {
+            this(indexInput, indexInput.getFilePointer(), indexInput.length() - indexInput.getFilePointer());
+        }
 
         public Supplier(IndexInput indexInput, long sliceStartOffset, long sliceLength) throws IOException {
             this.currentInput = indexInput;

@@ -11,7 +11,7 @@ import csv
 import matplotlib.pyplot as plt
 import os
 
-def create_index(host, index_name, dimension, shards=1):
+def create_index(host, index_name, dimension, shards=1, min_batch_size_for_quantization=1000000):
     """Create a knn index with jvector engine"""
     url = f"http://{host}/{index_name}"
     
@@ -19,6 +19,7 @@ def create_index(host, index_name, dimension, shards=1):
         "settings": {
             "index": {
                 "knn": True,
+                "knn.derived_source.enabled": True,
                 "number_of_shards": shards,
                 "number_of_replicas": 0
             }
@@ -32,7 +33,9 @@ def create_index(host, index_name, dimension, shards=1):
                         "name": "disk_ann",
                         "space_type": "l2",
                         "engine": "jvector",
-                        "parameters": {}
+                        "parameters": {
+                            "advanced.min_batch_size_for_quantization": min_batch_size_for_quantization
+                        }
                     }
                 },
                 "id": {"type": "keyword"}
@@ -422,6 +425,8 @@ def main():
                         help="Force merge after every N documents (0 to disable intermediate merges)")
     parser.add_argument("--csv-output", type=str, help="CSV file to save merge time data")
     parser.add_argument("--plot", action="store_true", help="Generate plots from CSV data")
+    parser.add_argument("--min-batch-size-for-quantization", type=int, default=1000000,
+                        help="Minimum batch size for quantization (default: 1M)")
     
     args = parser.parse_args()
     
@@ -434,7 +439,7 @@ def main():
         print(f"Estimated size: ~{args.num_vectors * args.dimension * 4 / (1024*1024*1024):.2f} GB (raw vectors only)")
         
         # Create index
-        create_index(args.host, args.index, args.dimension, args.shards)
+        create_index(args.host, args.index, args.dimension, args.shards, args.min_batch_size_for_quantization)
         
         # Index vectors
         index_vectors(args.host, args.index, args.num_vectors, args.dimension, args.batch_size, args.force_merge_frequency, args.csv_output)

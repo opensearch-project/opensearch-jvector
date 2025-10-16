@@ -186,6 +186,7 @@ public class LuceneEngineIT extends KNNRestTestCase {
             .startObject()
             .startObject(PROPERTIES_FIELD_NAME)
             .startObject(FIELD_NAME)
+            .field("doc_values", false)
             .field(TYPE_FIELD_NAME, KNN_VECTOR_TYPE)
             .field(DIMENSION_FIELD_NAME, DIMENSION)
             .startObject(KNNConstants.KNN_METHOD)

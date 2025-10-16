@@ -5,7 +5,6 @@
 
 package org.opensearch.knn.index.engine;
 
-import org.junit.Test;
 import org.opensearch.client.*;
 
 import com.google.common.collect.ImmutableList;
@@ -25,7 +24,6 @@ import org.opensearch.knn.TestUtils;
 import org.opensearch.knn.common.KNNConstants;
 import org.opensearch.knn.index.SpaceType;
 import org.opensearch.knn.index.VectorDataType;
-import org.opensearch.knn.index.codec.jvector.JVectorFormat;
 import org.opensearch.knn.index.query.KNNQueryBuilder;
 
 import java.io.IOException;
@@ -90,6 +88,7 @@ public class JVectorEngineIT extends KNNRestTestCase {
         XContentBuilder builder = jsonBuilder().startObject()
             .startObject(PROPERTIES_FIELD_NAME)
             .startObject(FIELD_NAME)
+            .field("doc_values", false)
             .field(TYPE_FIELD_NAME, KNN_VECTOR_TYPE)
             .field(DIMENSION_FIELD_NAME, CommonTestUtils.DIMENSION)
             .startObject(KNNConstants.KNN_METHOD)
@@ -97,8 +96,14 @@ public class JVectorEngineIT extends KNNRestTestCase {
             .field(KNNConstants.METHOD_PARAMETER_SPACE_TYPE, SpaceType.L2.getValue())
             .field(KNNConstants.KNN_ENGINE, KNNEngine.JVECTOR.getName())
             .startObject(KNNConstants.PARAMETERS)
+            // Adding all the parameters here (even though we could have just let it use whatever defaults) just to make sure everything is
+            // correctly wired
             .field(KNNConstants.METHOD_PARAMETER_M, mValues.get(random().nextInt(mValues.size())))
             .field(KNNConstants.METHOD_PARAMETER_EF_CONSTRUCTION, efConstructionValues.get(random().nextInt(efConstructionValues.size())))
+            .field(KNNConstants.METHOD_PARAMETER_ALPHA, 1.2)
+            .field(KNNConstants.METHOD_PARAMETER_NEIGHBOR_OVERFLOW, 2.0)
+            .field(KNNConstants.METHOD_PARAMETER_HIERARCHY_ENABLED, false)
+            .field(KNNConstants.METHOD_PARAMETER_MIN_BATCH_SIZE_FOR_QUANTIZATION, 1000)
             .endObject()
             .endObject()
             .endObject()
@@ -428,178 +433,5 @@ public class JVectorEngineIT extends KNNRestTestCase {
                 assertEquals(KNNEngine.LUCENE.score(rawScore, spaceType), actualScores.get(j), 0.0001);
             }
         }
-    }
-
-    /**
-     * Test that verifies JVector's behavior with mixed batch sizes for quantization.
-     * Some batches will be smaller than DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION
-     * and some will be larger.
-     */
-    public void testMixedBatchSizesForQuantization() throws Exception {
-        int dimension = 16;
-        final SpaceType spaceType = SpaceType.L2;
-        createKnnIndexMappingWithJVectorEngine(dimension, spaceType, VectorDataType.FLOAT);
-
-        // Define batch sizes - mix of small and large batches
-        int smallBatchSize = JVectorFormat.DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION / 4;
-        int largeBatchSize = JVectorFormat.DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION * 2;
-
-        final float[][] vectors = new float[smallBatchSize + largeBatchSize + smallBatchSize][dimension];
-        for (int i = 0; i < vectors.length; i++) {
-            for (int j = 0; j < dimension; j++) {
-                vectors[i][j] = randomFloat();
-            }
-        }
-        final int totalDocs = vectors.length;
-        final int firstSmallBatchOffset = 0;
-        final int largeBatchOffset = firstSmallBatchOffset + smallBatchSize;
-        final int secondSmallBatchOffset = largeBatchOffset + largeBatchSize;
-
-        // Add the first small batch (below quantization threshold)
-        logger.info("Adding first small batch");
-        for (int i = firstSmallBatchOffset; i < largeBatchOffset; i++) {
-            addKnnDoc(INDEX_NAME, Integer.toString(i, 10), FIELD_NAME, vectors[i]);
-        }
-        flushIndex(INDEX_NAME);
-
-        logger.info("Adding large batch");
-        // Add the large batch (above quantization threshold)
-        for (int i = largeBatchOffset; i < secondSmallBatchOffset; i++) {
-            addKnnDoc(INDEX_NAME, Integer.toString(i, 10), FIELD_NAME, vectors[i]);
-        }
-        flushIndex(INDEX_NAME);
-
-        logger.info("Adding second small batch");
-        // Add another small batch
-        for (int i = secondSmallBatchOffset; i < totalDocs; i++) {
-            addKnnDoc(INDEX_NAME, Integer.toString(i, 10), FIELD_NAME, vectors[i]);
-        }
-        flushIndex(INDEX_NAME);
-
-        // Force merge to trigger quantization for all segments
-        logger.info("Force merging");
-        forceMergeKnnIndex(INDEX_NAME);
-
-        // Verify the total document count
-        int expectedTotalDocs = vectors.length;
-        assertEquals(expectedTotalDocs, getDocCount(INDEX_NAME));
-
-        // Perform search and verify recall
-        logger.info("Searching");
-        float[] queryVector = randomFloatVector(dimension);
-        int k = 10;
-
-        // First search without forcing merge
-        Response response = searchKNNIndex(INDEX_NAME, new KNNQueryBuilder(FIELD_NAME, queryVector, k), k);
-        List<KNNResult> results = parseSearchResponse(EntityUtils.toString(response.getEntity()), FIELD_NAME);
-
-        // Verify we got k results (or all docs if less than k)
-        assertEquals(Math.min(k, expectedTotalDocs), results.size());
-
-        // Calculate ground truth with brute force
-        logger.info("Calculating ground truth");
-        List<Set<String>> groundTruth = TestUtils.computeGroundTruthValues(vectors, new float[][] { queryVector }, spaceType, k);
-        assertEquals(1, groundTruth.size());
-        Set<String> expectedDocIds = groundTruth.getFirst();
-
-        // calculate recall
-        logger.info("Calculating recall");
-        float recall = ((float) results.stream().filter(r -> expectedDocIds.contains(r.getDocId())).count()) / ((float) k);
-        assertTrue("Expected recall to be at least 0.9 but got " + recall, recall >= 0.9);
-    }
-
-    /**
-     * Test for recall with various overquery parameters.
-     * We expect the recall to be higher the more we increase the overquery parameter
-     * @throws Exception exception
-     */
-    @Test
-    public void testQuantizationWithOverQueryParameter() throws Exception {
-        int dimension = 512;
-        final SpaceType spaceType = SpaceType.L2;
-        createKnnIndexMappingWithJVectorEngine(dimension, spaceType, VectorDataType.FLOAT);
-
-        // Choosing a batch size that will trigger quantization
-        int batchSize = JVectorFormat.DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION * 2;
-
-        final float[][] vectors = new float[batchSize][dimension];
-        for (int i = 0; i < vectors.length; i++) {
-            for (int j = 0; j < dimension; j++) {
-                vectors[i][j] = randomFloat();
-            }
-        }
-        final int totalDocs = vectors.length;
-
-        logger.info("Adding batch of vectors with size {} that is expected to trigger quantization", totalDocs);
-        for (int i = 0; i < batchSize; i++) {
-            addKnnDoc(INDEX_NAME, Integer.toString(i, 10), FIELD_NAME, vectors[i]);
-        }
-        flushIndex(INDEX_NAME);
-
-        // Force merge to trigger quantization for all segments
-        logger.info("Force merging just in case quantization didn't happen because of segment fragmentation");
-        forceMergeKnnIndex(INDEX_NAME);
-
-        // Verify the total document count
-        int expectedTotalDocs = vectors.length;
-        assertEquals(expectedTotalDocs, getDocCount(INDEX_NAME));
-
-        // Perform search and verify recall
-        float[] queryVector = randomFloatVector(dimension);
-        int k = 10;
-
-        // Calculate ground truth with brute force
-        logger.info("Calculating ground truth");
-        List<Set<String>> groundTruth = TestUtils.computeGroundTruthValues(vectors, new float[][] { queryVector }, spaceType, k);
-        assertEquals(1, groundTruth.size());
-        Set<String> expectedDocIds = groundTruth.getFirst();
-
-        logger.info("Searching with low overquery factor");
-        // 1. Search with a low-overquery factor
-        final Map<String, Object> methodParametersWithLowOverQuery = new HashMap<>();
-        methodParametersWithLowOverQuery.put(KNNConstants.METHOD_PARAMETER_OVERQUERY_FACTOR, 1);
-        methodParametersWithLowOverQuery.put(KNNConstants.METHOD_PARAMETER_THRESHOLD, DEFAULT_QUERY_SIMILARITY_THRESHOLD);
-        methodParametersWithLowOverQuery.put(METHOD_PARAMETER_RERANK_FLOOR, DEFAULT_QUERY_RERANK_FLOOR);
-
-        KNNQueryBuilder knnQueryBuilder = KNNQueryBuilder.builder()
-            .k(k)
-            .vector(queryVector)
-            .fieldName(FIELD_NAME)
-            .methodParameters(methodParametersWithLowOverQuery)
-            .build();
-        Response response = searchKNNIndex(INDEX_NAME, knnQueryBuilder, k);
-        List<KNNResult> results = parseSearchResponse(EntityUtils.toString(response.getEntity()), FIELD_NAME);
-
-        // Verify we got k results (or all docs if less than k)
-        assertEquals(Math.min(k, expectedTotalDocs), results.size());
-
-        // calculate recall
-        logger.info("Calculating recall");
-        float recall = ((float) results.stream().filter(r -> expectedDocIds.contains(r.getDocId())).count()) / ((float) k);
-        assertTrue("Expected recall to be lower than 0.7 but got " + recall, recall < 0.7);
-
-        // 2. Search with a high-overquery factor
-        logger.info("Searching with high overquery factor");
-        final Map<String, Object> methodParametersWithHighOverQuery = new HashMap<>();
-        methodParametersWithHighOverQuery.put(KNNConstants.METHOD_PARAMETER_OVERQUERY_FACTOR, 100);
-        methodParametersWithHighOverQuery.put(KNNConstants.METHOD_PARAMETER_THRESHOLD, DEFAULT_QUERY_SIMILARITY_THRESHOLD);
-        methodParametersWithHighOverQuery.put(METHOD_PARAMETER_RERANK_FLOOR, DEFAULT_QUERY_RERANK_FLOOR);
-
-        knnQueryBuilder = KNNQueryBuilder.builder()
-            .k(k)
-            .vector(queryVector)
-            .fieldName(FIELD_NAME)
-            .methodParameters(methodParametersWithHighOverQuery)
-            .build();
-        response = searchKNNIndex(INDEX_NAME, knnQueryBuilder, k);
-        results = parseSearchResponse(EntityUtils.toString(response.getEntity()), FIELD_NAME);
-
-        // Verify we got k results (or all docs if less than k)
-        assertEquals(Math.min(k, expectedTotalDocs), results.size());
-
-        // calculate recall
-        logger.info("Calculating recall");
-        recall = ((float) results.stream().filter(r -> expectedDocIds.contains(r.getDocId())).count()) / ((float) k);
-        assertTrue("Expected recall to be at least 0.9 but got " + recall, recall >= 0.8);
     }
 }

@@ -41,6 +41,8 @@ public abstract class BasePerFieldKnnVectorsFormat extends PerFieldKnnVectorsFor
     private final int defaultBeamWidth;
     private float defaultAlpha;
     private float defaultNeighborOverflow;
+    private int defaultMinBatchSizeForQuantization;
+    private boolean defaultHierarchyEnabled;
     private final Supplier<KnnVectorsFormat> defaultFormatSupplier;
     private final BiFunction<KNNEngine, KNNVectorsFormatParams, KnnVectorsFormat> vectorsFormatSupplier;
     private Function<KNNScalarQuantizedVectorsFormatParams, KnnVectorsFormat> scalarQuantizedVectorsFormatSupplier;
@@ -53,6 +55,8 @@ public abstract class BasePerFieldKnnVectorsFormat extends PerFieldKnnVectorsFor
         int defaultBeamWidth,
         float defaultAlpha,
         float defaultNeighborOverflow,
+        int defaultMinBatchSizeForQuantization,
+        boolean defaultHierarchyEnabled,
         Supplier<KnnVectorsFormat> defaultFormatSupplier,
         BiFunction<KNNEngine, KNNVectorsFormatParams, KnnVectorsFormat> vectorsFormatSupplier
     ) {
@@ -63,6 +67,8 @@ public abstract class BasePerFieldKnnVectorsFormat extends PerFieldKnnVectorsFor
         this.vectorsFormatSupplier = vectorsFormatSupplier;
         this.defaultAlpha = defaultAlpha;
         this.defaultNeighborOverflow = defaultNeighborOverflow;
+        this.defaultMinBatchSizeForQuantization = defaultMinBatchSizeForQuantization;
+        this.defaultHierarchyEnabled = defaultHierarchyEnabled;
     }
 
     @Override
@@ -100,6 +106,8 @@ public abstract class BasePerFieldKnnVectorsFormat extends PerFieldKnnVectorsFor
                     defaultBeamWidth,
                     defaultAlpha,
                     defaultNeighborOverflow,
+                    defaultMinBatchSizeForQuantization,
+                    defaultHierarchyEnabled,
                     knnMethodContext.getSpaceType()
                 );
                 log.debug(
@@ -141,6 +149,8 @@ public abstract class BasePerFieldKnnVectorsFormat extends PerFieldKnnVectorsFor
                     defaultBeamWidth,
                     defaultAlpha,
                     defaultNeighborOverflow,
+                    defaultMinBatchSizeForQuantization,
+                    defaultHierarchyEnabled,
                     knnMethodContext.getSpaceType()
                 );
                 log.debug(

@@ -32,7 +32,6 @@ import org.opensearch.knn.index.SpaceType;
 import org.opensearch.knn.plugin.JVectorKNNPlugin;
 import org.opensearch.knn.plugin.script.KNNScoringScriptEngine;
 import org.junit.AfterClass;
-import org.junit.Before;
 import org.opensearch.client.Request;
 import org.opensearch.client.Response;
 import org.opensearch.common.settings.Settings;
@@ -153,11 +152,6 @@ public class KNNRestTestCase extends ODFERestTestCase {
             log.error("Failed to dump coverage: ", ex);
             throw new RuntimeException("Failed to dump coverage: " + ex);
         }
-    }
-
-    @Before
-    public void cleanUpCache() throws Exception {
-        clearCache();
     }
 
     /**
@@ -1152,18 +1146,6 @@ public class KNNRestTestCase extends ODFERestTestCase {
     }
 
     /**
-     * Clear cache
-     * <p>
-     * This function is a temporary workaround. Right now, we do not have a way of clearing the cache except by deleting
-     * an index or changing k-NN settings. That being said, this function bounces a random k-NN setting in order to
-     * clear the cache.
-     */
-    protected void clearCache() throws Exception {
-        updateClusterSettings(KNNSettings.KNN_CACHE_ITEM_EXPIRY_TIME_MINUTES, "1m");
-        updateClusterSettings(KNNSettings.KNN_CACHE_ITEM_EXPIRY_TIME_MINUTES, null);
-    }
-
-    /**
      * Clear script cache
      * <p>
      * Remove k-NN script from script cache so that it has to be recompiled
@@ -1596,6 +1578,19 @@ public class KNNRestTestCase extends ODFERestTestCase {
     // Method that adds multiple documents into the index using Bulk API
     public void bulkAddKnnDocs(String index, String fieldName, float[][] indexVectors, int baseDocId, int docCount, boolean refresh)
         throws IOException {
+        bulkAddKnnDocs(index, fieldName, indexVectors, 0, baseDocId, docCount, refresh);
+    }
+
+    // Method that adds multiple documents into the index using Bulk API
+    public void bulkAddKnnDocs(
+        String index,
+        String fieldName,
+        float[][] sourceVectors,
+        int sourceOffset,
+        int baseDocId,
+        int docCount,
+        boolean refresh
+    ) throws IOException {
         Request request = new Request("POST", "/_bulk");
 
         request.addParameter("refresh", Boolean.toString(refresh));
@@ -1610,7 +1605,7 @@ public class KNNRestTestCase extends ODFERestTestCase {
                 .append("{ \"")
                 .append(fieldName)
                 .append("\" : ")
-                .append(Arrays.toString(indexVectors[i]))
+                .append(Arrays.toString(sourceVectors[sourceOffset + i]))
                 .append(" }\n");
         }
 

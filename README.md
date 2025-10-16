@@ -27,6 +27,8 @@
 - _**DiskANN**_ - JVector is a pure Java implementation capable to perform vector ANN search in a way that is optimized for RAM bound environments with minimal additional overhead. No need involving native dependencies (FAISS) and cumbersome JNI mechanism.
 - _**Thread Safety**_ - JVector is a threadsafe index that supports concurrent modification and inserts with near perfect scalability as you add cores, Lucene is not threadsafe; This allows us to ingest much higher volume of vectors a lot faster without unnecessary merge operations to parallelize ingestion concurrency.
 - _**quantized index construction**_ - JVector can perform index construction w/ quantized vectors, saving memory = larger segments = fewer segments = faster searches
+- _**Quantization refinement**_ - JVector can refine the quantization codebooks during merge, this allows us to have a more accurate quantization and better recall without the penalty of full codebook recomputation
+- _**Incremental merges**_ - JVector plugin can perform incremental vector inserts into previously persisted indexes without the need for a full rebuild of the index. This is an enormous saving for updates (especially updates of large graphs!) which are a common operation in many search applications.
 - _**Quantized Disk ANN**_ - JVector supports DiskANN style quantization with rerank, it's quite easy (in principle) to demonstrate that this is a massive difference in performance for larger-than-memory indexes (in practice it takes days/weeks to insert enough vectors into Lucene to show this b/c of the single threaded problem, that's the only hard part)
 - _**PQ and BQ support**_  - As part of (3) JVector supports PQ as well as the BQ that Lucene offers, it seems that this is fairly rare (pgvector doesn't do PQ either) because (1) the code required to get high performance ADC with SIMD is a bit involved and (2) it requires a separate codebook which Lucene isn't set up to easily accommodate.  PQ at 64x compression gives you higher relevance than BQ at 32x
 - _**Fused ADC**_ - Features that nobody else has like Fused ADC and NVQ and Anisotropic PQ
@@ -131,6 +133,19 @@ For example if Lucene is doing 100x the number of disk reads compared to JVector
 ![throughput.png](throughput.png)
 ![latency.png](latency.png)
 ![recall.png](recall.png)
+
+### Incremental merges
+Incremental merges are a key differentiator between JVector and other KNN engines. The following graphs show the cost of merges as a function of the number of documents.
+You can see the stark differences when we leverage the incremental merge capabilities of JVector plugin compared to the full rebuild scenario on every merge.
+
+Without incremental merges:
+![merge_times_before_incremental.png](merge_times_before_incremental_smoothed_plot.png)
+
+With incremental merges:
+![merge_times_after_incremental.png](merge_times_plot_after_incremental.png)
+
+Comparison:
+![merge_times_comparison.png](merge_times_comparison.png)
 
 ## Credits and Acknowledgments
 

@@ -7,6 +7,7 @@ package org.opensearch.knn.index.engine;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.primitives.Floats;
+import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.lucene.codecs.Codec;
 import org.apache.lucene.codecs.FilterCodec;
 import org.apache.lucene.codecs.KnnVectorsFormat;
@@ -37,6 +38,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -45,7 +47,7 @@ import static org.opensearch.knn.KNNRestTestCase.FIELD_NAME;
 import static org.opensearch.knn.common.KNNConstants.DISK_ANN;
 import static org.opensearch.knn.common.KNNConstants.VECTOR_DATA_TYPE_FIELD;
 import static org.opensearch.knn.index.KNNSettings.KNN_INDEX;
-import static org.opensearch.knn.index.codec.jvector.JVectorFormat.DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION;
+import static org.opensearch.knn.common.KNNConstants.DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION;
 
 public class CommonTestUtils {
     private static final NamedXContentRegistry DEFAULT_NAMED_X_CONTENT_REGISTRY = new NamedXContentRegistry(
@@ -130,7 +132,7 @@ public class CommonTestUtils {
 
                     @Override
                     public KnnVectorsFormat getKnnVectorsFormatForField(String field) {
-                        return new JVectorFormat(minBatchSizeForQuantization, true);
+                        return new JVectorFormat(minBatchSizeForQuantization);
                     }
                 };
             }
@@ -275,6 +277,20 @@ public class CommonTestUtils {
         int docCount,
         boolean refresh
     ) throws IOException {
+        bulkAddKnnDocs(restClient, index, fieldName, indexVectors, 0, baseDocId, docCount, refresh);
+    }
+
+    // Method that adds multiple documents into the index using Bulk API
+    public static void bulkAddKnnDocs(
+        RestClient restClient,
+        String index,
+        String fieldName,
+        float[][] sourceVectors,
+        int sourceOffset,
+        int baseDocId,
+        int docCount,
+        boolean refresh
+    ) throws IOException {
         Request request = new Request("POST", "/_bulk");
 
         request.addParameter("refresh", Boolean.toString(refresh));
@@ -289,7 +305,7 @@ public class CommonTestUtils {
                 .append("{ \"")
                 .append(fieldName)
                 .append("\" : ")
-                .append(Arrays.toString(indexVectors[i]))
+                .append(Arrays.toString(sourceVectors[sourceOffset + i]))
                 .append(" }\n");
         }
 
@@ -297,6 +313,67 @@ public class CommonTestUtils {
 
         Response response = restClient.performRequest(request);
         Assert.assertEquals(200, response.getStatusLine().getStatusCode());
+    }
+
+    public static void flushIndex(RestClient restClient, final String index) throws IOException {
+        Request request = new Request("POST", "/" + index + "/_flush");
+
+        Response response = restClient.performRequest(request);
+        Assert.assertEquals(
+            request.getEndpoint() + ": failed",
+            RestStatus.OK,
+            RestStatus.fromCode(response.getStatusLine().getStatusCode())
+        );
+    }
+
+    public static int getDocCount(RestClient restClient, String indexName) throws Exception {
+        Request request = new Request("GET", "/" + indexName + "/_count");
+
+        Response response = restClient.performRequest(request);
+
+        Assert.assertEquals(
+            request.getEndpoint() + ": failed",
+            RestStatus.OK,
+            RestStatus.fromCode(response.getStatusLine().getStatusCode())
+        );
+
+        String responseBody = EntityUtils.toString(response.getEntity());
+
+        Map<String, Object> responseMap = createParser(MediaTypeRegistry.getDefaultMediaType().xContent(), responseBody).map();
+        return (Integer) responseMap.get("count");
+    }
+
+    /**
+     * Force merge KNN index segments
+     */
+    public static void forceMergeKnnIndex(RestClient restClient, String index) throws Exception {
+        forceMergeKnnIndex(restClient, index, 1);
+    }
+
+    /**
+     * Force merge KNN index segments
+     */
+    public static void forceMergeKnnIndex(RestClient restClient, String index, int maxSegments) throws Exception {
+        Request request = new Request("POST", "/" + index + "/_refresh");
+
+        Response response = restClient.performRequest(request);
+        Assert.assertEquals(
+            request.getEndpoint() + ": failed",
+            RestStatus.OK,
+            RestStatus.fromCode(response.getStatusLine().getStatusCode())
+        );
+
+        request = new Request("POST", "/" + index + "/_forcemerge");
+
+        request.addParameter("max_num_segments", String.valueOf(maxSegments));
+        request.addParameter("flush", "true");
+        response = restClient.performRequest(request);
+        Assert.assertEquals(
+            request.getEndpoint() + ": failed",
+            RestStatus.OK,
+            RestStatus.fromCode(response.getStatusLine().getStatusCode())
+        );
+        TimeUnit.SECONDS.sleep(5); // To make sure force merge is completed
     }
 
     private static NamedXContentRegistry xContentRegistry() {
