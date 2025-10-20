@@ -39,8 +39,10 @@ jobs:
           exclude-workflow-initiator-as-approver: true
       - name: Build with Gradle
         run: |
-          ./gradlew --no-daemon -Dbuild.snapshot=false publishNebulaPublicationToLocalRepoRepository
-          ./gradlew --no-daemon -Dbuild.snapshot=false publishPluginZipPublicationToLocalRepoRepository
+          OS_VERSION=`./gradlew -Dbuild.snapshot=false properties | grep -iE "^version:" | cut -d: -f2 | cut -d. -f1-3 | tr -d ' '`
+          echo "OS_VERSION $OS_VERSION"
+          ./gradlew --no-daemon -Dbuild.snapshot=false -Dopensearch.version=$OS_VERSION publishNebulaPublicationToLocalRepoRepository
+          ./gradlew --no-daemon -Dbuild.snapshot=false -Dopensearch.version=$OS_VERSION publishPluginZipPublicationToLocalRepoRepository
           tar -C build -czvf artifacts.tar.gz repository
       - name: Draft a release
         uses: softprops/action-gh-release@v1
