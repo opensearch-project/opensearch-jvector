@@ -11,7 +11,7 @@ import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.lucene.codecs.Codec;
 import org.apache.lucene.codecs.FilterCodec;
 import org.apache.lucene.codecs.KnnVectorsFormat;
-import org.apache.lucene.codecs.lucene101.Lucene101Codec;
+import org.apache.lucene.backward_codecs.lucene101.Lucene101Codec;
 import org.apache.lucene.codecs.perfield.PerFieldKnnVectorsFormat;
 import org.junit.Assert;
 import org.opensearch.client.Request;

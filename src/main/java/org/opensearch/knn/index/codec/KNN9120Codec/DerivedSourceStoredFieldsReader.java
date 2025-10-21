@@ -11,9 +11,9 @@ import org.apache.lucene.index.SegmentReadState;
 import org.apache.lucene.index.StoredFieldVisitor;
 import org.apache.lucene.util.IOUtils;
 import org.opensearch.index.fieldvisitor.FieldsVisitor;
-import org.opensearch.knn.index.codec.derivedsource.DerivedSourceReadersSupplier;
-import org.opensearch.knn.index.codec.derivedsource.DerivedSourceStoredFieldVisitor;
-import org.opensearch.knn.index.codec.derivedsource.DerivedSourceVectorInjector;
+import org.opensearch.knn.index.codec.backward_codecs.KNN9120Codec.KNN9120DerivedSourceStoredFieldVisitor;
+import org.opensearch.knn.index.codec.backward_codecs.KNN9120Codec.DerivedSourceVectorInjector;
+import org.opensearch.knn.index.codec.backward_codecs.KNN9120Codec.KNN9120DerivedSourceReadersSupplier;
 
 import java.io.IOException;
 import java.util.List;
@@ -21,24 +21,23 @@ import java.util.List;
 public class DerivedSourceStoredFieldsReader extends StoredFieldsReader {
     private final StoredFieldsReader delegate;
     private final List<FieldInfo> derivedVectorFields;
-    private final DerivedSourceReadersSupplier derivedSourceReadersSupplier;
+    private final KNN9120DerivedSourceReadersSupplier derivedSourceReadersSupplier;
     private final SegmentReadState segmentReadState;
     private final boolean shouldInject;
 
     private final DerivedSourceVectorInjector derivedSourceVectorInjector;
 
-    /**
-     *
-     * @param delegate delegate StoredFieldsReader
-     * @param derivedVectorFields List of fields that are derived source fields
-     * @param derivedSourceReadersSupplier Supplier for the derived source readers
-     * @param segmentReadState SegmentReadState for the segment
-     * @throws IOException in case of I/O error
-     */
+    /*
+    * @param delegate: Delegate StoredFieldsReader
+    * @param derivedVectorFields List of fields that are derived source fields
+    * @param derivedSourceReadersSupplier Supplier for the derived source readers
+    * @param segmentReadState: SegmentReadState for the segment
+    * @throws IOException in case of I/O error
+    */
     public DerivedSourceStoredFieldsReader(
         StoredFieldsReader delegate,
         List<FieldInfo> derivedVectorFields,
-        DerivedSourceReadersSupplier derivedSourceReadersSupplier,
+        KNN9120DerivedSourceReadersSupplier derivedSourceReadersSupplier,
         SegmentReadState segmentReadState
     ) throws IOException {
         this(delegate, derivedVectorFields, derivedSourceReadersSupplier, segmentReadState, true);
@@ -47,7 +46,7 @@ public class DerivedSourceStoredFieldsReader extends StoredFieldsReader {
     private DerivedSourceStoredFieldsReader(
         StoredFieldsReader delegate,
         List<FieldInfo> derivedVectorFields,
-        DerivedSourceReadersSupplier derivedSourceReadersSupplier,
+        KNN9120DerivedSourceReadersSupplier derivedSourceReadersSupplier,
         SegmentReadState segmentReadState,
         boolean shouldInject
     ) throws IOException {
@@ -60,7 +59,11 @@ public class DerivedSourceStoredFieldsReader extends StoredFieldsReader {
     }
 
     private DerivedSourceVectorInjector createDerivedSourceVectorInjector() throws IOException {
-        return new DerivedSourceVectorInjector(derivedSourceReadersSupplier, segmentReadState, derivedVectorFields);
+        return new DerivedSourceVectorInjector(
+            derivedSourceReadersSupplier.getReaders(segmentReadState),
+            segmentReadState,
+            derivedVectorFields
+        );
     }
 
     @Override
@@ -74,7 +77,7 @@ public class DerivedSourceStoredFieldsReader extends StoredFieldsReader {
             );
         }
         if (shouldInject && isVisitorNeedFields) {
-            delegate.document(docId, new DerivedSourceStoredFieldVisitor(storedFieldVisitor, docId, derivedSourceVectorInjector));
+            delegate.document(docId, new KNN9120DerivedSourceStoredFieldVisitor(storedFieldVisitor, docId, derivedSourceVectorInjector));
             return;
         }
         delegate.document(docId, storedFieldVisitor);
@@ -102,7 +105,7 @@ public class DerivedSourceStoredFieldsReader extends StoredFieldsReader {
 
     @Override
     public void close() throws IOException {
-        IOUtils.close(delegate, derivedSourceVectorInjector);
+        IOUtils.close(delegate);
     }
 
     /**

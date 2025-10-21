@@ -6,60 +6,59 @@
 package org.opensearch.knn.index.codec.derivedsource;
 
 import lombok.extern.log4j.Log4j2;
-import org.apache.lucene.index.FieldInfo;
 import org.apache.lucene.index.SegmentReadState;
-import org.apache.lucene.util.IOUtils;
 import org.opensearch.common.collect.Tuple;
 import org.opensearch.common.io.stream.BytesStreamOutput;
 import org.opensearch.common.xcontent.XContentHelper;
+import org.opensearch.common.xcontent.support.XContentMapValues;
 import org.opensearch.core.common.Strings;
 import org.opensearch.core.common.bytes.BytesReference;
 import org.opensearch.core.xcontent.MediaType;
 import org.opensearch.core.xcontent.MediaTypeRegistry;
 import org.opensearch.core.xcontent.XContentBuilder;
 
-import java.io.Closeable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import java.util.function.Function;
 
-/**
- * This class is responsible for injecting vectors into the source of a document. From a high level, it uses alternative
- *  format readers and information about the fields to inject vectors into the source.
- */
 @Log4j2
-public class DerivedSourceVectorInjector implements Closeable {
+public class DerivedSourceVectorTransformer {
 
     private final DerivedSourceReaders derivedSourceReaders;
-    private final List<PerFieldDerivedVectorInjector> perFieldDerivedVectorInjectors;
-    private final Set<String> fieldNames;
+    Function<Map<String, Object>, Map<String, Object>> derivedSourceVectorTransformer;
+    Map<String, PerFieldDerivedVectorTransformer> perFieldDerivedVectorTransformers;
+    private boolean isNested;
+    private final DerivedSourceLuceneHelper derivedSourceLuceneHelper;
 
     /**
-     * Constructor for DerivedSourceVectorInjector.
      *
-     * @param derivedSourceReadersSupplier Supplier for the derived source readers.
+     * @param derivedSourceReaders derived source readers.
      * @param segmentReadState Segment read state
      * @param fieldsToInjectVector List of fields to inject vectors into
      */
-    public DerivedSourceVectorInjector(
-        DerivedSourceReadersSupplier derivedSourceReadersSupplier,
+    public DerivedSourceVectorTransformer(
+        DerivedSourceReaders derivedSourceReaders,
         SegmentReadState segmentReadState,
-        List<FieldInfo> fieldsToInjectVector
-    ) throws IOException {
-        this.derivedSourceReaders = derivedSourceReadersSupplier.getReaders(segmentReadState);
-        this.perFieldDerivedVectorInjectors = new ArrayList<>();
-        this.fieldNames = new HashSet<>();
-        for (FieldInfo fieldInfo : fieldsToInjectVector) {
-            this.perFieldDerivedVectorInjectors.add(
-                PerFieldDerivedVectorInjectorFactory.create(fieldInfo, derivedSourceReaders, segmentReadState)
+        List<DerivedFieldInfo> fieldsToInjectVector
+    ) {
+        this.derivedSourceReaders = derivedSourceReaders;
+        perFieldDerivedVectorTransformers = new HashMap<>();
+        Map<String, Function<Object, Object>> perFieldDerivedVectorTransformersFunctionValues = new HashMap<>();
+        for (DerivedFieldInfo derivedFieldInfo : fieldsToInjectVector) {
+            isNested = derivedFieldInfo.isNested() || isNested;
+            PerFieldDerivedVectorTransformer perFieldDerivedVectorTransformer = PerFieldDerivedVectorTransformerFactory.create(
+                derivedFieldInfo.fieldInfo(),
+                derivedFieldInfo.isNested(),
+                derivedSourceReaders
             );
-            this.fieldNames.add(fieldInfo.name);
+            perFieldDerivedVectorTransformers.put(derivedFieldInfo.name(), perFieldDerivedVectorTransformer);
+            perFieldDerivedVectorTransformersFunctionValues.put(derivedFieldInfo.name(), perFieldDerivedVectorTransformer);
         }
+        derivedSourceVectorTransformer = XContentMapValues.transform(perFieldDerivedVectorTransformersFunctionValues, true);
+        derivedSourceLuceneHelper = new DerivedSourceLuceneHelper(derivedSourceReaders, segmentReadState);
     }
 
     /**
@@ -80,26 +79,34 @@ public class DerivedSourceVectorInjector implements Closeable {
             MediaTypeRegistry.getDefaultMediaType()
         );
         // Have to create a copy of the map here to ensure that is mutable
-        Map<String, Object> sourceAsMap = new HashMap<>(mapTuple.v2());
+        Map<String, Object> sourceAsMap = mapTuple.v2();
+
+        // We only need the offset for the nested fields. If there arent any, we can skip
+        int offset = 0;
+        if (isNested) {
+            offset = derivedSourceLuceneHelper.getFirstChild(docId);
+        }
 
         // For each vector field, add in the source. The per field injectors are responsible for skipping if
         // the field is not present.
-        for (PerFieldDerivedVectorInjector vectorInjector : perFieldDerivedVectorInjectors) {
-            vectorInjector.inject(docId, sourceAsMap);
+        for (PerFieldDerivedVectorTransformer vectorTransformer : perFieldDerivedVectorTransformers.values()) {
+            vectorTransformer.setCurrentDoc(offset, docId);
         }
+
+        Map<String, Object> copy = derivedSourceVectorTransformer.apply(sourceAsMap);
 
         // At this point, we can serialize the modified source map
         // Setting to 1024 based on
         // https://github.com/opensearch-project/OpenSearch/blob/2.18.0/server/src/main/java/org/opensearch/search/fetch/subphase/FetchSourcePhase.java#L106
         BytesStreamOutput bStream = new BytesStreamOutput(1024);
         MediaType actualContentType = mapTuple.v1();
-        XContentBuilder builder = MediaTypeRegistry.contentBuilder(actualContentType, bStream).map(sourceAsMap);
+        XContentBuilder builder = MediaTypeRegistry.contentBuilder(actualContentType, bStream).map(copy);
         builder.close();
         return BytesReference.toBytes(BytesReference.bytes(builder));
     }
 
     /**
-     * Whether or not to inject vectors based on what fields are explicitly required
+     * Whether to inject vectors based on what fields are explicitly required
      *
      * @param includes List of fields that are required to be injected
      * @param excludes List of fields that are not required to be injected
@@ -109,28 +116,23 @@ public class DerivedSourceVectorInjector implements Closeable {
         // If any of the vector fields are explicitly required we should inject
         if (includes != null && includes != Strings.EMPTY_ARRAY) {
             for (String includedField : includes) {
-                if (fieldNames.contains(includedField)) {
+                if (perFieldDerivedVectorTransformers.containsKey(includedField)) {
                     return true;
                 }
             }
         }
 
-        // If all of the vector fields are explicitly excluded we should not inject
+        // If all the vector fields are explicitly excluded we should not inject
         if (excludes != null && excludes != Strings.EMPTY_ARRAY) {
             int excludedVectorFieldCount = 0;
             for (String excludedField : excludes) {
-                if (fieldNames.contains(excludedField)) {
+                if (perFieldDerivedVectorTransformers.containsKey(excludedField)) {
                     excludedVectorFieldCount++;
                 }
             }
-            // Inject if we havent excluded all of the fields
-            return excludedVectorFieldCount < fieldNames.size();
+            // Inject if we haven't excluded all the fields
+            return excludedVectorFieldCount < perFieldDerivedVectorTransformers.size();
         }
         return true;
-    }
-
-    @Override
-    public void close() throws IOException {
-        IOUtils.close(derivedSourceReaders);
     }
 }
