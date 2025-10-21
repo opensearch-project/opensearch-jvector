@@ -61,7 +61,7 @@ public class JVectorKnnFloatVectorQuery extends KnnFloatVectorQuery {
     @Override
     protected TopDocs approximateSearch(
         LeafReaderContext context,
-        Bits acceptDocs,
+        AcceptDocs acceptDocs,
         int visitedLimit,
         KnnCollectorManager knnCollectorManager
     ) throws IOException {
