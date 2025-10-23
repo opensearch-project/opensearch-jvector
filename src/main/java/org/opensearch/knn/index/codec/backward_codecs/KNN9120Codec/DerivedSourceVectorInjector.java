@@ -8,6 +8,7 @@ package org.opensearch.knn.index.codec.backward_codecs.KNN9120Codec;
 import lombok.extern.log4j.Log4j2;
 import org.apache.lucene.index.FieldInfo;
 import org.apache.lucene.index.SegmentReadState;
+import org.apache.lucene.util.IOUtils;
 import org.opensearch.common.collect.Tuple;
 import org.opensearch.common.io.stream.BytesStreamOutput;
 import org.opensearch.common.xcontent.XContentHelper;
@@ -18,6 +19,7 @@ import org.opensearch.core.xcontent.MediaTypeRegistry;
 import org.opensearch.core.xcontent.XContentBuilder;
 
 import java.io.IOException;
+import java.io.Closeable;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -31,7 +33,7 @@ import java.util.Set;
  *  format readers and information about the fields to inject vectors into the source.
  */
 @Log4j2
-public class DerivedSourceVectorInjector {
+public class DerivedSourceVectorInjector implements Closeable {
 
     private final KNN9120DerivedSourceReaders derivedSourceReaders;
     private final List<PerFieldDerivedVectorInjector> perFieldDerivedVectorInjectors;
@@ -48,7 +50,7 @@ public class DerivedSourceVectorInjector {
         KNN9120DerivedSourceReaders derivedSourceReaders,
         SegmentReadState segmentReadState,
         List<FieldInfo> fieldsToInjectVector
-    ) {
+    ) throws IOException {
         this.derivedSourceReaders = derivedSourceReaders;
         this.perFieldDerivedVectorInjectors = new ArrayList<>();
         this.fieldNames = new HashSet<>();
@@ -125,5 +127,10 @@ public class DerivedSourceVectorInjector {
             return excludedVectorFieldCount < fieldNames.size();
         }
         return true;
+    }
+
+    @Override
+    public void close() throws IOException {
+        IOUtils.close(derivedSourceReaders);
     }
 }
