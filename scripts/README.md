@@ -2,6 +2,24 @@
 
 This directory contains scripts for testing OpenSearch JVector functionality, particularly with large indices.
 
+## Project Structure
+
+```
+scripts/
+├── create_and_test_large_index.py    # Main testing script
+├── jvector_utils/                     # Modular utilities package
+│   ├── __init__.py
+│   ├── index_operations.py           # Index creation and management
+│   ├── search_operations.py          # Search testing and statistics
+│   ├── recall_measurement.py         # Ground truth tracking and recall
+│   ├── stats_utils.py                # KNN statistics utilities
+│   ├── visualization.py              # Performance plotting
+│   └── README.md                     # Package documentation
+└── README.md                          # This file
+```
+
+See `jvector_utils/README.md` for detailed module documentation.
+
 ## Installation
 
 ### Prerequisites
@@ -46,6 +64,48 @@ If you prefer not to use a virtual environment:
 ```bash
 pip install -r requirements.txt
 ```
+
+## Testing
+
+### Unit Tests for Recall Measurement
+
+Before using recall measurement with large indices, you can verify it's working correctly:
+
+```bash
+# Run comprehensive unit tests
+python test_recall_measurement.py
+```
+
+This test suite verifies:
+- ✅ Basic ground truth tracking functionality
+- ✅ Correctness with large vector sets (100+ vectors)
+- ✅ Recall calculation accuracy
+- ✅ Multiple query vector handling
+- ✅ Both L2 and cosine distance metrics
+- ✅ Edge cases (k > num_vectors, ties, etc.)
+
+**Expected output:** All 6 tests should pass with "🎉 All tests passed!"
+
+### Integration Test with OpenSearch
+
+Test recall measurement end-to-end with a real OpenSearch instance:
+
+```bash
+# Run integration test (requires OpenSearch running)
+python test_recall_integration.py
+
+# Customize test parameters
+python test_recall_integration.py --dimension 256 --num-vectors 5000 --num-queries 10
+```
+
+This integration test:
+1. Creates a small test index
+2. Indexes vectors with ground truth tracking
+3. Performs searches and measures recall
+4. Verifies recall values are reasonable
+5. Cleans up the test index
+
+**Expected output:** Recall values should typically be >0.9 for small indices.
 
 ## Usage
 
