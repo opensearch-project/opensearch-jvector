@@ -15,7 +15,8 @@ sudo apt install python3
 sudo brew install python3
 ```
 - OpenSearch instance with JVector plugin installed. 
-   See Install Jvector plugin section of [developer guide] (DEVELOPER_GUIDE.md).
+
+   See Install Jvector plugin section of [Developer Guide](DEVELOPER_GUIDE.md).
 
 ### Setup
 
