@@ -122,6 +122,75 @@ You can control the number of test searches with the `--num-searches` parameter:
 python create_and_test_large_index.py --num-searches 10
 ```
 
+#### Recall Measurement
+
+The script now supports measuring recall@k to evaluate the quality of approximate nearest neighbor search results. Recall is calculated by comparing the approximate search results from the JVector index against ground truth computed using an efficient incremental approach.
+
+**Key Feature**: The implementation uses a memory-efficient algorithm that computes ground truth incrementally during indexing using min-heaps, eliminating the need to store all vectors in memory.
+
+##### Options:
+
+- `--measure-recall`: Enable recall measurement (disabled by default)
+- `--num-recall-queries`: Number of query vectors to pre-generate for recall measurement (default: same as `--num-searches`)
+
+##### How it works:
+
+1. When `--measure-recall` is enabled, the script pre-generates random query vectors
+2. During indexing, for each indexed vector, it updates min-heaps to track the k-nearest neighbors for each query
+3. After indexing completes, the ground truth is already computed and stored in the heaps
+4. During search testing, it uses the pre-generated query vectors and compares results with the pre-computed ground truth
+5. Reports recall@k for each query and provides summary statistics
+
+This approach is **much more memory-efficient** than storing all vectors, as it only needs to store:
+- The query vectors (num_queries × dimension)
+- The k-nearest neighbors for each query (num_queries × k × small overhead)
+
+##### Example:
+
+```bash
+# Enable recall measurement with default settings
+python create_and_test_large_index.py --measure-recall --num-vectors 1000000
+
+# Pre-generate 50 query vectors for recall testing
+python create_and_test_large_index.py --measure-recall --num-recall-queries 50 --num-searches 50
+
+# Combine with other options
+python create_and_test_large_index.py --measure-recall --num-recall-queries 20 --num-searches 20 --dimension 384
+```
+
+##### Output:
+
+For each search iteration, the script reports:
+- Recall@k value (e.g., 0.9500 means 95% of results match ground truth)
+- Number of correct results out of k (e.g., "9/10 correct")
+
+After all searches, a summary is provided:
+- Average Recall@k across all queries
+- Minimum Recall@k
+- Maximum Recall@k
+- Standard deviation
+
+##### Memory Considerations:
+
+The memory usage for recall tracking is approximately:
+```
+Query vectors: num_queries × dimension × 8 bytes
+Ground truth heaps: num_queries × k × 16 bytes
+Total Memory (MB) ≈ (num_queries × dimension × 8 + num_queries × k × 16) / (1024 × 1024)
+```
+
+Examples (with k=10):
+- 10 queries × 768 dimensions ≈ 0.06 MB (query vectors) + 0.002 MB (heaps) ≈ **0.06 MB total**
+- 100 queries × 768 dimensions ≈ 0.59 MB (query vectors) + 0.015 MB (heaps) ≈ **0.60 MB total**
+- 1000 queries × 768 dimensions ≈ 5.86 MB (query vectors) + 0.15 MB (heaps) ≈ **6.01 MB total**
+
+Compare this to the old approach of storing all vectors:
+- 1,000,000 vectors × 768 dimensions ≈ **5,859 MB** (nearly 6 GB!)
+
+The new approach is **~1000x more memory efficient** for typical use cases!
+
+**Note**: Recall measurement is not available when using `--skip-indexing` flag, as it requires tracking vectors during indexing.
+
 #### CSV Output And Plotting
 
 You can save the merge time data to a CSV file using the `--csv-output` option. The CSV file will contain the following columns:

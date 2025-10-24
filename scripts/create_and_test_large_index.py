@@ -10,6 +10,7 @@ import sys
 import csv
 import matplotlib.pyplot as plt
 import os
+import heapq
 
 def create_index(host, index_name, dimension, shards=1, min_batch_size_for_quantization=1000000):
     """Create a knn index with jvector engine"""
@@ -50,13 +51,17 @@ def create_index(host, index_name, dimension, shards=1, min_batch_size_for_quant
     print(f"Successfully created index {index_name}")
     return response.json()
 
-def index_vectors(host, index_name, num_vectors, dimension, batch_size=1000, force_merge_frequency=0, csv_file=None):
-    """Index vectors in batches"""
+def index_vectors(host, index_name, num_vectors, dimension, batch_size=1000, force_merge_frequency=0, csv_file=None, ground_truth_tracker=None):
+    """Index vectors in batches
+
+    Args:
+        ground_truth_tracker: Optional GroundTruthTracker to update during indexing
+    """
     url = f"http://{host}/{index_name}/_bulk"
     headers = {"Content-Type": "application/x-ndjson"}
-    
+
     total_batches = (num_vectors + batch_size - 1) // batch_size
-    
+
     # Initialize CSV file if provided
     csv_writer = None
     csv_file_handle = None
@@ -64,23 +69,27 @@ def index_vectors(host, index_name, num_vectors, dimension, batch_size=1000, for
         csv_file_handle = open(csv_file, 'w', newline='')
         csv_writer = csv.writer(csv_file_handle)
         csv_writer.writerow(['num_documents', 'graph_merge_time_ms', 'quantization_training_time_ms', 'force_merge_duration_sec', 'index_size_bytes'])
-    
+
     for batch in range(total_batches):
         start_idx = batch * batch_size
         end_idx = min((batch + 1) * batch_size, num_vectors)
         current_batch_size = end_idx - start_idx
-        
+
         bulk_data = []
         for i in range(current_batch_size):
             doc_id = start_idx + i
             # Create action line
             action = {"index": {"_index": index_name, "_id": str(doc_id)}}
             bulk_data.append(json.dumps(action))
-            
+
             # Create random vector with values between -1 and 1
             vector = np.random.uniform(-1, 1, dimension).tolist()
             document = {"vector_field": vector, "id": str(doc_id)}
             bulk_data.append(json.dumps(document))
+
+            # Update ground truth tracker if provided
+            if ground_truth_tracker:
+                ground_truth_tracker.update(str(doc_id), vector)
         
         bulk_body = "\n".join(bulk_data) + "\n"
         
@@ -112,7 +121,7 @@ def index_vectors(host, index_name, num_vectors, dimension, batch_size=1000, for
     
     if csv_file_handle:
         csv_file_handle.close()
-    
+
     return True
 
 def force_merge(host, index_name, max_segments=1):
@@ -214,13 +223,118 @@ def print_jvector_search_stats(stats):
     for metric, value in all_nodes_stats.items():
         print(f"  {metric}: {value}")
 
-def test_search(host, index_name, dimension, k=10):
-    """Test kNN search on the index"""
+class GroundTruthTracker:
+    """Tracks ground truth for pre-generated query vectors using min-heaps
+
+    This allows computing ground truth incrementally during indexing without
+    storing all vectors in memory.
+    """
+
+    def __init__(self, query_vectors, k, space_type='l2'):
+        """Initialize tracker with query vectors
+
+        Args:
+            query_vectors: List of query vectors to track ground truth for
+            k: Number of nearest neighbors to track
+            space_type: Distance metric ('l2' or 'cosine')
+        """
+        self.query_vectors = query_vectors
+        self.k = k
+        self.space_type = space_type
+
+        # For each query, maintain a max-heap of size k
+        # We use max-heap so we can efficiently remove the farthest neighbor
+        # when we find a closer one
+        # Heap stores tuples of (-distance, doc_id) - negative for max-heap behavior
+        self.heaps = [[] for _ in query_vectors]
+
+    def update(self, doc_id, vector):
+        """Update ground truth with a new vector
+
+        Args:
+            doc_id: Document ID
+            vector: Vector to add
+        """
+        vector_np = np.array(vector)
+
+        for i, query_vector in enumerate(self.query_vectors):
+            # Compute distance
+            if self.space_type == 'l2':
+                dist = np.linalg.norm(query_vector - vector_np)
+            elif self.space_type == 'cosine':
+                query_norm = np.linalg.norm(query_vector)
+                vector_norm = np.linalg.norm(vector_np)
+                if query_norm > 0 and vector_norm > 0:
+                    cosine_sim = np.dot(query_vector, vector_np) / (query_norm * vector_norm)
+                    dist = 1 - cosine_sim
+                else:
+                    dist = 1.0
+            else:
+                raise ValueError(f"Unsupported space_type: {self.space_type}")
+
+            heap = self.heaps[i]
+
+            # If heap is not full, add the item
+            if len(heap) < self.k:
+                heapq.heappush(heap, (-dist, doc_id))
+            # If this distance is smaller than the largest in heap, replace it
+            elif dist < -heap[0][0]:
+                heapq.heapreplace(heap, (-dist, doc_id))
+
+    def get_ground_truth(self, query_index):
+        """Get ground truth for a specific query
+
+        Args:
+            query_index: Index of the query vector
+
+        Returns:
+            List of doc_ids of the k nearest neighbors
+        """
+        heap = self.heaps[query_index]
+        # Sort by distance (ascending) and return doc_ids
+        sorted_results = sorted(heap, key=lambda x: -x[0])
+        return [doc_id for _, doc_id in sorted_results]
+
+    def get_query_vector(self, query_index):
+        """Get the query vector at the given index"""
+        return self.query_vectors[query_index]
+
+def calculate_recall(approximate_results, ground_truth):
+    """Calculate recall@k
+
+    Args:
+        approximate_results: List of doc_ids from approximate search
+        ground_truth: List of doc_ids from exact search
+
+    Returns:
+        Recall value (0.0 to 1.0)
+    """
+    if not ground_truth:
+        return 0.0
+
+    approximate_set = set(approximate_results)
+    ground_truth_set = set(ground_truth)
+
+    intersection = approximate_set.intersection(ground_truth_set)
+    recall = len(intersection) / len(ground_truth)
+
+    return recall
+
+def test_search(host, index_name, dimension, k=10, query_vector=None):
+    """Test kNN search on the index
+
+    Args:
+        query_vector: Optional pre-generated query vector. If None, a random one is created.
+
+    Returns:
+        Tuple of (success, results_list, query_vector, duration)
+    """
     url = f"http://{host}/{index_name}/_search"
-    
-    # Create random query vector
-    query_vector = np.random.uniform(-1, 1, dimension).tolist()
-    
+
+    # Create random query vector if not provided
+    if query_vector is None:
+        query_vector = np.random.uniform(-1, 1, dimension).tolist()
+
     query = {
         "size": k,
         "query": {
@@ -232,27 +346,36 @@ def test_search(host, index_name, dimension, k=10):
             }
         }
     }
-    
+
     start_time = time.time()
     response = requests.post(url, json=query)
     duration = time.time() - start_time
-    
+
     if response.status_code != 200:
         print(f"Search failed: {response.text}")
-        return False
-    
+        return False, [], query_vector, duration
+
     results = response.json()
     hits = results["hits"]["hits"]
-    
-    print(f"Search completed in {duration:.4f} seconds, found {len(hits)} results")
-    return True
+    result_ids = [hit["_id"] for hit in hits]
 
-def test_search_with_stats(host, index_name, dimension, k=10, num_searches=5):
-    """Test kNN search on the index and report JVector stats for each iteration"""
+    print(f"Search completed in {duration:.4f} seconds, found {len(hits)} results")
+    return True, result_ids, query_vector, duration
+
+def test_search_with_stats(host, index_name, dimension, k=10, num_searches=5, ground_truth_tracker=None):
+    """Test kNN search on the index and report JVector stats for each iteration
+
+    Args:
+        ground_truth_tracker: Optional GroundTruthTracker for recall calculation
+    """
     # Get initial stats
     current_stats = get_knn_stats(host)
     print("\nInitial JVector Stats:")
     print_jvector_search_stats(current_stats)
+
+    # Track recall if tracker is provided
+    measure_recall = ground_truth_tracker is not None
+    recall_values = []
     
     # JVector-specific metrics we want to track
     jvector_metrics = [
@@ -274,10 +397,23 @@ def test_search_with_stats(host, index_name, dimension, k=10, num_searches=5):
     # Perform multiple searches and check stats after each
     for i in range(num_searches):
         print(f"\n--- Search Iteration {i+1}/{num_searches} ---")
-        
+
+        # If using tracker, use the pre-generated query vector
+        query_vector = None
+        if measure_recall:
+            query_vector = ground_truth_tracker.get_query_vector(i).tolist()
+
         # Perform search
-        test_search(host, index_name, dimension, k)
-        
+        success, result_ids, query_vector_used, duration = test_search(host, index_name, dimension, k, query_vector)
+
+        # Calculate recall if enabled
+        if measure_recall and success:
+            # Use pre-computed ground truth from tracker
+            ground_truth = ground_truth_tracker.get_ground_truth(i)
+            recall = calculate_recall(result_ids, ground_truth)
+            recall_values.append(recall)
+            print(f"Recall@{k}: {recall:.4f} ({len(set(result_ids).intersection(set(ground_truth)))}/{k} correct)")
+
         # Get stats after this search
         new_stats = get_knn_stats(host)
         
@@ -349,7 +485,15 @@ def test_search_with_stats(host, index_name, dimension, k=10, num_searches=5):
         diff = final_val - initial_val
         avg = diff / num_searches if num_searches > 0 else 0
         print(f"  {metric}: {avg:.2f}")
-    
+
+    # Print recall summary if measured
+    if measure_recall and recall_values:
+        print("\n=== Recall Summary ===")
+        print(f"Average Recall@{k}: {np.mean(recall_values):.4f}")
+        print(f"Min Recall@{k}: {np.min(recall_values):.4f}")
+        print(f"Max Recall@{k}: {np.max(recall_values):.4f}")
+        print(f"Std Dev: {np.std(recall_values):.4f}")
+
     return True
 
 def get_knn_stat_value(stats, stat_name):
@@ -427,22 +571,57 @@ def main():
     parser.add_argument("--plot", action="store_true", help="Generate plots from CSV data")
     parser.add_argument("--min-batch-size-for-quantization", type=int, default=1000000,
                         help="Minimum batch size for quantization (default: 1M)")
-    
+    parser.add_argument("--measure-recall", action="store_true",
+                        help="Measure recall by computing ground truth incrementally (memory efficient)")
+    parser.add_argument("--num-recall-queries", type=int, default=None,
+                        help="Number of query vectors to pre-generate for recall measurement (default: same as --num-searches)")
+
     args = parser.parse_args()
+
+    # Set default for num_recall_queries if not specified
+    if args.num_recall_queries is None:
+        args.num_recall_queries = args.num_searches
     
     if args.plot and args.csv_output:
         plot_merge_times(args.csv_output)
         return
-    
+
+    # Storage for ground truth tracker if recall measurement is enabled
+    ground_truth_tracker = None
+
     if not args.skip_indexing:
         print(f"Creating large JVector index with {args.num_vectors} vectors of dimension {args.dimension}")
         print(f"Estimated size: ~{args.num_vectors * args.dimension * 4 / (1024*1024*1024):.2f} GB (raw vectors only)")
-        
+
+        if args.measure_recall:
+            # Pre-generate query vectors for recall measurement
+            print(f"\nRecall measurement enabled - pre-generating {args.num_recall_queries} query vectors")
+            query_vectors = [np.random.uniform(-1, 1, args.dimension) for _ in range(args.num_recall_queries)]
+
+            # Initialize ground truth tracker
+            ground_truth_tracker = GroundTruthTracker(query_vectors, k=10, space_type='l2')
+
+            # Calculate memory usage
+            # Each query vector: dimension * 8 bytes
+            # Each heap entry: ~(8 bytes for distance + 8 bytes for pointer) * k * num_queries
+            query_mem = args.num_recall_queries * args.dimension * 8 / (1024 * 1024)
+            heap_mem = args.num_recall_queries * 10 * 16 / (1024 * 1024)  # k=10, ~16 bytes per entry
+            total_mem = query_mem + heap_mem
+
+            print(f"Memory usage for recall tracking:")
+            print(f"  Query vectors: ~{query_mem:.2f} MB")
+            print(f"  Ground truth heaps: ~{heap_mem:.2f} MB")
+            print(f"  Total: ~{total_mem:.2f} MB")
+
         # Create index
         create_index(args.host, args.index, args.dimension, args.shards, args.min_batch_size_for_quantization)
-        
-        # Index vectors
-        index_vectors(args.host, args.index, args.num_vectors, args.dimension, args.batch_size, args.force_merge_frequency, args.csv_output)
+
+        # Index vectors with ground truth tracker
+        index_vectors(args.host, args.index, args.num_vectors, args.dimension, args.batch_size,
+                     args.force_merge_frequency, args.csv_output, ground_truth_tracker=ground_truth_tracker)
+
+        if args.measure_recall:
+            print(f"\nGround truth computed for {args.num_recall_queries} query vectors during indexing")
         
         # Get stats before final force merge
         print("\nIndex stats before final force merge:")
@@ -459,10 +638,22 @@ def main():
         # Get current index stats
         print("\nCurrent index stats:")
         get_index_stats(args.host, args.index)
-    
+
+        if args.measure_recall:
+            print("\nWarning: Recall measurement requires indexing to store vectors.")
+            print("Cannot measure recall when using --skip-indexing flag.")
+
     # Test search with JVector stats
     print("\nTesting search with JVector stats:")
-    test_search_with_stats(args.host, args.index, args.dimension, k=10, num_searches=args.num_searches)
+
+    # Limit num_searches to num_recall_queries if using ground truth tracker
+    actual_num_searches = args.num_searches
+    if ground_truth_tracker and args.num_searches > args.num_recall_queries:
+        print(f"\nWarning: Limiting searches to {args.num_recall_queries} (number of pre-generated recall queries)")
+        actual_num_searches = args.num_recall_queries
+
+    test_search_with_stats(args.host, args.index, args.dimension, k=10, num_searches=actual_num_searches,
+                          ground_truth_tracker=ground_truth_tracker)
     
     print("\nTest completed successfully!")
     
