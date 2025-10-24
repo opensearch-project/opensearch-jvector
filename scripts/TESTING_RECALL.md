@@ -272,7 +272,6 @@ print(f"Recall: {recall}")
 ## Additional Resources
 
 - **Package Documentation**: See `jvector_utils/README.md`
-- **Refactoring Details**: See `REFACTORING_SUMMARY.md`
 - **Main Script Usage**: See `README.md`
 
 ## Summary
