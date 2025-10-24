@@ -7,7 +7,15 @@ This directory contains scripts for testing OpenSearch JVector functionality, pa
 ### Prerequisites
 
 - Python 3.6+
-- OpenSearch instance with JVector plugin installed
+```bash
+#Linux users
+sudo apt install python3
+
+# Mac users (install latest version of python3)
+sudo brew install python3
+```
+- OpenSearch instance with JVector plugin installed. 
+   See Install Jvector plugin section of [developer guide] (DEVELOPER_GUIDE.md).
 
 ### Setup
 
@@ -17,7 +25,9 @@ It's recommended to use a virtual environment to avoid conflicts with other Pyth
 
 1. Create a virtual environment:
    ```bash
-   sudo apt install python3.11-venv
+   # Linux users
+   sudo apt install python3.11-venv   
+
    # Using venv (Python 3.3+)
    python3 -m venv .venv
    
@@ -41,7 +51,7 @@ It's recommended to use a virtual environment to avoid conflicts with other Pyth
 
 #### Direct Installation
 
-If you prefer not to use a virtual environment:
+Make sure you have pip installed. If you prefer not to use a virtual environment:
 
 ```bash
 pip install -r requirements.txt
@@ -51,7 +61,7 @@ pip install -r requirements.txt
 
 ### Creating and Testing Large JVector Index
 
-The `create_and_test_large_index.py` script creates a large JVector index that exceeds 2GB after force merge, which is useful for testing large index handling capabilities.
+The `create_and_test_large_index.py` script creates a large JVector index that exceeds 2GB after force merge, which is useful for testing large index handling capabilities. The script with no parameters (i.e. default) can take up to 1hr to finish. 
 
 ```bash
 python create_and_test_large_index.py [options]
@@ -81,7 +91,7 @@ python create_and_test_large_index.py --dimension 1024 --num-vectors 5000000 --b
 1. Creates a knn_vector index with JVector engine
 2. Indexes the specified number of vectors with the given dimension
 3. Reports index stats before force merge
-4. Performs a force merge to consolidate segments
+4. Performs a force merge 1 segment to consolidate segments
 5. Reports index stats after force merge
 6. Tests search functionality on the large index
 
@@ -103,7 +113,7 @@ The script collects and reports JVector-specific search and indexing statistics:
 - `knn_graph_merge_time`: Time spent on graph merge (ms)
 
 ##### Search Testing
-For each search iteration, the script:
+The search performs a vector search, and defaults to 10 nearest neighbors (k). For each search iteration, the script:
 1. Performs a kNN search
 2. Collects the JVector stats
 3. Reports the incremental changes for each metric
@@ -114,7 +124,7 @@ After all searches are complete, the script provides:
 - Total differences between initial and final stats
 - Average values per search
 
-This detailed reporting helps in understanding the search behavior and performance characteristics of the JVector engine on a per-query basis.
+This detailed reporting helps in understanding the search behavior and performance characteristics of the JVector engine on a per-query basis. Please refer to the last section of this readme for a sample report. 
 
 You can control the number of test searches with the `--num-searches` parameter:
 
@@ -164,3 +174,49 @@ PID=$(jps | grep OpenSearch | awk '{print $1}')
 # Start profiling
 jcmd $PID JFR.start name=OnDemand settings=profile duration=600s filename=/tmp/app_jfr_$(date +%s).jfr
 ```
+
+#### Sample Output 
+
+Index stats after final force merge:
+Index size: 661120592 bytes (0.62 GB)
+
+Testing search with JVector stats:
+
+Initial JVector Stats:
+
+JVector Search Statistics:
+  knn_query_visited_nodes: 0
+  knn_query_expanded_nodes: 0
+  knn_query_expanded_base_layer_nodes: 0
+
+--- Search Iteration 1/1 ---
+Search completed in 1.0714 seconds, found 10 results
+
+JVector Stats for this iteration:
+  knn_query_visited_nodes: +961
+  knn_query_expanded_nodes: +66
+  knn_query_expanded_base_layer_nodes: +66
+
+=== JVector Stats Summary ===
+
+Initial Stats:
+  knn_query_visited_nodes: 0
+  knn_query_expanded_nodes: 0
+  knn_query_expanded_base_layer_nodes: 0
+
+Final Stats:
+  knn_query_visited_nodes: 4769
+  knn_query_expanded_nodes: 327
+  knn_query_expanded_base_layer_nodes: 327
+
+Total Differences (Final - Initial):
+  knn_query_visited_nodes: +4769
+  knn_query_expanded_nodes: +327
+  knn_query_expanded_base_layer_nodes: +327
+
+Average per Search:
+  knn_query_visited_nodes: 953.80
+  knn_query_expanded_nodes: 65.40
+  knn_query_expanded_base_layer_nodes: 65.40
+
+Test completed successfully!
