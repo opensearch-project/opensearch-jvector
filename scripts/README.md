@@ -2,6 +2,24 @@
 
 This directory contains scripts for testing OpenSearch JVector functionality, particularly with large indices.
 
+## Project Structure
+
+```
+scripts/
+├── jvector_index_and_search/          # JVector indexing and search testing
+│   ├── README.md                      # Comprehensive documentation
+│   ├── create_and_test_large_index.py # Main testing script
+├── demo.sh                            # Demo script
+├── requirements.txt                   # Python dependencies
+└── README.md                          # This file
+```
+
+## Quick Links
+
+- **[JVector Index and Search Testing](jvector_index_and_search/README.md)** - Main testing framework
+- **[Testing Guide](jvector_index_and_search/TESTING_RECALL.md)** - How to test recall measurement
+- **[Package Documentation](jvector_index_and_search/jvector_utils/README.md)** - Utilities API reference
+
 ## Installation
 
 ### Prerequisites
@@ -49,118 +67,82 @@ pip install -r requirements.txt
 
 ## Usage
 
-### Creating and Testing Large JVector Index
+### JVector Index and Search Testing
 
-The `create_and_test_large_index.py` script creates a large JVector index that exceeds 2GB after force merge, which is useful for testing large index handling capabilities.
+The main testing framework is located in the `jvector_index_and_search/` directory.
 
-```bash
-python create_and_test_large_index.py [options]
-```
+**See the [jvector_index_and_search/README.md](jvector_index_and_search/README.md) for complete documentation.**
 
-#### Options:
-
-- `--host`: OpenSearch host:port (default: localhost:9200)
-- `--index`: Index name (default: large-jvector-index)
-- `--dimension`: Vector dimension (default: 768)
-- `--num-vectors`: Number of vectors to index (default: 3,000,000)
-- `--batch-size`: Batch size for indexing (default: 1,000)
-- `--shards`: Number of shards (default: 1)
-
-#### Example:
+#### Quick Start
 
 ```bash
-# Create a large index with default settings
-python create_and_test_large_index.py
+cd jvector_index_and_search
 
-# Create a larger index with custom settings
-python create_and_test_large_index.py --dimension 1024 --num-vectors 5000000 --batch-size 2000 --shards 2
+# Run unit tests (no OpenSearch required)
+python test_recall_measurement.py
+
+# Run integration tests (requires OpenSearch)
+python test_recall_integration.py
+
+# Create and test a large index
+python create_and_test_large_index.py --num-vectors 100000
+
+# With recall measurement
+python create_and_test_large_index.py --measure-recall --num-vectors 100000
 ```
 
-#### What the script does:
+#### Key Features
 
-1. Creates a knn_vector index with JVector engine
-2. Indexes the specified number of vectors with the given dimension
-3. Reports index stats before force merge
-4. Performs a force merge to consolidate segments
-5. Reports index stats after force merge
-6. Tests search functionality on the large index
+- **Large-scale indexing**: Index millions of vectors with configurable batch sizes
+- **Force merge tracking**: Monitor graph merge and quantization times
+- **Search testing**: Perform multiple searches with detailed JVector statistics
+- **Recall measurement**: Memory-efficient ground truth tracking (~1000x less memory)
+- **Performance visualization**: Generate plots of merge times vs document count
 
-#### Notes:
-
-- The default settings (3M vectors with 768 dimensions) should create an index exceeding 2GB after force merge
-- Adjust the parameters based on your available system resources
-- The script requires sufficient memory and disk space to handle large indices
-
-#### JVector Statistics
-
-The script collects and reports JVector-specific search and indexing statistics:
-
-- `knn_query_visited_nodes`: Number of nodes visited during graph search
-- `knn_query_expanded_nodes`: Number of nodes expanded during graph search
-- `knn_query_expanded_base_layer_nodes`: Number of base layer nodes expanded
-- `knn_query_graph_search_time`: Time spent on graph search (ms)
-- `knn_quantization_training_time`: Time spent on quantization training (ms)
-- `knn_graph_merge_time`: Time spent on graph merge (ms)
-
-##### Search Testing
-For each search iteration, the script:
-1. Performs a kNN search
-2. Collects the JVector stats
-3. Reports the incremental changes for each metric
-
-After all searches are complete, the script provides:
-- Initial stats (before any searches)
-- Final stats (after all searches)
-- Total differences between initial and final stats
-- Average values per search
-
-This detailed reporting helps in understanding the search behavior and performance characteristics of the JVector engine on a per-query basis.
-
-You can control the number of test searches with the `--num-searches` parameter:
+#### Common Commands
 
 ```bash
-python create_and_test_large_index.py --num-searches 10
+cd jvector_index_and_search
+
+# Basic large index test
+python create_and_test_large_index.py --num-vectors 1000000
+
+# With recall measurement
+python create_and_test_large_index.py --measure-recall --num-vectors 100000 --num-recall-queries 20
+
+# Performance analysis with visualization
+python create_and_test_large_index.py --force-merge-frequency 100000 --csv-output merge_times.csv --plot
+
+# Search only (skip indexing)
+python create_and_test_large_index.py --skip-indexing --index my-existing-index --dimension 768
 ```
 
-#### CSV Output And Plotting
+For complete documentation, options, and examples, see:
+- **[jvector_index_and_search/README.md](jvector_index_and_search/README.md)** - Complete usage guide
+- **[jvector_index_and_search/TESTING_RECALL.md](jvector_index_and_search/TESTING_RECALL.md)** - Testing and troubleshooting
 
-You can save the merge time data to a CSV file using the `--csv-output` option. The CSV file will contain the following columns:
+## Other Scripts
 
-- `num_documents`: Number of documents indexed
-- `graph_merge_time_ms`: Time taken for graph merge (in milliseconds)
-- `quantization_training_time_ms`: Time taken for quantization training (in milliseconds)
-- `force_merge_duration_sec`: Duration of force merge (in seconds)
-- `index_size_bytes`: Size of the index after force merge (in bytes)
+### demo.sh
 
-```shell
-# Run with CSV output
-python create_and_test_large_index.py --batch-size 1000 --force-merge-frequency 1000 --num-vectors 100000 --csv-output merge_times.csv
+A demo script for quick testing (if available).
 
-# Generate plots from existing CSV
-python create_and_test_large_index.py --csv-output merge_times.csv --plot
-```
+## Profiling
 
-#### Important Note For Large Indices
+You can profile the OpenSearch Java process while running tests:
 
-When working with large indices, it's important to consider the point at which we will require quantization.
-Quantization is becoming critical during index construction when we can't fit the full precision vectors in memory and are forced to use disk.
-Therefore, we want to set the `minimum_batch_size_for_quantization` to a value high enough so we can avoid quantization during index construction.
-Or alternatively, we can set it to a lower value and accept the additional compute cost of quantization during index construction, and thus avoid the disk access.
-
-```shell
-# Run with quantization disabled during index construction until we reach 10M documents
-python create_and_test_large_index.py --batch-size 1000 --force-merge-frequency 1000 --num-vectors 100000 --min-batch-size-for-quantization 10000000
-```
-
-For long running tests you would want to move the script to run in the background and redirect the output to a file:
-```shell
-nohup python create_and_test_large_index.py --batch-size 5000 --force-merge-frequency 100000 --num-vectors 10000000 --min-batch-size-for-quantization 10000000 > output.log 2>&1 &
-```
-
-You can also profile the java process while running the script:
-```shell
+```bash
 # Get the process id of the opensearch java process
 PID=$(jps | grep OpenSearch | awk '{print $1}')
+
 # Start profiling
 jcmd $PID JFR.start name=OnDemand settings=profile duration=600s filename=/tmp/app_jfr_$(date +%s).jfr
 ```
+
+## Contributing
+
+When adding new scripts or modifying existing ones:
+1. Follow the modular structure established in `jvector_index_and_search/`
+2. Add comprehensive documentation
+3. Include unit tests where applicable
+4. Update this README with links to new functionality
