@@ -6,19 +6,19 @@ This directory contains scripts for testing OpenSearch JVector functionality, pa
 
 ```
 scripts/
-├── create_and_test_large_index.py    # Main testing script
-├── jvector_utils/                     # Modular utilities package
-│   ├── __init__.py
-│   ├── index_operations.py           # Index creation and management
-│   ├── search_operations.py          # Search testing and statistics
-│   ├── recall_measurement.py         # Ground truth tracking and recall
-│   ├── stats_utils.py                # KNN statistics utilities
-│   ├── visualization.py              # Performance plotting
-│   └── README.md                     # Package documentation
+├── jvector_index_and_search/          # JVector indexing and search testing
+│   ├── README.md                      # Comprehensive documentation
+│   ├── create_and_test_large_index.py # Main testing script
+├── demo.sh                            # Demo script
+├── requirements.txt                   # Python dependencies
 └── README.md                          # This file
 ```
 
-See `jvector_utils/README.md` for detailed module documentation.
+## Quick Links
+
+- **[JVector Index and Search Testing](jvector_index_and_search/README.md)** - Main testing framework
+- **[Testing Guide](jvector_index_and_search/TESTING_RECALL.md)** - How to test recall measurement
+- **[Package Documentation](jvector_index_and_search/jvector_utils/README.md)** - Utilities API reference
 
 ## Installation
 
@@ -65,231 +65,84 @@ If you prefer not to use a virtual environment:
 pip install -r requirements.txt
 ```
 
-## Testing
-
-### Unit Tests for Recall Measurement
-
-Before using recall measurement with large indices, you can verify it's working correctly:
-
-```bash
-# Run comprehensive unit tests
-python test_recall_measurement.py
-```
-
-This test suite verifies:
-- ✅ Basic ground truth tracking functionality
-- ✅ Correctness with large vector sets (100+ vectors)
-- ✅ Recall calculation accuracy
-- ✅ Multiple query vector handling
-- ✅ Both L2 and cosine distance metrics
-- ✅ Edge cases (k > num_vectors, ties, etc.)
-
-**Expected output:** All 6 tests should pass with "🎉 All tests passed!"
-
-### Integration Test with OpenSearch
-
-Test recall measurement end-to-end with a real OpenSearch instance:
-
-```bash
-# Run integration test (requires OpenSearch running)
-python test_recall_integration.py
-
-# Customize test parameters
-python test_recall_integration.py --dimension 256 --num-vectors 5000 --num-queries 10
-```
-
-This integration test:
-1. Creates a small test index
-2. Indexes vectors with ground truth tracking
-3. Performs searches and measures recall
-4. Verifies recall values are reasonable
-5. Cleans up the test index
-
-**Expected output:** Recall values should typically be >0.9 for small indices.
-
 ## Usage
 
-### Creating and Testing Large JVector Index
+### JVector Index and Search Testing
 
-The `create_and_test_large_index.py` script creates a large JVector index that exceeds 2GB after force merge, which is useful for testing large index handling capabilities.
+The main testing framework is located in the `jvector_index_and_search/` directory.
 
-```bash
-python create_and_test_large_index.py [options]
-```
+**See the [jvector_index_and_search/README.md](jvector_index_and_search/README.md) for complete documentation.**
 
-#### Options:
-
-- `--host`: OpenSearch host:port (default: localhost:9200)
-- `--index`: Index name (default: large-jvector-index)
-- `--dimension`: Vector dimension (default: 768)
-- `--num-vectors`: Number of vectors to index (default: 3,000,000)
-- `--batch-size`: Batch size for indexing (default: 1,000)
-- `--shards`: Number of shards (default: 1)
-
-#### Example:
+#### Quick Start
 
 ```bash
-# Create a large index with default settings
-python create_and_test_large_index.py
+cd jvector_index_and_search
 
-# Create a larger index with custom settings
-python create_and_test_large_index.py --dimension 1024 --num-vectors 5000000 --batch-size 2000 --shards 2
+# Run unit tests (no OpenSearch required)
+python test_recall_measurement.py
+
+# Run integration tests (requires OpenSearch)
+python test_recall_integration.py
+
+# Create and test a large index
+python create_and_test_large_index.py --num-vectors 100000
+
+# With recall measurement
+python create_and_test_large_index.py --measure-recall --num-vectors 100000
 ```
 
-#### What the script does:
+#### Key Features
 
-1. Creates a knn_vector index with JVector engine
-2. Indexes the specified number of vectors with the given dimension
-3. Reports index stats before force merge
-4. Performs a force merge to consolidate segments
-5. Reports index stats after force merge
-6. Tests search functionality on the large index
+- **Large-scale indexing**: Index millions of vectors with configurable batch sizes
+- **Force merge tracking**: Monitor graph merge and quantization times
+- **Search testing**: Perform multiple searches with detailed JVector statistics
+- **Recall measurement**: Memory-efficient ground truth tracking (~1000x less memory)
+- **Performance visualization**: Generate plots of merge times vs document count
 
-#### Notes:
-
-- The default settings (3M vectors with 768 dimensions) should create an index exceeding 2GB after force merge
-- Adjust the parameters based on your available system resources
-- The script requires sufficient memory and disk space to handle large indices
-
-#### JVector Statistics
-
-The script collects and reports JVector-specific search and indexing statistics:
-
-- `knn_query_visited_nodes`: Number of nodes visited during graph search
-- `knn_query_expanded_nodes`: Number of nodes expanded during graph search
-- `knn_query_expanded_base_layer_nodes`: Number of base layer nodes expanded
-- `knn_query_graph_search_time`: Time spent on graph search (ms)
-- `knn_quantization_training_time`: Time spent on quantization training (ms)
-- `knn_graph_merge_time`: Time spent on graph merge (ms)
-
-##### Search Testing
-For each search iteration, the script:
-1. Performs a kNN search
-2. Collects the JVector stats
-3. Reports the incremental changes for each metric
-
-After all searches are complete, the script provides:
-- Initial stats (before any searches)
-- Final stats (after all searches)
-- Total differences between initial and final stats
-- Average values per search
-
-This detailed reporting helps in understanding the search behavior and performance characteristics of the JVector engine on a per-query basis.
-
-You can control the number of test searches with the `--num-searches` parameter:
+#### Common Commands
 
 ```bash
-python create_and_test_large_index.py --num-searches 10
+cd jvector_index_and_search
+
+# Basic large index test
+python create_and_test_large_index.py --num-vectors 1000000
+
+# With recall measurement
+python create_and_test_large_index.py --measure-recall --num-vectors 100000 --num-recall-queries 20
+
+# Performance analysis with visualization
+python create_and_test_large_index.py --force-merge-frequency 100000 --csv-output merge_times.csv --plot
+
+# Search only (skip indexing)
+python create_and_test_large_index.py --skip-indexing --index my-existing-index --dimension 768
 ```
 
-#### Recall Measurement
+For complete documentation, options, and examples, see:
+- **[jvector_index_and_search/README.md](jvector_index_and_search/README.md)** - Complete usage guide
+- **[jvector_index_and_search/TESTING_RECALL.md](jvector_index_and_search/TESTING_RECALL.md)** - Testing and troubleshooting
 
-The script now supports measuring recall@k to evaluate the quality of approximate nearest neighbor search results. Recall is calculated by comparing the approximate search results from the JVector index against ground truth computed using an efficient incremental approach.
+## Other Scripts
 
-**Key Feature**: The implementation uses a memory-efficient algorithm that computes ground truth incrementally during indexing using min-heaps, eliminating the need to store all vectors in memory.
+### demo.sh
 
-##### Options:
+A demo script for quick testing (if available).
 
-- `--measure-recall`: Enable recall measurement (disabled by default)
-- `--num-recall-queries`: Number of query vectors to pre-generate for recall measurement (default: same as `--num-searches`)
+## Profiling
 
-##### How it works:
-
-1. When `--measure-recall` is enabled, the script pre-generates random query vectors
-2. During indexing, for each indexed vector, it updates min-heaps to track the k-nearest neighbors for each query
-3. After indexing completes, the ground truth is already computed and stored in the heaps
-4. During search testing, it uses the pre-generated query vectors and compares results with the pre-computed ground truth
-5. Reports recall@k for each query and provides summary statistics
-
-This approach is **much more memory-efficient** than storing all vectors, as it only needs to store:
-- The query vectors (num_queries × dimension)
-- The k-nearest neighbors for each query (num_queries × k × small overhead)
-
-##### Example:
+You can profile the OpenSearch Java process while running tests:
 
 ```bash
-# Enable recall measurement with default settings
-python create_and_test_large_index.py --measure-recall --num-vectors 1000000
-
-# Pre-generate 50 query vectors for recall testing
-python create_and_test_large_index.py --measure-recall --num-recall-queries 50 --num-searches 50
-
-# Combine with other options
-python create_and_test_large_index.py --measure-recall --num-recall-queries 20 --num-searches 20 --dimension 384
-```
-
-##### Output:
-
-For each search iteration, the script reports:
-- Recall@k value (e.g., 0.9500 means 95% of results match ground truth)
-- Number of correct results out of k (e.g., "9/10 correct")
-
-After all searches, a summary is provided:
-- Average Recall@k across all queries
-- Minimum Recall@k
-- Maximum Recall@k
-- Standard deviation
-
-##### Memory Considerations:
-
-The memory usage for recall tracking is approximately:
-```
-Query vectors: num_queries × dimension × 8 bytes
-Ground truth heaps: num_queries × k × 16 bytes
-Total Memory (MB) ≈ (num_queries × dimension × 8 + num_queries × k × 16) / (1024 × 1024)
-```
-
-Examples (with k=10):
-- 10 queries × 768 dimensions ≈ 0.06 MB (query vectors) + 0.002 MB (heaps) ≈ **0.06 MB total**
-- 100 queries × 768 dimensions ≈ 0.59 MB (query vectors) + 0.015 MB (heaps) ≈ **0.60 MB total**
-- 1000 queries × 768 dimensions ≈ 5.86 MB (query vectors) + 0.15 MB (heaps) ≈ **6.01 MB total**
-
-Compare this to the old approach of storing all vectors:
-- 1,000,000 vectors × 768 dimensions ≈ **5,859 MB** (nearly 6 GB!)
-
-The new approach is **~1000x more memory efficient** for typical use cases!
-
-**Note**: Recall measurement is not available when using `--skip-indexing` flag, as it requires tracking vectors during indexing.
-
-#### CSV Output And Plotting
-
-You can save the merge time data to a CSV file using the `--csv-output` option. The CSV file will contain the following columns:
-
-- `num_documents`: Number of documents indexed
-- `graph_merge_time_ms`: Time taken for graph merge (in milliseconds)
-- `quantization_training_time_ms`: Time taken for quantization training (in milliseconds)
-- `force_merge_duration_sec`: Duration of force merge (in seconds)
-- `index_size_bytes`: Size of the index after force merge (in bytes)
-
-```shell
-# Run with CSV output
-python create_and_test_large_index.py --batch-size 1000 --force-merge-frequency 1000 --num-vectors 100000 --csv-output merge_times.csv
-
-# Generate plots from existing CSV
-python create_and_test_large_index.py --csv-output merge_times.csv --plot
-```
-
-#### Important Note For Large Indices
-
-When working with large indices, it's important to consider the point at which we will require quantization.
-Quantization is becoming critical during index construction when we can't fit the full precision vectors in memory and are forced to use disk.
-Therefore, we want to set the `minimum_batch_size_for_quantization` to a value high enough so we can avoid quantization during index construction.
-Or alternatively, we can set it to a lower value and accept the additional compute cost of quantization during index construction, and thus avoid the disk access.
-
-```shell
-# Run with quantization disabled during index construction until we reach 10M documents
-python create_and_test_large_index.py --batch-size 1000 --force-merge-frequency 1000 --num-vectors 100000 --min-batch-size-for-quantization 10000000
-```
-
-For long running tests you would want to move the script to run in the background and redirect the output to a file:
-```shell
-nohup python create_and_test_large_index.py --batch-size 5000 --force-merge-frequency 100000 --num-vectors 10000000 --min-batch-size-for-quantization 10000000 > output.log 2>&1 &
-```
-
-You can also profile the java process while running the script:
-```shell
 # Get the process id of the opensearch java process
 PID=$(jps | grep OpenSearch | awk '{print $1}')
+
 # Start profiling
 jcmd $PID JFR.start name=OnDemand settings=profile duration=600s filename=/tmp/app_jfr_$(date +%s).jfr
 ```
+
+## Contributing
+
+When adding new scripts or modifying existing ones:
+1. Follow the modular structure established in `jvector_index_and_search/`
+2. Add comprehensive documentation
+3. Include unit tests where applicable
+4. Update this README with links to new functionality
