@@ -10,7 +10,6 @@ import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.search.*;
 import org.apache.lucene.search.knn.KnnCollectorManager;
 import org.apache.lucene.search.knn.KnnSearchStrategy;
-import org.apache.lucene.util.Bits;
 
 import java.io.IOException;
 
@@ -24,7 +23,7 @@ public class JVectorKnnFloatVectorQuery extends KnnFloatVectorQuery {
     private final float threshold;
     private final float rerankFloor;
     private final boolean usePruning;
-    private static final KnnSearchStrategy.Hnsw DEFAULT_STRATEGY = new KnnSearchStrategy.Hnsw(0);
+    private static final KnnSearchStrategy DEFAULT_STRATEGY = new KnnSearchStrategy.Hnsw(100);
 
     public JVectorKnnFloatVectorQuery(
         String field,
