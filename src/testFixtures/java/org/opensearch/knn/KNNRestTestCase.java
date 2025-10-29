@@ -228,7 +228,6 @@ public class KNNRestTestCase extends ODFERestTestCase {
 
         Response response = client().performRequest(request);
         assertEquals(request.getEndpoint() + ": failed", RestStatus.OK, RestStatus.fromCode(response.getStatusLine().getStatusCode()));
-
         return response;
     }
 
@@ -1477,7 +1476,6 @@ public class KNNRestTestCase extends ODFERestTestCase {
             1
         );
     }
-
 
     public void bulkIngestRandomVectorsWithSkipsAndNestedMultiDoc(
         String indexName,

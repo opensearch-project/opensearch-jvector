@@ -169,22 +169,14 @@ public class JVectorReader extends KnnVectorsReader {
             // Convert the acceptDocs bitmap from Lucene to jVector ordinal bitmap filter
             // Logic works as follows: if acceptDocs is null, we accept all ordinals. Otherwise, we check if the jVector ordinal has a
             // corresponding Lucene doc ID accepted by acceptDocs filter.
-            Bits b = acceptDocs.bits();
-            io.github.jbellis.jvector.util.Bits compatibleBits = ord -> b == null ||
-                    b.get(jvectorLuceneDocMap.getLuceneDocId(ord));
-
-             /*io.github.jbellis.jvector.util.Bits compatibleBits = ord -> {
-                try {
-                    if (acceptDocs == null || acceptDocs.bits() == null)
-                        return true;
-
-                    return acceptDocs.bits().get(jvectorLuceneDocMap.getLuceneDocId(ord));
-                } catch (IOException e) {
-                    log.error("Encountered exception while comparing AcceptDocs");
-                    //throw new RuntimeException(e);
-                }
-                 return false;
-             };*/
+            io.github.jbellis.jvector.util.Bits compatibleBits;
+            if (acceptDocs == null)
+                compatibleBits = ord -> true;
+            else {
+                Bits b = acceptDocs.bits();
+                compatibleBits = ord -> b == null ||
+                        b.get(jvectorLuceneDocMap.getLuceneDocId(ord));
+            }
 
             try (var graphSearcher = new GraphSearcher(index)) {
                 final var searchResults = graphSearcher.search(

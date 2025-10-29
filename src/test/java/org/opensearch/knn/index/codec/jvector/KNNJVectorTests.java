@@ -262,6 +262,7 @@ public class KNNJVectorTests extends LuceneTestCase {
                 final float[] source = new float[] { 0.0f, 1.0f / i };
                 final Document doc = new Document();
                 doc.add(new KnnFloatVectorField("test_field", source, VectorSimilarityFunction.EUCLIDEAN));
+                doc.add(new StringField("my_doc_id", Integer.toString(1, 10), Field.Store.YES));
                 w.addDocument(doc);
                 w.commit(); // this creates a new segment
             }
@@ -271,10 +272,10 @@ public class KNNJVectorTests extends LuceneTestCase {
                 log.info("We should now have 10 segments, each with a single document");
                 Assert.assertEquals(10, reader.getContext().leaves().size());
                 Assert.assertEquals(totalNumberOfDocs, reader.numDocs());
-                final Query filterQuery = new MatchAllDocsQuery();
+                final Query filterQuery = new TermQuery(new Term("my_doc_id", "1"));
                 final IndexSearcher searcher = newSearcher(reader);
-                KnnFloatVectorQuery knnFloatVectorQuery = new KnnFloatVectorQuery("test_field", target, k, filterQuery);
-                TopDocs topDocs = searcher.search(knnFloatVectorQuery, k);
+                KnnFloatVectorQuery kfilterQuery = new KnnFloatVectorQuery("test_field", target, k, filterQuery);
+                TopDocs topDocs = searcher.search(kfilterQuery, k);
                 assertEquals(k, topDocs.totalHits.value());
                 assertEquals(9, topDocs.scoreDocs[0].doc);
                 Assert.assertEquals(
