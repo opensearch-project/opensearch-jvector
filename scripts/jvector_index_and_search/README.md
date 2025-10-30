@@ -240,6 +240,54 @@ index_vectors("localhost:9200", "my-index", num_vectors=10000, dimension=768)
 
 See [jvector_utils/README.md](jvector_utils/README.md) for detailed package documentation.
 
+## Sample Output
+
+#### Sample Output
+```bash
+Index stats after final force merge:
+Index size: 661120592 bytes (0.62 GB)
+
+Testing search with JVector stats:
+
+Initial JVector Stats:
+
+JVector Search Statistics:
+knn_query_visited_nodes: 0
+knn_query_expanded_nodes: 0
+knn_query_expanded_base_layer_nodes: 0
+
+--- Search Iteration 1/1 ---
+Search completed in 1.0714 seconds, found 10 results
+
+JVector Stats for this iteration:
+knn_query_visited_nodes: +961
+knn_query_expanded_nodes: +66
+knn_query_expanded_base_layer_nodes: +66
+
+=== JVector Stats Summary ===
+
+Initial Stats:
+knn_query_visited_nodes: 0
+knn_query_expanded_nodes: 0
+knn_query_expanded_base_layer_nodes: 0
+
+Final Stats:
+knn_query_visited_nodes: 4769
+knn_query_expanded_nodes: 327
+knn_query_expanded_base_layer_nodes: 327
+
+Total Differences (Final - Initial):
+knn_query_visited_nodes: +4769
+knn_query_expanded_nodes: +327
+knn_query_expanded_base_layer_nodes: +327
+
+Average per Search:
+knn_query_visited_nodes: 953.80
+knn_query_expanded_nodes: 65.40
+knn_query_expanded_base_layer_nodes: 65.40
+
+Test completed successfully!
+```
 ## Troubleshooting
 
 ### Connection Errors
@@ -287,7 +335,7 @@ curl http://localhost:9200/_cat/plugins
 
 - **Testing Guide**: [TESTING_RECALL.md](TESTING_RECALL.md)
 - **Package Documentation**: [jvector_utils/README.md](jvector_utils/README.md)
-- **Main Scripts README**: [../README.md](../README.md)
+- **Main Scripts README**: [README.md](../README.md)
 
 ## Contributing
 
