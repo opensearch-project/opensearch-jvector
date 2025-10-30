@@ -20,6 +20,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * Upgrade Gradle to 8.14 [165] (https://github.com/opensearch-project/opensearch-jvector/pull/165)
 ### Documentation
 * Add docker instructions [163] (https://github.com/opensearch-project/opensearch-jvector/pull/163)
+* Update script and main docs with minor fixes [193] (https://github.com/opensearch-project/opensearch-jvector/pull/193)
 ### Maintenance
 * Fix documentation bugs [161] (https://github.com/opensearch-project/opensearch-jvector/pull/161)
 ### Refactoring
