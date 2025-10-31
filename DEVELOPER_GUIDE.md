@@ -134,7 +134,7 @@ If you want to build the plugin to later use with a different plugin such as neu
 ./gradlew build
 
 # Install the plugin locally to your local maven repository
-PLUGIN_VERSION="3.0.0.0-alpha1-SNAPSHOT"
+PLUGIN_VERSION="3.2.0.0"
 LOCAL_DISTRIBUTION_DIR="build/distributions"
 # Install the plugin jar files
 mvn install:install-file \
@@ -247,14 +247,14 @@ In case remote cluster is secured it's possible to pass username and password wi
 ```
 
 ### Install jVector KNN within your existing OpenSearch cluster installation
-The jvector plugin can be downloaded from [here](https://ci.opensearch.org/ci/dbc/snapshots/maven/org/opensearch/knn/opensearch-jvector/3.0.0.4-SNAPSHOT/)
+The jvector plugin can be downloaded from [here](https://repo1.maven.org/maven2/org/opensearch/plugin/opensearch-jvector-plugin/)
 ```bash
 # Go into the OpenSearch directory
 cd opensearch
 # First remove the KNN plugin
 bin/opensearch-plugin remove opensearch-knn-plugin
 # Then download the jvector plugin
-curl https://repo1.maven.org/maven2/org/opensearch/plugin/opensearch-jvector-plugin/3.0.0.4/opensearch-jvector-plugin-3.0.0.4.zip -o opensearch-jvector-plugin.zip
+curl https://repo1.maven.org/maven2/org/opensearch/plugin/opensearch-jvector-plugin/3.2.0.0/opensearch-jvector-plugin-3.2.0.0.zip -o opensearch-jvector-plugin.zip
 ./bin/opensearch-plugin install file://`pwd`/opensearch-jvector-plugin.zip
 # Start OpenSearch
 ./bin/opensearch
@@ -265,13 +265,13 @@ curl https://repo1.maven.org/maven2/org/opensearch/plugin/opensearch-jvector-plu
 You can build a Docker image with the jVector KNN plugin installed using the following Dockerfile:
 
 ```Dockerfile
-FROM opensearchproject/opensearch:3.0.0
+FROM opensearchproject/opensearch:3.2.0
 
 # Remove the KNN plugin
 RUN /usr/share/opensearch/bin/opensearch-plugin remove opensearch-neural-search && \
     /usr/share/opensearch/bin/opensearch-plugin remove opensearch-knn
 # Install JVector plugin
-RUN curl https://repo1.maven.org/maven2/org/opensearch/plugin/opensearch-jvector-plugin/3.0.0.4/opensearch-jvector-plugin-3.0.0.4.zip -o opensearch-jvector-plugin.zip && \
+RUN curl https://repo1.maven.org/maven2/org/opensearch/plugin/opensearch-jvector-plugin/3.2.0.0/opensearch-jvector-plugin-3.2.0.0.zip -o opensearch-jvector-plugin.zip && \
     /usr/share/opensearch/bin/opensearch-plugin install --batch file://`pwd`/opensearch-jvector-plugin.zip
 ```
 
