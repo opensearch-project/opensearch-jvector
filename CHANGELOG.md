@@ -18,6 +18,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Infrastructure
 * Upgrade to JDK24 [165] (https://github.com/opensearch-project/opensearch-jvector/pull/165)
 * Upgrade Gradle to 8.14 [165] (https://github.com/opensearch-project/opensearch-jvector/pull/165)
+* Upgrade Lucene to 10.3.1 [188] (https://github.com/opensearch-project/opensearch-jvector/pull/188)
 ### Documentation
 * Add docker instructions [163] (https://github.com/opensearch-project/opensearch-jvector/pull/163)
 ### Maintenance
