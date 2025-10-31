@@ -25,7 +25,7 @@ import org.opensearch.core.xcontent.XContentParser;
 import org.opensearch.index.query.MatchAllQueryBuilder;
 import org.opensearch.knn.common.KNNConstants;
 import org.opensearch.knn.index.VectorDataType;
-import org.opensearch.knn.index.codec.derivedsource.ParentChildHelper;
+import org.opensearch.knn.index.codec.backward_codecs.KNN9120Codec.ParentChildHelper;
 import org.opensearch.knn.index.query.KNNQueryBuilder;
 import org.opensearch.knn.index.KNNSettings;
 import org.opensearch.knn.index.SpaceType;
@@ -228,7 +228,6 @@ public class KNNRestTestCase extends ODFERestTestCase {
 
         Response response = client().performRequest(request);
         assertEquals(request.getEndpoint() + ": failed", RestStatus.OK, RestStatus.fromCode(response.getStatusLine().getStatusCode()));
-
         return response;
     }
 
