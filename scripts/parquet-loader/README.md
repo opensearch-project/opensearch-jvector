@@ -33,13 +33,16 @@ This script efficiently loads data from Parquet files into an OpenSearch index, 
     OPENSEARCH_HOSTS='["http://localhost:9200"]'
     OPENSEARCH_INDEX="my-index"
     ```
+    Alternatively, set these variables on your local terminal
+    export OPENSEARCH_HOSTS='[{"host":"localhost","port":9200,"scheme":"http"}]'
+    export OPENSEARCH_INDEX="my-index"
 
 ## Usage
 
 Run the script from the command line, providing the path to your Parquet file and the number of parallel workers:
 
 ```bash
-python osbench.py /path/to/your/data.parquet --workers 4
+python osbench.py --path /path/to/your/data.parquet --procs 4
 ```
 
 -   `/path/to/your/data.parquet`: The Parquet file to load.

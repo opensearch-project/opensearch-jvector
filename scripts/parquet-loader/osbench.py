@@ -46,21 +46,31 @@ PROG_ADD = "add"         # increment docs by n
 PROG_FILE = "file_done"  # one file finished
 PROG_DONE = "done"       # one worker finished
 
-def start_progress_consumer(progress_q, total_docs: int, total_files: int, procs: int):
+def start_progress_consumer(progress_q, procs: int = 1):
     """
     Run a background thread that updates two bars:
       - docs indexed (primary, by actions confirmed from workers)
       - files done (secondary, optional)
     """
-    def _runner():
-        doc_bar = tqdm(total=total_docs or 0, desc="Indexed docs", unit="doc", position=0)
-        file_bar = tqdm(total=total_files or 0, desc="Files", unit="file", position=1, leave=False)
-        done = 0
+    def _runner(progress_q, stop_event, *args, **kwargs):
+        import traceback, os, sys, queue
+        # ensure progress-bar variables exist and are safe-to-call even if not set up
+        class _NoopBar:
+            def update(self, n=1): pass
+            def set_description(self, *a, **k): pass
+            def close(self): pass
+            def refresh(self): pass
+
+        file_bar = _NoopBar()
+        # other bars used by the runner (if any) can be initialized similarly:
+        files_bar = _NoopBar()
+        docs_bar = _NoopBar()
+
         try:
-            while done < procs:
+            while not stop_event.is_set():
                 try:
                     kind, value = progress_q.get(timeout=0.5)
-                except Empty:
+                except queue.Empty:
                     continue
                 if kind == PROG_ADD:
                     doc_bar.update(int(value))
@@ -68,13 +78,42 @@ def start_progress_consumer(progress_q, total_docs: int, total_files: int, procs
                     file_bar.update(1)
                 elif kind == PROG_DONE:
                     done += 1
+        except Exception as e:
+            # Avoid using buffered stderr at interpreter shutdown — write raw bytes.
+            tb = traceback.format_exc()
+            try:
+                os.write(2, b"Exception in runner thread:\n")
+                os.write(2, tb.encode("utf-8", "backslashreplace"))
+            except Exception:
+                # best-effort: if os.write fails, silently ignore to avoid aborting
+                pass
+
+            # try to notify the main process via the queue (best-effort)
+            try:
+                progress_q.put(("runner_error", tb))
+            except Exception:
+                pass
+
+            # ensure we set stop_event so main cleans up worker threads/processes
+            try:
+                stop_event.set()
+                t.join(timeout=10)
+            except Exception:
+                pass
+
+            # do not re-raise here because re-raising can cause unclean interpreter shutdown
+            return
         finally:
             doc_bar.close()
             file_bar.close()
-    t = Thread(target=_runner, daemon=True)
-    t.start()
-    return t
 
+    # create a stop event for the runner thread and pass it in
+    from threading import Event
+    stop_event = Event()
+    t = Thread(target=_runner, args=(progress_q, stop_event), daemon=False)
+    t.start()
+    return t, stop_event
+    
 
 
 # ------------------------------
@@ -221,11 +260,38 @@ def print_critical(item, pid):
 # ------------------------------
 def actions_from_batch_numpy(batch: pa.RecordBatch, index_name: str, numpy_ok: bool) -> List[Dict[str, Any]]:
     names = batch.schema.names
-    i_chunk = names.index("chunk_id")
-    i_emb = names.index("embeddings")
+    # tolerate missing columns: fallback to synthetic row ids if chunk_id absent
+    i_chunk = names.index("chunk_id") if "chunk_id" in names else None
+
+    # find embeddings column (accept common alternatives or detect by type)
+    i_emb = None
+    if "embeddings" in names:
+        i_emb = names.index("embeddings")
+    else:
+        for alt in ("embedding", "vector", "vec", "features", "feat"):
+            if alt in names:
+                i_emb = names.index(alt)
+                break
+
+    if i_emb is None:
+        # type-based detection: FixedSizeList<float>
+        for idx, fname in enumerate(names):
+            f = batch.schema.field(idx)
+            if pa.types.is_fixed_size_list(f.type) and pa.types.is_floating(f.type.value_type):
+                i_emb = idx
+                break
+
+    if i_emb is None:
+        # no embeddings found -> skip this batch instead of crashing worker
+        print(f"[worker] Missing required column 'embeddings' in batch — available columns: {names}", file=sys.stderr)
+        return []
+
     n = batch.num_rows
 
-    chunk_ids = batch.column(i_chunk).to_pylist()
+    if i_chunk is not None:
+        chunk_ids = batch.column(i_chunk).to_pylist()
+    else:
+        chunk_ids = [str(i) for i in range(n)]
     emb_field = batch.schema.field(i_emb)
     emb_col = batch.column(i_emb)
     emb_type = emb_field.type
@@ -396,10 +462,8 @@ def main():
     progress_q = manager.Queue(maxsize=10000)
 
     # start the background consumer (2 progress bars)
-    progress_thread = start_progress_consumer(
+    progress_thread, progress_stop_event = start_progress_consumer(
         progress_q,
-        total_docs=total_rows,        # from parquet metadata; 0 if unknown
-        total_files=len(files),
         procs=args.procs
     )
 
