@@ -25,7 +25,15 @@ scripts/
 ### Prerequisites
 
 - Python 3.6+
-- OpenSearch instance with JVector plugin installed
+```bash
+#Linux users
+sudo apt install python3
+
+# Mac users (install latest version of python3)
+sudo brew install python3
+```
+- OpenSearch instance with JVector plugin installed. 
+   See Install Jvector plugin section of [developer guide] (DEVELOPER_GUIDE.md).
 
 ### Setup
 
@@ -35,7 +43,9 @@ It's recommended to use a virtual environment to avoid conflicts with other Pyth
 
 1. Create a virtual environment:
    ```bash
-   sudo apt install python3.11-venv
+   # Linux users
+   sudo apt install python3.11-venv   
+
    # Using venv (Python 3.3+)
    python3 -m venv .venv
    
@@ -59,7 +69,7 @@ It's recommended to use a virtual environment to avoid conflicts with other Pyth
 
 #### Direct Installation
 
-If you prefer not to use a virtual environment:
+Make sure you have pip installed. If you prefer not to use a virtual environment:
 
 ```bash
 pip install -r requirements.txt
