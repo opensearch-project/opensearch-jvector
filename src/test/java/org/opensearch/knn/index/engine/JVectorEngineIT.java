@@ -350,7 +350,12 @@ public class JVectorEngineIT extends KNNRestTestCase {
 
     private List<float[]> queryResults(final float[] searchVector, final int k) throws Exception {
         final String responseBody = EntityUtils.toString(
-            searchKNNIndex(INDEX_NAME, new KNNQueryBuilder(FIELD_NAME, searchVector, k, new TermQueryBuilder(TERM_QUERY_FIELD_NAME, TERM_QUERY_FIELD_VALUE)), k).getEntity());
+            searchKNNIndex(
+                INDEX_NAME,
+                new KNNQueryBuilder(FIELD_NAME, searchVector, k, new TermQueryBuilder(TERM_QUERY_FIELD_NAME, TERM_QUERY_FIELD_VALUE)),
+                k
+            ).getEntity()
+        );
         final List<KNNResult> knnResults = parseSearchResponse(responseBody, FIELD_NAME);
         assertNotNull(knnResults);
         return knnResults.stream().map(KNNResult::getVector).collect(Collectors.toUnmodifiableList());
@@ -420,7 +425,11 @@ public class JVectorEngineIT extends KNNRestTestCase {
 
         int k = CommonTestUtils.TEST_INDEX_VECTORS.length;
         for (float[] queryVector : TEST_QUERY_VECTORS) {
-            Response response = searchKNNIndex(INDEX_NAME, new KNNQueryBuilder(fieldName, queryVector, k, new TermQueryBuilder(TERM_QUERY_FIELD_NAME, TERM_QUERY_FIELD_VALUE)), k);
+            Response response = searchKNNIndex(
+                INDEX_NAME,
+                new KNNQueryBuilder(fieldName, queryVector, k, new TermQueryBuilder(TERM_QUERY_FIELD_NAME, TERM_QUERY_FIELD_VALUE)),
+                k
+            );
             String responseBody = EntityUtils.toString(response.getEntity());
             List<KNNResult> knnResults = parseSearchResponse(responseBody, fieldName);
             assertEquals(k, knnResults.size());

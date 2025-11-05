@@ -622,7 +622,11 @@ public class KNNRestTestCase extends ODFERestTestCase {
     protected <T> void addKnnDoc(String index, String docId, String fieldName, T vector) throws IOException {
         Request request = new Request("POST", "/" + index + "/_doc/" + docId + "?refresh=true");
 
-        XContentBuilder builder = XContentFactory.jsonBuilder().startObject().field(fieldName, vector).field(TERM_QUERY_FIELD_NAME, TERM_QUERY_FIELD_VALUE).endObject();
+        XContentBuilder builder = XContentFactory.jsonBuilder()
+            .startObject()
+            .field(fieldName, vector)
+            .field(TERM_QUERY_FIELD_NAME, TERM_QUERY_FIELD_VALUE)
+            .endObject();
         request.setJsonEntity(builder.toString());
         client().performRequest(request);
 
