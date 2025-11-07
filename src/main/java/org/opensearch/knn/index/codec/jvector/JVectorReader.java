@@ -169,7 +169,7 @@ public class JVectorReader extends KnnVectorsReader {
             // Logic works as follows: if acceptDocs is null, we accept all ordinals. Otherwise, we check if the jVector ordinal has a
             // corresponding Lucene doc ID accepted by acceptDocs filter.
             io.github.jbellis.jvector.util.Bits compatibleBits = ord -> acceptDocs == null
-                || acceptDocs.get(jvectorLuceneDocMap.getLuceneDocId(ord));
+                || (jvectorLuceneDocMap.getLuceneDocId(ord) != -1 && acceptDocs.get(jvectorLuceneDocMap.getLuceneDocId(ord)));
 
             try (var graphSearcher = new GraphSearcher(index)) {
                 final var searchResults = graphSearcher.search(
