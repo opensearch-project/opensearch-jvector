@@ -21,8 +21,6 @@ import java.io.IOException;
 public class DerivedSourceReadersSupplier {
     private final DerivedSourceReaderSupplier<KnnVectorsReader> knnVectorsReaderSupplier;
     private final DerivedSourceReaderSupplier<DocValuesProducer> docValuesProducerSupplier;
-    // private final DerivedSourceReaderSupplier<FieldsProducer> fieldsProducerSupplier;
-    // private final DerivedSourceReaderSupplier<NormsProducer> normsProducer;
 
     /**
      * Get the readers for the segment
