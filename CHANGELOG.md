@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * Update script and main docs with minor fixes [196] (https://github.com/opensearch-project/opensearch-jvector/pull/196)
 ### Bug Fixes
 ### Infrastructure
+* Upgrade Lucene to 10.3.1 [189] (https://github.com/opensearch-project/opensearch-jvector/pull/189)
 ### Documentation
 ### Maintenance
 ### Refactoring

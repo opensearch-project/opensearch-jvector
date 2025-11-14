@@ -3,90 +3,90 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package org.opensearch.knn.index.codec.KNN9120Codec;
+package org.opensearch.knn.index.codec.KNN10010Codec;
 
 import org.apache.lucene.codecs.StoredFieldsReader;
-import org.apache.lucene.index.FieldInfo;
 import org.apache.lucene.index.SegmentReadState;
 import org.apache.lucene.index.StoredFieldVisitor;
 import org.apache.lucene.util.IOUtils;
 import org.opensearch.index.fieldvisitor.FieldsVisitor;
-import org.opensearch.knn.index.codec.derivedsource.DerivedSourceReadersSupplier;
+import org.opensearch.knn.index.codec.derivedsource.DerivedFieldInfo;
+import org.opensearch.knn.index.codec.derivedsource.DerivedSourceReaders;
 import org.opensearch.knn.index.codec.derivedsource.DerivedSourceStoredFieldVisitor;
-import org.opensearch.knn.index.codec.derivedsource.DerivedSourceVectorInjector;
+import org.opensearch.knn.index.codec.derivedsource.DerivedSourceVectorTransformer;
 
 import java.io.IOException;
 import java.util.List;
 
-public class DerivedSourceStoredFieldsReader extends StoredFieldsReader {
+public class KNN10010DerivedSourceStoredFieldsReader extends StoredFieldsReader {
     private final StoredFieldsReader delegate;
-    private final List<FieldInfo> derivedVectorFields;
-    private final DerivedSourceReadersSupplier derivedSourceReadersSupplier;
+    private final List<DerivedFieldInfo> derivedVectorFields;
+    private final DerivedSourceReaders derivedSourceReaders;
     private final SegmentReadState segmentReadState;
     private final boolean shouldInject;
 
-    private final DerivedSourceVectorInjector derivedSourceVectorInjector;
+    private final DerivedSourceVectorTransformer derivedSourceVectorTransformer;
 
     /**
      *
      * @param delegate delegate StoredFieldsReader
      * @param derivedVectorFields List of fields that are derived source fields
-     * @param derivedSourceReadersSupplier Supplier for the derived source readers
+     * @param derivedSourceReaders derived source readers
      * @param segmentReadState SegmentReadState for the segment
      * @throws IOException in case of I/O error
      */
-    public DerivedSourceStoredFieldsReader(
+    public KNN10010DerivedSourceStoredFieldsReader(
         StoredFieldsReader delegate,
-        List<FieldInfo> derivedVectorFields,
-        DerivedSourceReadersSupplier derivedSourceReadersSupplier,
+        List<DerivedFieldInfo> derivedVectorFields,
+        DerivedSourceReaders derivedSourceReaders,
         SegmentReadState segmentReadState
     ) throws IOException {
-        this(delegate, derivedVectorFields, derivedSourceReadersSupplier, segmentReadState, true);
+        this(delegate, derivedVectorFields, derivedSourceReaders, segmentReadState, true);
     }
 
-    private DerivedSourceStoredFieldsReader(
+    private KNN10010DerivedSourceStoredFieldsReader(
         StoredFieldsReader delegate,
-        List<FieldInfo> derivedVectorFields,
-        DerivedSourceReadersSupplier derivedSourceReadersSupplier,
+        List<DerivedFieldInfo> derivedVectorFields,
+        DerivedSourceReaders derivedSourceReaders,
         SegmentReadState segmentReadState,
         boolean shouldInject
     ) throws IOException {
         this.delegate = delegate;
         this.derivedVectorFields = derivedVectorFields;
-        this.derivedSourceReadersSupplier = derivedSourceReadersSupplier;
+        this.derivedSourceReaders = derivedSourceReaders;
         this.segmentReadState = segmentReadState;
         this.shouldInject = shouldInject;
-        this.derivedSourceVectorInjector = createDerivedSourceVectorInjector();
+        this.derivedSourceVectorTransformer = createDerivedSourceVectorTransformer();
     }
 
-    private DerivedSourceVectorInjector createDerivedSourceVectorInjector() throws IOException {
-        return new DerivedSourceVectorInjector(derivedSourceReadersSupplier, segmentReadState, derivedVectorFields);
+    private DerivedSourceVectorTransformer createDerivedSourceVectorTransformer() {
+        return new DerivedSourceVectorTransformer(derivedSourceReaders, segmentReadState, derivedVectorFields);
     }
 
     @Override
     public void document(int docId, StoredFieldVisitor storedFieldVisitor) throws IOException {
         // If the visitor has explicitly indicated it does not need the fields, we should not inject them
-        boolean isVisitorNeedFields = true;
-        if (storedFieldVisitor instanceof FieldsVisitor) {
-            isVisitorNeedFields = derivedSourceVectorInjector.shouldInject(
-                ((FieldsVisitor) storedFieldVisitor).includes(),
-                ((FieldsVisitor) storedFieldVisitor).excludes()
-            );
-        }
-        if (shouldInject && isVisitorNeedFields) {
-            delegate.document(docId, new DerivedSourceStoredFieldVisitor(storedFieldVisitor, docId, derivedSourceVectorInjector));
+        if (shouldInject && doesVisitorNeedVectors(storedFieldVisitor)) {
+            delegate.document(docId, new DerivedSourceStoredFieldVisitor(storedFieldVisitor, docId, derivedSourceVectorTransformer));
             return;
         }
         delegate.document(docId, storedFieldVisitor);
     }
 
+    private boolean doesVisitorNeedVectors(StoredFieldVisitor delegate) {
+        if (delegate instanceof FieldsVisitor fv) {
+            return derivedSourceVectorTransformer.shouldInject(fv.includes(), fv.excludes());
+        }
+        return true;
+    }
+
     @Override
     public StoredFieldsReader clone() {
         try {
-            return new DerivedSourceStoredFieldsReader(
+            return new KNN10010DerivedSourceStoredFieldsReader(
                 delegate.clone(),
                 derivedVectorFields,
-                derivedSourceReadersSupplier,
+                derivedSourceReaders.cloneWithMerge(),
                 segmentReadState,
                 shouldInject
             );
@@ -102,7 +102,7 @@ public class DerivedSourceStoredFieldsReader extends StoredFieldsReader {
 
     @Override
     public void close() throws IOException {
-        IOUtils.close(delegate, derivedSourceVectorInjector);
+        IOUtils.close(delegate, derivedSourceReaders);
     }
 
     /**
@@ -110,14 +110,14 @@ public class DerivedSourceStoredFieldsReader extends StoredFieldsReader {
      * on merge we will end up just writing the source to disk. We cant override
      * {@link StoredFieldsReader#getMergeInstance()} because it is used elsewhere than just merging.
      *
-     * @return Merged instance that wont inject by default
+     * @return Merged instance that won't inject by default
      */
     private StoredFieldsReader cloneForMerge() {
         try {
-            return new DerivedSourceStoredFieldsReader(
+            return new KNN10010DerivedSourceStoredFieldsReader(
                 delegate.getMergeInstance(),
                 derivedVectorFields,
-                derivedSourceReadersSupplier,
+                derivedSourceReaders.cloneWithMerge(),
                 segmentReadState,
                 false
             );
@@ -134,8 +134,8 @@ public class DerivedSourceStoredFieldsReader extends StoredFieldsReader {
      * @return wrapped stored fields reader
      */
     public static StoredFieldsReader wrapForMerge(StoredFieldsReader storedFieldsReader) {
-        if (storedFieldsReader instanceof DerivedSourceStoredFieldsReader) {
-            return ((DerivedSourceStoredFieldsReader) storedFieldsReader).cloneForMerge();
+        if (storedFieldsReader instanceof KNN10010DerivedSourceStoredFieldsReader reader) {
+            return reader.cloneForMerge();
         }
         return storedFieldsReader;
     }

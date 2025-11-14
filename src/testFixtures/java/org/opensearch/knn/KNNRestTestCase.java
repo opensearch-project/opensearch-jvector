@@ -25,7 +25,7 @@ import org.opensearch.core.xcontent.XContentParser;
 import org.opensearch.index.query.MatchAllQueryBuilder;
 import org.opensearch.knn.common.KNNConstants;
 import org.opensearch.knn.index.VectorDataType;
-import org.opensearch.knn.index.codec.derivedsource.ParentChildHelper;
+import org.opensearch.knn.index.codec.backward_codecs.KNN9120Codec.ParentChildHelper;
 import org.opensearch.knn.index.query.KNNQueryBuilder;
 import org.opensearch.knn.index.KNNSettings;
 import org.opensearch.knn.index.SpaceType;
@@ -122,6 +122,8 @@ public class KNNRestTestCase extends ODFERestTestCase {
     private static final String SYSTEM_INDEX_PREFIX = ".opendistro";
     public static final int MIN_CODE_UNITS = 4;
     public static final int MAX_CODE_UNITS = 10;
+    public static final String TERM_QUERY_FIELD_NAME = "my_field";
+    public static final String TERM_QUERY_FIELD_VALUE = "1";
 
     @AfterClass
     public static void dumpCoverage() throws IOException, MalformedObjectNameException {
@@ -228,7 +230,6 @@ public class KNNRestTestCase extends ODFERestTestCase {
 
         Response response = client().performRequest(request);
         assertEquals(request.getEndpoint() + ": failed", RestStatus.OK, RestStatus.fromCode(response.getStatusLine().getStatusCode()));
-
         return response;
     }
 
@@ -621,7 +622,11 @@ public class KNNRestTestCase extends ODFERestTestCase {
     protected <T> void addKnnDoc(String index, String docId, String fieldName, T vector) throws IOException {
         Request request = new Request("POST", "/" + index + "/_doc/" + docId + "?refresh=true");
 
-        XContentBuilder builder = XContentFactory.jsonBuilder().startObject().field(fieldName, vector).endObject();
+        XContentBuilder builder = XContentFactory.jsonBuilder()
+            .startObject()
+            .field(fieldName, vector)
+            .field(TERM_QUERY_FIELD_NAME, TERM_QUERY_FIELD_VALUE)
+            .endObject();
         request.setJsonEntity(builder.toString());
         client().performRequest(request);
 
@@ -710,6 +715,7 @@ public class KNNRestTestCase extends ODFERestTestCase {
         for (int i = 0; i < fieldNames.size(); i++) {
             builder.field(fieldNames.get(i), vectors.get(i));
         }
+        builder.field(TERM_QUERY_FIELD_NAME, TERM_QUERY_FIELD_VALUE);
         builder.endObject();
 
         request.setJsonEntity(builder.toString());
