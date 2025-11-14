@@ -45,6 +45,10 @@ public class KNN10010DerivedSourceStoredFieldsFormat extends StoredFieldsFormat 
         List<DerivedFieldInfo> derivedVectorFields = Stream.concat(
             DerivedSourceSegmentAttributeParser.parseDerivedVectorFields(segmentInfo, false)
                 .stream()
+                .map(field -> fieldInfos.fieldInfo(field))
+                .filter(Objects::nonNull)
+                .map(fieldInfo -> new DerivedFieldInfo(fieldInfo, false)),
+                .stream()
                 .filter(field -> fieldInfos.fieldInfo(field) != null)
                 .map(field -> new DerivedFieldInfo(fieldInfos.fieldInfo(field), false)),
             DerivedSourceSegmentAttributeParser.parseDerivedVectorFields(segmentInfo, true)

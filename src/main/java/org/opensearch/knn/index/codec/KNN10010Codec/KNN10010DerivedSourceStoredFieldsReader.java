@@ -74,7 +74,9 @@ public class KNN10010DerivedSourceStoredFieldsReader extends StoredFieldsReader 
     }
 
     private boolean doesVisitorNeedVectors(StoredFieldVisitor delegate) {
-        if (delegate instanceof FieldsVisitor) {
+       if (delegate instanceof FieldsVisitor fv) {
+            return derivedSourceVectorTransformer.shouldInject(fv.includes(), fvexcludes());
+        }
             return derivedSourceVectorTransformer.shouldInject(
                 ((FieldsVisitor) delegate).includes(),
                 ((FieldsVisitor) delegate).excludes()
@@ -137,7 +139,9 @@ public class KNN10010DerivedSourceStoredFieldsReader extends StoredFieldsReader 
      * @return wrapped stored fields reader
      */
     public static StoredFieldsReader wrapForMerge(StoredFieldsReader storedFieldsReader) {
-        if (storedFieldsReader instanceof KNN10010DerivedSourceStoredFieldsReader) {
+        if (storedFieldsReader instanceof KNN10010DerivedSourceStoredFieldsReader reader) {
+             return reader.cloneForMerge();
+        }
             return ((KNN10010DerivedSourceStoredFieldsReader) storedFieldsReader).cloneForMerge();
         }
         return storedFieldsReader;
