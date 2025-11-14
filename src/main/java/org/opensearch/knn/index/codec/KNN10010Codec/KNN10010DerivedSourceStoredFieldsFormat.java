@@ -28,6 +28,7 @@ import org.opensearch.knn.index.util.IndexUtil;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Stream;
 
 @AllArgsConstructor
@@ -48,13 +49,11 @@ public class KNN10010DerivedSourceStoredFieldsFormat extends StoredFieldsFormat 
                 .map(field -> fieldInfos.fieldInfo(field))
                 .filter(Objects::nonNull)
                 .map(fieldInfo -> new DerivedFieldInfo(fieldInfo, false)),
-                .stream()
-                .filter(field -> fieldInfos.fieldInfo(field) != null)
-                .map(field -> new DerivedFieldInfo(fieldInfos.fieldInfo(field), false)),
             DerivedSourceSegmentAttributeParser.parseDerivedVectorFields(segmentInfo, true)
                 .stream()
-                .filter(field -> fieldInfos.fieldInfo(field) != null)
-                .map(field -> new DerivedFieldInfo(fieldInfos.fieldInfo(field), true))
+                .map(field -> fieldInfos.fieldInfo(field))
+                .filter(Objects::nonNull)
+                .map(fieldInfo -> new DerivedFieldInfo(fieldInfo, true))
         ).toList();
 
         // If no fields have it enabled, we can just short-circuit and return the delegate's fieldReader
