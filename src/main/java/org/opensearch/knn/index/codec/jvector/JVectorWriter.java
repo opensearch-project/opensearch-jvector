@@ -608,8 +608,6 @@ public class JVectorWriter extends KnnVectorsWriter {
         private final MergeState mergeState;
         private final GraphNodeIdToDocMap graphNodeIdToDocMap;
         private final int[] graphNodeIdsToRavvOrds;
-        private final int[] baseOrds; // Base ordinals for each reader
-        private boolean deletesFound = false;
         private final FixedBitSet[] liveGraphNodesPerReader;
 
         /**
@@ -668,7 +666,6 @@ public class JVectorWriter extends KnnVectorsWriter {
                                 } else {
                                     // This vector is deleted so we need to mark it as deleted in the liveGraphNodesPerReader
                                     liveGraphNodesPerReader[i].clear(it.index());
-                                    deletesFound = true;
                                 }
                             }
                             if (liveVectorCountInReader >= vectorsCountInLeadingReader) {
@@ -716,7 +713,6 @@ public class JVectorWriter extends KnnVectorsWriter {
 
             this.perReaderFloatVectorValues = new JVectorFloatVectorValues[readers.length];
             this.dimension = dimension;
-            this.baseOrds = baseOrds;
 
             // Build mapping from global ordinal to [readerIndex, readerOrd]
             this.ravvOrdToReaderMapping = new int[totalDocsCount][2];
