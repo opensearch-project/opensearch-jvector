@@ -11,6 +11,7 @@ import io.github.jbellis.jvector.graph.disk.*;
 import io.github.jbellis.jvector.graph.disk.feature.Feature;
 import io.github.jbellis.jvector.graph.disk.feature.FeatureId;
 import io.github.jbellis.jvector.graph.disk.feature.InlineVectors;
+import io.github.jbellis.jvector.graph.diversity.VamanaDiversityProvider;
 import io.github.jbellis.jvector.graph.similarity.BuildScoreProvider;
 import io.github.jbellis.jvector.quantization.PQVectors;
 import io.github.jbellis.jvector.quantization.ProductQuantization;
@@ -916,25 +917,56 @@ public class JVectorWriter extends KnnVectorsWriter {
                 );
                 final String segmentName = segmentWriteState.segmentInfo.name;
                 log.info(
-                    "No deletes found, and no PQ codebooks found, expanding previous graph with additional vectors for field {} in segment {}",
+                    "No pre-existing PQ codebooks found, expanding previous graph with additional vectors for field {} in segment {}",
                     fieldName,
                     segmentName
                 );
                 final RandomAccessReader leadingOnHeapGraphReader = leadingReader.getNeighborsScoreCacheForField(fieldName);
                 final int numBaseVectors = leadingReader.getFloatVectorValues(fieldName).size();
-                graph = (OnHeapGraphIndex) GraphIndexBuilder.buildAndMergeNewNodes(
-                    leadingOnHeapGraphReader,
-                    liveGraphNodesPerReader[LEADING_READER_IDX],
-                    remappedRandomAccessVectorValues,
-                    buildScoreProvider,
-                    numBaseVectors,
-                    beamWidth,
-                    degreeOverflow,
-                    alpha,
-                    hierarchyEnabled,
-                    SIMD_POOL_MERGE,
-                    PARALLELISM_POOL
-                );
+
+                var diversityProvider = new VamanaDiversityProvider(buildScoreProvider, alpha);
+
+                try (
+                    OnHeapGraphIndex leadingGraph = OnHeapGraphIndex.load(
+                        leadingOnHeapGraphReader,
+                        remappedRandomAccessVectorValues.dimension(),
+                        degreeOverflow,
+                        diversityProvider
+                    );
+                ) {
+
+                    GraphIndexBuilder builder = new GraphIndexBuilder(
+                        buildScoreProvider,
+                        remappedRandomAccessVectorValues.dimension(),
+                        leadingGraph,
+                        beamWidth,
+                        degreeOverflow,
+                        alpha,
+                        true,
+                        SIMD_POOL_MERGE,
+                        PARALLELISM_POOL
+                    );
+
+                    var vv = remappedRandomAccessVectorValues.threadLocalSupplier();
+
+                    // parallel graph construction from the merge documents Ids
+                    SIMD_POOL_MERGE.submit(
+                        () -> IntStream.range(numBaseVectors, remappedRandomAccessVectorValues.size()).parallel().forEach(ord -> {
+                            builder.addGraphNode(ord, vv.get().getVector(ord));
+                        })
+                    ).join();
+
+                    // mark deleted nodes
+                    for (int i = 0; i < numBaseVectors; i++) {
+                        if (!liveGraphNodesPerReader[LEADING_READER_IDX].get(i)) {
+                            builder.markNodeDeleted(i);
+                        }
+                    }
+
+                    builder.cleanup();
+
+                    graph = (OnHeapGraphIndex) builder.getGraph();
+                }
             } else {
                 log.info("PQ codebooks found, building graph from scratch with PQ vectors");
                 buildScoreProvider = BuildScoreProvider.pqBuildScoreProvider(getVectorSimilarityFunction(fieldInfo), pqVectors);
