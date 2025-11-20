@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Enhancements
 * Add script for loading vector data using Parquet [192](https://github.com/opensearch-project/opensearch-jvector/issues/192)
 * Update script and main docs with minor fixes [196] (https://github.com/opensearch-project/opensearch-jvector/pull/196)
+* Support deletes for incremental insertion [203](https://github.com/opensearch-project/opensearch-jvector/pull/203)
 ### Bug Fixes
 ### Infrastructure
 ### Documentation
