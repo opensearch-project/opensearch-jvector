@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * PQ refinement during merge [109](https://github.com/opensearch-project/opensearch-jvector/issues/109)
 * Persistent Ordinal To docID Mapping [167](https://github.com/opensearch-project/opensearch-jvector/pull/167)
 * Incremental Insertion With Leading Segment [167](https://github.com/opensearch-project/opensearch-jvector/pull/167)
+* Support deletes for incremental insertion [203](https://github.com/opensearch-project/opensearch-jvector/pull/203)
 * Remove Redundant FlatVectorFormat [167](https://github.com/opensearch-project/opensearch-jvector/pull/167)
 * Remove Redundant DocValuesFormat [167](https://github.com/opensearch-project/opensearch-jvector/pull/167)
 ### Bug Fixes
