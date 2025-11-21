@@ -10,7 +10,6 @@ import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.search.*;
 import org.apache.lucene.search.knn.KnnCollectorManager;
 import org.apache.lucene.search.knn.KnnSearchStrategy;
-import org.apache.lucene.util.Bits;
 
 import java.io.IOException;
 
@@ -24,6 +23,7 @@ public class JVectorKnnFloatVectorQuery extends KnnFloatVectorQuery {
     private final float threshold;
     private final float rerankFloor;
     private final boolean usePruning;
+    private static final KnnSearchStrategy DEFAULT_STRATEGY = new KnnSearchStrategy.Hnsw(100);
 
     public JVectorKnnFloatVectorQuery(
         String field,
@@ -61,11 +61,11 @@ public class JVectorKnnFloatVectorQuery extends KnnFloatVectorQuery {
     @Override
     protected TopDocs approximateSearch(
         LeafReaderContext context,
-        Bits acceptDocs,
+        AcceptDocs acceptDocs,
         int visitedLimit,
         KnnCollectorManager knnCollectorManager
     ) throws IOException {
-        final KnnCollector delegateCollector = knnCollectorManager.newCollector(visitedLimit, KnnSearchStrategy.Hnsw.DEFAULT, context);
+        final KnnCollector delegateCollector = knnCollectorManager.newCollector(visitedLimit, DEFAULT_STRATEGY, context);
         final KnnCollector knnCollector = new JVectorKnnCollector(delegateCollector, threshold, rerankFloor, overQueryFactor, usePruning);
         LeafReader reader = context.reader();
         FloatVectorValues floatVectorValues = reader.getFloatVectorValues(field);

@@ -11,7 +11,7 @@ import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.lucene.codecs.Codec;
 import org.apache.lucene.codecs.FilterCodec;
 import org.apache.lucene.codecs.KnnVectorsFormat;
-import org.apache.lucene.codecs.lucene101.Lucene101Codec;
+import org.apache.lucene.codecs.lucene103.Lucene103Codec;
 import org.apache.lucene.codecs.perfield.PerFieldKnnVectorsFormat;
 import org.junit.Assert;
 import org.opensearch.client.Request;
@@ -125,7 +125,7 @@ public class CommonTestUtils {
     }
 
     public static Codec getCodec(int minBatchSizeForQuantization) {
-        return new FilterCodec(KNNCodecVersion.V_10_01_0.getCodecName(), new Lucene101Codec()) {
+        return new FilterCodec(KNNCodecVersion.V_10_03_0.getCodecName(), new Lucene103Codec()) {
             @Override
             public KnnVectorsFormat knnVectorsFormat() {
                 return new PerFieldKnnVectorsFormat() {

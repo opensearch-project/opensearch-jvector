@@ -3,9 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package org.opensearch.knn.index.codec.KNN9120Codec;
+package org.opensearch.knn.index.codec.backward_codecs.KNN9120Codec;
 
-import lombok.Builder;
+import org.apache.lucene.backward_codecs.lucene912.Lucene912Codec;
 import org.apache.lucene.codecs.Codec;
 import org.apache.lucene.codecs.CompoundFormat;
 import org.apache.lucene.codecs.DocValuesFormat;
@@ -14,16 +14,20 @@ import org.apache.lucene.codecs.KnnVectorsFormat;
 import org.apache.lucene.codecs.StoredFieldsFormat;
 import org.apache.lucene.codecs.perfield.PerFieldKnnVectorsFormat;
 import org.opensearch.index.mapper.MapperService;
-import org.opensearch.knn.index.codec.KNNCodecVersion;
-import org.opensearch.knn.index.codec.KNNFormatFacade;
-import org.opensearch.knn.index.codec.derivedsource.DerivedSourceReadersSupplier;
+import org.opensearch.knn.index.codec.KNN80Codec.KNN80CompoundFormat;
+import org.opensearch.knn.index.codec.KNN80Codec.KNN80DocValuesFormat;
+import org.opensearch.knn.index.codec.KNN9120Codec.KNN9120PerFieldKnnVectorsFormat;
+
+import java.util.Optional;
 
 /**
  * KNN Codec that wraps the Lucene Codec which is part of Lucene 9.12
  */
 public class KNN9120Codec extends FilterCodec {
-    private static final KNNCodecVersion VERSION = KNNCodecVersion.V_9_12_0;
-    private final KNNFormatFacade knnFormatFacade;
+    private static final String NAME = "KNN9120Codec";
+    private static final Codec DEFAULT_DELEGATE = new Lucene912Codec();
+    private static final PerFieldKnnVectorsFormat DEFAULT_KNN_VECTOR_FORMAT = new KNN9120PerFieldKnnVectorsFormat(Optional.empty());
+
     private final PerFieldKnnVectorsFormat perFieldKnnVectorsFormat;
     private final StoredFieldsFormat storedFieldsFormat;
 
@@ -33,7 +37,7 @@ public class KNN9120Codec extends FilterCodec {
      * No arg constructor that uses Lucene99 as the delegate
      */
     public KNN9120Codec() {
-        this(VERSION.getDefaultCodecDelegate(), VERSION.getPerFieldKnnVectorsFormat(), null);
+        this(DEFAULT_DELEGATE, DEFAULT_KNN_VECTOR_FORMAT, null);
     }
 
     /**
@@ -43,10 +47,8 @@ public class KNN9120Codec extends FilterCodec {
      * @param delegate codec that will perform all operations this codec does not override
      * @param knnVectorsFormat per field format for KnnVector
      */
-    @Builder
-    protected KNN9120Codec(Codec delegate, PerFieldKnnVectorsFormat knnVectorsFormat, MapperService mapperService) {
-        super(VERSION.getCodecName(), delegate);
-        knnFormatFacade = VERSION.getKnnFormatFacadeSupplier().apply(delegate);
+    private KNN9120Codec(Codec delegate, PerFieldKnnVectorsFormat knnVectorsFormat, MapperService mapperService) {
+        super(NAME, delegate);
         perFieldKnnVectorsFormat = knnVectorsFormat;
         this.mapperService = mapperService;
         this.storedFieldsFormat = getStoredFieldsFormat();
@@ -54,12 +56,12 @@ public class KNN9120Codec extends FilterCodec {
 
     @Override
     public DocValuesFormat docValuesFormat() {
-        return knnFormatFacade.docValuesFormat();
+        return new KNN80DocValuesFormat(delegate.docValuesFormat());
     }
 
     @Override
     public CompoundFormat compoundFormat() {
-        return knnFormatFacade.compoundFormat();
+        return new KNN80CompoundFormat(delegate.compoundFormat());
     }
 
     @Override
@@ -73,7 +75,7 @@ public class KNN9120Codec extends FilterCodec {
     }
 
     private StoredFieldsFormat getStoredFieldsFormat() {
-        DerivedSourceReadersSupplier derivedSourceReadersSupplier = new DerivedSourceReadersSupplier((segmentReadState) -> {
+        KNN9120DerivedSourceReadersSupplier derivedSourceReadersSupplier = new KNN9120DerivedSourceReadersSupplier((segmentReadState) -> {
             if (segmentReadState.fieldInfos.hasVectorValues()) {
                 return knnVectorsFormat().fieldsReader(segmentReadState);
             }
@@ -96,6 +98,6 @@ public class KNN9120Codec extends FilterCodec {
             }
             return null;
         }));
-        return new DerivedSourceStoredFieldsFormat(delegate.storedFieldsFormat(), derivedSourceReadersSupplier, mapperService);
+        return new KNN9120DerivedSourceStoredFieldsFormat(delegate.storedFieldsFormat(), derivedSourceReadersSupplier, mapperService);
     }
 }

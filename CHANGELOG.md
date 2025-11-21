@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * Support deletes for incremental insertion [203](https://github.com/opensearch-project/opensearch-jvector/pull/203)
 ### Bug Fixes
 ### Infrastructure
+* Upgrade Lucene to 10.3.1 [189] (https://github.com/opensearch-project/opensearch-jvector/pull/201)
 ### Documentation
 ### Maintenance
 ### Refactoring

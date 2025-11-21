@@ -22,6 +22,7 @@ import lombok.extern.log4j.Log4j2;
 import org.apache.lucene.codecs.CodecUtil;
 import org.apache.lucene.codecs.KnnVectorsReader;
 import org.apache.lucene.index.*;
+import org.apache.lucene.search.AcceptDocs;
 import org.apache.lucene.search.KnnCollector;
 import org.apache.lucene.store.*;
 import org.apache.lucene.util.Bits;
@@ -128,7 +129,7 @@ public class JVectorReader extends KnnVectorsReader {
     }
 
     @Override
-    public void search(String field, float[] target, KnnCollector knnCollector, Bits acceptDocs) throws IOException {
+    public void search(String field, float[] target, KnnCollector knnCollector, AcceptDocs acceptDocs) throws IOException {
         final OnDiskGraphIndex index = fieldEntryMap.get(field).index;
         final JVectorKnnCollector jvectorKnnCollector;
         if (knnCollector instanceof JVectorKnnCollector) {
@@ -168,8 +169,13 @@ public class JVectorReader extends KnnVectorsReader {
             // Convert the acceptDocs bitmap from Lucene to jVector ordinal bitmap filter
             // Logic works as follows: if acceptDocs is null, we accept all ordinals. Otherwise, we check if the jVector ordinal has a
             // corresponding Lucene doc ID accepted by acceptDocs filter.
-            io.github.jbellis.jvector.util.Bits compatibleBits = ord -> acceptDocs == null
-                || (jvectorLuceneDocMap.getLuceneDocId(ord) != -1 && acceptDocs.get(jvectorLuceneDocMap.getLuceneDocId(ord)));
+            io.github.jbellis.jvector.util.Bits compatibleBits;
+            if (acceptDocs == null) compatibleBits = ord -> true;
+            else {
+                Bits b = acceptDocs.bits();
+                compatibleBits = ord -> b == null
+                    || (jvectorLuceneDocMap.getLuceneDocId(ord) != -1 && b.get(jvectorLuceneDocMap.getLuceneDocId(ord)));
+            }
 
             try (var graphSearcher = new GraphSearcher(index)) {
                 final var searchResults = graphSearcher.search(
@@ -212,7 +218,7 @@ public class JVectorReader extends KnnVectorsReader {
     }
 
     @Override
-    public void search(String field, byte[] target, KnnCollector knnCollector, Bits acceptDocs) throws IOException {
+    public void search(String field, byte[] target, KnnCollector knnCollector, AcceptDocs acceptDocs) throws IOException {
         // TODO: implement this
         throw new UnsupportedOperationException("Byte vector search is not supported yet with jVector");
     }
