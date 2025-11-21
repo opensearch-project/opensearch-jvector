@@ -173,7 +173,8 @@ public class JVectorReader extends KnnVectorsReader {
             if (acceptDocs == null) compatibleBits = ord -> true;
             else {
                 Bits b = acceptDocs.bits();
-                compatibleBits = ord -> b == null || b.get(jvectorLuceneDocMap.getLuceneDocId(ord));
+                compatibleBits = ord -> b == null
+                    || (jvectorLuceneDocMap.getLuceneDocId(ord) != -1 && b.get(jvectorLuceneDocMap.getLuceneDocId(ord)));
             }
 
             try (var graphSearcher = new GraphSearcher(index)) {
