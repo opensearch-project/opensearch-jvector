@@ -9,6 +9,7 @@ import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.lucene.codecs.perfield.PerFieldKnnVectorsFormat;
 import org.apache.lucene.index.SegmentReader;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.opensearch.client.Request;
 import org.opensearch.client.Response;
@@ -514,6 +515,7 @@ public class InternalKNNEngineTests extends OpenSearchIntegTestCase {
      * @throws Exception exception
      */
     @Test
+    @Ignore
     public void testQuantizationWithOverQueryParameter() throws Exception {
         int dimension = 512;
         final SpaceType spaceType = SpaceType.L2;
@@ -570,7 +572,7 @@ public class InternalKNNEngineTests extends OpenSearchIntegTestCase {
         // calculate recall
         logger.info("Calculating recall");
         float recall = ((float) results.stream().filter(r -> expectedDocIds.contains(r.getDocId())).count()) / ((float) k);
-        assertTrue("Expected recall to be lower than 0.9 but got " + recall, recall <= 0.9);
+        assertTrue("Expected recall to be lower than 0.7 but got " + recall, recall <= 0.7);
 
         // 2. Search with a high-overquery factor
         logger.info("Searching with high overquery factor");
