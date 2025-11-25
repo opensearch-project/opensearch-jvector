@@ -36,7 +36,6 @@ import org.opensearch.knn.TestUtils;
 
 import java.io.IOException;
 import java.util.*;
-import java.util.concurrent.TimeUnit;
 
 import static org.opensearch.knn.KNNRestTestCase.FIELD_NAME;
 import static org.opensearch.knn.KNNRestTestCase.INDEX_NAME;

@@ -385,15 +385,11 @@ public class CommonTestUtils {
                 RestStatus.OK,
                 RestStatus.fromCode(refreshResponse.getStatusLine().getStatusCode())
             );
-        }
-        else
-        {
+        } else {
             try {
                 // Sleep for 1 second to ensure indices are queryable, if refresh is not set.
                 TimeUnit.SECONDS.sleep(1);
-            }
-            catch (InterruptedException ex)
-            {
+            } catch (InterruptedException ex) {
                 Thread.currentThread().interrupt();
             }
         }
