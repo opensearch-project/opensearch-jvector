@@ -386,49 +386,18 @@ public class CommonTestUtils {
                 RestStatus.fromCode(refreshResponse.getStatusLine().getStatusCode())
             );
         }
-    }
-
-    // Method that adds multiple documents into the index using Bulk API
-    /*public static void bulkAddKnnDocs(
-            RestClient restClient,
-            String index,
-            String fieldName,
-        float[][] sourceVectors,
-        int sourceOffset,
-        int baseDocId,
-        int docCount,
-        boolean refresh
-    ) throws IOException {
-        Request request = new Request("POST", "/_bulk");
-
-        request.addParameter("refresh", Boolean.toString(refresh));
-        StringBuilder sb = new StringBuilder();
-
-        for (int i = 0; i < docCount; i++) {
-            sb.append("{ \"index\" : { \"_index\" : \"")
-                .append(index)
-                .append("\", \"_id\" : \"")
-                .append(baseDocId + i)
-                .append("\" } }\n")
-                .append("{ \"")
-                .append(fieldName)
-                .append("\" : ");
-
-                float[] vec = sourceVectors[sourceOffset + i];
-                // manual serialization: avoids Arrays.toString overhead
-                for (int j = 0; j < vec.length; j++) {
-                    if (j > 0) sb.append(',');
-                    sb.append(Float.toString(vec[j]));
-                }
-                //.append(Arrays.toString(sourceVectors[sourceOffset + i]))
-                sb.append(" }\n");
+        else
+        {
+            try {
+                // Sleep for 1 second to ensure indices are queryable, if refresh is not set.
+                TimeUnit.SECONDS.sleep(1);
+            }
+            catch (InterruptedException ex)
+            {
+                Thread.currentThread().interrupt();
+            }
         }
-
-        request.setJsonEntity(sb.toString());
-
-        Response response = restClient.performRequest(request);
-        Assert.assertEquals(200, response.getStatusLine().getStatusCode());
-    }*/
+    }
 
     public static void flushIndex(RestClient restClient, final String index) throws IOException {
         Request request = new Request("POST", "/" + index + "/_flush");

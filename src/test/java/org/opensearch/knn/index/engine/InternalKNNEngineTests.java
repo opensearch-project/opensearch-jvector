@@ -36,6 +36,7 @@ import org.opensearch.knn.TestUtils;
 
 import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 import static org.opensearch.knn.KNNRestTestCase.FIELD_NAME;
 import static org.opensearch.knn.KNNRestTestCase.INDEX_NAME;
@@ -527,7 +528,7 @@ public class InternalKNNEngineTests extends OpenSearchIntegTestCase {
         final int totalDocs = vectors.length;
 
         logger.info("Adding batch of vectors with size {} that is expected to trigger quantization", totalDocs);
-        CommonTestUtils.bulkAddKnnDocs(restClient, INDEX_NAME, FIELD_NAME, vectors, batchSize, true);
+        CommonTestUtils.bulkAddKnnDocs(restClient, INDEX_NAME, FIELD_NAME, vectors, batchSize, false);
         CommonTestUtils.flushIndex(restClient, INDEX_NAME);
 
         // Force merge to trigger quantization for all segments
