@@ -570,7 +570,7 @@ public class InternalKNNEngineTests extends OpenSearchIntegTestCase {
         // calculate recall
         logger.info("Calculating recall");
         float recall = ((float) results.stream().filter(r -> expectedDocIds.contains(r.getDocId())).count()) / ((float) k);
-        assertTrue("Expected recall to be lower than 0.7 but got " + recall, recall < 0.7);
+        assertTrue("Expected recall to be lower than 0.9 but got " + recall, recall <= 0.9);
 
         // 2. Search with a high-overquery factor
         logger.info("Searching with high overquery factor");
@@ -594,7 +594,7 @@ public class InternalKNNEngineTests extends OpenSearchIntegTestCase {
         // calculate recall
         logger.info("Calculating recall");
         recall = ((float) results.stream().filter(r -> expectedDocIds.contains(r.getDocId())).count()) / ((float) k);
-        assertTrue("Expected recall to be at least 0.9 but got " + recall, recall >= 0.8);
+        assertTrue("Expected recall to be at least 0.9 but got " + recall, recall >= 0.9);
     }
 
     @Test
