@@ -33,12 +33,14 @@ import org.opensearch.knn.index.codec.jvector.JVectorFormat;
 import org.opensearch.knn.index.query.KNNQueryBuilder;
 import org.opensearch.knn.plugin.JVectorKNNPlugin;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -280,11 +282,117 @@ public class CommonTestUtils {
         bulkAddKnnDocs(restClient, index, fieldName, indexVectors, 0, baseDocId, docCount, refresh);
     }
 
-    // Method that adds multiple documents into the index using Bulk API
     public static void bulkAddKnnDocs(
         RestClient restClient,
         String index,
         String fieldName,
+        float[][] sourceVectors,
+        int sourceOffset,
+        int baseDocId,
+        int docCount,
+        boolean refresh
+    ) throws IOException {
+
+        // max docs per bulk request and max parallel bulk requests
+        final int batchSize = 1000; // adjust to your payload size / network characteristics
+        final int maxConcurrency = 4;
+
+        int totalBatches = (docCount + batchSize - 1) / batchSize;
+        int poolSize = Math.min(maxConcurrency, Math.max(1, totalBatches));
+        ExecutorService executor = Executors.newFixedThreadPool(poolSize);
+        List<Future<Void>> futures = new ArrayList<>();
+
+        try {
+            for (int batchStart = 0; batchStart < docCount; batchStart += batchSize) {
+                final int start = batchStart;
+                final int end = Math.min(docCount, start + batchSize);
+
+                futures.add(executor.submit(() -> {
+                    ByteArrayOutputStream out = new ByteArrayOutputStream();
+                    for (int i = start; i < end; i++) {
+                        int docIndex = sourceOffset + i;
+                        int docId = baseDocId + i;
+
+                        // metadata line: {"index":{"_index":"<index>","_id":"<id>"}}
+                        try (XContentBuilder meta = XContentFactory.jsonBuilder(out)) {
+                            meta.startObject()
+                                .startObject("index")
+                                .field("_index", index)
+                                .field("_id", String.valueOf(docId))
+                                .endObject()
+                                .endObject();
+                            meta.flush();
+                        }
+                        out.write('\n');
+
+                        // source line: {"<fieldName>":[...vector...]}
+                        try (XContentBuilder src = XContentFactory.jsonBuilder(out)) {
+                            src.startObject().field(fieldName, sourceVectors[docIndex]).endObject();
+                            src.flush();
+                        }
+                        out.write('\n');
+                    }
+
+                    Request request = new Request("POST", "/_bulk");
+
+                    // Do not refresh per-batch; refresh once at the end if requested.
+                    // Use UTF-8 string entity from the bytes produced by the builder.
+                    request.setJsonEntity(out.toString(StandardCharsets.UTF_8));
+
+                    Response response = restClient.performRequest(request);
+                    Assert.assertEquals(200, response.getStatusLine().getStatusCode());
+                    return null;
+                }));
+            }
+
+            // Wait for all batches to finish and propagate exceptions as IOExceptions
+            for (Future<Void> f : futures) {
+                try {
+                    f.get();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new IOException("Interrupted while indexing bulk requests", e);
+                } catch (ExecutionException e) {
+                    // Unwrap and throw the real cause as IOException to match signature
+                    Throwable cause = e.getCause();
+                    if (cause instanceof IOException) {
+                        throw (IOException) cause;
+                    } else {
+                        throw new IOException("Bulk indexing task failed", cause);
+                    }
+                }
+            }
+        } finally {
+            executor.shutdown();
+            try {
+                // give some time for graceful shutdown; not critical for tests but keeps things tidy
+                if (!executor.awaitTermination(30, TimeUnit.SECONDS)) {
+                    executor.shutdownNow();
+                }
+            } catch (InterruptedException ie) {
+                executor.shutdownNow();
+                Thread.currentThread().interrupt();
+                throw new IOException("Interrupted while waiting for executor shutdown", ie);
+            }
+        }
+
+        // Refresh once if requested (cheaper than refreshing every bulk)
+        if (refresh) {
+            Request refreshRequest = new Request("POST", "/" + index + "/_refresh");
+            Response refreshResponse = restClient.performRequest(refreshRequest);
+            Assert.assertEquals(
+                refreshRequest.getEndpoint() + ": failed",
+                RestStatus.OK,
+                RestStatus.fromCode(refreshResponse.getStatusLine().getStatusCode())
+            );
+        }
+    }
+
+    // Method that adds multiple documents into the index using Bulk API
+    /*public static void bulkAddKnnDocs(
+            RestClient restClient,
+            String index,
+            String fieldName,
         float[][] sourceVectors,
         int sourceOffset,
         int baseDocId,
@@ -304,16 +412,23 @@ public class CommonTestUtils {
                 .append("\" } }\n")
                 .append("{ \"")
                 .append(fieldName)
-                .append("\" : ")
-                .append(Arrays.toString(sourceVectors[sourceOffset + i]))
-                .append(" }\n");
+                .append("\" : ");
+
+                float[] vec = sourceVectors[sourceOffset + i];
+                // manual serialization: avoids Arrays.toString overhead
+                for (int j = 0; j < vec.length; j++) {
+                    if (j > 0) sb.append(',');
+                    sb.append(Float.toString(vec[j]));
+                }
+                //.append(Arrays.toString(sourceVectors[sourceOffset + i]))
+                sb.append(" }\n");
         }
 
         request.setJsonEntity(sb.toString());
 
         Response response = restClient.performRequest(request);
         Assert.assertEquals(200, response.getStatusLine().getStatusCode());
-    }
+    }*/
 
     public static void flushIndex(RestClient restClient, final String index) throws IOException {
         Request request = new Request("POST", "/" + index + "/_flush");
