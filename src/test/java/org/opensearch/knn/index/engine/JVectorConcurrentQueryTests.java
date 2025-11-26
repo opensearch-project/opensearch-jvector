@@ -16,6 +16,7 @@ import org.opensearch.core.rest.RestStatus;
 import org.opensearch.core.xcontent.MediaTypeRegistry;
 import org.opensearch.core.xcontent.ToXContent;
 import org.opensearch.core.xcontent.XContentBuilder;
+import org.opensearch.index.query.MatchAllQueryBuilder;
 import org.opensearch.knn.KNNResult;
 import org.opensearch.knn.TestUtils;
 import org.opensearch.knn.index.SpaceType;
@@ -37,8 +38,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
-import static org.opensearch.knn.KNNRestTestCase.FIELD_NAME;
-import static org.opensearch.knn.KNNRestTestCase.INDEX_NAME;
+import static org.opensearch.knn.KNNRestTestCase.*;
 import static org.opensearch.knn.TestUtils.generateRandomVectors;
 import static org.opensearch.knn.index.engine.CommonTestUtils.DIMENSION;
 
@@ -101,7 +101,11 @@ public class JVectorConcurrentQueryTests extends OpenSearchIntegTestCase {
                         float[] queryVector = QUERY_VECTORS[queryIdx];
 
                         // Execute KNN search query
-                        Response response = searchKNNIndex(INDEX_NAME, new KNNQueryBuilder(FIELD_NAME, queryVector, K), K);
+                        Response response = searchKNNIndex(
+                            INDEX_NAME,
+                            new KNNQueryBuilder(FIELD_NAME, queryVector, K, new MatchAllQueryBuilder()),
+                            K
+                        );
 
                         // Parse response
                         String responseBody = EntityUtils.toString(response.getEntity());
@@ -183,7 +187,7 @@ public class JVectorConcurrentQueryTests extends OpenSearchIntegTestCase {
     /**
      * Index the test vectors
      */
-    private void indexTestVectors() throws IOException {
+    private void indexTestVectors() {
         for (int i = 0; i < TEST_VECTORS.length; i++) {
             client().prepareIndex(INDEX_NAME).setId("doc_" + i).setSource(FIELD_NAME, TEST_VECTORS[i]).get();
         }
