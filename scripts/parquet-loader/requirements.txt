@@ -1,4 +1,4 @@
-opensearch-py
+opensearch-py>=3.1.0
 pyarrow
 pandas
 tqdm
