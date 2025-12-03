@@ -49,6 +49,19 @@ public abstract class BasePerFieldKnnVectorsFormat extends PerFieldKnnVectorsFor
     private static final String MAX_CONNECTIONS = "max_connections";
     private static final String BEAM_WIDTH = "beam_width";
 
+    /**
+     * Construct a new BasePerFieldKnnVectorsFormat.
+     *
+     * @param mapperService optional mapper service
+     * @param defaultMaxConnections default max connections for format
+     * @param defaultBeamWidth default beam width
+     * @param defaultAlpha default alpha parameter
+     * @param defaultNeighborOverflow default neighbor overflow multiplier
+     * @param defaultMinBatchSizeForQuantization default min batch size for quantization
+     * @param defaultHierarchyEnabled default hierarchy enabled flag
+     * @param defaultFormatSupplier supplier returning default vectors format
+     * @param vectorsFormatSupplier supplier creating format from engine + params
+     */
     public BasePerFieldKnnVectorsFormat(
         Optional<MapperService> mapperService,
         int defaultMaxConnections,

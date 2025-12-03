@@ -38,12 +38,4 @@ public class KNNFeatureFlags {
     public static List<Setting<?>> getFeatureFlags() {
         return ImmutableList.of(KNN_FORCE_EVICT_CACHE_ENABLED_SETTING);
     }
-
-    /**
-     * Checks if force evict for cache is enabled by executing a check against cluster settings
-     * @return true if force evict setting is set to true
-     */
-    public static boolean isForceEvictCacheEnabled() {
-        return Booleans.parseBoolean(KNNSettings.state().getSettingValue(KNN_FORCE_EVICT_CACHE_ENABLED).toString(), false);
-    }
 }
