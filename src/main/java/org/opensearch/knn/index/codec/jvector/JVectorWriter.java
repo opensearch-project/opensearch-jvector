@@ -67,12 +67,13 @@ import static org.opensearch.knn.index.codec.jvector.JVectorFormat.*;
  * JVector keeps its own ordinals to identify its nodes. Those ordinals can be different from the Lucene document IDs.
  * Document IDs in Lucene can change after a merge operation. Therefore, we need to maintain a mapping between
  * JVector ordinals and Lucene document IDs that can hold across merges.
+ * </p>
  * <p>
  * Document IDs in Lucene are mapped across merges and sorts using the {@link org.apache.lucene.index.MergeState.DocMap} for merges and {@link org.apache.lucene.index.Sorter.DocMap} for flush/sorts.
  * For jVector however, we don't want to modify the ordinals in the jVector graph, and therefore we need to maintain a mapping between the jVector ordinals and the new Lucene document IDs.
  * This is achieved by keeping checkpoints of the {@link GraphNodeIdToDocMap} class in the index metadata and allowing us to update the mapping as needed across merges by constructing a new mapping from the previous mapping and the {@link MergeState.DocMap} provided in the {@link MergeState}.
  * And across sorts with {@link GraphNodeIdToDocMap#update(Sorter.DocMap)} during flushes.
- * <p>
+ * </p>
  *
  */
 @Log4j2

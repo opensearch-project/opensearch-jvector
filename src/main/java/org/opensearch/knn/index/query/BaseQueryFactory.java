@@ -59,14 +59,6 @@ public abstract class BaseQueryFactory {
         public Optional<QueryShardContext> getContext() {
             return Optional.ofNullable(context);
         }
-
-        public Optional<RescoreContext> getRescoreContext() {
-            return Optional.ofNullable(rescoreContext);
-        }
-
-        public Optional<Boolean> getExpandNested() {
-            return Optional.ofNullable(expandNested);
-        }
     }
 
     /**

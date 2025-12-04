@@ -21,21 +21,39 @@ import java.util.Set;
  */
 @AllArgsConstructor
 public enum CompressionLevel {
-    NOT_CONFIGURED(-1, "", null, Collections.emptySet()),
-    x1(1, "1x", null, Collections.emptySet()),
-    x2(2, "2x", null, Collections.emptySet()),
-    x4(4, "4x", null, Collections.emptySet()),
-    x8(8, "8x", new RescoreContext(2.0f, false, false), Set.of(Mode.ON_DISK)),
-    x16(16, "16x", new RescoreContext(3.0f, false, false), Set.of(Mode.ON_DISK)),
-    x32(32, "32x", new RescoreContext(3.0f, false, false), Set.of(Mode.ON_DISK)),
-    x64(64, "64x", new RescoreContext(5.0f, false, false), Set.of(Mode.ON_DISK));
-
-    public static final CompressionLevel MAX_COMPRESSION_LEVEL = CompressionLevel.x64;
 
     /**
-     * Default is set to 1x and is a noop
+    Unconfigured option
      */
-    private static final CompressionLevel DEFAULT = x1;
+    NOT_CONFIGURED(-1, "", null, Collections.emptySet()),
+    /**
+     No compression
+     */
+    x1(1, "1x", null, Collections.emptySet()),
+    /**
+     Compress using 16bits for a 32-bit floating point number
+     */
+    x2(2, "2x", null, Collections.emptySet()),
+    /**
+     Compress using 8bits for a 32-bit floating point number
+     */
+    x4(4, "4x", null, Collections.emptySet()),
+    /**
+     Compress using 4bits for a 32-bit floating point number
+     */
+    x8(8, "8x", new RescoreContext(2.0f, false, false), Set.of(Mode.ON_DISK)),
+    /**
+     Compress using 2bits for a 32-bit floating point number
+     */
+    x16(16, "16x", new RescoreContext(3.0f, false, false), Set.of(Mode.ON_DISK)),
+    /**
+     Compress using 1bit for a 32-bit floating point number
+     */
+    x32(32, "32x", new RescoreContext(3.0f, false, false), Set.of(Mode.ON_DISK)),
+    /**
+     Compress using 1bits for a 64-bit floating point number
+     */
+    x64(64, "64x", new RescoreContext(5.0f, false, false), Set.of(Mode.ON_DISK));
 
     /**
      * Get the compression level from a string representation. The format for the string should be "Nx", where N is
@@ -61,20 +79,6 @@ public enum CompressionLevel {
     private final String name;
     private final RescoreContext defaultRescoreContext;
     private final Set<Mode> modesForRescore;
-
-    /**
-     * Gets the number of bits used to represent a float in order to achieve this compression. For instance, for
-     * 32x compression, each float would need to be encoded in a single bit.
-     *
-     * @return number of bits to represent a float at this compression level
-     */
-    public int numBitsForFloat32() {
-        if (this == NOT_CONFIGURED) {
-            return DEFAULT.numBitsForFloat32();
-        }
-
-        return (Float.BYTES * Byte.SIZE) / compressionLevel;
-    }
 
     /**
      * Utility method that checks if compression is configured.

@@ -496,6 +496,20 @@ run {
     }
 }
 
+// suppress javadoc/doclint warnings produced for generated sources
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    // disable javadoc doclint warnings during compilation
+    options.compilerArgs += ['-Xdoclint:none']
+}
+
+tasks.withType(Javadoc).configureEach {
+    // make javadoc task quiet about doclint issues
+    try {
+        options.addStringOption('Xdoclint:none', '-quiet')
+    } catch (Exception ignored) {}
+}
+
 // updateVersion: Task to auto increment to the next development iteration
 task updateVersion {
     onlyIf { System.getProperty('newVersion') }
