@@ -28,6 +28,8 @@ public abstract class AbstractMethodResolver implements MethodResolver {
      * Utility method to get the compression level from the context
      *
      * @param resolvedKnnMethodContext Resolved method context. Should have an encoder set in the params if available
+     * @param knnMethodConfigContext the method context to read configuration from
+     * @param encoderMap mapping of encoder names to components used to resolve defaults
      * @return {@link CompressionLevel} Compression level that is configured with the {@link KNNMethodContext}
      */
     protected CompressionLevel resolveCompressionLevelFromMethodContext(
