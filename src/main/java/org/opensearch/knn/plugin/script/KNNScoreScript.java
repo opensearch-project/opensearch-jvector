@@ -21,6 +21,8 @@ import java.util.function.BiFunction;
  * KNNScoreScript is used for adjusting the score of query results based on similarity distance methods. Scripts
  * operate on a per document basis. Because the scoring method is passed in during construction, KNNScoreScripts are
  * only concerned with the types of the query and docs being processed.
+ *
+ * @param <T> the concrete script context/type used by implementations
  */
 public abstract class KNNScoreScript<T> extends ScoreScript {
     protected final T queryValue;

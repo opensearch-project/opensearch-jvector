@@ -9,6 +9,7 @@ import java.util.function.Supplier;
 
 /**
  * Class represents a stat the plugin keeps track of
+ * @param <T> the payload type stored in this stat object
  */
 public class KNNStat<T> {
     private Boolean clusterLevel;

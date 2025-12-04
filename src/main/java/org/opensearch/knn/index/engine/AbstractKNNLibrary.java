@@ -20,7 +20,10 @@ import java.util.Map;
 @AllArgsConstructor(access = AccessLevel.PACKAGE)
 public abstract class AbstractKNNLibrary implements KNNLibrary {
 
+    /** Map of method name -> KNN method implementation. */
     protected final Map<String, KNNMethod> methods;
+
+    /** Library version identifier. */
     @Getter
     protected final String version;
 
