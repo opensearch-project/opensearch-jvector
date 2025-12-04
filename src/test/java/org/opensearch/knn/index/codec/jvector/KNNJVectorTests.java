@@ -28,6 +28,8 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static org.opensearch.knn.KNNRestTestCase.TERM_QUERY_FIELD_NAME;
+import static org.opensearch.knn.KNNRestTestCase.TERM_QUERY_FIELD_VALUE;
 import static org.opensearch.knn.common.KNNConstants.DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION;
 import static org.opensearch.knn.index.engine.CommonTestUtils.getCodec;
 
@@ -194,6 +196,7 @@ public class KNNJVectorTests extends LuceneTestCase {
                 final float[] source = new float[] { 0.0f, i };
                 doc.add(new KnnFloatVectorField("test_field", source, vectorSimilarityFunction));
                 doc.add(new IntField(TEST_ID_FIELD, i, Field.Store.YES));
+                doc.add(new StringField(TERM_QUERY_FIELD_NAME, TERM_QUERY_FIELD_VALUE, Field.Store.YES));
                 // Add the sortable field
                 doc.add(new NumericDocValuesField(sortFieldName, i));
                 w.addDocument(doc);
@@ -206,7 +209,7 @@ public class KNNJVectorTests extends LuceneTestCase {
                 Assert.assertEquals(1, reader.getContext().leaves().size());
                 Assert.assertEquals(totalNumberOfDocs, reader.numDocs());
 
-                final Query filterQuery = new MatchAllDocsQuery();
+                final Query filterQuery = new TermQuery(new Term(TERM_QUERY_FIELD_NAME, TERM_QUERY_FIELD_VALUE));
                 final IndexSearcher searcher = newSearcher(reader);
                 KnnFloatVectorQuery knnFloatVectorQuery = getJVectorKnnFloatVectorQuery("test_field", target, k, filterQuery);
                 TopDocs topDocs = searcher.search(knnFloatVectorQuery, k);
@@ -262,6 +265,7 @@ public class KNNJVectorTests extends LuceneTestCase {
                 final float[] source = new float[] { 0.0f, 1.0f / i };
                 final Document doc = new Document();
                 doc.add(new KnnFloatVectorField("test_field", source, VectorSimilarityFunction.EUCLIDEAN));
+                doc.add(new StringField("my_doc_id", Integer.toString(1, 10), Field.Store.YES));
                 w.addDocument(doc);
                 w.commit(); // this creates a new segment
             }
@@ -271,10 +275,10 @@ public class KNNJVectorTests extends LuceneTestCase {
                 log.info("We should now have 10 segments, each with a single document");
                 Assert.assertEquals(10, reader.getContext().leaves().size());
                 Assert.assertEquals(totalNumberOfDocs, reader.numDocs());
-                final Query filterQuery = new MatchAllDocsQuery();
+                final Query filterQuery = new TermQuery(new Term("my_doc_id", "1"));
                 final IndexSearcher searcher = newSearcher(reader);
-                KnnFloatVectorQuery knnFloatVectorQuery = new KnnFloatVectorQuery("test_field", target, k, filterQuery);
-                TopDocs topDocs = searcher.search(knnFloatVectorQuery, k);
+                KnnFloatVectorQuery kfilterQuery = new KnnFloatVectorQuery("test_field", target, k, filterQuery);
+                TopDocs topDocs = searcher.search(kfilterQuery, k);
                 assertEquals(k, topDocs.totalHits.value());
                 assertEquals(9, topDocs.scoreDocs[0].doc);
                 Assert.assertEquals(
@@ -325,6 +329,7 @@ public class KNNJVectorTests extends LuceneTestCase {
                 final Document doc = new Document();
                 doc.add(new KnnFloatVectorField("test_field", source, VectorSimilarityFunction.EUCLIDEAN));
                 doc.add(new StringField("my_doc_id", Integer.toString(i, 10), Field.Store.YES));
+                doc.add(new StringField(TERM_QUERY_FIELD_NAME, TERM_QUERY_FIELD_VALUE, Field.Store.YES));
                 w.addDocument(doc);
                 w.commit(); // this creates a new segment without triggering a merge
             }
@@ -336,7 +341,7 @@ public class KNNJVectorTests extends LuceneTestCase {
                 log.info("We should now have 1 segment with 10 documents");
                 Assert.assertEquals(1, reader.getContext().leaves().size());
                 Assert.assertEquals(totalNumberOfDocs, reader.numDocs());
-                final Query filterQuery = new MatchAllDocsQuery();
+                final Query filterQuery = new TermQuery(new Term(TERM_QUERY_FIELD_NAME, TERM_QUERY_FIELD_VALUE));
                 final IndexSearcher searcher = newSearcher(reader);
                 KnnFloatVectorQuery knnFloatVectorQuery = getJVectorKnnFloatVectorQuery("test_field", target, k, filterQuery);
                 TopDocs topDocs = searcher.search(knnFloatVectorQuery, k);

@@ -14,12 +14,12 @@ import java.util.concurrent.Callable
 /**** This entire section is boiler plate of OpenSearch plugin files. ****/
 buildscript {
     ext {
-        // build.version_qualifier parameter applies to knn plugin artifacts only. OpenSearch version must be set
+        // build.version_qualifier parameter applies to jvector plugin artifacts only. OpenSearch version must be set
         // explicitly as 'opensearch.version' property, for instance opensearch.version=2.0.0-rc1-SNAPSHOT
-        opensearch_version = System.getProperty("opensearch.version", "3.2.0-SNAPSHOT")
+        opensearch_version = System.getProperty("opensearch.version", "3.3.0-SNAPSHOT")
         version_qualifier = System.getProperty("build.version_qualifier", "")
         opensearch_group = "org.opensearch"
-        isSnapshot = "true" == System.getProperty("build.snapshot", "true")
+        isSnapshot = "true" == System.getProperty("build.snapshot", "false")
 
         version_tokens = opensearch_version.tokenize('-')
         opensearch_build = version_tokens[0] + '.0'
@@ -310,6 +310,7 @@ dependencies {
     api group: 'com.google.guava', name: 'failureaccess', version:'1.0.1'
     api group: 'com.google.guava', name: 'guava', version:'32.1.3-jre'
     api group: 'commons-lang', name: 'commons-lang', version: '2.6'
+    api "org.apache.commons:commons-lang3:${versions.commonslang}"
     testFixturesImplementation "org.opensearch.test:framework:${opensearch_version}"
     // Add the high-level client dependency
     testImplementation "org.opensearch.client:opensearch-rest-high-level-client:${opensearch_version}"
@@ -326,15 +327,12 @@ dependencies {
     testFixturesImplementation group: 'net.minidev', name: 'json-smart', version: "${versions.json_smart}"
     testFixturesImplementation "org.opensearch:common-utils:${version}"
     implementation 'com.github.oshi:oshi-core:6.4.13'
+    implementation "org.slf4j:slf4j-api:${versions.slf4j}"
 
     implementation "io.github.jbellis:jvector:${jvector_version}"
     //api "io.github.jbellis:jvector-native:${jvector_version}"
     implementation 'org.agrona:agrona:1.20.0'
 
-    // OpenSearch core is using slf4j 1.7.36. Therefore, we cannot change the version here.
-    implementation 'org.slf4j:slf4j-api:1.7.36'
-    // Add this line to provide the SLF4J to Log4j2 binding for 1.7.x
-    //implementation "org.apache.logging.log4j:log4j-slf4j-impl:${versions.log4j}"
     // Add this line for SLF4J 2.x compatibility
     implementation "org.apache.logging.log4j:log4j-slf4j2-impl:${versions.log4j}"
 

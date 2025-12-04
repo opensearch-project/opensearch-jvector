@@ -12,12 +12,16 @@ import org.opensearch.Version;
 import org.opensearch.cluster.metadata.IndexMetadata;
 import org.opensearch.cluster.metadata.MappingMetadata;
 import org.opensearch.common.ValidationException;
+import org.opensearch.index.mapper.FieldMapper;
+import org.opensearch.index.mapper.MapperService;
 import org.opensearch.knn.common.KNNConstants;
 import org.opensearch.knn.index.engine.KNNMethodContext;
+import org.opensearch.knn.index.KNNSettings;
 import org.opensearch.knn.index.engine.MethodComponentContext;
 import org.opensearch.knn.index.SpaceType;
 import org.opensearch.knn.index.VectorDataType;
 import org.opensearch.knn.index.mapper.KNNVectorFieldMapper;
+import org.opensearch.knn.index.mapper.KNNVectorFieldType;
 import org.opensearch.knn.index.query.request.MethodParameter;
 import org.opensearch.knn.index.engine.KNNEngine;
 
@@ -360,5 +364,34 @@ public class IndexUtil {
         return parameters.getOrDefault(VECTOR_DATA_TYPE_FIELD, VectorDataType.DEFAULT.getValue())
             .toString()
             .equals(VectorDataType.BYTE.getValue());
+    }
+
+    public static boolean isDerivedEnabledForIndex(MapperService mapperService) {
+        if (mapperService == null) {
+            return false;
+        }
+
+        if (!mapperService.documentMapper().sourceMapper().enabled()) {
+            return false;
+        }
+
+        if (!KNNSettings.isKNNDerivedSourceEnabled(mapperService.getIndexSettings().getSettings())) {
+            return false;
+        }
+
+        // We do not support derived fields for seg rep with node to node replication enabled. This is because of
+        // special handling of source during indexing on segrep replicas with respect to the translog.
+        if (mapperService.getIndexSettings().isSegRepLocalEnabled()) {
+            return false;
+        }
+        return true;
+    }
+
+    public static boolean isDerivedEnabledForField(KNNVectorFieldType knnVectorFieldType, MapperService mapperService) {
+        // Skip copy to fields
+        if (mapperService.documentMapper().mappers().getMapper(knnVectorFieldType.name()) instanceof FieldMapper mapper) {
+            return mapper.copyTo() == null || mapper.copyTo().copyToFields() == null || mapper.copyTo().copyToFields().isEmpty();
+        }
+        return true;
     }
 }

@@ -8,8 +8,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Features
 ### Enhancements
 * Add script for loading vector data using Parquet [192](https://github.com/opensearch-project/opensearch-jvector/issues/192)
+* Update script and main docs with minor fixes [196](https://github.com/opensearch-project/opensearch-jvector/pull/196)
+* Support deletes for incremental insertion [203](https://github.com/opensearch-project/opensearch-jvector/pull/203)
+* Make tests more resilient [212](https://github.com/opensearch-project/opensearch-jvector/pull/212)
 ### Bug Fixes
+* Fix vulnerability in python script by upgrading opensearch-py [213](https://github.com/opensearch-project/opensearch-jvector/pull/213)
 ### Infrastructure
+* Upgrade Lucene to 10.3.1 [189] (https://github.com/opensearch-project/opensearch-jvector/pull/201)
 ### Documentation
 ### Maintenance
 ### Refactoring

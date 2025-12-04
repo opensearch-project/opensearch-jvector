@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package org.opensearch.knn.index.codec.KNN9120Codec;
+package org.opensearch.knn.index.codec.backward_codecs.KNN9120Codec;
 
 import lombok.AllArgsConstructor;
 import org.apache.lucene.codecs.StoredFieldsFormat;
@@ -16,27 +16,23 @@ import org.apache.lucene.index.SegmentReadState;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.IOContext;
 import org.opensearch.common.Nullable;
-import org.opensearch.index.mapper.MappedFieldType;
 import org.opensearch.index.mapper.MapperService;
-import org.opensearch.knn.index.KNNSettings;
-import org.opensearch.knn.index.codec.derivedsource.DerivedSourceReadersSupplier;
-import org.opensearch.knn.index.mapper.KNNVectorFieldType;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.opensearch.knn.common.KNNConstants.DERIVED_VECTOR_FIELD_ATTRIBUTE_KEY;
-import static org.opensearch.knn.common.KNNConstants.DERIVED_VECTOR_FIELD_ATTRIBUTE_TRUE_VALUE;
-
 @AllArgsConstructor
-public class DerivedSourceStoredFieldsFormat extends StoredFieldsFormat {
+public class KNN9120DerivedSourceStoredFieldsFormat extends StoredFieldsFormat {
 
     private final StoredFieldsFormat delegate;
-    private final DerivedSourceReadersSupplier derivedSourceReadersSupplier;
+    private final KNN9120DerivedSourceReadersSupplier derivedSourceReadersSupplier;
     // IMPORTANT Do not rely on this for the reader, it will be null if SPI is used
     @Nullable
     private final MapperService mapperService;
+
+    static final String DERIVED_VECTOR_FIELD_ATTRIBUTE_KEY = "knn-derived-source-enabled";
+    static final String DERIVED_VECTOR_FIELD_ATTRIBUTE_TRUE_VALUE = "true";
 
     @Override
     public StoredFieldsReader fieldsReader(Directory directory, SegmentInfo segmentInfo, FieldInfos fieldInfos, IOContext ioContext)
@@ -55,28 +51,18 @@ public class DerivedSourceStoredFieldsFormat extends StoredFieldsFormat {
         if (derivedVectorFields == null || derivedVectorFields.isEmpty()) {
             return delegate.fieldsReader(directory, segmentInfo, fieldInfos, ioContext);
         }
-        return new DerivedSourceStoredFieldsReader(
+        SegmentReadState segmentReadState = new SegmentReadState(directory, segmentInfo, fieldInfos, ioContext);
+        KNN9120DerivedSourceReaders derivedSourceReaders = derivedSourceReadersSupplier.getReaders(segmentReadState);
+        return new KNN9120DerivedSourceStoredFieldsReader(
             delegate.fieldsReader(directory, segmentInfo, fieldInfos, ioContext),
             derivedVectorFields,
-            derivedSourceReadersSupplier,
+            derivedSourceReaders,
             new SegmentReadState(directory, segmentInfo, fieldInfos, ioContext)
         );
     }
 
     @Override
-    public StoredFieldsWriter fieldsWriter(Directory directory, SegmentInfo segmentInfo, IOContext ioContext) throws IOException {
-        StoredFieldsWriter delegateWriter = delegate.fieldsWriter(directory, segmentInfo, ioContext);
-        if (mapperService != null && KNNSettings.isKNNDerivedSourceEnabled(mapperService.getIndexSettings().getSettings())) {
-            List<String> vectorFieldTypes = new ArrayList<>();
-            for (MappedFieldType fieldType : mapperService.fieldTypes()) {
-                if (fieldType instanceof KNNVectorFieldType) {
-                    vectorFieldTypes.add(fieldType.name());
-                }
-            }
-            if (vectorFieldTypes.isEmpty() == false) {
-                return new DerivedSourceStoredFieldsWriter(delegateWriter, vectorFieldTypes);
-            }
-        }
-        return delegateWriter;
+    public StoredFieldsWriter fieldsWriter(Directory directory, SegmentInfo segmentInfo, IOContext ioContext) {
+        throw new UnsupportedOperationException("KNN9120DerivedSourceStoredFieldsFormat does not support fieldsWriter");
     }
 }

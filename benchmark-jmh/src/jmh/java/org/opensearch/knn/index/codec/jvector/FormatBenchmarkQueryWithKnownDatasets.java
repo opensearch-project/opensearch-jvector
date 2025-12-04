@@ -70,7 +70,7 @@ public class FormatBenchmarkQueryWithKnownDatasets {
 
     @Param({ "sift-128-euclidean.hdf5", /*"nytimes-256-angular.hdf5", "ada002-100k"*/ })
     private String datasetName;
-    @Param({ JVECTOR_NOT_QUANTIZED/*, JVECTOR_QUANTIZED*/, LUCENE101 })  // This will run the benchmark each codec type
+    @Param({ JVECTOR_NOT_QUANTIZED/*, JVECTOR_QUANTIZED*/, LUCENE103 })  // This will run the benchmark each codec type
     private String codecType;
     private DataSet dataset;
     private static final int K = 100;
