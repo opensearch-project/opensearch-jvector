@@ -7,8 +7,6 @@ package org.opensearch.knn.common;
 
 import org.opensearch.knn.index.VectorDataType;
 
-import java.util.List;
-
 public class KNNConstants {
     // shared across library constants
     public static final String DIMENSION = "dimension";

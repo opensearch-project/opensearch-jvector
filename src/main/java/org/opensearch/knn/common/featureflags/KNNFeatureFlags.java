@@ -9,9 +9,7 @@ package org.opensearch.knn.common.featureflags;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import lombok.experimental.UtilityClass;
-import org.opensearch.common.Booleans;
 import org.opensearch.common.settings.Setting;
-import org.opensearch.knn.index.KNNSettings;
 
 import java.util.List;
 

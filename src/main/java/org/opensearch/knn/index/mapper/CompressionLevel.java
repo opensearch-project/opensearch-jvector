@@ -55,7 +55,6 @@ public enum CompressionLevel {
      */
     x64(64, "64x", new RescoreContext(5.0f, false, false), Set.of(Mode.ON_DISK));
 
-
     /**
      * Get the compression level from a string representation. The format for the string should be "Nx", where N is
      * the factor by which compression should take place
@@ -80,7 +79,6 @@ public enum CompressionLevel {
     private final String name;
     private final RescoreContext defaultRescoreContext;
     private final Set<Mode> modesForRescore;
-
 
     /**
      * Utility method that checks if compression is configured.
