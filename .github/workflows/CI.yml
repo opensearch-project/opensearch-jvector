@@ -86,7 +86,7 @@ jobs:
 
     name: Build and Test jVector k-NN Plugin on MacOS
     needs: Get-CI-Image-Tag
-    runs-on: macos-13
+    runs-on: macos-latest
 
     steps:
       - name: Checkout jVector k-NN

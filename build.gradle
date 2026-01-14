@@ -16,7 +16,9 @@ buildscript {
     ext {
         // build.version_qualifier parameter applies to jvector plugin artifacts only. OpenSearch version must be set
         // explicitly as 'opensearch.version' property, for instance opensearch.version=2.0.0-rc1-SNAPSHOT
-        opensearch_version = System.getProperty("opensearch.version", "3.4.0")
+        opensearch_version = System.getProperty("opensearch.version", "3.5.0-SNAPSHOT")
+        opensearch_build = opensearch_version.replaceAll(/(\.\d)([^\d]*)$/, '$1.0$2')
+        common_utils_version = System.getProperty("common_utils.version", opensearch_build)
         version_qualifier = System.getProperty("build.version_qualifier", "")
         opensearch_group = "org.opensearch"
         isSnapshot = "true" == System.getProperty("build.snapshot", "false")
@@ -326,7 +328,7 @@ dependencies {
     }
     // Explicitly include a safe version of json-smart for test fixtures
     testFixturesImplementation group: 'net.minidev', name: 'json-smart', version: "${versions.json_smart}"
-    testFixturesImplementation "org.opensearch:common-utils:${version}"
+    testFixturesImplementation "org.opensearch:common-utils:${common_utils_version}"
     implementation 'com.github.oshi:oshi-core:6.4.13'
     implementation "org.slf4j:slf4j-api:${versions.slf4j}"
 
