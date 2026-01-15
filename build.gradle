@@ -16,7 +16,7 @@ buildscript {
     ext {
         // build.version_qualifier parameter applies to jvector plugin artifacts only. OpenSearch version must be set
         // explicitly as 'opensearch.version' property, for instance opensearch.version=2.0.0-rc1-SNAPSHOT
-        opensearch_version = System.getProperty("opensearch.version", "3.3.2")
+        opensearch_version = System.getProperty("opensearch.version", "3.4.0")
         version_qualifier = System.getProperty("build.version_qualifier", "")
         opensearch_group = "org.opensearch"
         isSnapshot = "true" == System.getProperty("build.snapshot", "false")
@@ -175,8 +175,9 @@ allprojects {
         version += "-SNAPSHOT"
     }
     apply from: rootProject.file('build-tools/repositories.gradle').absoluteFile
-    plugins.withId('java') {
-        sourceCompatibility = targetCompatibility = java_release_version
+    java {
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
     }
 
     afterEvaluate {

@@ -9,7 +9,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Enhancements
 ### Bug Fixes
 ### Infrastructure
-* Update OpenSearch compatibility from version 3.3.0 to 3.3.2 [PR #226](https://github.com/opensearch-project/opensearch-jvector/pull/226)
+* Upgrade Gradle to 9.2.0 [220] (https://github.com/opensearch-project/opensearch-jvector/pull/222)
+* Add support for JDK25 [220] (https://github.com/opensearch-project/opensearch-jvector/pull/222)
 ### Documentation
 ### Maintenance
 * Fix vulnerability due to matplotlib CVE-66034 [223] (https://github.com/opensearch-project/opensearch-jvector/pull/223)
