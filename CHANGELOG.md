@@ -14,4 +14,5 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Documentation
 ### Maintenance
 * Fix vulnerability due to matplotlib CVE-66034 [223] (https://github.com/opensearch-project/opensearch-jvector/pull/223)
+* Disable some Github workflows since those are failing consistently [231] (https://github.com/opensearch-project/opensearch-jvector/pull/231)
 ### Refactoring

@@ -31,6 +31,8 @@ on:
 
 jobs:
   Restart-Upgrade-BWCTests-k-NN:
+    # See https://github.com/opensearch-project/opensearch-jvector/issues/229
+    if: false
     strategy:
       matrix:
         java: [ 21 ]
@@ -126,6 +128,8 @@ jobs:
           fi 
 
   Rolling-Upgrade-BWCTests-k-NN:
+    # See https://github.com/opensearch-project/opensearch-jvector/issues/229
+    if: false
     strategy:
       matrix:
         java: [ 21 ]
