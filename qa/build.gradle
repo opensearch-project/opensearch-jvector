@@ -5,6 +5,7 @@
 
 import org.apache.tools.ant.taskdefs.condition.Os
 import java.nio.file.Files
+import java.nio.file.Paths
 
 apply plugin: 'opensearch.testclusters'
 apply plugin: 'opensearch.build'
@@ -35,6 +36,7 @@ String default_bwc_version = System.getProperty("bwc.version")
 String knn_bwc_version = System.getProperty("tests.bwc.version", default_bwc_version)
 boolean isSnapshot = knn_bwc_version.contains("-SNAPSHOT")
 String knn_bwc_version_no_qualifier = isSnapshot ? knn_bwc_version - "-SNAPSHOT" : knn_bwc_version
+def opensearch_jvector_build = knn_bwc_version.replaceAll(/(\.\d)([^\d]*)$/, '$1.0$2')
 
 String os_platform = "linux"
 String artifact_type = "tar"
@@ -53,9 +55,39 @@ allprojects {
     }
 }
 
+tasks.register("downloadFromMaven", Copy) {
+    mustRunAfter pullBwcPlugin
+
+    def mavenSnapshotRepoUrl = "https://central.sonatype.com/repository/maven-snapshots/"
+    def groupId = "org.opensearch.plugin"
+    def artifactId = "opensearch-jvector-plugin"
+    
+    if (isSnapshot) {
+        def repos = project.getRepositories();
+        MavenArtifactRepository opensearchRepo = repos.maven(repo -> {
+            repo.setName("opensearch-snapshots");
+            repo.setUrl(mavenSnapshotRepoUrl);
+        });
+    }
+
+    configurations {
+        pluginArtifact {
+        }
+    }
+
+    dependencies {
+        pluginArtifact("${groupId}:${artifactId}:${opensearch_jvector_build}@zip")
+    }
+
+    from zipTree(configurations.pluginArtifact.singleFile)
+    into java.nio.file.Path.of(tmp_dir.absolutePath, "opensearch-jvector")
+
+}
+
 // Task to pull k-NN plugin from archive
 task pullBwcPlugin {
     doFirst {
+        tmp_dir.mkdirs()
         File[] tempFiles = tmp_dir.listFiles()
         for (File child : tempFiles) {
             if (child.exists() && child.toString().contains("opensearch-")) {
@@ -65,7 +97,7 @@ task pullBwcPlugin {
     }
 
     doLast {
-        ext{
+       ext{
             if (isSnapshot) {
                 srcUrl = "https://ci.opensearch.org/ci/dbc/distribution-build-opensearch/${knn_bwc_version_no_qualifier}/latest/${os_platform}/x64/${artifact_type}/dist/opensearch/opensearch-${knn_bwc_version_no_qualifier}-${os_platform}-x64.${file_ext}"
             } else {
@@ -95,7 +127,7 @@ task pullBwcPlugin {
 
 // Task to zip plugin from archive
 task zipBwcPlugin(type: Zip) {
-    dependsOn "pullBwcPlugin"
+    dependsOn downloadFromMaven, pullBwcPlugin
     from(java.nio.file.Path.of(tmp_dir.absolutePath, "opensearch-jvector"))
     destinationDirectory = tmp_dir
     archiveFileName = "opensearch-jvector-${knn_bwc_version_no_qualifier}.zip"

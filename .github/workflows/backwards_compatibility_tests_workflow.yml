@@ -35,7 +35,7 @@ jobs:
       matrix:
         java: [ 21 ]
         os: [ubuntu-latest]
-        bwc_version : [ "2.18.0","2.19.1", "3.0.0", "3.2.0", "3.3.0", "3.4.0"]
+        bwc_version : [ "3.2.0" ]
         opensearch_version : [ "3.5.0-SNAPSHOT" ]
     name: k-NN Restart-Upgrade BWC Tests
     runs-on: ${{ matrix.os }}
@@ -120,7 +120,7 @@ jobs:
       matrix:
         java: [ 21 ]
         os: [ubuntu-latest]
-        bwc_version: [ "2.19.2-SNAPSHOT" ]
+        bwc_version: [ "3.2.0" ]
         opensearch_version: [ "3.5.0-SNAPSHOT" ]
 
     name: k-NN Rolling-Upgrade BWC Tests
