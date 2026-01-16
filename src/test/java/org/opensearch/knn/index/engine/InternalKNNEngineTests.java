@@ -506,7 +506,7 @@ public class InternalKNNEngineTests extends OpenSearchIntegTestCase {
         // calculate recall
         logger.info("Calculating recall");
         float recall = ((float) results.stream().filter(r -> expectedDocIds.contains(r.getDocId())).count()) / ((float) k);
-        assertTrue("Expected recall to be at least 0.9 but got " + recall, recall >= 0.9);
+        assertTrue("Expected recall to be at least 0.9 but got " + recall, recall >= 0.9f);
     }
 
     /**
