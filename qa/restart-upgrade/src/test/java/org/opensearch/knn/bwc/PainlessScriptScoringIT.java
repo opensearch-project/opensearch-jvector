@@ -21,7 +21,7 @@ public class PainlessScriptScoringIT extends AbstractRestartUpgradeTestCase {
     // KNN painless script scoring for space_type "l2"
     public void testKNNL2PainlessScriptScore() throws Exception {
         if (isRunningAgainstOldCluster()) {
-            createKnnIndex(testIndex, createKNNDefaultScriptScoreSettings(), createKnnIndexMapping(TEST_FIELD, DIMENSIONS));
+            createKnnIndex(testIndex, createKNNDefaultScriptScoreSettings(), createKnnScriptScoreIndexMapping(TEST_FIELD, DIMENSIONS));
             addKNNDocs(testIndex, TEST_FIELD, DIMENSIONS, DOC_ID, NUM_DOCS);
         } else {
             DOC_ID = NUM_DOCS;
@@ -41,7 +41,7 @@ public class PainlessScriptScoringIT extends AbstractRestartUpgradeTestCase {
     // KNN painless script scoring for space_type "l1"
     public void testKNNL1PainlessScriptScore() throws Exception {
         if (isRunningAgainstOldCluster()) {
-            createKnnIndex(testIndex, createKNNDefaultScriptScoreSettings(), createKnnIndexMapping(TEST_FIELD, DIMENSIONS));
+            createKnnIndex(testIndex, createKNNDefaultScriptScoreSettings(), createKnnScriptScoreIndexMapping(TEST_FIELD, DIMENSIONS));
             addKNNDocs(testIndex, TEST_FIELD, DIMENSIONS, DOC_ID, NUM_DOCS);
         } else {
             DOC_ID = NUM_DOCS;
