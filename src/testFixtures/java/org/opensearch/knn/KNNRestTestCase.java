@@ -86,7 +86,7 @@ import static org.opensearch.knn.common.KNNConstants.METHOD_PARAMETER_EF_SEARCH;
 import static org.opensearch.knn.common.KNNConstants.METHOD_PARAMETER_NLIST;
 import static org.opensearch.knn.common.KNNConstants.METHOD_PARAMETER_SPACE_TYPE;
 import static org.opensearch.knn.common.KNNConstants.NAME;
-import static org.opensearch.knn.common.KNNConstants.METHOD_HNSW;
+import static org.opensearch.knn.common.KNNConstants.DISK_ANN;
 import static org.opensearch.knn.common.KNNConstants.PARAMETERS;
 import static org.opensearch.knn.common.KNNConstants.METHOD_PARAMETER_EF_CONSTRUCTION;
 import static org.opensearch.knn.common.KNNConstants.METHOD_PARAMETER_M;
@@ -128,8 +128,6 @@ public class KNNRestTestCase extends ODFERestTestCase {
     private static final String SYSTEM_INDEX_PREFIX = ".opendistro";
     public static final int MIN_CODE_UNITS = 4;
     public static final int MAX_CODE_UNITS = 10;
-    public static final String TERM_QUERY_FIELD_NAME = "my_field";
-    public static final String TERM_QUERY_FIELD_VALUE = "1";
 
     @AfterClass
     public static void dumpCoverage() throws IOException, MalformedObjectNameException {
@@ -228,7 +226,6 @@ public class KNNRestTestCase extends ODFERestTestCase {
     protected Response searchKNNIndex(String index, String query, int resultSize) throws IOException {
         Request request = new Request("POST", "/" + index + "/_search");
         request.setJsonEntity(query);
-
         request.addParameter("size", Integer.toString(resultSize));
         request.addParameter("search_type", "query_then_fetch");
         // Nested field does not support explain parameter and the request is rejected if we set explain parameter
@@ -414,6 +411,22 @@ public class KNNRestTestCase extends ODFERestTestCase {
      * Utility to create a Knn Index Mapping
      */
     protected String createKnnIndexMapping(String fieldName, Integer dimensions) throws IOException {
+        return XContentFactory.jsonBuilder()
+            .startObject()
+            .startObject("properties")
+            .startObject(fieldName)
+            .field("type", "knn_vector")
+            .field("dimension", dimensions.toString())
+            .startObject(KNN_METHOD)
+            .field(NAME, DISK_ANN)
+            .endObject()
+            .endObject()
+            .endObject()
+            .endObject()
+            .toString();
+    }
+
+    protected String createKnnScriptScoreIndexMapping(String fieldName, Integer dimensions) throws IOException {
         return XContentFactory.jsonBuilder()
             .startObject()
             .startObject("properties")
@@ -629,11 +642,7 @@ public class KNNRestTestCase extends ODFERestTestCase {
     protected <T> void addKnnDoc(String index, String docId, String fieldName, T vector) throws IOException {
         Request request = new Request("POST", "/" + index + "/_doc/" + docId + "?refresh=true");
 
-        XContentBuilder builder = XContentFactory.jsonBuilder()
-            .startObject()
-            .field(fieldName, vector)
-            .field(TERM_QUERY_FIELD_NAME, TERM_QUERY_FIELD_VALUE)
-            .endObject();
+        XContentBuilder builder = XContentFactory.jsonBuilder().startObject().field(fieldName, vector).endObject();
         request.setJsonEntity(builder.toString());
         client().performRequest(request);
 
@@ -722,7 +731,6 @@ public class KNNRestTestCase extends ODFERestTestCase {
         for (int i = 0; i < fieldNames.size(); i++) {
             builder.field(fieldNames.get(i), vectors.get(i));
         }
-        builder.field(TERM_QUERY_FIELD_NAME, TERM_QUERY_FIELD_VALUE);
         builder.endObject();
 
         request.setJsonEntity(builder.toString());
@@ -1743,7 +1751,7 @@ public class KNNRestTestCase extends ODFERestTestCase {
             .field(VECTOR_TYPE, KNN_VECTOR)
             .field(DIMENSION, dimensions.toString())
             .startObject(KNN_METHOD)
-            .field(NAME, METHOD_HNSW)
+            .field(NAME, DISK_ANN)
             .endObject()
             .endObject()
             .endObject()
@@ -1766,7 +1774,7 @@ public class KNNRestTestCase extends ODFERestTestCase {
             .field(VECTOR_TYPE, KNN_VECTOR)
             .field(DIMENSION, dimensions.toString())
             .startObject(KNN_METHOD)
-            .field(NAME, METHOD_HNSW)
+            .field(NAME, DISK_ANN)
             .field(METHOD_PARAMETER_SPACE_TYPE, spaceType.getValue())
             .field(KNN_ENGINE, engine)
             .startObject(PARAMETERS)
@@ -1796,7 +1804,7 @@ public class KNNRestTestCase extends ODFERestTestCase {
             .field(VECTOR_TYPE, KNN_VECTOR)
             .field(DIMENSION, dimensions.toString())
             .startObject(KNN_METHOD)
-            .field(NAME, METHOD_HNSW)
+            .field(NAME, DISK_ANN)
             .field(METHOD_PARAMETER_SPACE_TYPE, spaceType.getValue())
             .field(KNN_ENGINE, engine)
             .startObject(PARAMETERS)

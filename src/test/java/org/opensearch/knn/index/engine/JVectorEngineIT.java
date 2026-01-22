@@ -18,7 +18,6 @@ import org.opensearch.common.settings.Settings;
 import org.opensearch.core.xcontent.XContentBuilder;
 import org.opensearch.index.query.QueryBuilder;
 import org.opensearch.index.query.QueryBuilders;
-import org.opensearch.index.query.TermQueryBuilder;
 import org.opensearch.knn.KNNRestTestCase;
 import org.opensearch.knn.KNNResult;
 import org.opensearch.knn.TestUtils;
@@ -350,11 +349,7 @@ public class JVectorEngineIT extends KNNRestTestCase {
 
     private List<float[]> queryResults(final float[] searchVector, final int k) throws Exception {
         final String responseBody = EntityUtils.toString(
-            searchKNNIndex(
-                INDEX_NAME,
-                new KNNQueryBuilder(FIELD_NAME, searchVector, k, new TermQueryBuilder(TERM_QUERY_FIELD_NAME, TERM_QUERY_FIELD_VALUE)),
-                k
-            ).getEntity()
+            searchKNNIndex(INDEX_NAME, new KNNQueryBuilder(FIELD_NAME, searchVector, k), k).getEntity()
         );
         final List<KNNResult> knnResults = parseSearchResponse(responseBody, FIELD_NAME);
         assertNotNull(knnResults);
@@ -425,11 +420,7 @@ public class JVectorEngineIT extends KNNRestTestCase {
 
         int k = CommonTestUtils.TEST_INDEX_VECTORS.length;
         for (float[] queryVector : TEST_QUERY_VECTORS) {
-            Response response = searchKNNIndex(
-                INDEX_NAME,
-                new KNNQueryBuilder(fieldName, queryVector, k, new TermQueryBuilder(TERM_QUERY_FIELD_NAME, TERM_QUERY_FIELD_VALUE)),
-                k
-            );
+            Response response = searchKNNIndex(INDEX_NAME, buildSearchQuery(fieldName, k, queryVector, methodParameters), k);
             String responseBody = EntityUtils.toString(response.getEntity());
             List<KNNResult> knnResults = parseSearchResponse(responseBody, fieldName);
             assertEquals(k, knnResults.size());
