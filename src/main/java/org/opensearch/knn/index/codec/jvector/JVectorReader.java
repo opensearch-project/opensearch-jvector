@@ -213,6 +213,12 @@ public class JVectorReader extends KnnVectorsReader {
                     expandedBaseLayerCount
                 );
 
+                // Apache Lucene tracks visited counter so to validate scored docs/ total hits (
+                // see AbstractKnnVectorQuery please). The counter has to be updated manually.
+                final int visitedCount = visitedNodesCount + expandedCount;
+                if (visitedCount > 0) {
+                    jvectorKnnCollector.incVisitedCount(visitedCount);
+                }
             }
         }
     }
