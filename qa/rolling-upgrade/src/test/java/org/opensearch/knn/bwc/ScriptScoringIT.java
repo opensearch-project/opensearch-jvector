@@ -20,7 +20,7 @@ public class ScriptScoringIT extends AbstractRollingUpgradeTestCase {
         waitForClusterHealthGreen(NODES_BWC_CLUSTER);
         switch (getClusterType()) {
             case OLD:
-                createKnnIndex(testIndex, createKNNDefaultScriptScoreSettings(), createKnnIndexMapping(TEST_FIELD, DIMENSIONS));
+                createKnnIndex(testIndex, createKNNDefaultScriptScoreSettings(), createKnnScriptScoreIndexMapping(TEST_FIELD, DIMENSIONS));
                 int docIdOld = 0;
                 addKNNDocs(testIndex, TEST_FIELD, DIMENSIONS, docIdOld, NUM_DOCS);
                 break;
