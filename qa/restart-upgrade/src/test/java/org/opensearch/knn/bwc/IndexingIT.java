@@ -268,7 +268,7 @@ public class IndexingIT extends AbstractRestartUpgradeTestCase {
     }
 
     // Custom Method Field Mapping
-    // space_type : "inner_product", engine : "faiss", m : 50, ef_construction : 1024
+    // space_type : "inner_product", engine : "jvector", m : 50, ef_construction : 1024
     public void testKNNIndexCustomMethodFieldMapping() throws Exception {
         if (isRunningAgainstOldCluster()) {
             createKnnIndex(
