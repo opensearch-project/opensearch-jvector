@@ -37,7 +37,7 @@ public class ScriptScoringIT extends AbstractRestartUpgradeTestCase {
     // KNN script scoring for space_type "l2"
     public void testKNNL2ScriptScore() throws Exception {
         if (isRunningAgainstOldCluster()) {
-            createKnnIndex(testIndex, createKNNDefaultScriptScoreSettings(), createKnnIndexMapping(TEST_FIELD, DIMENSIONS));
+            createKnnIndex(testIndex, createKNNDefaultScriptScoreSettings(), createKnnScriptScoreIndexMapping(TEST_FIELD, DIMENSIONS));
             addKNNDocs(testIndex, TEST_FIELD, DIMENSIONS, DOC_ID, NUM_DOCS);
         } else {
             QUERY_COUNT = NUM_DOCS;
@@ -53,7 +53,7 @@ public class ScriptScoringIT extends AbstractRestartUpgradeTestCase {
     // KNN script scoring for space_type "l1"
     public void testKNNL1ScriptScore() throws Exception {
         if (isRunningAgainstOldCluster()) {
-            createKnnIndex(testIndex, createKNNDefaultScriptScoreSettings(), createKnnIndexMapping(TEST_FIELD, DIMENSIONS));
+            createKnnIndex(testIndex, createKNNDefaultScriptScoreSettings(), createKnnScriptScoreIndexMapping(TEST_FIELD, DIMENSIONS));
             addKNNDocs(testIndex, TEST_FIELD, DIMENSIONS, DOC_ID, NUM_DOCS);
         } else {
             QUERY_COUNT = NUM_DOCS;
@@ -69,7 +69,7 @@ public class ScriptScoringIT extends AbstractRestartUpgradeTestCase {
     // KNN script scoring for space_type "innerproduct"
     public void testKNNInnerProductScriptScore() throws Exception {
         if (isRunningAgainstOldCluster()) {
-            createKnnIndex(testIndex, createKNNDefaultScriptScoreSettings(), createKnnIndexMapping(TEST_FIELD, DIMENSIONS));
+            createKnnIndex(testIndex, createKNNDefaultScriptScoreSettings(), createKnnScriptScoreIndexMapping(TEST_FIELD, DIMENSIONS));
             addKNNDocs(testIndex, TEST_FIELD, DIMENSIONS, DOC_ID, NUM_DOCS);
         } else {
             QUERY_COUNT = NUM_DOCS;
