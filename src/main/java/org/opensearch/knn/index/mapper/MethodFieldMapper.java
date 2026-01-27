@@ -53,8 +53,8 @@ public class MethodFieldMapper extends KNNVectorFieldMapper {
         Explicit<Boolean> ignoreMalformed,
         boolean stored,
         boolean hasDocValues,
-        OriginalMappingParameters originalMappingParameters,
-        boolean isDerivedSourceEnabled
+        OriginalMappingParameters originalMappingParameters
+        // boolean isDerivedSourceEnabled
     ) {
 
         KNNMethodContext knnMethodContext = originalMappingParameters.getResolvedKnnMethodContext();
@@ -107,8 +107,7 @@ public class MethodFieldMapper extends KNNVectorFieldMapper {
             stored,
             hasDocValues,
             knnMethodConfigContext,
-            originalMappingParameters,
-            isDerivedSourceEnabled
+            originalMappingParameters
         );
     }
 
@@ -121,8 +120,7 @@ public class MethodFieldMapper extends KNNVectorFieldMapper {
         boolean stored,
         boolean hasDocValues,
         KNNMethodConfigContext knnMethodConfigContext,
-        OriginalMappingParameters originalMappingParameters,
-        boolean isDerivedSourceEnabled
+        OriginalMappingParameters originalMappingParameters
     ) {
 
         super(
@@ -134,8 +132,8 @@ public class MethodFieldMapper extends KNNVectorFieldMapper {
             stored,
             hasDocValues,
             knnMethodConfigContext.getVersionCreated(),
-            originalMappingParameters,
-            isDerivedSourceEnabled
+            originalMappingParameters
+
         );
         this.useLuceneBasedVectorField = KNNVectorFieldMapperUtil.useLuceneKNNVectorsFormat(indexCreatedVersion);
         KNNMappingConfig knnMappingConfig = mappedFieldType.getKnnMappingConfig();

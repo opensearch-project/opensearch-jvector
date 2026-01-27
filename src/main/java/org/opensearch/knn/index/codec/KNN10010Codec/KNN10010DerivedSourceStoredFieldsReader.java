@@ -24,6 +24,7 @@ public class KNN10010DerivedSourceStoredFieldsReader extends StoredFieldsReader 
     private final DerivedSourceReaders derivedSourceReaders;
     private final SegmentReadState segmentReadState;
     private final boolean shouldInject;
+    private boolean transformerInitialized = false;
 
     private final DerivedSourceVectorTransformer derivedSourceVectorTransformer;
 
@@ -66,18 +67,30 @@ public class KNN10010DerivedSourceStoredFieldsReader extends StoredFieldsReader 
     @Override
     public void document(int docId, StoredFieldVisitor storedFieldVisitor) throws IOException {
         // If the visitor has explicitly indicated it does not need the fields, we should not inject them
-        if (shouldInject && doesVisitorNeedVectors(storedFieldVisitor)) {
-            delegate.document(docId, new DerivedSourceStoredFieldVisitor(storedFieldVisitor, docId, derivedSourceVectorTransformer));
-            return;
+        if (shouldInject) {
+            initializeTransformerIfNeeded(storedFieldVisitor);
+            if (derivedSourceVectorTransformer.hasFieldsToInject()) {
+                delegate.document(docId, new DerivedSourceStoredFieldVisitor(storedFieldVisitor, docId, derivedSourceVectorTransformer));
+                return;
+            }
         }
         delegate.document(docId, storedFieldVisitor);
     }
 
-    private boolean doesVisitorNeedVectors(StoredFieldVisitor delegate) {
-        if (delegate instanceof FieldsVisitor fv) {
-            return derivedSourceVectorTransformer.shouldInject(fv.includes(), fv.excludes());
+    private void initializeTransformerIfNeeded(StoredFieldVisitor visitor) {
+        if (transformerInitialized) {
+            return;
         }
-        return true;
+        String[] includes = null;
+        String[] excludes = null;
+
+        if (visitor instanceof FieldsVisitor) {
+            includes = ((FieldsVisitor) visitor).includes();
+            excludes = ((FieldsVisitor) visitor).excludes();
+        }
+
+        derivedSourceVectorTransformer.initialize(includes, excludes);
+        transformerInitialized = true;
     }
 
     @Override
@@ -134,8 +147,8 @@ public class KNN10010DerivedSourceStoredFieldsReader extends StoredFieldsReader 
      * @return wrapped stored fields reader
      */
     public static StoredFieldsReader wrapForMerge(StoredFieldsReader storedFieldsReader) {
-        if (storedFieldsReader instanceof KNN10010DerivedSourceStoredFieldsReader reader) {
-            return reader.cloneForMerge();
+        if (storedFieldsReader instanceof KNN10010DerivedSourceStoredFieldsReader) {
+            return ((KNN10010DerivedSourceStoredFieldsReader) storedFieldsReader).cloneForMerge();
         }
         return storedFieldsReader;
     }
