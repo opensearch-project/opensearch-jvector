@@ -14,7 +14,7 @@ import java.io.IOException;
 
 /**
  * Class encapsulates the suppliers to give the {@link DerivedSourceReaders} from particular formats needed to implement
- * derived source. More specifically, given a {@link SegmentReadState}, this class will provide
+ * derived source. More specifically, given a {@link org.apache.lucene.index.SegmentReadState}, this class will provide
  * the correct format reader for that segment.
  */
 @RequiredArgsConstructor

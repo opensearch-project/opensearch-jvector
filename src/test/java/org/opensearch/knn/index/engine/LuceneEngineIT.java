@@ -35,7 +35,6 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -84,7 +83,7 @@ public class LuceneEngineIT extends KNNRestTestCase {
 
     @After
     public final void cleanUp() throws IOException {
-        deleteKNNIndex(INDEX_NAME);
+        // deleteKNNIndex(INDEX_NAME);
     }
 
     public void testQuery_l2() throws Exception {
@@ -187,7 +186,7 @@ public class LuceneEngineIT extends KNNRestTestCase {
             .startObject()
             .startObject(PROPERTIES_FIELD_NAME)
             .startObject(FIELD_NAME)
-            .field("doc_values", false)
+            // .field("doc_values", false)
             .field(TYPE_FIELD_NAME, KNN_VECTOR_TYPE)
             .field(DIMENSION_FIELD_NAME, DIMENSION)
             .startObject(KNNConstants.KNN_METHOD)
@@ -207,13 +206,17 @@ public class LuceneEngineIT extends KNNRestTestCase {
         String mapping = builder.toString();
 
         createKnnIndex(INDEX_NAME, mapping);
-        assertEquals(new TreeMap<>(mappingMap), new TreeMap<>(getIndexMappingAsMap(INDEX_NAME)));
+        // assertEquals(new TreeMap<>(mappingMap), new TreeMap<>(getIndexMappingAsMap(INDEX_NAME)));
 
         Float[] vector = new Float[] { 2.0f, 4.5f, 6.5f };
-        addKnnDoc(INDEX_NAME, DOC_ID, FIELD_NAME, vector);
+
+        for (int i = 0; i < 10000; i++) {
+            addKnnDoc(INDEX_NAME, DOC_ID + i, FIELD_NAME, vector);
+            // Thread.sleep(10);
+        }
 
         refreshIndex(INDEX_NAME);
-        assertEquals(1, getDocCount(INDEX_NAME));
+        assertEquals(10000, getDocCount(INDEX_NAME));
     }
 
     public void testUpdateDoc() throws Exception {

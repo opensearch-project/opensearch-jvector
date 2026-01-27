@@ -15,7 +15,6 @@ import org.apache.lucene.index.SegmentReadState;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.IOContext;
 import org.opensearch.common.Nullable;
-import org.opensearch.index.mapper.FieldMapper;
 import org.opensearch.index.mapper.MappedFieldType;
 import org.opensearch.index.mapper.MapperService;
 import org.opensearch.knn.index.codec.derivedsource.DerivedFieldInfo;
@@ -28,7 +27,6 @@ import org.opensearch.knn.index.util.IndexUtil;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import java.util.stream.Stream;
 
 @AllArgsConstructor
@@ -46,14 +44,12 @@ public class KNN10010DerivedSourceStoredFieldsFormat extends StoredFieldsFormat 
         List<DerivedFieldInfo> derivedVectorFields = Stream.concat(
             DerivedSourceSegmentAttributeParser.parseDerivedVectorFields(segmentInfo, false)
                 .stream()
-                .map(field -> fieldInfos.fieldInfo(field))
-                .filter(Objects::nonNull)
-                .map(fieldInfo -> new DerivedFieldInfo(fieldInfo, false)),
+                .filter(field -> fieldInfos.fieldInfo(field) != null)
+                .map(field -> new DerivedFieldInfo(fieldInfos.fieldInfo(field), false)),
             DerivedSourceSegmentAttributeParser.parseDerivedVectorFields(segmentInfo, true)
                 .stream()
-                .map(field -> fieldInfos.fieldInfo(field))
-                .filter(Objects::nonNull)
-                .map(fieldInfo -> new DerivedFieldInfo(fieldInfo, true))
+                .filter(field -> fieldInfos.fieldInfo(field) != null)
+                .map(field -> new DerivedFieldInfo(fieldInfos.fieldInfo(field), true))
         ).toList();
 
         // If no fields have it enabled, we can just short-circuit and return the delegate's fieldReader
@@ -105,13 +101,5 @@ public class KNN10010DerivedSourceStoredFieldsFormat extends StoredFieldsFormat 
             DerivedSourceSegmentAttributeParser.addDerivedVectorFieldsSegmentInfoAttribute(segmentInfo, nestedVectorFieldTypes, true);
         }
         return new KNN10010DerivedSourceStoredFieldsWriter(delegateWriter, vectorFieldTypes);
-    }
-
-    public static boolean isDerivedEnabledForField(KNNVectorFieldType knnVectorFieldType, MapperService mapperService) {
-        // Skip copy to fields
-        if (mapperService.documentMapper().mappers().getMapper(knnVectorFieldType.name()) instanceof FieldMapper mapper) {
-            return mapper.copyTo() == null || mapper.copyTo().copyToFields() == null || mapper.copyTo().copyToFields().isEmpty();
-        }
-        return true;
     }
 }
