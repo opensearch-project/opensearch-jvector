@@ -35,8 +35,7 @@ public class FlatVectorFieldMapper extends KNNVectorFieldMapper {
         Explicit<Boolean> ignoreMalformed,
         boolean stored,
         boolean hasDocValues,
-        OriginalMappingParameters originalMappingParameters,
-        boolean isDerivedSourceEnabled
+        OriginalMappingParameters originalMappingParameters
     ) {
         final KNNVectorFieldType mappedFieldType = new KNNVectorFieldType(
             fullname,
@@ -53,8 +52,7 @@ public class FlatVectorFieldMapper extends KNNVectorFieldMapper {
             stored,
             hasDocValues,
             knnMethodConfigContext.getVersionCreated(),
-            originalMappingParameters,
-            isDerivedSourceEnabled
+            originalMappingParameters
         );
     }
 
@@ -67,8 +65,7 @@ public class FlatVectorFieldMapper extends KNNVectorFieldMapper {
         boolean stored,
         boolean hasDocValues,
         Version indexCreatedVersion,
-        OriginalMappingParameters originalMappingParameters,
-        boolean isDerivedSourceEnabled
+        OriginalMappingParameters originalMappingParameters
     ) {
         super(
             simpleName,
@@ -79,8 +76,7 @@ public class FlatVectorFieldMapper extends KNNVectorFieldMapper {
             stored,
             hasDocValues,
             indexCreatedVersion,
-            originalMappingParameters,
-            isDerivedSourceEnabled
+            originalMappingParameters
         );
         // setting it explicitly false here to ensure that when flatmapper is used Lucene based Vector field is not created.
         this.useLuceneBasedVectorField = false;
