@@ -88,10 +88,9 @@ public abstract class KNNVectorFieldMapper extends ParametrizedFieldMapper {
      */
     public static class Builder extends ParametrizedFieldMapper.Builder {
         protected Boolean ignoreMalformed;
-        protected final boolean isDerivedSourceEnabled;
 
         protected final Parameter<Boolean> stored = Parameter.storeParam(m -> toType(m).stored, false);
-        protected final Parameter<Boolean> hasDocValues = Parameter.docValuesParam(m -> toType(m).hasDocValues, true);
+        protected Parameter<Boolean> hasDocValues;
         protected final Parameter<Integer> dimension = new Parameter<>(
             KNNConstants.DIMENSION,
             false,
@@ -182,14 +181,14 @@ public abstract class KNNVectorFieldMapper extends ParametrizedFieldMapper {
             String name,
             Version indexCreatedVersion,
             KNNMethodConfigContext knnMethodConfigContext,
-            OriginalMappingParameters originalParameters,
-            boolean isDerivedSourceEnabled
+            OriginalMappingParameters originalParameters
         ) {
             super(name);
             this.indexCreatedVersion = indexCreatedVersion;
             this.knnMethodConfigContext = knnMethodConfigContext;
             this.originalParameters = originalParameters;
-            this.isDerivedSourceEnabled = isDerivedSourceEnabled;
+
+            this.hasDocValues = Parameter.docValuesParam(m -> toType(m).hasDocValues, false);
         }
 
         @Override
@@ -232,6 +231,13 @@ public abstract class KNNVectorFieldMapper extends ParametrizedFieldMapper {
             // or
             // MethodFieldMapper to maintain backwards compatibility
             if (originalParameters.getResolvedKnnMethodContext() == null && context.indexCreatedVersion().onOrAfter(Version.V_2_17_0)) {
+                // Prior to 3.0.0, hasDocValues defaulted to false. However, FlatVectorFieldMapper requires
+                // hasDocValues to be true to maintain proper functionality for vector search operations.
+                // For indices created on or after 3.0.0, we automatically set hasDocValues to true if not
+                // explicitly configured to ensure consistent behavior.
+                if (indexCreatedVersion.onOrAfter(Version.V_3_0_0) && hasDocValues.isConfigured() == false) {
+                    hasDocValues = Parameter.docValuesParam(m -> toType(m).hasDocValues, true);
+                }
                 return FlatVectorFieldMapper.createFieldMapper(
                     buildFullName(context),
                     name,
@@ -258,8 +264,7 @@ public abstract class KNNVectorFieldMapper extends ParametrizedFieldMapper {
                     .multiFields(multiFieldsBuilder)
                     .copyTo(copyToBuilder)
                     .ignoreMalformed(ignoreMalformed)
-                    .stored(false)
-                    // .stored(stored.getValue())
+                    .stored(stored.getValue())
                     .hasDocValues(true)
                     .originalKnnMethodContext(knnMethodContext.get())
                     .build();
@@ -281,7 +286,7 @@ public abstract class KNNVectorFieldMapper extends ParametrizedFieldMapper {
                 copyToBuilder,
                 ignoreMalformed,
                 stored.getValue(),
-                hasDocValues.getValue(),
+                hasDocValues.get(),
                 originalParameters
             );
         }
@@ -323,8 +328,7 @@ public abstract class KNNVectorFieldMapper extends ParametrizedFieldMapper {
                 name,
                 parserContext.indexVersionCreated(),
                 null,
-                null,
-                IndexUtil.isDerivedEnabledForIndex(parserContext.mapperService())
+                null
             );
             builder.parse(name, parserContext, node);
             builder.setOriginalParameters(new OriginalMappingParameters(builder));
@@ -528,7 +532,7 @@ public abstract class KNNVectorFieldMapper extends ParametrizedFieldMapper {
         updateEngineStats();
         this.indexCreatedVersion = indexCreatedVersion;
         this.originalMappingParameters = originalMappingParameters;
-        this.isDerivedSourceEnabled = true;
+        this.isDerivedSourceEnabled = null;
     }
 
     public KNNVectorFieldMapper clone() {
@@ -758,7 +762,7 @@ public abstract class KNNVectorFieldMapper extends ParametrizedFieldMapper {
             .mode(fieldType().getKnnMappingConfig().getMode())
             .build();
 
-        return new Builder(simpleName(), indexCreatedVersion, knnMethodConfigContext, originalMappingParameters, isDerivedSourceEnabled)
+        return new Builder(simpleName(), indexCreatedVersion, knnMethodConfigContext, originalMappingParameters)
             .init(this);
     }
 
