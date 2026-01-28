@@ -36,7 +36,6 @@ public class JVectorFormat extends KnnVectorsFormat {
     // Unfortunately, this can't be managed yet by the OpenSearch ThreadPool because it's not supporting {@link ForkJoinPool} types
     public static final ForkJoinPool SIMD_POOL_MERGE = getPhysicalCoreExecutor();
     public static final ForkJoinPool SIMD_POOL_FLUSH = getPhysicalCoreExecutor();
-    public static final ForkJoinPool PARALLELISM_POOL = ForkJoinPool.commonPool();
 
     private final int maxConn;
     private final int beamWidth;
