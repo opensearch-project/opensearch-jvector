@@ -532,7 +532,7 @@ public abstract class KNNVectorFieldMapper extends ParametrizedFieldMapper {
         updateEngineStats();
         this.indexCreatedVersion = indexCreatedVersion;
         this.originalMappingParameters = originalMappingParameters;
-        this.isDerivedSourceEnabled = null;
+        this.isDerivedSourceEnabled = true;
     }
 
     public KNNVectorFieldMapper clone() {
