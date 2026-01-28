@@ -944,6 +944,7 @@ public class KNNRestTestCase extends ODFERestTestCase {
             .put("number_of_shards", 1)
             .put("number_of_replicas", 0)
             .put(KNN_INDEX, true)
+            .put(KNNSettings.KNN_DERIVED_SOURCE_ENABLED, true)
             .put(INDEX_KNN_ADVANCED_APPROXIMATE_THRESHOLD, approximateThreshold)
             // .put("use_compound_file", false)
             .build();
