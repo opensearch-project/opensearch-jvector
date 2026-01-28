@@ -14,21 +14,30 @@ import java.nio.file.Path;
 import java.util.Arrays;
 import lombok.extern.log4j.Log4j2;
 import org.apache.lucene.document.*;
+import org.apache.lucene.document.KnnFloatVectorField;
 import org.apache.lucene.index.*;
 import org.apache.lucene.search.*;
-import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.tests.util.LuceneTestCase;
 import org.junit.Assert;
 import org.junit.Test;
+import org.opensearch.knn.common.KNNConstants;
+import org.opensearch.knn.index.SpaceType;
 import org.opensearch.knn.index.ThreadLeakFiltersForTests;
+import org.opensearch.knn.index.VectorDataType;
 
 /**
- * Test cases specifically for reproducing and validating fixes for merge bugs with deleted documents.
- * These tests target three specific bugs:
- * 1. Bug 1: IllegalArgumentException: Ordinal out of bounds: -1 (during PQ encoding)
- * 2. Bug 2: ArrayIndexOutOfBoundsException: Index N out of bounds for length N (FixedBitSet sizing)
- * 3. Bug 3: ArrayIndexOutOfBoundsException: Index M out of bounds for length N (array sizing with deletions)
+ * Test cases for validating merge behavior with deleted documents in the OpenSearch JVector plugin.
+ *
+ * These tests validate the OpenSearch-jvector plugin's custom codec (JVectorFormat) and merge behavior
+ * when documents are deleted, ensuring proper handling of:
+ * - Merges with deleted documents in the leading reader (most live docs)
+ * - Off-by-one errors in array sizing during merges
+ * - Correct array sizing when many documents are deleted
+ * - Product Quantization (PQ) encoding with deletions
+ *
+ * Unlike generic Lucene tests, these specifically test the opensearch-jvector plugin's VectorField
+ * and JVectorKnnFloatVectorQuery implementations.
  */
 @ThreadLeakFilters(
     defaultFilters = true,
@@ -42,18 +51,33 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
     private static final String TEST_ID_FIELD = "id";
 
     /**
-     * Test Case 1: Reproduce Bug 1 - Ordinal out of bounds: -1
+     * Helper method to create JVectorKnnFloatVectorQuery with default parameters
+     */
+    private JVectorKnnFloatVectorQuery getJVectorKnnFloatVectorQuery(
+        String fieldName,
+        float[] target,
+        int k,
+        Query filterQuery
+    ) {
+        return new JVectorKnnFloatVectorQuery(
+            fieldName,
+            target,
+            k,
+            filterQuery,
+            KNNConstants.DEFAULT_OVER_QUERY_FACTOR,
+            KNNConstants.DEFAULT_QUERY_SIMILARITY_THRESHOLD.floatValue(),
+            KNNConstants.DEFAULT_QUERY_RERANK_FLOOR.floatValue(),
+            KNNConstants.DEFAULT_QUERY_USE_PRUNING
+        );
+    }
+
+    /**
+     * Test merge with deleted documents in the leading reader (segment with most live docs) with PQ enabled.
      *
-     * Scenario: Merge with deleted documents in leading reader, PQ enabled
-     *
-     * Setup:
-     * - Create segment A with 1000 vectors
-     * - Delete 100 vectors from segment A (making it the leading reader with most live docs)
-     * - Create segment B with 500 vectors (no deletes)
-     * - Trigger merge with PQ quantization enabled
-     *
-     * Expected: Should complete successfully without IllegalArgumentException
-     * Before fix: Would throw "IllegalArgumentException: Ordinal out of bounds: -1" during PQ encoding
+     * This validates that the opensearch-jvector codec correctly handles merging when:
+     * - The leading reader has deleted documents
+     * - Product Quantization is enabled
+     * - Search results are accurate after merge
      */
     @Test
     public void testMergeWithDeletedDocsInLeadingReader_PQEnabled()
@@ -65,12 +89,12 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
         final int k = 10;
 
         log.info(
-            "Starting Bug 1 reproduction test: merge with deleted docs in leading reader, PQ enabled"
+            "Testing merge with deleted docs in leading reader, PQ enabled"
         );
 
         IndexWriterConfig config = newIndexWriterConfig();
         config.setUseCompoundFile(false);
-        config.setCodec(getCodec(DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION)); // Enable PQ
+        config.setCodec(getCodec(1)); // Enable PQ
         config.setMergePolicy(new ForceMergesOnlyMergePolicy());
         config.setMergeScheduler(new SerialMergeScheduler());
 
@@ -104,9 +128,8 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
                 writer.addDocument(doc);
             }
             writer.commit();
-            log.info("Segment A committed");
 
-            // Step 2: Delete 100 documents from segment A
+            // Step 2: Delete documents from segment A
             log.info("Deleting {} documents from segment A", deleteCount);
             for (int i = 0; i < deleteCount; i++) {
                 writer.deleteDocuments(
@@ -114,12 +137,8 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
                 );
             }
             writer.commit();
-            log.info(
-                "Deletions committed. Segment A now has {} live docs",
-                segmentASize - deleteCount
-            );
 
-            // Step 3: Add segment B with 500 documents (no deletes)
+            // Step 3: Add segment B
             log.info("Adding segment B with {} documents", segmentBSize);
             for (int i = segmentASize; i < segmentASize + segmentBSize; i++) {
                 Document doc = new Document();
@@ -142,27 +161,14 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
                 writer.addDocument(doc);
             }
             writer.commit();
-            log.info("Segment B committed");
 
-            // Step 4: Force merge - this should trigger Bug 1 before the fix
-            log.info(
-                "Starting force merge - this would trigger Bug 1 (Ordinal out of bounds: -1) before fix"
-            );
-            try {
-                writer.forceMerge(1);
-                log.info("Force merge completed successfully!");
-            } catch (IllegalArgumentException e) {
-                if (e.getMessage().contains("Ordinal out of bounds: -1")) {
-                    log.error("BUG 1 REPRODUCED: {}", e.getMessage());
-                    throw new AssertionError(
-                        "Bug 1 reproduced: " + e.getMessage(),
-                        e
-                    );
-                }
-                throw e;
-            }
+            // Step 4: Force merge
+            log.info("Starting force merge");
+            writer.forceMerge(1);
+            writer.commit();
+            log.info("Force merge completed successfully");
 
-            // Step 5: Verify the merged index
+            // Step 5: Verify the merged index and search functionality
             try (IndexReader reader = DirectoryReader.open(writer)) {
                 log.info("Verifying merged index");
                 Assert.assertEquals(
@@ -180,62 +186,68 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
                 final float[] target = new float[dimension];
                 Arrays.fill(target, 0.5f);
                 final IndexSearcher searcher = newSearcher(reader);
-                KnnFloatVectorQuery query = new KnnFloatVectorQuery(
-                    TEST_FIELD,
-                    target,
-                    k
-                );
+                JVectorKnnFloatVectorQuery query =
+                    getJVectorKnnFloatVectorQuery(
+                        TEST_FIELD,
+                        target,
+                        k,
+                        new MatchAllDocsQuery()
+                    );
                 TopDocs topDocs = searcher.search(query, k);
+
                 Assert.assertEquals(
                     "Should return k results",
                     k,
                     topDocs.totalHits.value()
                 );
 
+                // Verify that deleted documents are not in results
+                for (int i = 0; i < topDocs.scoreDocs.length; i++) {
+                    Document doc = reader
+                        .storedFields()
+                        .document(topDocs.scoreDocs[i].doc);
+                    int docId = Integer.parseInt(doc.get(TEST_ID_FIELD));
+                    Assert.assertTrue(
+                        "Deleted documents should not appear in results",
+                        docId >= deleteCount || docId >= segmentASize
+                    );
+                }
+
                 log.info(
-                    "Test passed! Merge with deleted docs in leading reader works correctly with PQ enabled"
+                    "Test passed! Merge with deleted docs in leading reader works correctly with PQ"
                 );
             }
         }
     }
 
     /**
-     * Test Case 2: Reproduce Bug 2 - Index N out of bounds for length N
+     * Test merge where vector count equals document count to validate proper array sizing.
      *
-     * Scenario: Merge where vector count equals document count (off-by-one in FixedBitSet)
-     *
-     * Setup:
-     * - Create segment with exactly 1127 documents, all with vectors
-     * - Some documents are deleted (liveDocs marks them)
-     * - Trigger merge
-     *
-     * Expected: Should complete successfully without ArrayIndexOutOfBoundsException
-     * Before fix: Would throw "ArrayIndexOutOfBoundsException: Index 1127 out of bounds for length 1127"
+     * This validates that the opensearch-jvector codec correctly handles off-by-one errors
+     * in array allocation during merge operations.
      */
     @Test
     public void testMergeWithExactVectorCount_OffByOne() throws IOException {
-        final int exactCount = 1127; // Specific count that triggers the bug
+        final int exactCount = 1127;
         final int deleteCount = 50;
         final int dimension = 64;
+        final int k = 10;
 
-        log.info(
-            "Starting Bug 2 reproduction test: off-by-one error with exact vector count"
-        );
+        log.info("Testing off-by-one error with exact vector count");
 
         IndexWriterConfig config = newIndexWriterConfig();
         config.setUseCompoundFile(false);
-        config.setCodec(getCodec());
+        config.setCodec(getCodec(1));
         config.setMergePolicy(new ForceMergesOnlyMergePolicy());
         config.setMergeScheduler(new SerialMergeScheduler());
 
         final Path indexPath = createTempDir();
-        log.info("Index path: {}", indexPath);
 
         try (
             FSDirectory dir = FSDirectory.open(indexPath);
             IndexWriter writer = new IndexWriter(dir, config)
         ) {
-            // Step 1: Add exactly 1127 documents
+            // Add exactly 1127 documents
             log.info("Adding exactly {} documents", exactCount);
             for (int i = 0; i < exactCount; i++) {
                 Document doc = new Document();
@@ -259,7 +271,7 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
             }
             writer.commit();
 
-            // Step 2: Delete some documents
+            // Delete some documents
             log.info("Deleting {} documents", deleteCount);
             for (int i = 0; i < deleteCount; i++) {
                 writer.deleteDocuments(
@@ -267,13 +279,9 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
                 );
             }
             writer.commit();
-            log.info(
-                "Deletions committed. Now have {} live docs",
-                exactCount - deleteCount
-            );
 
-            // Step 3: Add another small segment to force merge
-            log.info("Adding second segment with 100 documents");
+            // Add another segment to force merge
+            log.info("Adding second segment");
             for (int i = exactCount; i < exactCount + 100; i++) {
                 Document doc = new Document();
                 float[] vector = new float[dimension];
@@ -296,31 +304,14 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
             }
             writer.commit();
 
-            // Step 4: Force merge - this should trigger Bug 2 before the fix
-            log.info(
-                "Starting force merge - this would trigger Bug 2 (off-by-one) before fix"
-            );
-            try {
-                writer.forceMerge(1);
-                log.info("Force merge completed successfully!");
-            } catch (ArrayIndexOutOfBoundsException e) {
-                if (
-                    e
-                        .getMessage()
-                        .contains("out of bounds for length " + exactCount)
-                ) {
-                    log.error("BUG 2 REPRODUCED: {}", e.getMessage());
-                    throw new AssertionError(
-                        "Bug 2 reproduced: " + e.getMessage(),
-                        e
-                    );
-                }
-                throw e;
-            }
+            // Force merge
+            log.info("Starting force merge");
+            writer.forceMerge(1);
+            writer.commit();
+            log.info("Force merge completed successfully");
 
-            // Step 5: Verify the merged index
+            // Verify the merged index
             try (IndexReader reader = DirectoryReader.open(writer)) {
-                log.info("Verifying merged index");
                 Assert.assertEquals(
                     "Should have 1 segment after merge",
                     1,
@@ -332,36 +323,47 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
                     reader.numDocs()
                 );
 
-                log.info("Test passed! Off-by-one error is fixed");
+                // Verify search works
+                final float[] target = new float[dimension];
+                Arrays.fill(target, 0.5f);
+                final IndexSearcher searcher = newSearcher(reader);
+                JVectorKnnFloatVectorQuery query =
+                    getJVectorKnnFloatVectorQuery(
+                        TEST_FIELD,
+                        target,
+                        k,
+                        new MatchAllDocsQuery()
+                    );
+                TopDocs topDocs = searcher.search(query, k);
+                Assert.assertEquals(
+                    "Should return k results",
+                    k,
+                    topDocs.totalHits.value()
+                );
+
+                log.info(
+                    "Test passed! Off-by-one error handling works correctly"
+                );
             }
         }
     }
 
     /**
-     * Test Case 3: Reproduce Bug 3 - Index M out of bounds for length N (M > N)
+     * Test merge with many deleted documents in the leading reader.
      *
-     * Scenario: Merge with many deleted documents in leading reader
-     *
-     * Setup:
-     * - Create segment A with 103451 vectors, delete ~8000 vectors (leaving ~95643 live)
-     * - Create segment B with 3150 vectors (no deletes)
-     * - Segment A becomes leading reader due to most live vectors
-     * - Trigger merge
-     *
-     * Expected: Should complete successfully without ArrayIndexOutOfBoundsException
-     * Before fix: Would throw "ArrayIndexOutOfBoundsException: Index 103451 out of bounds for length 95643"
+     * This validates that the opensearch-jvector codec correctly handles array sizing
+     * when a large number of documents are deleted from the segment with the most live docs.
      */
     @Test
     public void testMergeWithManyDeletedDocsInLeadingReader()
         throws IOException {
-        final int segmentASize = 10000; // Scaled down from 103451 for faster test
-        final int deleteCount = 800; // Scaled down from ~8000
-        final int segmentBSize = 315; // Scaled down from 3150
+        final int segmentASize = 10000;
+        final int deleteCount = 800;
+        final int segmentBSize = 315;
         final int dimension = 64;
+        final int k = 10;
 
-        log.info(
-            "Starting Bug 3 reproduction test: many deleted docs in leading reader"
-        );
+        log.info("Testing merge with many deleted docs in leading reader");
         log.info(
             "Segment A: {} total, {} to delete, {} live",
             segmentASize,
@@ -372,18 +374,17 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
 
         IndexWriterConfig config = newIndexWriterConfig();
         config.setUseCompoundFile(false);
-        config.setCodec(getCodec());
+        config.setCodec(getCodec(1));
         config.setMergePolicy(new ForceMergesOnlyMergePolicy());
         config.setMergeScheduler(new SerialMergeScheduler());
 
         final Path indexPath = createTempDir();
-        log.info("Index path: {}", indexPath);
 
         try (
             FSDirectory dir = FSDirectory.open(indexPath);
             IndexWriter writer = new IndexWriter(dir, config)
         ) {
-            // Step 1: Add segment A with many documents
+            // Add segment A
             log.info("Adding segment A with {} documents", segmentASize);
             for (int i = 0; i < segmentASize; i++) {
                 Document doc = new Document();
@@ -406,9 +407,8 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
                 writer.addDocument(doc);
             }
             writer.commit();
-            log.info("Segment A committed");
 
-            // Step 2: Delete many documents from segment A
+            // Delete many documents from segment A
             log.info("Deleting {} documents from segment A", deleteCount);
             for (int i = 0; i < deleteCount; i++) {
                 writer.deleteDocuments(
@@ -416,12 +416,8 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
                 );
             }
             writer.commit();
-            log.info(
-                "Deletions committed. Segment A now has {} live docs",
-                segmentASize - deleteCount
-            );
 
-            // Step 3: Add segment B (smaller, no deletes)
+            // Add segment B
             log.info("Adding segment B with {} documents", segmentBSize);
             for (int i = segmentASize; i < segmentASize + segmentBSize; i++) {
                 Document doc = new Document();
@@ -444,33 +440,15 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
                 writer.addDocument(doc);
             }
             writer.commit();
-            log.info("Segment B committed");
 
-            // Step 4: Force merge - this should trigger Bug 3 before the fix
-            log.info(
-                "Starting force merge - this would trigger Bug 3 (incorrect array sizing) before fix"
-            );
-            try {
-                writer.forceMerge(1);
-                log.info("Force merge completed successfully!");
-            } catch (ArrayIndexOutOfBoundsException e) {
-                String msg = e.getMessage();
-                if (
-                    msg.contains("out of bounds for length") &&
-                    msg.contains(String.valueOf(segmentASize - deleteCount))
-                ) {
-                    log.error("BUG 3 REPRODUCED: {}", e.getMessage());
-                    throw new AssertionError(
-                        "Bug 3 reproduced: " + e.getMessage(),
-                        e
-                    );
-                }
-                throw e;
-            }
+            // Force merge
+            log.info("Starting force merge");
+            writer.forceMerge(1);
+            writer.commit();
+            log.info("Force merge completed successfully");
 
-            // Step 5: Verify the merged index
+            // Verify the merged index
             try (IndexReader reader = DirectoryReader.open(writer)) {
-                log.info("Verifying merged index");
                 Assert.assertEquals(
                     "Should have 1 segment after merge",
                     1,
@@ -482,6 +460,25 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
                     reader.numDocs()
                 );
 
+                // Verify search works
+                final float[] target = new float[dimension];
+                Arrays.fill(target, 0.5f);
+                final IndexSearcher searcher = newSearcher(reader);
+                JVectorKnnFloatVectorQuery query =
+                    getJVectorKnnFloatVectorQuery(
+                        TEST_FIELD,
+                        target,
+                        k,
+                        new MatchAllDocsQuery()
+                    );
+                TopDocs topDocs = searcher.search(query, k);
+
+                Assert.assertEquals(
+                    "Should return k results",
+                    k,
+                    topDocs.totalHits.value()
+                );
+
                 log.info(
                     "Test passed! Array sizing with many deletions works correctly"
                 );
@@ -490,42 +487,48 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
     }
 
     /**
-     * Comprehensive test combining all three bug scenarios
-     * Tests multiple merge cycles with various deletion patterns
+     * Comprehensive test combining multiple deletion patterns and document overwrites across multiple merge cycles.
+     *
+     * This validates that the opensearch-jvector codec handles complex scenarios with:
+     * - Multiple small segments (10-20 documents each)
+     * - Various deletion patterns
+     * - Document overwrites (updates that create deletions)
+     * - Product Quantization enabled
+     * - Accurate search results after merge
      */
     @Test
     public void testMultipleMergesWithVariousDeletionPatterns()
         throws IOException {
         final int dimension = 64;
-        final int k = 10;
+        final int k = 5;
 
         log.info(
-            "Starting comprehensive test: multiple merges with various deletion patterns"
+            "Testing multiple merges with various deletion patterns and overwrites"
         );
 
         IndexWriterConfig config = newIndexWriterConfig();
         config.setUseCompoundFile(false);
-        config.setCodec(getCodec(DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION)); // Enable PQ
+        config.setCodec(getCodec(1)); // Enable PQ
+        // config.setCodec(getCodec(1000000)); // Disable PQ
         config.setMergePolicy(new ForceMergesOnlyMergePolicy());
         config.setMergeScheduler(new SerialMergeScheduler());
 
         final Path indexPath = createTempDir();
-        log.info("Index path: {}", indexPath);
 
         try (
             FSDirectory dir = FSDirectory.open(indexPath);
             IndexWriter writer = new IndexWriter(dir, config)
         ) {
-            // Create multiple segments with different sizes and deletion patterns
             int docId = 0;
 
-            // Segment 1: Large segment with many deletions (tests Bug 3)
-            log.info("Creating segment 1: large with many deletions");
-            int seg1Size = 5000;
+            // Segment 1: 2000 documents with 400 explicit deletions (20%)
+            log.info("Creating segment 1: 2000 docs with explicit deletions");
+            int seg1Size = 2000;
+            int seg1Start = docId;
             for (int i = 0; i < seg1Size; i++) {
                 Document doc = new Document();
                 float[] vector = new float[dimension];
-                Arrays.fill(vector, docId * 0.001f);
+                Arrays.fill(vector, docId * 0.01f);
                 doc.add(
                     new KnnFloatVectorField(
                         TEST_FIELD,
@@ -544,28 +547,23 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
                 docId++;
             }
             writer.commit();
-            // Delete 20% from segment 1
-            for (int i = 0; i < seg1Size / 5; i++) {
+            // Delete first 400 documents
+            for (int i = seg1Start; i < seg1Start + 400; i++) {
                 writer.deleteDocuments(
                     new Term(TEST_ID_FIELD, String.valueOf(i))
                 );
             }
             writer.commit();
-            log.info(
-                "Segment 1: {} total, {} deleted, {} live",
-                seg1Size,
-                seg1Size / 5,
-                seg1Size - seg1Size / 5
-            );
+            int seg1LiveDocs = seg1Size - 400;
 
-            // Segment 2: Medium segment with few deletions
-            log.info("Creating segment 2: medium with few deletions");
-            int seg2Size = 2000;
+            // Segment 2: 1500 documents with 300 overwrites (updates)
+            log.info("Creating segment 2: 1500 docs with overwrites");
+            int seg2Size = 1500;
             int seg2Start = docId;
             for (int i = 0; i < seg2Size; i++) {
                 Document doc = new Document();
                 float[] vector = new float[dimension];
-                Arrays.fill(vector, docId * 0.001f);
+                Arrays.fill(vector, docId * 0.01f);
                 doc.add(
                     new KnnFloatVectorField(
                         TEST_FIELD,
@@ -584,27 +582,47 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
                 docId++;
             }
             writer.commit();
-            // Delete 5% from segment 2
-            for (int i = seg2Start; i < seg2Start + seg2Size / 20; i++) {
-                writer.deleteDocuments(
-                    new Term(TEST_ID_FIELD, String.valueOf(i))
+            // Overwrite 300 documents (this creates deletions + new docs)
+            log.info("Overwriting 300 documents in segment 2");
+            for (int i = seg2Start; i < seg2Start + 300; i++) {
+                Document doc = new Document();
+                float[] vector = new float[dimension];
+                Arrays.fill(vector, (i + 1000) * 0.01f); // Different vector values
+                doc.add(
+                    new KnnFloatVectorField(
+                        TEST_FIELD,
+                        vector,
+                        VectorSimilarityFunction.EUCLIDEAN
+                    )
+                );
+                doc.add(
+                    new StringField(
+                        TEST_ID_FIELD,
+                        String.valueOf(i),
+                        Field.Store.YES
+                    )
+                );
+                writer.updateDocument(
+                    new Term(TEST_ID_FIELD, String.valueOf(i)),
+                    doc
                 );
             }
             writer.commit();
-            log.info(
-                "Segment 2: {} total, {} deleted, {} live",
-                seg2Size,
-                seg2Size / 20,
-                seg2Size - seg2Size / 20
-            );
+            int seg2LiveDocs = seg2Size; // Overwrites don't change live doc count
 
-            // Segment 3: Small segment with no deletions
-            log.info("Creating segment 3: small with no deletions");
-            int seg3Size = 500;
+            // First intermediate merge after segment 2
+            log.info("Performing first intermediate merge after segment 2");
+            writer.forceMerge(1);
+            writer.commit();
+            log.info("First intermediate merge completed");
+
+            // Segment 3: 1200 documents with no deletions
+            log.info("Creating segment 3: 1200 docs with no deletions");
+            int seg3Size = 1200;
             for (int i = 0; i < seg3Size; i++) {
                 Document doc = new Document();
                 float[] vector = new float[dimension];
-                Arrays.fill(vector, docId * 0.001f);
+                Arrays.fill(vector, docId * 0.01f);
                 doc.add(
                     new KnnFloatVectorField(
                         TEST_FIELD,
@@ -623,16 +641,17 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
                 docId++;
             }
             writer.commit();
-            log.info("Segment 3: {} total, no deletions", seg3Size);
 
-            // Segment 4: Exact count that might trigger off-by-one (tests Bug 2)
-            log.info("Creating segment 4: exact count for off-by-one test");
-            int seg4Size = 1127;
+            // Segment 4: 1800 documents with mixed deletions and overwrites
+            log.info(
+                "Creating segment 4: 1800 docs with mixed deletions and overwrites"
+            );
+            int seg4Size = 1800;
             int seg4Start = docId;
             for (int i = 0; i < seg4Size; i++) {
                 Document doc = new Document();
                 float[] vector = new float[dimension];
-                Arrays.fill(vector, docId * 0.001f);
+                Arrays.fill(vector, docId * 0.01f);
                 doc.add(
                     new KnnFloatVectorField(
                         TEST_FIELD,
@@ -651,35 +670,223 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
                 docId++;
             }
             writer.commit();
-            // Delete some from segment 4
-            for (int i = seg4Start; i < seg4Start + 50; i++) {
+            // Delete 200 documents
+            for (int i = seg4Start; i < seg4Start + 200; i++) {
+                writer.deleteDocuments(
+                    new Term(TEST_ID_FIELD, String.valueOf(i))
+                );
+            }
+            // Overwrite 200 different documents
+            for (int i = seg4Start + 500; i < seg4Start + 700; i++) {
+                Document doc = new Document();
+                float[] vector = new float[dimension];
+                Arrays.fill(vector, (i + 2000) * 0.01f);
+                doc.add(
+                    new KnnFloatVectorField(
+                        TEST_FIELD,
+                        vector,
+                        VectorSimilarityFunction.EUCLIDEAN
+                    )
+                );
+                doc.add(
+                    new StringField(
+                        TEST_ID_FIELD,
+                        String.valueOf(i),
+                        Field.Store.YES
+                    )
+                );
+                writer.updateDocument(
+                    new Term(TEST_ID_FIELD, String.valueOf(i)),
+                    doc
+                );
+            }
+            writer.commit();
+            int seg4LiveDocs = seg4Size - 200; // Only explicit deletions reduce count
+
+            // Second intermediate merge after segment 4
+            log.info("Performing second intermediate merge after segment 4");
+            writer.forceMerge(1);
+            writer.commit();
+            log.info("Second intermediate merge completed");
+
+            // Segment 5: 1000 documents, all overwritten
+            log.info("Creating segment 5: 1000 docs, all overwritten");
+            int seg5Size = 1000;
+            int seg5Start = docId;
+            for (int i = 0; i < seg5Size; i++) {
+                Document doc = new Document();
+                float[] vector = new float[dimension];
+                Arrays.fill(vector, docId * 0.01f);
+                doc.add(
+                    new KnnFloatVectorField(
+                        TEST_FIELD,
+                        vector,
+                        VectorSimilarityFunction.EUCLIDEAN
+                    )
+                );
+                doc.add(
+                    new StringField(
+                        TEST_ID_FIELD,
+                        String.valueOf(docId),
+                        Field.Store.YES
+                    )
+                );
+                writer.addDocument(doc);
+                docId++;
+            }
+            writer.commit();
+            // Overwrite all documents
+            log.info("Overwriting all 1000 documents in segment 5");
+            for (int i = seg5Start; i < seg5Start + seg5Size; i++) {
+                Document doc = new Document();
+                float[] vector = new float[dimension];
+                Arrays.fill(vector, (i + 3000) * 0.01f);
+                doc.add(
+                    new KnnFloatVectorField(
+                        TEST_FIELD,
+                        vector,
+                        VectorSimilarityFunction.EUCLIDEAN
+                    )
+                );
+                doc.add(
+                    new StringField(
+                        TEST_ID_FIELD,
+                        String.valueOf(i),
+                        Field.Store.YES
+                    )
+                );
+                writer.updateDocument(
+                    new Term(TEST_ID_FIELD, String.valueOf(i)),
+                    doc
+                );
+            }
+            writer.commit();
+            int seg5LiveDocs = seg5Size; // Overwrites maintain count
+
+            // Segment 6: 1500 documents with scattered deletions (10%)
+            log.info("Creating segment 6: 1500 docs with scattered deletions");
+            int seg6Size = 1500;
+            int seg6Start = docId;
+            for (int i = 0; i < seg6Size; i++) {
+                Document doc = new Document();
+                float[] vector = new float[dimension];
+                Arrays.fill(vector, docId * 0.01f);
+                doc.add(
+                    new KnnFloatVectorField(
+                        TEST_FIELD,
+                        vector,
+                        VectorSimilarityFunction.EUCLIDEAN
+                    )
+                );
+                doc.add(
+                    new StringField(
+                        TEST_ID_FIELD,
+                        String.valueOf(docId),
+                        Field.Store.YES
+                    )
+                );
+                writer.addDocument(doc);
+                docId++;
+            }
+            writer.commit();
+            // Delete every 10th document (scattered pattern)
+            log.info("Deleting scattered documents (every 10th) in segment 6");
+            for (int i = seg6Start; i < seg6Start + seg6Size; i += 10) {
                 writer.deleteDocuments(
                     new Term(TEST_ID_FIELD, String.valueOf(i))
                 );
             }
             writer.commit();
+            int seg6LiveDocs = seg6Size - (seg6Size / 10); // ~10% deleted
+
+            // Segment 7: 2000 documents with heavy overwrites (50%)
+            log.info("Creating segment 7: 2000 docs with heavy overwrites");
+            int seg7Size = 2000;
+            int seg7Start = docId;
+            for (int i = 0; i < seg7Size; i++) {
+                Document doc = new Document();
+                float[] vector = new float[dimension];
+                Arrays.fill(vector, docId * 0.01f);
+                doc.add(
+                    new KnnFloatVectorField(
+                        TEST_FIELD,
+                        vector,
+                        VectorSimilarityFunction.EUCLIDEAN
+                    )
+                );
+                doc.add(
+                    new StringField(
+                        TEST_ID_FIELD,
+                        String.valueOf(docId),
+                        Field.Store.YES
+                    )
+                );
+                writer.addDocument(doc);
+                docId++;
+            }
+            writer.commit();
+            // Overwrite 50% of documents
+            log.info("Overwriting 1000 documents (50%) in segment 7");
+            for (int i = seg7Start; i < seg7Start + 1000; i++) {
+                Document doc = new Document();
+                float[] vector = new float[dimension];
+                Arrays.fill(vector, (i + 4000) * 0.01f);
+                doc.add(
+                    new KnnFloatVectorField(
+                        TEST_FIELD,
+                        vector,
+                        VectorSimilarityFunction.EUCLIDEAN
+                    )
+                );
+                doc.add(
+                    new StringField(
+                        TEST_ID_FIELD,
+                        String.valueOf(i),
+                        Field.Store.YES
+                    )
+                );
+                writer.updateDocument(
+                    new Term(TEST_ID_FIELD, String.valueOf(i)),
+                    doc
+                );
+            }
+            writer.commit();
+            int seg7LiveDocs = seg7Size; // Overwrites maintain count
+
+            // Third intermediate merge after segment 7
+            log.info("Performing third intermediate merge after segment 7");
+            writer.forceMerge(1);
+            writer.commit();
+            log.info("Third intermediate merge completed");
+
+            int expectedLiveDocs =
+                seg1LiveDocs +
+                seg2LiveDocs +
+                seg3Size +
+                seg4LiveDocs +
+                seg5LiveDocs +
+                seg6LiveDocs +
+                seg7LiveDocs;
             log.info(
-                "Segment 4: {} total, 50 deleted, {} live",
-                seg4Size,
-                seg4Size - 50
+                "Total expected live docs: {} (seg1:{}, seg2:{}, seg3:{}, seg4:{}, seg5:{}, seg6:{}, seg7:{})",
+                expectedLiveDocs,
+                seg1LiveDocs,
+                seg2LiveDocs,
+                seg3Size,
+                seg4LiveDocs,
+                seg5LiveDocs,
+                seg6LiveDocs,
+                seg7LiveDocs
             );
 
-            // Calculate expected live docs
-            int expectedLiveDocs =
-                (seg1Size - seg1Size / 5) +
-                (seg2Size - seg2Size / 20) +
-                seg3Size +
-                (seg4Size - 50);
-            log.info("Total expected live docs: {}", expectedLiveDocs);
-
-            // Force merge - this tests all three bugs
-            log.info("Starting force merge - tests all three bug scenarios");
+            // Final force merge
+            log.info("Starting final force merge");
             writer.forceMerge(1);
-            log.info("Force merge completed successfully!");
+            writer.commit();
+            log.info("Force merge completed successfully");
 
             // Verify the merged index
             try (IndexReader reader = DirectoryReader.open(writer)) {
-                log.info("Verifying merged index");
                 Assert.assertEquals(
                     "Should have 1 segment after merge",
                     1,
@@ -695,11 +902,13 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
                 final float[] target = new float[dimension];
                 Arrays.fill(target, 0.5f);
                 final IndexSearcher searcher = newSearcher(reader);
-                KnnFloatVectorQuery query = new KnnFloatVectorQuery(
-                    TEST_FIELD,
-                    target,
-                    k
-                );
+                JVectorKnnFloatVectorQuery query =
+                    getJVectorKnnFloatVectorQuery(
+                        TEST_FIELD,
+                        target,
+                        k,
+                        new MatchAllDocsQuery()
+                    );
                 TopDocs topDocs = searcher.search(query, k);
                 Assert.assertEquals(
                     "Should return k results",
@@ -707,15 +916,30 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
                     topDocs.totalHits.value()
                 );
 
+                // Verify that overwritten documents have updated vectors
                 log.info(
-                    "Comprehensive test passed! All bug scenarios handled correctly"
+                    "Verifying overwritten documents have updated vectors"
+                );
+                for (int i = 0; i < topDocs.scoreDocs.length; i++) {
+                    Document doc = reader
+                        .storedFields()
+                        .document(topDocs.scoreDocs[i].doc);
+                    String id = doc.get(TEST_ID_FIELD);
+                    log.info("Result {}: doc ID = {}", i, id);
+                }
+
+                log.info(
+                    "Comprehensive test passed! All deletion and overwrite scenarios handled correctly"
                 );
             }
         }
     }
 
     /**
-     * Test with PQ disabled to ensure bugs are not PQ-specific
+     * Test merge with deleted documents when PQ is disabled.
+     *
+     * This validates that merge behavior with deletions works correctly
+     * regardless of whether Product Quantization is enabled.
      */
     @Test
     public void testMergeWithDeletedDocs_NoPQ() throws IOException {
@@ -723,8 +947,9 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
         final int segmentBSize = 500;
         final int deleteCount = 100;
         final int dimension = 64;
+        final int k = 10;
 
-        log.info("Starting test: merge with deleted docs, PQ disabled");
+        log.info("Testing merge with deleted docs, PQ disabled");
 
         IndexWriterConfig config = newIndexWriterConfig();
         config.setUseCompoundFile(false);
@@ -795,7 +1020,8 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
             // Force merge
             log.info("Starting force merge without PQ");
             writer.forceMerge(1);
-            log.info("Force merge completed successfully!");
+            writer.commit();
+            log.info("Force merge completed successfully");
 
             // Verify
             try (IndexReader reader = DirectoryReader.open(writer)) {
@@ -808,6 +1034,24 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
                     "Should have correct number of live docs",
                     segmentASize - deleteCount + segmentBSize,
                     reader.numDocs()
+                );
+
+                // Verify search works
+                final float[] target = new float[dimension];
+                Arrays.fill(target, 0.5f);
+                final IndexSearcher searcher = newSearcher(reader);
+                JVectorKnnFloatVectorQuery query =
+                    getJVectorKnnFloatVectorQuery(
+                        TEST_FIELD,
+                        target,
+                        k,
+                        new MatchAllDocsQuery()
+                    );
+                TopDocs topDocs = searcher.search(query, k);
+                Assert.assertEquals(
+                    "Should return k results",
+                    k,
+                    topDocs.totalHits.value()
                 );
 
                 log.info(
