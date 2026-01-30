@@ -57,7 +57,6 @@ import javax.management.ObjectName;
 import javax.management.remote.JMXConnector;
 import javax.management.remote.JMXConnectorFactory;
 import javax.management.remote.JMXServiceURL;
-import java.io.Console;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -940,7 +939,7 @@ public class KNNRestTestCase extends ODFERestTestCase {
             .put("number_of_shards", 1)
             .put("number_of_replicas", 0)
             .put(KNN_INDEX, true)
-            //.put(KNNSettings.KNN_DERIVED_SOURCE_ENABLED, true)
+            // .put(KNNSettings.KNN_DERIVED_SOURCE_ENABLED, true)
             .put(INDEX_KNN_ADVANCED_APPROXIMATE_THRESHOLD, approximateThreshold)
             // .put("use_compound_file", false)
             .build();

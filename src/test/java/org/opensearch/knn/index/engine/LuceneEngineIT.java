@@ -211,10 +211,10 @@ public class LuceneEngineIT extends KNNRestTestCase {
 
         Float[] vector = new Float[] { 2.0f, 4.5f, 6.5f };
 
-        //for (int i = 0; i < 10000; i++) {
+        // for (int i = 0; i < 10000; i++) {
         addKnnDoc(INDEX_NAME, DOC_ID, FIELD_NAME, vector);
         // Thread.sleep(10);
-        //}
+        // }
 
         refreshIndex(INDEX_NAME);
         assertEquals(1, getDocCount(INDEX_NAME));
