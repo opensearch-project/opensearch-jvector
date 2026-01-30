@@ -324,12 +324,7 @@ public abstract class KNNVectorFieldMapper extends ParametrizedFieldMapper {
 
         @Override
         public Mapper.Builder<?> parse(String name, Map<String, Object> node, ParserContext parserContext) throws MapperParsingException {
-            Builder builder = new Builder(
-                name,
-                parserContext.indexVersionCreated(),
-                null,
-                null
-            );
+            Builder builder = new Builder(name, parserContext.indexVersionCreated(), null, null);
             builder.parse(name, parserContext, node);
             builder.setOriginalParameters(new OriginalMappingParameters(builder));
 
@@ -762,8 +757,7 @@ public abstract class KNNVectorFieldMapper extends ParametrizedFieldMapper {
             .mode(fieldType().getKnnMappingConfig().getMode())
             .build();
 
-        return new Builder(simpleName(), indexCreatedVersion, knnMethodConfigContext, originalMappingParameters)
-            .init(this);
+        return new Builder(simpleName(), indexCreatedVersion, knnMethodConfigContext, originalMappingParameters).init(this);
     }
 
     @Override

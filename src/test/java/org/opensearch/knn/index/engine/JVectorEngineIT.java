@@ -89,7 +89,7 @@ public class JVectorEngineIT extends KNNRestTestCase {
         XContentBuilder builder = jsonBuilder().startObject()
             .startObject(PROPERTIES_FIELD_NAME)
             .startObject(FIELD_NAME)
-            .field("doc_values", false)
+            .field("doc_values", true)
             .field(TYPE_FIELD_NAME, KNN_VECTOR_TYPE)
             .field(DIMENSION_FIELD_NAME, CommonTestUtils.DIMENSION)
             .startObject(KNNConstants.KNN_METHOD)

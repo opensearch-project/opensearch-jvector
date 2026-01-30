@@ -370,6 +370,7 @@ integTest {
     println "Project root directory: ${project.rootDir}"
     systemProperty "java.security.policy", "file://${project.rootDir}/src/main/plugin-metadata/plugin-security.policy"
     systemProperty 'log4j.configurationFile', "${project.rootDir}/src/test/resources/log4j2.properties"
+    systemProperty "tests.path.repo", "${buildDir}/testSnapshotFolder"
     testLogging.showStandardStreams = true
     systemProperty 'tests.output', 'true'
     systemProperty 'java.io.tmpdir', opensearch_tmp_dir.absolutePath
@@ -453,8 +454,10 @@ testClusters.integTest {
     }
     systemProperty propertyKeys.breaker.useRealMemory, getBreakerSetting()
     systemProperty 'jdk.incubator.vector.VECTOR_ACCESS_OOB_CHECK', "0"
+    setting 'path.repo', "${buildDir}/testSnapshotFolder"
 }
 
+// TODO: JVector plugin does not support remote indexes, remote integration tests
 task integTestRemote(type: RestIntegTestTask) {
     testClassesDirs = sourceSets.test.output.classesDirs
     classpath = sourceSets.test.runtimeClasspath
@@ -467,6 +470,7 @@ task integTestRemote(type: RestIntegTestTask) {
 
     systemProperty 'tests.security.manager', 'false'
     systemProperty("test.exhaustive", System.getProperty("test.exhaustive"))
+    systemProperty "tests.path.repo", "${layout.buildDirectory.toString()}/testSnapshotFolder"
 
     systemProperty 'tests.output', 'true'
     // Run tests with remote cluster only if rest case is defined
