@@ -335,6 +335,7 @@ public class JVectorWriter extends KnnVectorsWriter {
                 .vectorEncoding(fieldInfo.getVectorEncoding())
                 .vectorSimilarityFunction(fieldInfo.getVectorSimilarityFunction())
                 .vectorDimension(remappedRandomAccessVectorValues.dimension())
+                .validHeapGraphNodes(new ValidHeapGraphNodes(graph))
                 .graphNodeIdToDocMap(graphNodeIdToDocMap);
 
             try (
@@ -428,6 +429,9 @@ public class JVectorWriter extends KnnVectorsWriter {
         long pqCodebooksAndVectorsLength;
         float degreeOverflow; // important when leveraging cache
         GraphNodeIdToDocMap graphNodeIdToDocMap;
+        // TODO: we almost certainly don't want this in the metadata
+        // since this is only useful during leading segment merge
+        ValidHeapGraphNodes validHeapGraphNodes;
 
         public void toOutput(IndexOutput out) throws IOException {
             out.writeInt(fieldNumber);
@@ -440,6 +444,7 @@ public class JVectorWriter extends KnnVectorsWriter {
             out.writeVLong(pqCodebooksAndVectorsLength);
             out.writeInt(Float.floatToIntBits(degreeOverflow));
             graphNodeIdToDocMap.toOutput(out);
+            validHeapGraphNodes.toOutput(out);
         }
 
         public VectorIndexFieldMetadata(IndexInput in) throws IOException {
@@ -453,6 +458,7 @@ public class JVectorWriter extends KnnVectorsWriter {
             this.pqCodebooksAndVectorsLength = in.readVLong();
             this.degreeOverflow = Float.intBitsToFloat(in.readInt());
             this.graphNodeIdToDocMap = new GraphNodeIdToDocMap(in);
+            this.validHeapGraphNodes = new ValidHeapGraphNodes(in);
         }
 
     }
@@ -603,12 +609,22 @@ public class JVectorWriter extends KnnVectorsWriter {
         // Total number of documents including those without values
         private final int totalDocsCount;
 
+        private final int totalLiveVectorsInLeadingReader;
+        private final int totalLiveVectorsInOtherReaders;
+
         // Vector dimension
         private final int dimension;
         private final FieldInfo fieldInfo;
         private final MergeState mergeState;
+
+        // The "graphNode" ordinal space includes all vectors in the leading segment and live vectors in the other segments
+        // The "compact" ordinal space includes only live vectors from all segments
+        // The RavvOrd space is the keyspace of ravvOrdToReaderMapping[][] declared earlier
         private final GraphNodeIdToDocMap graphNodeIdToDocMap;
+        private final GraphNodeIdToDocMap compactOrdToDocMap;
         private final int[] graphNodeIdsToRavvOrds;
+        private final int[] compactOrdsToRavvOrds;
+
         private final FixedBitSet[] liveGraphNodesPerReader;
 
         /**
@@ -721,21 +737,28 @@ public class JVectorWriter extends KnnVectorsWriter {
             // Will be used to build the new graphNodeIdToDocMap with the new graph node id to docId mapping.
             // This mapping should not be used to access the vectors at any time during construction, but only after the merge is complete
             // and the new segment is created and used by searchers.
+            // note: totalVectorsCount is an unnecessarily loose bound for the "graphNodeId" space, see init of graphNodeIdsToRavvOrds below
             final int[] graphNodeIdToDocIds = new int[totalVectorsCount];
+            final int[] compactOrdToDocIds = new int[totalLiveVectorsCount];
+            Arrays.fill(graphNodeIdToDocIds, -1);
+            Arrays.fill(compactOrdToDocIds, -1);
             // The graph node id to ravv ordinal mapping, for the leading reader this mapping is always identity, for the other readers we
             // only need to map the live vectors
             // Therefore the size of this array is the total number of vectors in the leading reader + the number of live vectors in all
             // other readers
-            final int totalLiveVectorsInLeadingReader = liveGraphNodesPerReader[LEADING_READER_IDX].cardinality();
-            final int totalLiveVectorsInOtherReaders = totalLiveVectorsCount - totalLiveVectorsInLeadingReader;
+            totalLiveVectorsInLeadingReader = liveGraphNodesPerReader[LEADING_READER_IDX].cardinality();
+            totalLiveVectorsInOtherReaders = totalLiveVectorsCount - totalLiveVectorsInLeadingReader;
             this.graphNodeIdsToRavvOrds = new int[totalLiveVectorsInOtherReaders + readers[LEADING_READER_IDX].getFloatVectorValues(
                 fieldName
             ).size()];
+            this.compactOrdsToRavvOrds = new int[totalLiveVectorsCount];
             // initialize the graphNodeIdsToRavvOrds with -1 to indicate that there is no mapping
             Arrays.fill(graphNodeIdsToRavvOrds, -1);
+            Arrays.fill(compactOrdsToRavvOrds, -1);
 
             int documentsIterated = 0;
             int graphNodeId = 0;
+            int compactNodeId = 0;
             // We can reuse the existing graph and simply remap the ravv ordinals to the new global doc ids
             // for the leading reader we must preserve the original node Ids and map them to the corresponding ravv vectors originally
             // used to build the graph
@@ -763,6 +786,12 @@ public class JVectorWriter extends KnnVectorsWriter {
                 final int ravvGlobalOrd = ravvLocalOrd + baseOrds[LEADING_READER_IDX];
                 graphNodeIdToDocIds[ravvLocalOrd] = newGlobalDocId;
                 graphNodeIdsToRavvOrds[ravvLocalOrd] = ravvGlobalOrd;
+                if (newGlobalDocId != -1) {
+                    // the "compact" ordinal space doesn't include any deletes
+                    compactOrdsToRavvOrds[compactNodeId] = ravvGlobalOrd;
+                    compactOrdToDocIds[compactNodeId] = newGlobalDocId;
+                    compactNodeId += 1;
+                }
                 ravvOrdToReaderMapping[ravvGlobalOrd][READER_ID] = LEADING_READER_IDX; // Reader index
                 ravvOrdToReaderMapping[ravvGlobalOrd][READER_ORD] = ravvLocalOrd; // Ordinal in reader
 
@@ -792,6 +821,9 @@ public class JVectorWriter extends KnnVectorsWriter {
                         final int ravvGlobalOrd = ravvLocalOrd + baseOrds[readerIdx];
                         graphNodeIdToDocIds[graphNodeId] = newGlobalDocId;
                         graphNodeIdsToRavvOrds[graphNodeId] = ravvGlobalOrd;
+                        compactOrdsToRavvOrds[compactNodeId] = ravvGlobalOrd;
+                        compactOrdToDocIds[compactNodeId] = newGlobalDocId;
+                        compactNodeId++;
                         graphNodeId++;
                         ravvOrdToReaderMapping[ravvGlobalOrd][READER_ID] = readerIdx; // Reader index
                         ravvOrdToReaderMapping[ravvGlobalOrd][READER_ORD] = ravvLocalOrd; // Ordinal in reader
@@ -813,6 +845,7 @@ public class JVectorWriter extends KnnVectorsWriter {
             }
 
             this.graphNodeIdToDocMap = new GraphNodeIdToDocMap(graphNodeIdToDocIds);
+            this.compactOrdToDocMap = new GraphNodeIdToDocMap(compactOrdToDocIds);
             log.debug("Created RandomAccessMergedFloatVectorValues with {} total vectors from {} readers", size, readers.length);
 
         }
@@ -843,7 +876,7 @@ public class JVectorWriter extends KnnVectorsWriter {
             // Get PQ compressor for leading reader
             final int totalVectorsCount = size;
             final String fieldName = fieldInfo.name;
-            final PQVectors pqVectors;
+            final PQVectors compactPqVectors;
             final OnHeapGraphIndex graph;
             // Get the leading reader
             PerFieldKnnVectorsFormat.FieldsReader fieldsReader = (PerFieldKnnVectorsFormat.FieldsReader) readers[LEADING_READER_IDX];
@@ -852,7 +885,7 @@ public class JVectorWriter extends KnnVectorsWriter {
                 this,
                 graphNodeIdsToRavvOrds
             );
-            final BuildScoreProvider buildScoreProvider;
+            final RemappedRandomAccessVectorValues compactRavv = new RemappedRandomAccessVectorValues(this, compactOrdsToRavvOrds);
             // Check if the leading reader has pre-existing PQ codebooks and if so, refine them with the remaining vectors
             if (leadingReader.getProductQuantizationForField(fieldInfo.name).isEmpty()) {
                 // No pre-existing codebooks, check if we have enough vectors to trigger quantization
@@ -861,6 +894,7 @@ public class JVectorWriter extends KnnVectorsWriter {
                     fieldName,
                     mergeState.segmentInfo.name
                 );
+                // TODO this check may need fixing to consider only live vectors
                 if (this.size() >= minimumBatchSizeForQuantization) {
                     log.info(
                         "Calculating new codebooks and compressed vectors for field: {}, with totalVectorCount: {}, above minimumBatchSizeForQuantization: {}",
@@ -868,7 +902,7 @@ public class JVectorWriter extends KnnVectorsWriter {
                         totalVectorsCount,
                         minimumBatchSizeForQuantization
                     );
-                    pqVectors = getPQVectors(remappedRandomAccessVectorValues, fieldInfo);
+                    compactPqVectors = getPQVectors(compactRavv, fieldInfo);
                 } else {
                     log.info(
                         "Not enough vectors found for field: {}, totalVectorCount: {}, is below minimumBatchSizeForQuantization: {}",
@@ -876,7 +910,7 @@ public class JVectorWriter extends KnnVectorsWriter {
                         totalVectorsCount,
                         minimumBatchSizeForQuantization
                     );
-                    pqVectors = null;
+                    compactPqVectors = null;
                 }
             } else {
                 log.info(
@@ -898,30 +932,77 @@ public class JVectorWriter extends KnnVectorsWriter {
                 final long trainingTime = end - start;
                 log.info("Refined PQ codebooks for field {}, in {} millis", fieldName, trainingTime);
                 KNNCounter.KNN_QUANTIZATION_TRAINING_TIME.add(trainingTime);
-                pqVectors = PQVectors.encodeAndBuild(
+                compactPqVectors = PQVectors.encodeAndBuild(
                     leadingCompressor,
-                    graphNodeIdsToRavvOrds.length,
-                    graphNodeIdsToRavvOrds,
+                    // graphNodeIdsToRavvOrds.length,
+                    // graphNodeIdsToRavvOrds,
+                    compactOrdsToRavvOrds.length,
+                    compactOrdsToRavvOrds,
                     this,
                     SIMD_POOL_MERGE
                 );
             }
 
-            if (pqVectors == null) {
-                buildScoreProvider = BuildScoreProvider.randomAccessScoreProvider(
-                    remappedRandomAccessVectorValues,
-                    getVectorSimilarityFunction(fieldInfo)
-                );
+            if (compactPqVectors == null) {
                 final String segmentName = segmentWriteState.segmentInfo.name;
                 log.info(
                     "No pre-existing PQ codebooks found, expanding previous graph with additional vectors for field {} in segment {}",
                     fieldName,
                     segmentName
                 );
+
+                // Since we're performing leading segment merge, we need to load the OnHeapGraphIndex
+                // corresponding to the leading segment, then mutate it.
+                // Since ordinals of OnHeapGraphIndex cannot be compacted, holes in the ordinals
+                // will build up over time.
+                // While creating score providers and updating the graph, we need to supply a RAVV that
+                // takes these holes into account, so we need some mappings to and from the ordinal space
+                // of the OnHeapGraphIndex (the heap ordinals)
+
+                // We load the valid heap ordinals first. We could theoretically get this information from the
+                // OnHeapGraphIndex itself, but loading it requires us to pass in a diversityProvider,
+                // which we build from a RAVV (heapRavv). However, we need to know the valid heap ordinals
+                // to generate the RAVV in the first place!
+                int[] validHeapNodes = leadingReader.getValidHeapGraphNodes(fieldName).getValidNodes();
+
+                int leadingGraphIdUpperBound = validHeapNodes[validHeapNodes.length - 1] + 1;
+                int heapOrdUpperBound = leadingGraphIdUpperBound + totalLiveVectorsInOtherReaders;
+                // TODO make sure it's sorted
+
+                // The "mid" ordinal space is the same as the "graphNodeId" ordinal space
+                // which includes all vectors from the leading segment and live vectors from other segments.
+                // We need this mapping to delete vectors later.
+                var midToHeapOrds = new int[graphNodeIdsToRavvOrds.length];
+                var heapToGlobalRavvOrds = new int[heapOrdUpperBound];
+                Arrays.fill(midToHeapOrds, -1);
+                Arrays.fill(heapToGlobalRavvOrds, -1);
+
+                int midOrd = 0;
+                for (; midOrd < validHeapNodes.length; midOrd++) {
+                    midToHeapOrds[midOrd] = validHeapNodes[midOrd];
+                    heapToGlobalRavvOrds[validHeapNodes[midOrd]] = graphNodeIdsToRavvOrds[midOrd];
+                }
+
+                for (int i = leadingGraphIdUpperBound; i < heapOrdUpperBound; i++) {
+                    midToHeapOrds[midOrd] = i;
+                    heapToGlobalRavvOrds[i] = graphNodeIdsToRavvOrds[midOrd];
+                    midOrd++;
+                }
+
+                if (midOrd != midToHeapOrds.length) {
+                    throw new IllegalStateException("failed to fill mid to heap ord map, this is a bug");
+                }
+
+                var heapRavv = new RemappedRandomAccessVectorValues(this, heapToGlobalRavvOrds);
+
+                var leadingBsp = BuildScoreProvider.randomAccessScoreProvider(
+                    heapRavv,
+                    getVectorSimilarityFunction(fieldInfo)
+                );
+                var diversityProvider = new VamanaDiversityProvider(leadingBsp, alpha);
+
                 final RandomAccessReader leadingOnHeapGraphReader = leadingReader.getNeighborsScoreCacheForField(fieldName);
                 final int numBaseVectors = leadingReader.getFloatVectorValues(fieldName).size();
-
-                var diversityProvider = new VamanaDiversityProvider(buildScoreProvider, alpha);
 
                 try (
                     OnHeapGraphIndex leadingGraph = OnHeapGraphIndex.load(
@@ -933,8 +1014,8 @@ public class JVectorWriter extends KnnVectorsWriter {
                 ) {
 
                     GraphIndexBuilder builder = new GraphIndexBuilder(
-                        buildScoreProvider,
-                        remappedRandomAccessVectorValues.dimension(),
+                        leadingBsp,
+                        heapRavv.dimension(),
                         leadingGraph,
                         beamWidth,
                         degreeOverflow,
@@ -944,11 +1025,11 @@ public class JVectorWriter extends KnnVectorsWriter {
                         PARALLELISM_POOL
                     );
 
-                    var vv = remappedRandomAccessVectorValues.threadLocalSupplier();
+                    var vv = heapRavv.threadLocalSupplier();
 
                     // parallel graph construction from the merge documents Ids
                     SIMD_POOL_MERGE.submit(
-                        () -> IntStream.range(numBaseVectors, remappedRandomAccessVectorValues.size()).parallel().forEach(ord -> {
+                        () -> IntStream.range(leadingGraph.getIdUpperBound(), heapRavv.size()).parallel().forEach(ord -> {
                             builder.addGraphNode(ord, vv.get().getVector(ord));
                         })
                     ).join();
@@ -956,7 +1037,8 @@ public class JVectorWriter extends KnnVectorsWriter {
                     // mark deleted nodes
                     for (int i = 0; i < numBaseVectors; i++) {
                         if (!liveGraphNodesPerReader[LEADING_READER_IDX].get(i)) {
-                            builder.markNodeDeleted(i);
+                            // we need to convert from the "mid" to the "heap" ordinal space to avoid errors
+                            builder.markNodeDeleted(midToHeapOrds[i]);
                         }
                     }
 
@@ -964,21 +1046,25 @@ public class JVectorWriter extends KnnVectorsWriter {
 
                     graph = (OnHeapGraphIndex) builder.getGraph();
                 }
+
+                // Note that the ordinals for the OnDiskGraphIndex will automatically be compacted
+                // But the OnHeapGraphIndex will not
+                writeField(fieldInfo, heapRavv, null, compactOrdToDocMap, graph);
             } else {
                 log.info("PQ codebooks found, building graph from scratch with PQ vectors");
-                buildScoreProvider = BuildScoreProvider.pqBuildScoreProvider(getVectorSimilarityFunction(fieldInfo), pqVectors);
+                // We're building from scratch, so we can use the "compact" ordinal space directly
+                var buildScoreProvider = BuildScoreProvider.pqBuildScoreProvider(getVectorSimilarityFunction(fieldInfo), compactPqVectors);
                 // Pre-init the diversity provider here to avoid doing it lazily (as it could block the SIMD threads)
                 buildScoreProvider.diversityProviderFor(0);
                 graph = getGraph(
                     buildScoreProvider,
-                    remappedRandomAccessVectorValues,
+                    compactRavv,
                     fieldInfo,
                     segmentWriteState.segmentInfo.name,
                     SIMD_POOL_MERGE
                 );
+                writeField(fieldInfo, compactRavv, compactPqVectors, compactOrdToDocMap, graph);
             }
-
-            writeField(fieldInfo, remappedRandomAccessVectorValues, pqVectors, graphNodeIdToDocMap, graph);
         }
 
         @Override

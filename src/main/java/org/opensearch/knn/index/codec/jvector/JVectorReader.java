@@ -128,6 +128,10 @@ public class JVectorReader extends KnnVectorsReader {
         return fieldEntryMap.get(field).index;
     }
 
+    public ValidHeapGraphNodes getValidHeapGraphNodes(String field) throws IOException {
+        return fieldEntryMap.get(field).validHeapGraphNodes;
+    }
+
     @Override
     public void search(String field, float[] target, KnnCollector knnCollector, AcceptDocs acceptDocs) throws IOException {
         final OnDiskGraphIndex index = fieldEntryMap.get(field).index;
@@ -258,6 +262,7 @@ public class JVectorReader extends KnnVectorsReader {
         private final String vectorIndexFieldDataFileName;
         private final String neighborsScoreCacheIndexFieldFileName;
         private final GraphNodeIdToDocMap graphNodeIdToDocMap;
+        private final ValidHeapGraphNodes validHeapGraphNodes;
         private final ReaderSupplier indexReaderSupplier;
         private final ReaderSupplier pqCodebooksReaderSupplier;
         private final ReaderSupplier neighborsScoreCacheIndexReaderSupplier;
@@ -276,6 +281,7 @@ public class JVectorReader extends KnnVectorsReader {
             this.pqCodebooksAndVectorsOffset = vectorIndexFieldMetadata.getPqCodebooksAndVectorsOffset();
             this.dimension = vectorIndexFieldMetadata.getVectorDimension();
             this.graphNodeIdToDocMap = vectorIndexFieldMetadata.getGraphNodeIdToDocMap();
+            this.validHeapGraphNodes = vectorIndexFieldMetadata.getValidHeapGraphNodes();
 
             this.vectorIndexFieldDataFileName = baseDataFileName + "_" + fieldInfo.name + "." + JVectorFormat.VECTOR_INDEX_EXTENSION;
             this.neighborsScoreCacheIndexFieldFileName = baseDataFileName
