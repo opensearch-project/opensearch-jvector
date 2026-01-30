@@ -24,7 +24,6 @@ import org.opensearch.knn.index.engine.KNNLibrarySearchContext;
 import org.opensearch.knn.index.engine.KNNMethodContext;
 import org.opensearch.knn.index.engine.MethodComponentContext;
 import org.opensearch.knn.index.mapper.KNNMappingConfig;
-// import org.opensearch.knn.index.memory.NativeMemoryCacheManager;
 import org.opensearch.knn.plugin.stats.KNNCounter;
 import org.opensearch.knn.quantization.models.quantizationState.QuantizationStateCache;
 import org.opensearch.knn.quantization.models.quantizationState.QuantizationStateCacheManager;
@@ -88,9 +87,7 @@ public class KNNTestCase extends OpenSearchTestCase {
         }
         initKNNSettings();
 
-        // Clean up the cache (NativeMemoryCacheManager not available in JVector)
-        // NativeMemoryCacheManager.getInstance().invalidateAll();
-        // NativeMemoryCacheManager.getInstance().close();
+        // Clean up the cache
         try {
             QuantizationStateCacheManager.getInstance().close();
         } catch (OpenSearchRejectedExecutionException e) {
