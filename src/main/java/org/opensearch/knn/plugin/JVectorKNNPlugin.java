@@ -8,6 +8,7 @@ package org.opensearch.knn.plugin;
 import org.opensearch.core.action.ActionResponse;
 import org.opensearch.index.codec.CodecServiceFactory;
 import org.opensearch.index.engine.EngineFactory;
+import org.opensearch.knn.index.codec.derivedsource.DerivedSourceIndexOperationListener;
 import org.opensearch.knn.plugin.search.KNNConcurrentSearchRequestDecider;
 import org.opensearch.knn.index.util.KNNClusterUtil;
 import org.opensearch.knn.index.query.KNNQueryBuilder;
@@ -190,6 +191,9 @@ public class JVectorKNNPlugin extends Plugin
     @Override
     public void onIndexModule(IndexModule indexModule) {
         KNNSettings.state().onIndexModule(indexModule);
+        if (KNNSettings.isKNNDerivedSourceEnabled(indexModule.getSettings())) {
+            indexModule.addIndexOperationListener(new DerivedSourceIndexOperationListener());
+        }
     }
 
     /**
