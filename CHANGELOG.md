@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Features
 ### Enhancements
 ### Bug Fixes
+* Revert of support deletes for incremental insertion [240](https://github.com/opensearch-project/opensearch-jvector/pull/240)
 ### Infrastructure
 * Update OpenSearch compatibility from version 3.3.0 to 3.3.2 [PR #226](https://github.com/opensearch-project/opensearch-jvector/pull/226)
 ### Documentation
