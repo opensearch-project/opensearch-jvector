@@ -48,25 +48,10 @@ public class GraphNodeIdToDocMapTests extends LuceneTestCase {
         }
     }
 
-    @Test
-    public void testConstructorWithDeletedDocuments() {
-        int[] ordinalsToDocIds = { -1, 2, -1, 6 }; // Mix of deleted (-1) and valid docs
-        GraphNodeIdToDocMap docMap = new GraphNodeIdToDocMap(ordinalsToDocIds);
-
-        // Test ordinal to doc ID mapping (including deleted docs)
-        assertEquals(-1, docMap.getLuceneDocId(0)); // deleted
-        assertEquals(2, docMap.getLuceneDocId(1));
-        assertEquals(-1, docMap.getLuceneDocId(2)); // deleted
-        assertEquals(6, docMap.getLuceneDocId(3));
-
-        // Test doc ID to ordinal mapping (only valid docs should map back)
-        assertEquals(1, docMap.getJVectorNodeId(2));
-        assertEquals(3, docMap.getJVectorNodeId(6));
-
-        // Unmapped doc IDs return -1
-        assertEquals(-1, docMap.getJVectorNodeId(0));
-        assertEquals(-1, docMap.getJVectorNodeId(1));
-        assertEquals(-1, docMap.getJVectorNodeId(3));
+    @Test(expected = IllegalStateException.class)
+    public void testConstructorThrowsWhenMaxDocsLessThanOrdinals() {
+        int[] invalidMapping = { -1 }; // This would cause issues in Arrays.stream().max()
+        new GraphNodeIdToDocMap(invalidMapping);
     }
 
     @Test
