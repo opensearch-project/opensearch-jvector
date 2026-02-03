@@ -22,7 +22,7 @@ buildscript {
         isSnapshot = "true" == System.getProperty("build.snapshot", "false")
 
         version_tokens = opensearch_version.tokenize('-')
-        opensearch_build = version_tokens[0] + '.0'
+        opensearch_build = version_tokens[0] + '.1'
         plugin_no_snapshot = opensearch_build
         if (version_qualifier) {
             opensearch_build += "-${version_qualifier}"
