@@ -28,11 +28,7 @@ import org.opensearch.monitor.jvm.JvmInfo;
 import org.opensearch.monitor.os.OsProbe;
 
 import java.security.InvalidParameterException;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -268,13 +264,31 @@ public class KNNSettings {
         Setting.Property.Dynamic
     );
 
-    public static final Setting<Boolean> KNN_DERIVED_SOURCE_ENABLED_SETTING = Setting.boolSetting(
+    // If index.knn is true, then index.knn.derived_source.enabled is also set to true
+    // This is added to IndexSettingProviders in JVectorKNNPlugin.java
+    public static final Setting<Boolean> KNN_DERIVED_SOURCE_ENABLED_SETTING = new Setting<>(
         KNN_DERIVED_SOURCE_ENABLED,
-        false,
+        (s) -> Boolean.toString(false),
+        (b) -> Booleans.parseBooleanStrict(b, false),
         IndexScope,
         Final,
         UnmodifiableOnRestore
-    );
+    ) {
+        @Override
+        public Set<SettingDependency> getSettingsDependencies(String key) {
+            return Set.of(new SettingDependency() {
+                @Override
+                public Setting<Boolean> getSetting() {  return IS_KNN_INDEX_SETTING;  }
+
+                @Override
+                public void validate(String key, Object value, Object dependency) {
+                    if (dependency instanceof Boolean isKnnEnabled && isKnnEnabled == false) {
+                        throw new IllegalArgumentException("Index setting \"index.knn\" must be true in order to enabled derived source");
+                    }
+                }
+            });
+        }
+    };
 
     /**
      * This setting identifies KNN index.
