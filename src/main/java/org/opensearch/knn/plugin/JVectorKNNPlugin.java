@@ -8,6 +8,7 @@ package org.opensearch.knn.plugin;
 import org.opensearch.core.action.ActionResponse;
 import org.opensearch.index.codec.CodecServiceFactory;
 import org.opensearch.index.engine.EngineFactory;
+import org.opensearch.index.shard.IndexSettingProvider;
 import org.opensearch.knn.index.codec.derivedsource.DerivedSourceIndexOperationListener;
 import org.opensearch.knn.plugin.search.KNNConcurrentSearchRequestDecider;
 import org.opensearch.knn.index.util.KNNClusterUtil;
@@ -68,6 +69,7 @@ import java.util.Optional;
 import java.util.function.Supplier;
 
 import static java.util.Collections.singletonList;
+import static org.opensearch.knn.index.KNNSettings.KNN_DERIVED_SOURCE_ENABLED;
 
 /**
  * Entry point for the KNN plugin where we define mapper for knn_vector type
@@ -150,6 +152,20 @@ public class JVectorKNNPlugin extends Plugin
     @Override
     public List<Setting<?>> getSettings() {
         return KNNSettings.state().getSettings();
+    }
+
+    @Override
+    public Collection<IndexSettingProvider> getAdditionalIndexSettingProviders() {
+        // Default derived source feature to true for knn indices.
+        return ImmutableList.of(new IndexSettingProvider() {
+            @Override
+            public Settings getAdditionalIndexSettings(String indexName, boolean isDataStreamIndex, Settings templateAndRequestSettings) {
+                if (templateAndRequestSettings.getAsBoolean(KNNSettings.KNN_INDEX, false)) {
+                    return Settings.builder().put(KNN_DERIVED_SOURCE_ENABLED, true).build();
+                }
+                return Settings.EMPTY;
+            }
+        });
     }
 
     public List<RestHandler> getRestHandlers(
