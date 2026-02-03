@@ -46,10 +46,7 @@ public class GraphNodeIdToDocMap {
         for (int ord = 0; ord < size; ord++) {
             final int docId = in.readVInt();
             graphNodeIdsToDocIds[ord] = docId;
-            if (docId != -1) {
-                // ignore deleted documents
-                docIdsToGraphNodeIds[docId] = ord;
-            }
+            docIdsToGraphNodeIds[docId] = ord;
         }
     }
 
@@ -71,19 +68,18 @@ public class GraphNodeIdToDocMap {
         // We are going to assume that the number of ordinals is roughly the same as the number of documents in the segment, therefore,
         // the mapping will not be sparse.
         if (maxDocs < graphNodeIdsToDocIds.length) {
+            throw new IllegalStateException("Max docs " + maxDocs + " is less than the number of ordinals " + graphNodeIdsToDocIds.length);
+        }
+        if (maxDocId > graphNodeIdsToDocIds.length) {
             log.warn(
-                "Max docs {} is less than the number of ordinals {}, this implies a lot of deleted documents. Or that some documents are missing vectors. Wasting a lot of memory",
-                maxDocs,
+                "Max doc id {} is greater than the number of ordinals {}, this implies a lot of deleted documents. Or that some documents are missing vectors. Wasting a lot of memory",
+                maxDocId,
                 graphNodeIdsToDocIds.length
             );
         }
         this.docIdsToGraphNodeIds = new int[maxDocs];
         Arrays.fill(this.docIdsToGraphNodeIds, -1); // -1 means no mapping to ordinal
         for (int ord = 0; ord < graphNodeIdsToDocIds.length; ord++) {
-            // -1 means no mapping to docId since document was deleted
-            if (graphNodeIdsToDocIds[ord] == -1) {
-                continue;
-            }
             this.docIdsToGraphNodeIds[graphNodeIdsToDocIds[ord]] = ord;
         }
     }
