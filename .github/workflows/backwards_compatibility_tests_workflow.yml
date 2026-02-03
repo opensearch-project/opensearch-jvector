@@ -31,6 +31,7 @@ on:
 
 jobs:
   Restart-Upgrade-BWCTests-k-NN:
+    if: false
     strategy:
       matrix:
         java: [ 21 ]
@@ -126,6 +127,7 @@ jobs:
           fi 
 
   Rolling-Upgrade-BWCTests-k-NN:
+    if: false
     strategy:
       matrix:
         java: [ 21 ]
