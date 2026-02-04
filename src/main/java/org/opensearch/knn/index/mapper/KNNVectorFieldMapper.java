@@ -392,13 +392,14 @@ public abstract class KNNVectorFieldMapper extends ParametrizedFieldMapper {
 
         private void validateFromKNNMethod(Builder builder) {
             ValidationException validationException;
-            if (builder.originalParameters.getResolvedKnnMethodContext().isTrainingRequired()) {
+            var context = builder.originalParameters.getResolvedKnnMethodContext();
+            if (context != null && context.isTrainingRequired()) {
                 validationException = new ValidationException();
                 validationException.addValidationError(String.format(Locale.ROOT, "\"%s\" requires training.", KNN_METHOD));
                 throw validationException;
             }
 
-            if (builder.originalParameters.getResolvedKnnMethodContext() != null) {
+            if (context != null) {
                 validationException = builder.originalParameters.getResolvedKnnMethodContext().validate(builder.knnMethodConfigContext);
                 if (validationException != null) {
                     throw validationException;

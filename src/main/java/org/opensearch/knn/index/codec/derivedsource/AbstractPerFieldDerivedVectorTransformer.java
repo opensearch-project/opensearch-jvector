@@ -6,6 +6,7 @@
 package org.opensearch.knn.index.codec.derivedsource;
 
 import org.apache.lucene.index.FieldInfo;
+import org.apache.lucene.index.VectorEncoding;
 import org.apache.lucene.util.BytesRef;
 import org.opensearch.common.CheckedSupplier;
 import org.opensearch.knn.common.FieldInfoExtractor;
@@ -33,7 +34,19 @@ public abstract class AbstractPerFieldDerivedVectorTransformer implements PerFie
         // If the vector value is a byte[], we must deserialize
         if (vectorValue instanceof byte[]) {
             BytesRef vectorBytesRef = new BytesRef((byte[]) vectorValue);
-            VectorDataType vectorDataType = FieldInfoExtractor.extractVectorDataType(fieldInfo);
+            // Determine the vector data type based on the vector encoding to ensure proper deserialization
+            VectorDataType vectorDataType;
+            if (fieldInfo.hasVectorValues()) {
+                // For vectors with native Lucene encoding, use the encoding type
+                if (fieldInfo.getVectorEncoding() == VectorEncoding.BYTE) {
+                    vectorDataType = VectorDataType.BYTE;
+                } else {
+                    vectorDataType = VectorDataType.FLOAT;
+                }
+            } else {
+                // For binary doc values, use the data type from field attributes
+                vectorDataType = FieldInfoExtractor.extractVectorDataType(fieldInfo);
+            }
             return KNNVectorFieldMapperUtil.deserializeStoredVector(vectorBytesRef, vectorDataType);
         }
         return vectorCloneSupplier.get();
