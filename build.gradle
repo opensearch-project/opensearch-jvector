@@ -16,7 +16,7 @@ buildscript {
     ext {
         // build.version_qualifier parameter applies to jvector plugin artifacts only. OpenSearch version must be set
         // explicitly as 'opensearch.version' property, for instance opensearch.version=2.0.0-rc1-SNAPSHOT
-        opensearch_version = System.getProperty("opensearch.version", "3.5.0-SNAPSHOT")
+        opensearch_version = System.getProperty("opensearch.version", "3.6.0-SNAPSHOT")
         opensearch_build = opensearch_version.replaceAll(/(\.\d)([^\d]*)$/, '$1.0$2')
         common_utils_version = System.getProperty("common_utils.version", opensearch_build)
         version_qualifier = System.getProperty("build.version_qualifier", "")
