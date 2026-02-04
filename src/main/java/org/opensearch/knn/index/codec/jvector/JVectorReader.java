@@ -173,8 +173,7 @@ public class JVectorReader extends KnnVectorsReader {
             if (acceptDocs == null) compatibleBits = ord -> true;
             else {
                 Bits b = acceptDocs.bits();
-                compatibleBits = ord -> b == null
-                    || (jvectorLuceneDocMap.getLuceneDocId(ord) != -1 && b.get(jvectorLuceneDocMap.getLuceneDocId(ord)));
+                compatibleBits = ord -> b == null || b.get(jvectorLuceneDocMap.getLuceneDocId(ord));
             }
 
             try (var graphSearcher = new GraphSearcher(index)) {
@@ -213,6 +212,12 @@ public class JVectorReader extends KnnVectorsReader {
                     expandedBaseLayerCount
                 );
 
+                // Apache Lucene tracks visited counter so to validate scored docs/ total hits (
+                // see AbstractKnnVectorQuery please). The counter has to be updated manually.
+                final int visitedCount = visitedNodesCount + expandedCount;
+                if (visitedCount > 0) {
+                    jvectorKnnCollector.incVisitedCount(visitedCount);
+                }
             }
         }
     }
