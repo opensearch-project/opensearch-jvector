@@ -20,7 +20,6 @@ public class ThreadLeakFiltersForTests implements ThreadFilter {
             && (threadGroup.getName().contains("InternalKNNEngineTests")
                 || threadGroup.getName().startsWith("TGRP-KNNJVectorTests")
                 || threadGroup.getName().startsWith("TGRP-JVectorConcurrentQueryTests")
-                || threadGroup.getName().startsWith("TGRP-JVectorMergeWithDeletedDocsTests")
                 || threadGroup.getName().startsWith("TGRP-MemoryUsageAnalysisTests"));
     }
 }
