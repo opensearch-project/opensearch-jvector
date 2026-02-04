@@ -139,15 +139,20 @@ public final class KNNVectorValuesFactory {
     ) throws IOException {
         if (fieldInfo.hasVectorValues() && knnVectorsReader != null) {
             final KnnVectorValues knnVectorValues;
+            final VectorDataType vectorDataType;
             if (fieldInfo.getVectorEncoding() == VectorEncoding.BYTE) {
                 knnVectorValues = knnVectorsReader.getByteVectorValues(fieldInfo.getName());
+                // Use BYTE data type for byte-encoded vectors to ensure proper extraction
+                vectorDataType = VectorDataType.BYTE;
             } else if (fieldInfo.getVectorEncoding() == VectorEncoding.FLOAT32) {
                 knnVectorValues = knnVectorsReader.getFloatVectorValues(fieldInfo.getName());
+                // Use FLOAT data type for float-encoded vectors
+                vectorDataType = VectorDataType.FLOAT;
             } else {
                 throw new IllegalArgumentException("Invalid Vector encoding provided, hence cannot return VectorValues");
             }
             return getVectorValues(
-                FieldInfoExtractor.extractVectorDataType(fieldInfo),
+                vectorDataType,
                 new KNNVectorValuesIterator.DocIdsIteratorValues(knnVectorValues)
             );
         } else if (docValuesProducer != null) {
