@@ -108,7 +108,7 @@ public interface VectorValueExtractorStrategy {
             docIdsIteratorValues.setLastOrd(ord);
 
             KnnVectorValues knnVectorValues = docIdsIteratorValues.getKnnVectorValues();
-            
+
             // Check the actual instance type of knnVectorValues to determine how to extract the vector
             if (knnVectorValues instanceof FloatVectorValues) {
                 FloatVectorValues floatVectorValues = (FloatVectorValues) knnVectorValues;

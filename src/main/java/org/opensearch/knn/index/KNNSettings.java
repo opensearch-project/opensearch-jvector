@@ -278,7 +278,9 @@ public class KNNSettings {
         public Set<SettingDependency> getSettingsDependencies(String key) {
             return Set.of(new SettingDependency() {
                 @Override
-                public Setting<Boolean> getSetting() {  return IS_KNN_INDEX_SETTING;  }
+                public Setting<Boolean> getSetting() {
+                    return IS_KNN_INDEX_SETTING;
+                }
 
                 @Override
                 public void validate(String key, Object value, Object dependency) {
