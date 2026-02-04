@@ -151,10 +151,7 @@ public final class KNNVectorValuesFactory {
             } else {
                 throw new IllegalArgumentException("Invalid Vector encoding provided, hence cannot return VectorValues");
             }
-            return getVectorValues(
-                vectorDataType,
-                new KNNVectorValuesIterator.DocIdsIteratorValues(knnVectorValues)
-            );
+            return getVectorValues(vectorDataType, new KNNVectorValuesIterator.DocIdsIteratorValues(knnVectorValues));
         } else if (docValuesProducer != null) {
             return getVectorValues(
                 FieldInfoExtractor.extractVectorDataType(fieldInfo),
