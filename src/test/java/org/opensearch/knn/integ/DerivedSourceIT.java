@@ -8,12 +8,12 @@ package org.opensearch.knn.integ;
 import lombok.SneakyThrows;
 import org.junit.Before;
 import org.opensearch.client.ResponseException;
+import org.opensearch.common.collect.Tuple;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.common.xcontent.XContentFactory;
 import org.opensearch.core.xcontent.XContentBuilder;
 import org.opensearch.knn.DerivedSourceTestCase;
 import org.opensearch.knn.DerivedSourceUtils;
-import org.opensearch.knn.Pair;
 import org.opensearch.knn.common.KNNConstants;
 import org.opensearch.knn.index.VectorDataType;
 
@@ -88,19 +88,19 @@ public class DerivedSourceIT extends DerivedSourceTestCase {
     public void testDerivedSource_whenSegrepLocal_thenDisabled() {
         // Set the data type input for float fields as byte. If derived source gets enabled, the original and derived
         // wont match because original will have source like [0, 1, 2] and derived will have [0.0, 1.0, 2.0]
-        final List<Pair<String, Boolean>> indexPrefixToEnabled = List.of(
-            new Pair<>("original-enable-", true),
-            new Pair<>("original-disable-", false)
+        final List<Tuple<String, Boolean>> indexPrefixToEnabled = List.of(
+            new Tuple<>("original-enable-", true),
+            new Tuple<>("original-disable-", false)
         );
         List<DerivedSourceUtils.IndexConfigContext> indexConfigContexts = new ArrayList<>();
         long consistentRandomSeed = random().nextLong();
-        for (Pair<String, Boolean> index : indexPrefixToEnabled) {
+        for (Tuple<String, Boolean> index : indexPrefixToEnabled) {
             Random random = new Random(consistentRandomSeed);
             DerivedSourceUtils.IndexConfigContext indexConfigContext = DerivedSourceUtils.IndexConfigContext.builder()
-                .indexName(getIndexName("deriveit", index.getFirst(), false))
-                .derivedEnabled(index.getSecond())
+                .indexName(getIndexName("deriveit", index.v1(), false))
+                .derivedEnabled(index.v2())
                 .random(random)
-                .settings(index.getSecond() ? DERIVED_ENABLED_WITH_SEGREP_SETTINGS : null)
+                .settings(index.v2() ? DERIVED_ENABLED_WITH_SEGREP_SETTINGS : null)
                 .fields(
                     List.of(
                         DerivedSourceUtils.NestedFieldContext.builder()
