@@ -9,6 +9,7 @@ import lombok.SneakyThrows;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.opensearch.client.Request;
 import org.opensearch.client.Response;
+import org.opensearch.common.collect.Tuple;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.common.xcontent.XContentFactory;
 import org.opensearch.core.rest.RestStatus;
@@ -26,13 +27,13 @@ import static org.opensearch.knn.TestUtils.BWC_VERSION;
 
 public class DerivedSourceTestCase extends KNNRestTestCase {
 
-    private static final List<Pair<String, Boolean>> INDEX_PREFIX_TO_ENABLED = List.of(
-        new Pair<>("original-enable-", true),
-        new Pair<>("original-disable-", false),
-        new Pair<>("e2e-", true),
-        new Pair<>("e2d-", false),
-        new Pair<>("d2e-", true),
-        new Pair<>("d2d-", false)
+    private static final List<Tuple<String, Boolean>> INDEX_PREFIX_TO_ENABLED = List.of(
+        new Tuple<>("original-enable-", true),
+        new Tuple<>("original-disable-", false),
+        new Tuple<>("e2e-", true),
+        new Tuple<>("e2d-", false),
+        new Tuple<>("d2e-", true),
+        new Tuple<>("d2d-", false)
     );
 
     private static final int MIN_DIMENSION = 4;
@@ -94,14 +95,14 @@ public class DerivedSourceTestCase extends KNNRestTestCase {
     protected List<DerivedSourceUtils.IndexConfigContext> getFlatIndexContexts(String testSuitePrefix, boolean addRandom, boolean addNull) {
         List<DerivedSourceUtils.IndexConfigContext> indexConfigContexts = new ArrayList<>();
         long consistentRandomSeed = random().nextLong();
-        for (Pair<String, Boolean> index : INDEX_PREFIX_TO_ENABLED) {
+        for (Tuple<String, Boolean> index : INDEX_PREFIX_TO_ENABLED) {
             Supplier<Integer> dimensionSupplier = randomIntegerSupplier(consistentRandomSeed, MIN_DIMENSION, MAX_DIMENSION);
             Supplier<Integer> binaryDimensionSupplier = randomIntegerSupplier(consistentRandomSeed, MIN_DIMENSION, MAX_DIMENSION, 8);
             Supplier<Integer> randomDocCountSupplier = randomIntegerSupplier(consistentRandomSeed, MIN_DOCS, MAX_DOCS);
             DerivedSourceUtils.IndexConfigContext indexConfigContext = DerivedSourceUtils.IndexConfigContext.builder()
-                .indexName(getIndexName(testSuitePrefix, index.getFirst(), addRandom))
+                .indexName(getIndexName(testSuitePrefix, index.v1(), addRandom))
                 .docCount(randomDocCountSupplier.get())
-                .derivedEnabled(index.getSecond())
+                .derivedEnabled(index.v2())
                 .random(new Random(consistentRandomSeed))
                 .fields(
                     List.of(
@@ -225,13 +226,13 @@ public class DerivedSourceTestCase extends KNNRestTestCase {
     protected List<DerivedSourceUtils.IndexConfigContext> getObjectIndexContexts(String testSuitePrefix, boolean addRandom) {
         List<DerivedSourceUtils.IndexConfigContext> indexConfigContexts = new ArrayList<>();
         long consistentRandomSeed = random().nextLong();
-        for (Pair<String, Boolean> index : INDEX_PREFIX_TO_ENABLED) {
+        for (Tuple<String, Boolean> index : INDEX_PREFIX_TO_ENABLED) {
             Supplier<Integer> dimensionSupplier = randomIntegerSupplier(consistentRandomSeed, MIN_DIMENSION, MAX_DIMENSION);
             Supplier<Integer> randomDocCountSupplier = randomIntegerSupplier(consistentRandomSeed, MIN_DOCS, MAX_DOCS);
             DerivedSourceUtils.IndexConfigContext indexConfigContext = DerivedSourceUtils.IndexConfigContext.builder()
-                .indexName(getIndexName(testSuitePrefix, index.getFirst(), addRandom))
+                .indexName(getIndexName(testSuitePrefix, index.v1(), addRandom))
                 .docCount(randomDocCountSupplier.get())
-                .derivedEnabled(index.getSecond())
+                .derivedEnabled(index.v2())
                 .random(new Random(consistentRandomSeed))
                 .fields(
                     List.of(
@@ -350,7 +351,7 @@ public class DerivedSourceTestCase extends KNNRestTestCase {
     ) {
         List<DerivedSourceUtils.IndexConfigContext> indexConfigContexts = new ArrayList<>();
         long consistentRandomSeed = random().nextLong();
-        for (Pair<String, Boolean> index : INDEX_PREFIX_TO_ENABLED) {
+        for (Tuple<String, Boolean> index : INDEX_PREFIX_TO_ENABLED) {
             Supplier<Integer> dimensionSupplier = randomIntegerSupplier(consistentRandomSeed, MIN_DIMENSION, MAX_DIMENSION);
             Supplier<Integer> randomDocCountSupplier = randomIntegerSupplier(consistentRandomSeed, MIN_DOCS, MAX_DOCS);
             Settings settingsWithAnalyzer = Settings.builder()
@@ -370,9 +371,9 @@ public class DerivedSourceTestCase extends KNNRestTestCase {
                 .put("index.analysis.analyzer.delimited_tf.tokenizer", "whitespace")
                 .build();
             DerivedSourceUtils.IndexConfigContext indexConfigContext = DerivedSourceUtils.IndexConfigContext.builder()
-                .indexName(getIndexName(testSuitePrefix, index.getFirst(), addRandom))
+                .indexName(getIndexName(testSuitePrefix, index.v1(), addRandom))
                 .docCount(randomDocCountSupplier.get())
-                .derivedEnabled(index.getSecond())
+                .derivedEnabled(index.v2())
                 .random(new Random(consistentRandomSeed))
                 .fields(
                     List.of(
@@ -495,13 +496,13 @@ public class DerivedSourceTestCase extends KNNRestTestCase {
     protected List<DerivedSourceUtils.IndexConfigContext> getNestedIndexContexts(String testSuitePrefix, boolean addRandom) {
         List<DerivedSourceUtils.IndexConfigContext> indexConfigContexts = new ArrayList<>();
         long consistentRandomSeed = random().nextLong();
-        for (Pair<String, Boolean> index : INDEX_PREFIX_TO_ENABLED) {
+        for (Tuple<String, Boolean> index : INDEX_PREFIX_TO_ENABLED) {
             Supplier<Integer> dimensionSupplier = randomIntegerSupplier(consistentRandomSeed, MIN_DIMENSION, MAX_DIMENSION);
             Supplier<Integer> randomDocCountSupplier = randomIntegerSupplier(consistentRandomSeed, MIN_DOCS, MAX_DOCS);
             DerivedSourceUtils.IndexConfigContext indexConfigContext = DerivedSourceUtils.IndexConfigContext.builder()
-                .indexName(getIndexName(testSuitePrefix, index.getFirst(), addRandom))
+                .indexName(getIndexName(testSuitePrefix, index.v1(), addRandom))
                 .docCount(randomDocCountSupplier.get())
-                .derivedEnabled(index.getSecond())
+                .derivedEnabled(index.v2())
                 .random(new Random(consistentRandomSeed))
                 .fields(
                     List.of(
@@ -643,13 +644,13 @@ public class DerivedSourceTestCase extends KNNRestTestCase {
     ) {
         List<DerivedSourceUtils.IndexConfigContext> indexConfigContexts = new ArrayList<>();
         long consistentRandomSeed = random().nextLong();
-        for (Pair<String, Boolean> index : INDEX_PREFIX_TO_ENABLED) {
+        for (Tuple<String, Boolean> index : INDEX_PREFIX_TO_ENABLED) {
             Supplier<Integer> dimensionSupplier = randomIntegerSupplier(consistentRandomSeed, MIN_DIMENSION, MAX_DIMENSION);
             Supplier<Integer> randomDocCountSupplier = randomIntegerSupplier(consistentRandomSeed, MIN_DOCS, MAX_DOCS);
             DerivedSourceUtils.IndexConfigContext indexConfigContext = DerivedSourceUtils.IndexConfigContext.builder()
-                .indexName(getIndexName(testSuitePrefix, index.getFirst(), addRandom))
+                .indexName(getIndexName(testSuitePrefix, index.v1(), addRandom))
                 .docCount(randomDocCountSupplier.get())
-                .derivedEnabled(index.getSecond())
+                .derivedEnabled(index.v2())
                 .random(new Random(consistentRandomSeed))
                 .fields(
                     List.of(
