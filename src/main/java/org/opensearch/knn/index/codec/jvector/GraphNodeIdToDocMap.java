@@ -43,6 +43,8 @@ public class GraphNodeIdToDocMap {
 
         graphNodeIdsToDocIds = new int[size];
         docIdsToGraphNodeIds = new int[maxDocId];
+        Arrays.fill(graphNodeIdsToDocIds, -1);
+        Arrays.fill(docIdsToGraphNodeIds, -1);
         for (int ord = 0; ord < size; ord++) {
             final int docId = in.readVInt();
             graphNodeIdsToDocIds[ord] = docId;
