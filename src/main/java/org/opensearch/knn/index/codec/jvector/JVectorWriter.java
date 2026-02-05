@@ -46,7 +46,9 @@ import java.util.stream.IntStream;
 
 import static io.github.jbellis.jvector.quantization.KMeansPlusPlusClusterer.UNWEIGHTED;
 import static org.apache.lucene.codecs.lucene99.Lucene99HnswVectorsReader.readVectorEncoding;
-import static org.opensearch.knn.index.codec.jvector.JVectorFormat.*;
+import static org.opensearch.knn.index.codec.jvector.JVectorFormat.PARALLELISM_POOL;
+import static org.opensearch.knn.index.codec.jvector.JVectorFormat.SIMD_POOL_FLUSH;
+import static org.opensearch.knn.index.codec.jvector.JVectorFormat.SIMD_POOL_MERGE;
 
 /**
  * JVectorWriter is responsible for writing vector data into index segments using the JVector library.
@@ -202,31 +204,23 @@ public class JVectorWriter extends KnnVectorsWriter {
         log.info("Flushing jVector graph index");
         for (FieldWriter<?> field : fields) {
             final RandomAccessVectorValues randomAccessVectorValues = field.randomAccessVectorValues;
-            final int[] newToOldOrds = new int[randomAccessVectorValues.size()];
-            for (int ord = 0; ord < randomAccessVectorValues.size(); ord++) {
-                newToOldOrds[ord] = ord;
-            }
-            final RemappedRandomAccessVectorValues remappedRandomAccessVectorValues = new RemappedRandomAccessVectorValues(
-                randomAccessVectorValues,
-                newToOldOrds
-            );
             final BuildScoreProvider buildScoreProvider;
             final PQVectors pqVectors;
             final FieldInfo fieldInfo = field.fieldInfo;
-            if (remappedRandomAccessVectorValues.size() >= minimumBatchSizeForQuantization) {
+            if (randomAccessVectorValues.size() >= minimumBatchSizeForQuantization) {
                 log.info("Calculating codebooks and compressed vectors for field {}", fieldInfo.name);
-                pqVectors = getPQVectors(remappedRandomAccessVectorValues, fieldInfo);
+                pqVectors = getPQVectors(randomAccessVectorValues, fieldInfo);
                 buildScoreProvider = BuildScoreProvider.pqBuildScoreProvider(getVectorSimilarityFunction(fieldInfo), pqVectors);
             } else {
                 log.info(
                     "Vector count: {}, less than limit to trigger PQ quantization: {}, for field {}, will use full precision vectors instead.",
-                    remappedRandomAccessVectorValues.size(),
+                    randomAccessVectorValues.size(),
                     minimumBatchSizeForQuantization,
                     fieldInfo.name
                 );
                 pqVectors = null;
                 buildScoreProvider = BuildScoreProvider.randomAccessScoreProvider(
-                    remappedRandomAccessVectorValues,
+                    randomAccessVectorValues,
                     getVectorSimilarityFunction(fieldInfo)
                 );
             }
@@ -243,19 +237,19 @@ public class JVectorWriter extends KnnVectorsWriter {
 
             OnHeapGraphIndex graph = getGraph(
                 buildScoreProvider,
-                remappedRandomAccessVectorValues,
+                randomAccessVectorValues,
                 fieldInfo,
                 segmentWriteState.segmentInfo.name,
                 SIMD_POOL_FLUSH
             );
-            writeField(field.fieldInfo, remappedRandomAccessVectorValues, pqVectors, graphNodeIdToDocMap, graph);
+            writeField(field.fieldInfo, randomAccessVectorValues, pqVectors, graphNodeIdToDocMap, graph);
 
         }
     }
 
     private void writeField(
         FieldInfo fieldInfo,
-        RemappedRandomAccessVectorValues remappedRandomAccessVectorValues,
+        RandomAccessVectorValues randomAccessVectorValues,
         PQVectors pqVectors,
         GraphNodeIdToDocMap graphNodeIdToDocMap,
         OnHeapGraphIndex graph
@@ -263,10 +257,10 @@ public class JVectorWriter extends KnnVectorsWriter {
         log.info(
             "Writing field {} with vector count: {}, for segment: {}",
             fieldInfo.name,
-            remappedRandomAccessVectorValues.size(),
+            randomAccessVectorValues.size(),
             segmentWriteState.segmentInfo.name
         );
-        final var vectorIndexFieldMetadata = writeGraph(graph, remappedRandomAccessVectorValues, fieldInfo, pqVectors, graphNodeIdToDocMap);
+        final var vectorIndexFieldMetadata = writeGraph(graph, randomAccessVectorValues, fieldInfo, pqVectors, graphNodeIdToDocMap);
         meta.writeInt(fieldInfo.number);
         vectorIndexFieldMetadata.toOutput(meta);
 
@@ -299,14 +293,14 @@ public class JVectorWriter extends KnnVectorsWriter {
     /**
      * Writes the graph and PQ codebooks and compressed vectors to the vector index file
      * @param graph graph
-     * @param remappedRandomAccessVectorValues random access vector values with remapped ordinals
+     * @param randomAccessVectorValues random access vector values with remapped ordinals
      * @param fieldInfo field info
      * @return Tuple of start offset and length of the graph
      * @throws IOException IOException
      */
     private VectorIndexFieldMetadata writeGraph(
         OnHeapGraphIndex graph,
-        RemappedRandomAccessVectorValues remappedRandomAccessVectorValues,
+        RandomAccessVectorValues randomAccessVectorValues,
         FieldInfo fieldInfo,
         PQVectors pqVectors,
         GraphNodeIdToDocMap graphNodeIdToDocMap
@@ -333,17 +327,17 @@ public class JVectorWriter extends KnnVectorsWriter {
                 .fieldNumber(fieldInfo.number)
                 .vectorEncoding(fieldInfo.getVectorEncoding())
                 .vectorSimilarityFunction(fieldInfo.getVectorSimilarityFunction())
-                .vectorDimension(remappedRandomAccessVectorValues.dimension())
+                .vectorDimension(randomAccessVectorValues.dimension())
                 .graphNodeIdToDocMap(graphNodeIdToDocMap);
 
             try (
                 var writer = new OnDiskSequentialGraphIndexWriter.Builder(graph, jVectorIndexWriter).with(
-                    new InlineVectors(remappedRandomAccessVectorValues.dimension())
+                    new InlineVectors(randomAccessVectorValues.dimension())
                 ).build()
             ) {
                 var suppliers = Feature.singleStateFactory(
                     FeatureId.INLINE_VECTORS,
-                    nodeId -> new InlineVectors.State(remappedRandomAccessVectorValues.getVector(nodeId))
+                    nodeId -> new InlineVectors.State(randomAccessVectorValues.getVector(nodeId))
                 );
                 writer.write(suppliers);
                 long endGraphOffset = jVectorIndexWriter.position();
@@ -355,7 +349,7 @@ public class JVectorWriter extends KnnVectorsWriter {
                     log.info(
                         "Writing PQ codebooks and vectors for field {} since the size is {} >= {}",
                         fieldInfo.name,
-                        remappedRandomAccessVectorValues.size(),
+                        randomAccessVectorValues.size(),
                         minimumBatchSizeForQuantization
                     );
                     resultBuilder.pqCodebooksAndVectorsOffset(endGraphOffset);
@@ -373,17 +367,16 @@ public class JVectorWriter extends KnnVectorsWriter {
         }
     }
 
-    private PQVectors getPQVectors(RemappedRandomAccessVectorValues remappedRandomAccessVectorValues, FieldInfo fieldInfo)
-        throws IOException {
+    private PQVectors getPQVectors(RandomAccessVectorValues randomAccessVectorValues, FieldInfo fieldInfo) throws IOException {
         final String fieldName = fieldInfo.name;
         final VectorSimilarityFunction vectorSimilarityFunction = fieldInfo.getVectorSimilarityFunction();
-        log.info("Computing PQ codebooks for field {} for {} vectors", fieldName, remappedRandomAccessVectorValues.size());
+        log.info("Computing PQ codebooks for field {} for {} vectors", fieldName, randomAccessVectorValues.size());
         final long start = Clock.systemDefaultZone().millis();
-        final var M = numberOfSubspacesPerVectorSupplier.apply(remappedRandomAccessVectorValues.dimension());
-        final var numberOfClustersPerSubspace = Math.min(256, remappedRandomAccessVectorValues.size()); // number of centroids per
+        final var M = numberOfSubspacesPerVectorSupplier.apply(randomAccessVectorValues.dimension());
+        final var numberOfClustersPerSubspace = Math.min(256, randomAccessVectorValues.size()); // number of centroids per
         // subspace
         ProductQuantization pq = ProductQuantization.compute(
-            remappedRandomAccessVectorValues,
+            randomAccessVectorValues,
             M, // number of subspaces
             numberOfClustersPerSubspace, // number of centroids per subspace
             vectorSimilarityFunction == VectorSimilarityFunction.EUCLIDEAN, // center the dataset
@@ -396,14 +389,9 @@ public class JVectorWriter extends KnnVectorsWriter {
         final long trainingTime = end - start;
         log.info("Computed PQ codebooks for field {}, in {} millis", fieldName, trainingTime);
         KNNCounter.KNN_QUANTIZATION_TRAINING_TIME.add(trainingTime);
-        log.info("Encoding and building PQ vectors for field {} for {} vectors", fieldName, remappedRandomAccessVectorValues.size());
+        log.info("Encoding and building PQ vectors for field {} for {} vectors", fieldName, randomAccessVectorValues.size());
         // PQVectors pqVectors = pq.encodeAll(randomAccessVectorValues, SIMD_POOL);
-        PQVectors pqVectors = PQVectors.encodeAndBuild(
-            pq,
-            remappedRandomAccessVectorValues.size(),
-            remappedRandomAccessVectorValues,
-            SIMD_POOL_MERGE
-        );
+        PQVectors pqVectors = PQVectors.encodeAndBuild(pq, randomAccessVectorValues.size(), randomAccessVectorValues, SIMD_POOL_MERGE);
         log.info(
             "Encoded and built PQ vectors for field {}, original size: {} bytes, compressed size: {} bytes",
             fieldName,
@@ -843,6 +831,7 @@ public class JVectorWriter extends KnnVectorsWriter {
             this.graphNodeIdToDocMap = new GraphNodeIdToDocMap(graphNodeIdToDocIds);
             this.compactOrdToDocMap = new GraphNodeIdToDocMap(compactOrdToDocIds);
             log.debug("Created RandomAccessMergedFloatVectorValues with {} total vectors from {} readers", size, readers.length);
+
         }
 
         /**
@@ -875,10 +864,6 @@ public class JVectorWriter extends KnnVectorsWriter {
             // Get the leading reader
             PerFieldKnnVectorsFormat.FieldsReader fieldsReader = (PerFieldKnnVectorsFormat.FieldsReader) readers[LEADING_READER_IDX];
             JVectorReader leadingReader = (JVectorReader) fieldsReader.getFieldReader(fieldName);
-            final RemappedRandomAccessVectorValues remappedRandomAccessVectorValues = new RemappedRandomAccessVectorValues(
-                this,
-                graphNodeIdsToRavvOrds
-            );
             final RemappedRandomAccessVectorValues compactRavv = new RemappedRandomAccessVectorValues(this, compactOrdsToRavvOrds);
             // Check if the leading reader has pre-existing PQ codebooks and if so, refine them with the remaining vectors
             if (leadingReader.getProductQuantizationForField(fieldInfo.name).isEmpty()) {
@@ -888,7 +873,6 @@ public class JVectorWriter extends KnnVectorsWriter {
                     fieldName,
                     mergeState.segmentInfo.name
                 );
-                // TODO refine test
                 if (totalLiveVectorsCount >= minimumBatchSizeForQuantization) {
                     log.info(
                         "Calculating new codebooks and compressed vectors for field: {}, with totalVectorCount: {}, above minimumBatchSizeForQuantization: {}",
@@ -1162,7 +1146,7 @@ public class JVectorWriter extends KnnVectorsWriter {
      */
     public OnHeapGraphIndex getGraph(
         BuildScoreProvider buildScoreProvider,
-        RemappedRandomAccessVectorValues remappedRandomAccessVectorValues,
+        RandomAccessVectorValues randomAccessVectorValues,
         FieldInfo fieldInfo,
         String segmentName,
         ForkJoinPool SIMD_POOL
@@ -1185,11 +1169,11 @@ public class JVectorWriter extends KnnVectorsWriter {
          */
         final long start = Clock.systemDefaultZone().millis();
         final OnHeapGraphIndex graphIndex;
-        var vv = remappedRandomAccessVectorValues.threadLocalSupplier();
+        var vv = randomAccessVectorValues.threadLocalSupplier();
 
         log.info("Building graph from merged float vector");
         // parallel graph construction from the merge documents Ids
-        SIMD_POOL.submit(() -> IntStream.range(0, remappedRandomAccessVectorValues.size()).parallel().forEach(ord -> {
+        SIMD_POOL.submit(() -> IntStream.range(0, randomAccessVectorValues.size()).parallel().forEach(ord -> {
             graphIndexBuilder.addGraphNode(ord, vv.get().getVector(ord));
         })).join();
         graphIndexBuilder.cleanup();
