@@ -5,7 +5,6 @@
 package org.opensearch.knn.index.engine;
 
 import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters;
-import com.google.common.primitives.Floats;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.junit.Test;
 import org.opensearch.client.Request;
@@ -203,7 +202,7 @@ public class JVectorConcurrentQueryTests extends OpenSearchIntegTestCase {
 
         // Disable derived source to keep vectors in _source
         // TODO: Enable derived source and read value from doc values instead
-        indexSettings = Settings.builder().put(indexSettings).put( KNN_DERIVED_SOURCE_ENABLED, false).build();
+        indexSettings = Settings.builder().put(indexSettings).put(KNN_DERIVED_SOURCE_ENABLED, false).build();
         createKnnIndex(INDEX_NAME, indexSettings, mapping);
     }
 
@@ -278,11 +277,11 @@ public class JVectorConcurrentQueryTests extends OpenSearchIntegTestCase {
         List<KNNResult> knnSearchResponses = hits.stream().map(hit -> {
             @SuppressWarnings("unchecked")
             Map<String, Object> hitMap = (Map<String, Object>) hit;
-            
+
             // Read vector from _source
             @SuppressWarnings("unchecked")
             Map<String, Object> source = (Map<String, Object>) hitMap.get("_source");
-            
+
             final float[] vector;
             if (source != null && source.containsKey(fieldName)) {
                 @SuppressWarnings("unchecked")
@@ -296,12 +295,8 @@ public class JVectorConcurrentQueryTests extends OpenSearchIntegTestCase {
                 // Return empty vector as fallback
                 vector = new float[0];
             }
-            
-            return new KNNResult(
-                (String) hitMap.get("_id"),
-                vector,
-                ((Double) hitMap.get("_score")).floatValue()
-            );
+
+            return new KNNResult((String) hitMap.get("_id"), vector, ((Double) hitMap.get("_score")).floatValue());
         }).collect(Collectors.toList());
 
         return knnSearchResponses;
