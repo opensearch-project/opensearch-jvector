@@ -74,7 +74,7 @@ public class GraphNodeIdToDocMap {
         // the mapping will not be sparse.
         if (maxDocs < 0.8 * graphNodeIdsToDocIds.length) {
             log.info(
-                "Max docs {} is less than the number of ordinals {}, this implies a lot of deleted documents. Or that some documents are missing vectors. Wasting a lot of memory",
+                "Max docs {} is less than 80% the number of ordinals {}, this implies a lot of deleted documents. Or that some documents are missing vectors. Wasting a lot of memory",
                 maxDocs,
                 graphNodeIdsToDocIds.length
             );
