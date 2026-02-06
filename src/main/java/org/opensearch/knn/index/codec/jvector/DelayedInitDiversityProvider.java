@@ -5,7 +5,8 @@
 
 package org.opensearch.knn.index.codec.jvector;
 
-import java.util.Optional;
+import org.opensearch.common.SetOnce;
+import org.opensearch.common.SetOnce.AlreadySetException;
 
 import io.github.jbellis.jvector.graph.NodeArray;
 import io.github.jbellis.jvector.graph.diversity.DiversityProvider;
@@ -27,7 +28,7 @@ import lombok.NonNull;
  */
 class DelayedInitDiversityProvider implements DiversityProvider {
 
-    private Optional<DiversityProvider> delegate = Optional.empty();
+    private SetOnce<DiversityProvider> delegate = new SetOnce<>();
 
     /**
      * Creates an uninitialized diversity provider.
@@ -35,17 +36,17 @@ class DelayedInitDiversityProvider implements DiversityProvider {
      */
     DelayedInitDiversityProvider() {}
 
-    /** Initialize this DiversityProvider with a delegate */
-    void initialize(@NonNull DiversityProvider delegate) {
-        if (this.delegate.isPresent()) {
-            throw new IllegalStateException("already initialized");
-        }
-        this.delegate = Optional.of(delegate);
+    /**
+     * Initialize this DiversityProvider with a delegate
+     * @throws AlreadySetException if already set
+     */
+    void initialize(@NonNull DiversityProvider delegate) throws AlreadySetException {
+        this.delegate.set(delegate);
     }
 
     @Override
     public double retainDiverse(NodeArray neighbors, int maxDegree, int diverseBefore, BitSet selected) {
-        if (delegate.isEmpty()) {
+        if (delegate.get() == null) {
             throw new IllegalStateException("DelayedInitDiversityProvider was not initialzied (call initialize() before use)");
         }
         return delegate.get().retainDiverse(neighbors, maxDegree, diverseBefore, selected);

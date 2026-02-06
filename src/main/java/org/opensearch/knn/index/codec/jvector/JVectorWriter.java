@@ -574,6 +574,11 @@ public class JVectorWriter extends KnnVectorsWriter {
         private static final int READER_ID = 0;
         private static final int READER_ORD = 1;
         private static final int LEADING_READER_IDX = 0;
+        // a number in [0.0, 1.0] that indicates how sparse heap graph ordinals are allowed
+        // to become before we break out of leading segment merge to make the ordinals compact again.
+        // Ordinal sparsity has a memory cost (in terms map memory usage)
+        // during leading segment merge.
+        private static final double MIN_HEAP_GRAPH_ORDINAL_DENSITY = 0.4;
 
         private final VectorTypeSupport VECTOR_TYPE_SUPPORT = VectorizationProvider.getInstance().getVectorTypeSupport();
 
@@ -983,7 +988,8 @@ public class JVectorWriter extends KnnVectorsWriter {
                 // even though Lucene should ensure that the sum of maxDoc across all segments
                 // is under IndexWriter.MAX_DOCS, our leading segment heap graph has holes
                 // that Lucene won't know about, which may push heapOrdUpperBound out of range.
-                if (heapOrdUpperBoundLong > IndexWriter.MAX_DOCS || heapOrdUpperBoundLong > Integer.MAX_VALUE) {
+                // IndexWriter.MAX_DOCS = Integer.MAX_VALUE - 128
+                if (heapOrdUpperBoundLong > IndexWriter.MAX_DOCS) {
                     log.warn(
                         "New ordinal upper bound for neighbor score cache is too large. "
                             + "This may indicate many deletes, or that you're approaching the maximum segment size. "
@@ -992,9 +998,22 @@ public class JVectorWriter extends KnnVectorsWriter {
                     return false; // indicate skipped
                 }
 
+                var heapGraphOrdinalDensity = totalLiveVectorsCount / (double) heapOrdUpperBoundLong;
+                if (heapGraphOrdinalDensity < MIN_HEAP_GRAPH_ORDINAL_DENSITY) {
+                    log.warn(
+                        "Heap ordinals will be insufficiently dense ({} < {}). "
+                            + "Will skip leading segment merge. (totalLiveVectors={}, heapOrdUpperBound={})",
+                        heapGraphOrdinalDensity,
+                        MIN_HEAP_GRAPH_ORDINAL_DENSITY,
+                        totalLiveVectorsCount,
+                        heapOrdUpperBoundLong
+                    );
+                    return false;
+                }
+
                 log.info("Starting leading segment merge for segment {} on field {}", segmentWriteState.segmentInfo.name, fieldInfo.name);
 
-                // we already checked that heapOrdUpperBoundLong <= Integer.MAX_VALUE
+                // we already checked that heapOrdUpperBoundLong <= IndexWriter.MAX_DOCS < Integer.MAX_VALUE
                 int heapOrdUpperBound = Math.toIntExact(heapOrdUpperBoundLong);
 
                 // While creating score providers and updating the graph, we need to supply a RAVV that
