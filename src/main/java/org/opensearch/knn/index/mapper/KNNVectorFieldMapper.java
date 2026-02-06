@@ -188,7 +188,7 @@ public abstract class KNNVectorFieldMapper extends ParametrizedFieldMapper {
             this.knnMethodConfigContext = knnMethodConfigContext;
             this.originalParameters = originalParameters;
 
-            this.hasDocValues = Parameter.docValuesParam(m -> toType(m).hasDocValues, false);
+            this.hasDocValues = Parameter.docValuesParam(m -> toType(m).hasDocValues, true);
         }
 
         @Override
@@ -235,7 +235,7 @@ public abstract class KNNVectorFieldMapper extends ParametrizedFieldMapper {
                 // hasDocValues to be true to maintain proper functionality for vector search operations.
                 // For indices created on or after 3.0.0, we automatically set hasDocValues to true if not
                 // explicitly configured to ensure consistent behavior.
-                if (indexCreatedVersion.onOrAfter(Version.V_3_0_0) && hasDocValues.isConfigured() == false) {
+                if (indexCreatedVersion.onOrAfter(Version.V_3_3_2) && hasDocValues.isConfigured() == false) {
                     hasDocValues = Parameter.docValuesParam(m -> toType(m).hasDocValues, true);
                 }
                 return FlatVectorFieldMapper.createFieldMapper(
@@ -265,7 +265,7 @@ public abstract class KNNVectorFieldMapper extends ParametrizedFieldMapper {
                     .copyTo(copyToBuilder)
                     .ignoreMalformed(ignoreMalformed)
                     .stored(stored.getValue())
-                    .hasDocValues(true)
+                    .hasDocValues(hasDocValues.get())
                     .originalKnnMethodContext(knnMethodContext.get())
                     .build();
                 return LuceneFieldMapper.createFieldMapper(
