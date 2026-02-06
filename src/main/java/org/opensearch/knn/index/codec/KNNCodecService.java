@@ -18,7 +18,12 @@ public class KNNCodecService extends CodecService {
     private final MapperService mapperService;
 
     public KNNCodecService(CodecServiceConfig codecServiceConfig) {
-        super(codecServiceConfig.getMapperService(), codecServiceConfig.getIndexSettings(), codecServiceConfig.getLogger());
+        super(
+            codecServiceConfig.getMapperService(),
+            codecServiceConfig.getIndexSettings(),
+            codecServiceConfig.getLogger(),
+            codecServiceConfig.getAdditionalCodecs()
+        );
         mapperService = codecServiceConfig.getMapperService();
     }
 
