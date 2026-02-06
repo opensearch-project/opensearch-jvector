@@ -4,12 +4,17 @@ This document contains a list of maintainers in this repo. See [opensearch-proje
 
 ## Current Maintainers
 
-| Maintainer    | GitHub ID                             | Affiliation |
-|---------------|---------------------------------------|-------------|
-| Samuel Herman | [sam-herman](https://github.com/sam-herman) | IBM         |
-| Jake Luciani  | [tjake](https://github.com/tjake)          | DataStax    |
-| Jim Dickinson | [jimdickinson](https://github.com/jimdickinson)            | IBM         |
-| Chris Mills   | [sandoichi](https://github.com/sandoichi)            | IBM         |
-| Akash Shankaran | [akash-shankaran](https://github.com/akashshankar)            | IBM         |
+| Maintainer      | GitHub ID                                             | Affiliation |
+|-----------------|-------------------------------------------------------|-------------|
+| Samuel Herman   | [sam-herman](https://github.com/sam-herman)           | IBM         |
+| Jake Luciani    | [tjake](https://github.com/tjake)                     | DataStax    |
+| Jim Dickinson   | [jimdickinson](https://github.com/jimdickinson)       | IBM         |
+| Chris Mills     | [sandoichi](https://github.com/sandoichi)             | IBM         |
+| Akash Shankaran | [akash-shankaran](https://github.com/akash-shankaran) | IBM         |
+| Andriy Redko    | [reta](https://github.com/reta)                       | IBM         |
 
+## Emeritus
 
+| Maintainer      | GitHub ID                                             | Affiliation |
+|-----------------|-------------------------------------------------------|-------------|
+| Jake Luciani    | [tjake](https://github.com/tjake)                     | Anthropic   |
