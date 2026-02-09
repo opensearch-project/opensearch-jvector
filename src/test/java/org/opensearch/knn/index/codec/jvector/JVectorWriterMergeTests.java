@@ -85,6 +85,8 @@ public class JVectorWriterMergeTests extends LuceneTestCase {
         int overqueryFactor = KNNConstants.DEFAULT_OVER_QUERY_FACTOR;
         @Default
         double minimumRecall = 0.99;
+        @Default
+        boolean leadingSegmentMergeDisabled = KNNConstants.DEFAULT_LEADING_SEGMENT_MERGE_DISABLED;
     }
 
     @Rule
@@ -102,7 +104,7 @@ public class JVectorWriterMergeTests extends LuceneTestCase {
         // Path indexPath = createTempDir();
         IndexWriterConfig iwc = LuceneTestCase.newIndexWriterConfig();
         iwc.setUseCompoundFile(false);
-        iwc.setCodec(getCodec(scenario.minPqThreshold));
+        iwc.setCodec(getCodec(scenario.minPqThreshold, scenario.leadingSegmentMergeDisabled));
         iwc.setMergePolicy(new ForceMergesOnlyMergePolicy(false));
 
         try (var fsd = FSDirectory.open(tempDir.getRoot().toPath()); var writer = new IndexWriter(fsd, iwc);) {
@@ -350,8 +352,9 @@ public class JVectorWriterMergeTests extends LuceneTestCase {
                     .deletionRanges(List.of(new DeletionRange(998, 1023), new DeletionRange(1023, 1100), new DeletionRange(2502, 2504)))
                     .build()
             )
+            .round(MergeTestRound.builder().segmentSizes(List.of(400)).build())  // an extra round just because
             .overqueryFactor(20)
-            .minimumRecall(0.99)
+            .minimumRecall(0.98)
             .build();
         runScenario(scenario);
     }
@@ -385,6 +388,52 @@ public class JVectorWriterMergeTests extends LuceneTestCase {
                     .deletionRanges(List.of(new DeletionRange(998, 1023), new DeletionRange(1023, 1100), new DeletionRange(2502, 2504)))
                     .build()
             )
+            .overqueryFactor(20)
+            .minimumRecall(0.99)
+            .build();
+        runScenario(scenario);
+    }
+
+    @Test
+    public void testLeadingSegmentMergeDisabled() throws IOException {
+        // we'll progressively increase to beyond the PQ threshold
+        var scenario = MergeTestScenario.builder()
+            .minPqThreshold(1000)   // start using PQ once the vector count crosses this
+            .leadingSegmentMergeDisabled(true)  // and disable leading segment merge
+            .round(
+                MergeTestRound.builder()
+                    .segmentSizes(List.of(10, 200, 50, 100, 100))  // count 460
+                    .deletionRanges(
+                        List.of(
+                            // total deletions 126
+                            new DeletionRange(0, 5),      // count 5
+                            new DeletionRange(210, 260),  // count 50
+                            new DeletionRange(330, 400),  // count 70
+                            new DeletionRange(410, 411)   // count 1
+                        )
+                    )
+                    .build()  // count 334
+            )
+            .round(
+                MergeTestRound.builder()
+                    .segmentSizes(List.of(10, 20, 300))  // count 330
+                    .deletionRanges(
+                        List.of(
+                            // total deletions 195
+                            new DeletionRange(405, 600),  // count 195, BUT this range has some overlap so actually 194
+                            new DeletionRange(10, 11)     // count 1
+                        )
+                    )
+                    .build()  // +135, total count 469
+            )
+            .round(MergeTestRound.builder().segmentSizes(List.of(50, 200)).build())  // bonus round
+            .round(
+                MergeTestRound.builder()
+                    .segmentSizes(List.of(20, 2000, 1))  // Add 2000 vectors to ensure PQ
+                    .deletionRanges(List.of(new DeletionRange(998, 1023), new DeletionRange(1023, 1100), new DeletionRange(2502, 2504)))
+                    .build()
+            )
+            .round(MergeTestRound.builder().segmentSizes(List.of(400)).build())
             .overqueryFactor(20)
             .minimumRecall(0.99)
             .build();

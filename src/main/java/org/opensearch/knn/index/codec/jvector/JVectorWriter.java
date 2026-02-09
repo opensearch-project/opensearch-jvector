@@ -96,6 +96,7 @@ public class JVectorWriter extends KnnVectorsWriter {
                                                                                  // as a function of the original dimension
     private final int minimumBatchSizeForQuantization; // Threshold for the vector count above which we will trigger PQ quantization
     private final boolean hierarchyEnabled;
+    private final boolean leadingSegmentMergeDisabled;
 
     private boolean finished = false;
 
@@ -107,7 +108,8 @@ public class JVectorWriter extends KnnVectorsWriter {
         float alpha,
         Function<Integer, Integer> numberOfSubspacesPerVectorSupplier,
         int minimumBatchSizeForQuantization,
-        boolean hierarchyEnabled
+        boolean hierarchyEnabled,
+        boolean leadingSegmentMergeDisabled
     ) throws IOException {
         this.segmentWriteState = segmentWriteState;
         this.maxConn = maxConn;
@@ -117,6 +119,8 @@ public class JVectorWriter extends KnnVectorsWriter {
         this.numberOfSubspacesPerVectorSupplier = numberOfSubspacesPerVectorSupplier;
         this.minimumBatchSizeForQuantization = minimumBatchSizeForQuantization;
         this.hierarchyEnabled = hierarchyEnabled;
+        this.leadingSegmentMergeDisabled = leadingSegmentMergeDisabled;
+
         String metaFileName = IndexFileNames.segmentFileName(
             segmentWriteState.segmentInfo.name,
             segmentWriteState.segmentSuffix,
@@ -796,7 +800,7 @@ public class JVectorWriter extends KnnVectorsWriter {
 
                 for (int docId = it.nextDoc(); docId != DocIdSetIterator.NO_MORE_DOCS; docId = it.nextDoc()) {
                     if (docMaps[readerIdx].get(docId) == -1) {
-                        log.warn(
+                        log.debug(
                             "Document {} in reader {} is not mapped to a global ordinal from the merge docMaps. Will skip this document for now",
                             docId,
                             readerIdx
@@ -956,11 +960,21 @@ public class JVectorWriter extends KnnVectorsWriter {
         /**
          * <p>Perform leading segment merge.
          *
-         * <p>In some cases leading segment merge should be skipped, and this method will return false.
+         * <p>
+         * In some cases leading segment merge should be skipped, and this method will return false.
+         * This is the case when:
+         * - Leading segment merge is disabled through configuration
+         * - There is a risk of integer overflow due to sparsity of the OnHeapGraph
+         * - The OnHeapGraph is too sparse relative to it's size
          *
          * @return a boolean value indicating if leading segment merge was performed
          */
         private boolean tryLeadingSegmentMerge() throws IOException {
+            if (leadingSegmentMergeDisabled) {
+                log.info("Leading segment merge is disabled, skipping");
+                return false;
+            }
+
             var leadingFieldsReader = (PerFieldKnnVectorsFormat.FieldsReader) readers[LEADING_READER_IDX];
             var leadingReader = (JVectorReader) leadingFieldsReader.getFieldReader(fieldInfo.name);
             var graphReader = leadingReader.getNeighborsScoreCacheForField(fieldInfo.name);

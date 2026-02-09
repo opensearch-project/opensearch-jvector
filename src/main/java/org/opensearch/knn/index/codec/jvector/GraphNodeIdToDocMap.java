@@ -72,9 +72,10 @@ public class GraphNodeIdToDocMap {
         final int maxDocs = maxDocId + 1;
         // We are going to assume that the number of ordinals is roughly the same as the number of documents in the segment, therefore,
         // the mapping will not be sparse.
+        // Note that the merge process may create ephemeral mappings that are sparse.
         if (maxDocs < 0.8 * graphNodeIdsToDocIds.length) {
             log.info(
-                "Max docs {} is less than 80% the number of ordinals {}, this implies a lot of deleted documents. Or that some documents are missing vectors. Wasting a lot of memory",
+                "Max docs {} is less than 80% the number of ordinals {}. This is normal if many docs were recently deleted or overwritten. Otherwise if many docs are missing vectors this is a waste of memory.",
                 maxDocs,
                 graphNodeIdsToDocIds.length
             );

@@ -45,6 +45,7 @@ public class JVectorFormat extends KnnVectorsFormat {
     private final float alpha;
     private final float neighborOverflow;
     private final boolean hierarchyEnabled;
+    private final boolean leadingSegmentMergeDisabled;
 
     public JVectorFormat() {
         this(
@@ -55,11 +56,16 @@ public class JVectorFormat extends KnnVectorsFormat {
             KNNConstants.DEFAULT_ALPHA_VALUE.floatValue(),
             JVectorFormat::getDefaultNumberOfSubspacesPerVector,
             KNNConstants.DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION,
-            KNNConstants.DEFAULT_HIERARCHY_ENABLED
+            KNNConstants.DEFAULT_HIERARCHY_ENABLED,
+            KNNConstants.DEFAULT_LEADING_SEGMENT_MERGE_DISABLED
         );
     }
 
     public JVectorFormat(int minBatchSizeForQuantization) {
+        this(minBatchSizeForQuantization, KNNConstants.DEFAULT_LEADING_SEGMENT_MERGE_DISABLED);
+    }
+
+    public JVectorFormat(int minBatchSizeForQuantization, boolean leadingSegmentMergeDisabled) {
         this(
             NAME,
             DEFAULT_MAX_CONN,
@@ -68,7 +74,8 @@ public class JVectorFormat extends KnnVectorsFormat {
             KNNConstants.DEFAULT_ALPHA_VALUE.floatValue(),
             JVectorFormat::getDefaultNumberOfSubspacesPerVector,
             minBatchSizeForQuantization,
-            KNNConstants.DEFAULT_HIERARCHY_ENABLED
+            KNNConstants.DEFAULT_HIERARCHY_ENABLED,
+            leadingSegmentMergeDisabled
         );
     }
 
@@ -79,7 +86,8 @@ public class JVectorFormat extends KnnVectorsFormat {
         float alpha,
         Function<Integer, Integer> numberOfSubspacesPerVectorSupplier,
         int minBatchSizeForQuantization,
-        boolean hierarchyEnabled
+        boolean hierarchyEnabled,
+        boolean leadingSegmentMergeDisabled
     ) {
         this(
             NAME,
@@ -89,7 +97,8 @@ public class JVectorFormat extends KnnVectorsFormat {
             alpha,
             numberOfSubspacesPerVectorSupplier,
             minBatchSizeForQuantization,
-            hierarchyEnabled
+            hierarchyEnabled,
+            leadingSegmentMergeDisabled
         );
     }
 
@@ -101,7 +110,8 @@ public class JVectorFormat extends KnnVectorsFormat {
         float alpha,
         Function<Integer, Integer> numberOfSubspacesPerVectorSupplier,
         int minBatchSizeForQuantization,
-        boolean hierarchyEnabled
+        boolean hierarchyEnabled,
+        boolean leadingSegmentMergeDisabled
     ) {
         super(name);
         this.maxConn = maxConn;
@@ -111,6 +121,7 @@ public class JVectorFormat extends KnnVectorsFormat {
         this.alpha = alpha;
         this.neighborOverflow = neighborOverflow;
         this.hierarchyEnabled = hierarchyEnabled;
+        this.leadingSegmentMergeDisabled = leadingSegmentMergeDisabled;
     }
 
     @Override
@@ -123,7 +134,8 @@ public class JVectorFormat extends KnnVectorsFormat {
             alpha,
             numberOfSubspacesPerVectorSupplier,
             minBatchSizeForQuantization,
-            hierarchyEnabled
+            hierarchyEnabled,
+            leadingSegmentMergeDisabled
         );
     }
 
