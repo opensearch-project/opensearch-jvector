@@ -6,9 +6,10 @@
 package org.opensearch.knn.common;
 
 import lombok.experimental.UtilityClass;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.lucene.index.FieldInfo;
 import org.apache.lucene.index.LeafReader;
+import org.apache.lucene.index.VectorEncoding;
 import org.opensearch.common.Nullable;
 import org.opensearch.knn.index.SpaceType;
 import org.opensearch.knn.index.VectorDataType;
@@ -44,6 +45,14 @@ public class FieldInfoExtractor {
      */
     public static VectorDataType extractVectorDataType(final FieldInfo fieldInfo) {
         String vectorDataTypeString = fieldInfo.getAttribute(KNNConstants.VECTOR_DATA_TYPE_FIELD);
+
+         if (StringUtils.isEmpty(vectorDataTypeString)) {
+            if (fieldInfo.hasVectorValues()) {
+                return fieldInfo.getVectorEncoding() == VectorEncoding.FLOAT32
+                        ? VectorDataType.FLOAT
+                        : VectorDataType.BYTE;
+            }
+        }
         return StringUtils.isNotEmpty(vectorDataTypeString) ? VectorDataType.get(vectorDataTypeString) : VectorDataType.DEFAULT;
     }
 
