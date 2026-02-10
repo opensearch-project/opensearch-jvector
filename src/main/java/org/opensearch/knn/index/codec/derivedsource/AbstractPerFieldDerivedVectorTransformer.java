@@ -35,18 +35,7 @@ public abstract class AbstractPerFieldDerivedVectorTransformer implements PerFie
         if (vectorValue instanceof byte[]) {
             BytesRef vectorBytesRef = new BytesRef((byte[]) vectorValue);
             // Determine the vector data type based on the vector encoding to ensure proper deserialization
-            VectorDataType vectorDataType;
-            if (fieldInfo.hasVectorValues()) {
-                // For vectors with native Lucene encoding, use the encoding type
-                if (fieldInfo.getVectorEncoding() == VectorEncoding.BYTE) {
-                    vectorDataType = VectorDataType.BYTE;
-                } else {
-                    vectorDataType = VectorDataType.FLOAT;
-                }
-            } else {
-                // For binary doc values, use the data type from field attributes
-                vectorDataType = FieldInfoExtractor.extractVectorDataType(fieldInfo);
-            }
+            VectorDataType vectorDataType = FieldInfoExtractor.extractVectorDataType(fieldInfo);
             return KNNVectorFieldMapperUtil.deserializeStoredVector(vectorBytesRef, vectorDataType);
         }
         return vectorCloneSupplier.get();

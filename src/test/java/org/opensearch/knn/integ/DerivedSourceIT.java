@@ -42,14 +42,12 @@ public class DerivedSourceIT extends DerivedSourceTestCase {
     }
 
     @SneakyThrows
-    @Ignore
     public void testFlatFields() {
         List<DerivedSourceUtils.IndexConfigContext> indexConfigContexts = getFlatIndexContexts("derivedit", true, true);
         testDerivedSourceE2E(indexConfigContexts);
     }
 
     @SneakyThrows
-    @Ignore
     public void testMetaFields() {
         List<DerivedSourceUtils.IndexConfigContext> indexConfigContexts = getIndexContextsWithMetaFields("derivedit", true, true);
         List<String> metaFields = List.of(ROUTING_FIELD, "_id", "_score");
@@ -76,7 +74,6 @@ public class DerivedSourceIT extends DerivedSourceTestCase {
     }
 
     @SneakyThrows
-    @Ignore
     public void testObjectField() {
         List<DerivedSourceUtils.IndexConfigContext> indexConfigContexts = getObjectIndexContexts("derivedit", true);
         testDerivedSourceE2E(indexConfigContexts);
