@@ -209,6 +209,7 @@ public class LuceneEngineIT extends KNNRestTestCase {
         assertEquals(new TreeMap<>(mappingMap), new TreeMap<>(getIndexMappingAsMap(INDEX_NAME)));
 
         Float[] vector = new Float[] { 2.0f, 4.5f, 6.5f };
+
         addKnnDoc(INDEX_NAME, DOC_ID, FIELD_NAME, vector);
 
         refreshIndex(INDEX_NAME);

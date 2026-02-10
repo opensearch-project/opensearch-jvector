@@ -5,7 +5,6 @@
 package org.opensearch.knn.index.engine;
 
 import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters;
-import com.google.common.primitives.Floats;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.junit.Test;
 import org.opensearch.client.Request;
@@ -40,6 +39,7 @@ import java.util.stream.Collectors;
 
 import static org.opensearch.knn.KNNRestTestCase.*;
 import static org.opensearch.knn.TestUtils.generateRandomVectors;
+import static org.opensearch.knn.index.KNNSettings.KNN_DERIVED_SOURCE_ENABLED;
 import static org.opensearch.knn.index.engine.CommonTestUtils.DIMENSION;
 
 @OpenSearchIntegTestCase.ClusterScope(scope = OpenSearchIntegTestCase.Scope.TEST, numDataNodes = 1)
@@ -199,6 +199,10 @@ public class JVectorConcurrentQueryTests extends OpenSearchIntegTestCase {
         String mapping = CommonTestUtils.createIndexMapping(dimension, spaceType, vectorDataType);
         Settings indexSettings = CommonTestUtils.getDefaultIndexSettings();
         // indexSettings = Settings.builder().put(indexSettings).put(INDEX_USE_COMPOUND_FILE.getKey(), false).build();
+
+        // Disable derived source to keep vectors in _source
+        // TODO: Enable derived source and read value from doc values instead
+        indexSettings = Settings.builder().put(indexSettings).put(KNN_DERIVED_SOURCE_ENABLED, false).build();
         createKnnIndex(INDEX_NAME, indexSettings, mapping);
     }
 
@@ -272,16 +276,27 @@ public class JVectorConcurrentQueryTests extends OpenSearchIntegTestCase {
         @SuppressWarnings("unchecked")
         List<KNNResult> knnSearchResponses = hits.stream().map(hit -> {
             @SuppressWarnings("unchecked")
-            final float[] vector = Floats.toArray(
-                Arrays.stream(
-                    ((ArrayList<Float>) ((Map<String, Object>) ((Map<String, Object>) hit).get("_source")).get(fieldName)).toArray()
-                ).map(Object::toString).map(Float::valueOf).collect(Collectors.toList())
-            );
-            return new KNNResult(
-                (String) ((Map<String, Object>) hit).get("_id"),
-                vector,
-                ((Double) ((Map<String, Object>) hit).get("_score")).floatValue()
-            );
+            Map<String, Object> hitMap = (Map<String, Object>) hit;
+
+            // Read vector from _source
+            @SuppressWarnings("unchecked")
+            Map<String, Object> source = (Map<String, Object>) hitMap.get("_source");
+
+            final float[] vector;
+            if (source != null && source.containsKey(fieldName)) {
+                @SuppressWarnings("unchecked")
+                ArrayList<Number> vectorList = (ArrayList<Number>) source.get(fieldName);
+                vector = new float[vectorList.size()];
+                for (int i = 0; i < vectorList.size(); i++) {
+                    vector[i] = vectorList.get(i).floatValue();
+                }
+            } else {
+                logger.warn("Vector field '{}' not found in _source for document {}", fieldName, hitMap.get("_id"));
+                // Return empty vector as fallback
+                vector = new float[0];
+            }
+
+            return new KNNResult((String) hitMap.get("_id"), vector, ((Double) hitMap.get("_score")).floatValue());
         }).collect(Collectors.toList());
 
         return knnSearchResponses;

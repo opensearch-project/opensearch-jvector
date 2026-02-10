@@ -13,9 +13,13 @@ import com.google.common.primitives.Ints;
 import com.jayway.jsonpath.JsonPath;
 import lombok.SneakyThrows;
 import lombok.extern.log4j.Log4j2;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.hc.core5.http.ParseException;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.hc.core5.net.URIBuilder;
+import org.hamcrest.Matchers;
 import org.opensearch.Version;
+import org.opensearch.common.xcontent.json.JsonXContent;
 import org.opensearch.core.common.bytes.BytesReference;
 import org.opensearch.common.xcontent.XContentHelper;
 import org.opensearch.core.xcontent.DeprecationHandler;
@@ -112,6 +116,8 @@ public class KNNRestTestCase extends ODFERestTestCase {
     public static final String FIELD_NAME = "test_field";
     public static final String FIELD_NAME_NON_KNN = "test_field_non_knn";
     public static final String PROPERTIES_FIELD = "properties";
+    public static final String ROUTING_FIELD = "_routing";
+    public static final String REQUIRED_FIELD = "required";
     public static final String STORE_FIELD = "store";
     public static final String STORED_QUERY_FIELD = "stored_fields";
     public static final String MATCH_ALL_QUERY_FIELD = "match_all";
@@ -644,6 +650,20 @@ public class KNNRestTestCase extends ODFERestTestCase {
         assertEquals(request.getEndpoint() + ": failed", RestStatus.OK, RestStatus.fromCode(response.getStatusLine().getStatusCode()));
     }
 
+    /**
+     * Adds a doc where document is represented as a string.
+     */
+    protected void addKnnDoc(final String index, final String docId, final String document, final String routingValue) throws IOException {
+        String endpoint = String.join("/", index, "_doc", docId);
+        if (!StringUtils.isEmpty(routingValue)) {
+            endpoint = endpoint + "?" + "routing=" + routingValue;
+        }
+        Request request = new Request("POST", endpoint);
+        request.setJsonEntity(document);
+        Response response = client().performRequest(request);
+        assertEquals(request.getEndpoint() + ": failed", RestStatus.CREATED, RestStatus.fromCode(response.getStatusLine().getStatusCode()));
+    }
+
     protected <T> void addNonKNNDoc(String index, String docId, String fieldName, String text) throws IOException {
         Request request = new Request("POST", "/" + index + "/_doc/" + docId + "?refresh=true");
 
@@ -793,40 +813,16 @@ public class KNNRestTestCase extends ODFERestTestCase {
     /**
      * Update a KNN Doc using the POST /\<index_name\>/_update/\<doc_id\>. Only the vector field will be updated.
      */
-    protected void updateKnnDocWithUpdateAPI(String index, String docId, String fieldName, Object[] vector) throws IOException {
+    protected void updateUpdateAPI(String index, String docId, String body) throws IOException {
         Request request = new Request("POST", "/" + index + "/_update/" + docId + "?refresh=true");
-        XContentBuilder builder = XContentFactory.jsonBuilder().startObject().startObject("doc");
-        String parent = ParentChildHelper.getParentField(fieldName);
-        if (parent != null) {
-            builder.startObject(parent).field(fieldName, vector).endObject();
-        } else {
-            builder.field(fieldName, vector);
-        }
-        builder.endObject().endObject();
-        request.setJsonEntity(builder.toString());
+        request.setJsonEntity(body);
         Response response = client().performRequest(request);
         assertEquals(request.getEndpoint() + ": failed", RestStatus.OK, RestStatus.fromCode(response.getStatusLine().getStatusCode()));
     }
 
-    protected void updateKnnDocByQuery(String index, String docId, String fieldName, Object[] vector) throws IOException {
+    protected void updateKnnDocByQuery(String index, String query) throws IOException {
         Request request = new Request("POST", "/" + index + "/_update_by_query?refresh=true");
-        XContentBuilder builder = XContentFactory.jsonBuilder()
-            .startObject()
-            .startObject("query")
-            .startObject("term")
-            .field("id", docId)
-            .endObject()
-            .endObject()
-            .startObject("script")
-            .field("source", "ctx._source." + fieldName + " = params.newValue")
-            .field("lang", "painless")
-            .startObject("params")
-            .field("newValue", vector)
-            .endObject()
-            .endObject()
-            .endObject();
-        request.setJsonEntity(builder.toString());
-
+        request.setJsonEntity(query);
         Response response = client().performRequest(request);
         assertEquals(request.getEndpoint() + ": failed", RestStatus.OK, RestStatus.fromCode(response.getStatusLine().getStatusCode()));
     }
@@ -893,6 +889,18 @@ public class KNNRestTestCase extends ODFERestTestCase {
     }
 
     /**
+     * Retrieve document by index and document id
+     */
+    protected Map<String, Object> getKnnDoc(final String index, final String docId, final String routingValue) throws Exception {
+
+        String endpoint = String.join("/", index, "_doc", docId);
+        if (!StringUtils.isEmpty(routingValue)) {
+            endpoint += "?routing=" + routingValue;
+        }
+        return getKnnDoc(endpoint);
+    }
+
+    /**
      * Utility to update  settings
      */
     protected void updateClusterSettings(String settingKey, Object value) throws Exception {
@@ -952,7 +960,9 @@ public class KNNRestTestCase extends ODFERestTestCase {
             .put("number_of_shards", 1)
             .put("number_of_replicas", 0)
             .put(KNN_INDEX, true)
+            // .put(KNNSettings.KNN_DERIVED_SOURCE_ENABLED, true)
             .put(INDEX_KNN_ADVANCED_APPROXIMATE_THRESHOLD, approximateThreshold)
+            // .put("use_compound_file", false)
             .build();
     }
 
@@ -2074,5 +2084,50 @@ public class KNNRestTestCase extends ODFERestTestCase {
      */
     protected static String randomLowerCaseString() {
         return randomAlphaOfLengthBetween(MIN_CODE_UNITS, MAX_CODE_UNITS).toLowerCase(Locale.ROOT);
+    }
+
+    protected static void restoreSnapshot(
+        String restoreIndexSuffix,
+        List<String> indices,
+        String repository,
+        String snapshot,
+        boolean waitForCompletion
+    ) throws IOException {
+        // valid restore
+        XContentBuilder restoreCommand = JsonXContent.contentBuilder().startObject();
+        restoreCommand.field("indices", String.join(",", indices));
+        restoreCommand.field("rename_pattern", "(.+)");
+        restoreCommand.field("rename_replacement", "$1" + restoreIndexSuffix);
+        restoreCommand.endObject();
+
+        Request restoreRequest = new Request("POST", "/_snapshot/" + repository + "/" + snapshot + "/_restore");
+        restoreRequest.addParameter("wait_for_completion", "true");
+        restoreRequest.setJsonEntity(restoreCommand.toString());
+
+        final Response restoreResponse = client().performRequest(restoreRequest);
+        assertThat(
+            "Failed to restore snapshot [" + snapshot + "] from repository [" + repository + "]: " + String.valueOf(restoreResponse),
+            restoreResponse.getStatusLine().getStatusCode(),
+            Matchers.equalTo(RestStatus.OK.getStatus())
+        );
+    }
+
+    private Map<String, Object> getKnnDoc(String endpoint) throws IOException, ParseException {
+        final Request request = new Request("GET", endpoint);
+        request.addParameter("ignore", "404");
+        final Response response = client().performRequest(request);
+
+        final Map<String, Object> responseMap = createParser(
+            MediaTypeRegistry.getDefaultMediaType().xContent(),
+            EntityUtils.toString(response.getEntity())
+        ).map();
+
+        assertNotNull(responseMap);
+        // assertTrue((Boolean) responseMap.get(DOCUMENT_FIELD_FOUND));
+        // assertNotNull(responseMap.get(DOCUMENT_FIELD_SOURCE));
+
+        final Map<String, Object> docMap = (Map<String, Object>) responseMap.get(DOCUMENT_FIELD_SOURCE);
+
+        return docMap;
     }
 }

@@ -15,20 +15,14 @@ import lombok.Getter;
 import lombok.NonNull;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.FieldType;
-import org.apache.lucene.document.KnnByteVectorField;
-import org.apache.lucene.document.KnnFloatVectorField;
 import org.opensearch.Version;
 import org.opensearch.common.Explicit;
-import org.opensearch.knn.index.KNNVectorSimilarityFunction;
-import org.opensearch.knn.index.VectorDataType;
-import org.opensearch.knn.index.VectorField;
+import org.opensearch.knn.index.*;
 import org.opensearch.knn.index.engine.KNNEngine;
 import org.opensearch.knn.index.engine.KNNLibraryIndexingContext;
 import org.opensearch.knn.index.engine.KNNMethodConfigContext;
 import org.opensearch.knn.index.engine.KNNMethodContext;
 
-import static org.opensearch.knn.common.KNNConstants.DERIVED_VECTOR_FIELD_ATTRIBUTE_KEY;
-import static org.opensearch.knn.common.KNNConstants.DERIVED_VECTOR_FIELD_ATTRIBUTE_TRUE_VALUE;
 import static org.opensearch.knn.index.mapper.KNNVectorFieldMapperUtil.createStoredFieldForByteVector;
 import static org.opensearch.knn.index.mapper.KNNVectorFieldMapperUtil.createStoredFieldForFloatVector;
 import static org.opensearch.knn.index.mapper.KNNVectorFieldMapperUtil.buildDocValuesFieldType;
@@ -50,8 +44,7 @@ public class LuceneFieldMapper extends KNNVectorFieldMapper {
         Map<String, String> metaValue,
         KNNMethodConfigContext knnMethodConfigContext,
         CreateLuceneFieldMapperInput createLuceneFieldMapperInput,
-        OriginalMappingParameters originalMappingParameters,
-        boolean isDerivedSourceEnabled
+        OriginalMappingParameters originalMappingParameters
     ) {
         final KNNVectorFieldType mappedFieldType = new KNNVectorFieldType(
             fullname,
@@ -85,21 +78,14 @@ public class LuceneFieldMapper extends KNNVectorFieldMapper {
             }
         );
 
-        return new LuceneFieldMapper(
-            mappedFieldType,
-            createLuceneFieldMapperInput,
-            knnMethodConfigContext,
-            originalMappingParameters,
-            isDerivedSourceEnabled
-        );
+        return new LuceneFieldMapper(mappedFieldType, createLuceneFieldMapperInput, knnMethodConfigContext, originalMappingParameters);
     }
 
     private LuceneFieldMapper(
         final KNNVectorFieldType mappedFieldType,
         final CreateLuceneFieldMapperInput input,
         KNNMethodConfigContext knnMethodConfigContext,
-        OriginalMappingParameters originalMappingParameters,
-        boolean isDerivedSourceEnabled
+        OriginalMappingParameters originalMappingParameters
     ) {
         super(
             input.getName(),
@@ -110,8 +96,7 @@ public class LuceneFieldMapper extends KNNVectorFieldMapper {
             input.isStored(),
             input.isHasDocValues(),
             knnMethodConfigContext.getVersionCreated(),
-            originalMappingParameters,
-            isDerivedSourceEnabled
+            originalMappingParameters
         );
         KNNMappingConfig knnMappingConfig = mappedFieldType.getKnnMappingConfig();
         KNNMethodContext resolvedKnnMethodContext = originalMappingParameters.getResolvedKnnMethodContext();
@@ -128,12 +113,6 @@ public class LuceneFieldMapper extends KNNVectorFieldMapper {
             this.vectorFieldType = null;
         }
 
-        if (isDerivedSourceEnabled) {
-            this.fieldType = new FieldType(this.fieldType);
-            this.fieldType.putAttribute(DERIVED_VECTOR_FIELD_ATTRIBUTE_KEY, DERIVED_VECTOR_FIELD_ATTRIBUTE_TRUE_VALUE);
-            this.fieldType.freeze();
-        }
-
         KNNLibraryIndexingContext knnLibraryIndexingContext = resolvedKnnMethodContext.getKnnEngine()
             .getKNNLibraryIndexingContext(resolvedKnnMethodContext, knnMethodConfigContext);
         this.perDimensionProcessor = knnLibraryIndexingContext.getPerDimensionProcessor();
@@ -142,9 +121,9 @@ public class LuceneFieldMapper extends KNNVectorFieldMapper {
     }
 
     @Override
-    protected List<Field> getFieldsForFloatVector(final float[] array) {
+    protected List<Field> getFieldsForFloatVector(final float[] array, boolean isDerivedSourceEnabled) {
         final List<Field> fieldsToBeAdded = new ArrayList<>();
-        fieldsToBeAdded.add(new KnnFloatVectorField(name(), array, fieldType));
+        fieldsToBeAdded.add(new DerivedKnnFloatVectorField(name(), array, fieldType, isDerivedSourceEnabled));
 
         if (hasDocValues && vectorFieldType != null) {
             fieldsToBeAdded.add(new VectorField(name(), array, vectorFieldType));
@@ -157,9 +136,9 @@ public class LuceneFieldMapper extends KNNVectorFieldMapper {
     }
 
     @Override
-    protected List<Field> getFieldsForByteVector(final byte[] array) {
+    protected List<Field> getFieldsForByteVector(final byte[] array, boolean isDerivedSourceEnabled) {
         final List<Field> fieldsToBeAdded = new ArrayList<>();
-        fieldsToBeAdded.add(new KnnByteVectorField(name(), array, fieldType));
+        fieldsToBeAdded.add(new DerivedKnnByteVectorField(name(), array, fieldType, isDerivedSourceEnabled));
 
         if (hasDocValues && vectorFieldType != null) {
             fieldsToBeAdded.add(new VectorField(name(), array, vectorFieldType));
@@ -184,6 +163,11 @@ public class LuceneFieldMapper extends KNNVectorFieldMapper {
     @Override
     protected PerDimensionProcessor getPerDimensionProcessor() {
         return perDimensionProcessor;
+    }
+
+    @Override
+    protected VectorTransformer getVectorTransformer() {
+        return super.getVectorTransformer();
     }
 
     @Override
