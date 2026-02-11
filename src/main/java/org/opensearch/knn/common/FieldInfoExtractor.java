@@ -48,7 +48,9 @@ public class FieldInfoExtractor {
 
         if (StringUtils.isEmpty(vectorDataTypeString)) {
             if (fieldInfo.hasVectorValues()) {
-                return fieldInfo.getVectorEncoding() == VectorEncoding.FLOAT32 ? VectorDataType.FLOAT : VectorDataType.BYTE;
+                vectorDataTypeString = fieldInfo.getVectorEncoding() == VectorEncoding.FLOAT32
+                    ? VectorDataType.FLOAT.toString()
+                    : VectorDataType.BYTE.toString();
             }
         }
         return StringUtils.isNotEmpty(vectorDataTypeString) ? VectorDataType.get(vectorDataTypeString) : VectorDataType.DEFAULT;
