@@ -46,11 +46,9 @@ public class FieldInfoExtractor {
     public static VectorDataType extractVectorDataType(final FieldInfo fieldInfo) {
         String vectorDataTypeString = fieldInfo.getAttribute(KNNConstants.VECTOR_DATA_TYPE_FIELD);
 
-         if (StringUtils.isEmpty(vectorDataTypeString)) {
+        if (StringUtils.isEmpty(vectorDataTypeString)) {
             if (fieldInfo.hasVectorValues()) {
-                return fieldInfo.getVectorEncoding() == VectorEncoding.FLOAT32
-                        ? VectorDataType.FLOAT
-                        : VectorDataType.BYTE;
+                return fieldInfo.getVectorEncoding() == VectorEncoding.FLOAT32 ? VectorDataType.FLOAT : VectorDataType.BYTE;
             }
         }
         return StringUtils.isNotEmpty(vectorDataTypeString) ? VectorDataType.get(vectorDataTypeString) : VectorDataType.DEFAULT;
