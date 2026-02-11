@@ -85,7 +85,7 @@ public class KNNVectorFieldMapperUtil {
      * @return either int[] or float[] of corresponding vector
      */
     public static Object deserializeStoredVector(BytesRef storedVector, VectorDataType vectorDataType) {
-        if (VectorDataType.BYTE == vectorDataType) {
+        if (VectorDataType.BYTE == vectorDataType || VectorDataType.BINARY == vectorDataType) {
             byte[] bytes = storedVector.bytes;
             int[] byteAsIntArray = new int[bytes.length];
             Arrays.setAll(byteAsIntArray, i -> bytes[i]);
