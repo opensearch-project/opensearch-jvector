@@ -100,6 +100,10 @@ public class KNNConstants {
                                                                                 // default
     public static final Boolean DEFAULT_HIERARCHY_ENABLED = false;
 
+    // Parameters that only affect merge
+    public static final String METHOD_PARAMETER_LEADING_SEGMENT_MERGE_DISABLED = "advanced.leading_segment_merge_disabled";
+    public static final boolean DEFAULT_LEADING_SEGMENT_MERGE_DISABLED = false;
+
     // API Constants
     public static final String CLEAR_CACHE = "clear_cache";
 
