@@ -47,7 +47,11 @@ public class QueryANNIT extends AbstractRestartUpgradeTestCase {
 
     public void testQueryOnLuceneIndex() throws Exception {
         if (isRunningAgainstOldCluster()) {
-            createKnnIndex(testIndex, getKNNDefaultIndexSettings(), createKnnIndexMapping(TEST_FIELD, DIMENSIONS, ALGORITHM, LUCENE_NAME));
+            createKnnIndex(
+                testIndex,
+                getKNNDefaultIndexSettings(),
+                createKnnIndexMapping(TEST_FIELD, DIMENSIONS, METHOD_HNSW, LUCENE_NAME)
+            );
             addKNNDocs(testIndex, TEST_FIELD, DIMENSIONS, 0, NUM_DOCS);
             validateKNNSearch(testIndex, TEST_FIELD, DIMENSIONS, NUM_DOCS, K);
         } else {
