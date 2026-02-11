@@ -7,7 +7,6 @@ package org.opensearch.knn.integ;
 
 import lombok.SneakyThrows;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.opensearch.client.ResponseException;
 import org.opensearch.common.collect.Tuple;
 import org.opensearch.common.settings.Settings;
