@@ -16,7 +16,7 @@ buildscript {
     ext {
         // build.version_qualifier parameter applies to jvector plugin artifacts only. OpenSearch version must be set
         // explicitly as 'opensearch.version' property, for instance opensearch.version=2.0.0-rc1-SNAPSHOT
-        opensearch_version = System.getProperty("opensearch.version", "3.3.2")
+        opensearch_version = System.getProperty("opensearch.version", "3.3.2-SNAPSHOT")
         version_qualifier = System.getProperty("build.version_qualifier", "")
         opensearch_group = "org.opensearch"
         isSnapshot = "true" == System.getProperty("build.snapshot", "false")
@@ -168,7 +168,7 @@ def getBreakerSetting() {
 
 allprojects {
     group = 'org.opensearch.knn'
-    version = opensearch_version.tokenize('-')[0] + '.1'
+    version = opensearch_version.tokenize('-')[0] + '.2'
     if (version_qualifier) {
         version += "-${version_qualifier}"
     }
