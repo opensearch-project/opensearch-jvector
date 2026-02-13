@@ -6,9 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased 3.6](https://github.com/opensearch-project/opensearch-jvector/compare/3.5...HEAD)
 ### Features
+* Enable derived sources for vectors to save storage costs. [241] (https://github.com/opensearch-project/opensearch-jvector/pull/241)
 ### Enhancements
 ### Bug Fixes
 ### Infrastructure
 ### Documentation
 ### Maintenance
 ### Refactoring
+

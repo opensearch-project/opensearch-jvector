@@ -11,6 +11,7 @@ import org.apache.lucene.index.FieldInfo;
 import org.apache.lucene.index.MergeState;
 import org.apache.lucene.index.StoredFieldDataInput;
 import org.apache.lucene.util.BytesRef;
+import org.opensearch.OpenSearchParseException;
 import org.opensearch.common.collect.Tuple;
 import org.opensearch.common.io.stream.BytesStreamOutput;
 import org.opensearch.common.xcontent.XContentHelper;
@@ -131,6 +132,15 @@ public class KNN10010DerivedSourceStoredFieldsWriter extends StoredFieldsWriter 
                     "Encountered NotXContent while deserializing _source field. Instead found String: [{}]",
                     // Limit max string length in case of long bytes object
                     new String(bytesRef.bytes, 0, Math.min(bytesRef.bytes.length, 512)),
+                    e
+                );
+                return;
+            } catch (OpenSearchParseException e) {
+                // Catch any other parsing exceptions (e.g., OpenSearchParseException for invalid JSON)
+                log.warn(
+                    "Failed to parse _source field as XContent. Instead found bytes: [{}]",
+                    // Limit max string length in case of long bytes object
+                    new String(bytesRef.bytes, bytesRef.offset, Math.min(bytesRef.length, 512)),
                     e
                 );
                 return;
