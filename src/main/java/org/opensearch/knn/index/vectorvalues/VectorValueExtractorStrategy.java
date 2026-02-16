@@ -110,10 +110,10 @@ public interface VectorValueExtractorStrategy {
             KnnVectorValues knnVectorValues = docIdsIteratorValues.getKnnVectorValues();
 
             // Check the actual instance type of knnVectorValues to determine how to extract the vector
-            if (knnVectorValues instanceof FloatVectorValues) {
+            if (vectorDataType == VectorDataType.FLOAT) {
                 FloatVectorValues floatVectorValues = (FloatVectorValues) knnVectorValues;
                 docIdsIteratorValues.setLastAccessedVector(floatVectorValues.vectorValue(ord));
-            } else if (knnVectorValues instanceof ByteVectorValues) {
+            } else if (vectorDataType == VectorDataType.BYTE || vectorDataType == VectorDataType.BINARY) {
                 ByteVectorValues byteVectorValues = (ByteVectorValues) knnVectorValues;
                 docIdsIteratorValues.setLastAccessedVector(byteVectorValues.vectorValue(ord));
             } else {

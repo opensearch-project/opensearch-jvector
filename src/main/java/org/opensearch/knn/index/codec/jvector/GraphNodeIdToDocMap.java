@@ -55,6 +55,10 @@ public class GraphNodeIdToDocMap {
         }
     }
 
+    public int getMaxDoc() {
+        return docIdsToGraphNodeIds.length;
+    }
+
     /**
      * Constructor that creates a new mapping between ordinals and docIds
      *

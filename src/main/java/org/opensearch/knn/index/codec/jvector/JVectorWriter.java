@@ -670,16 +670,18 @@ public class JVectorWriter extends KnnVectorsWriter {
                             int liveVectorCountInReader = 0;
                             KnnVectorValues.DocIndexIterator it = values.iterator();
                             while (it.nextDoc() != DocIdSetIterator.NO_MORE_DOCS) {
-                                if (liveDocs[i] == null || liveDocs[i].get(it.docID())) {
-                                    liveVectorCountInReader++;
-                                } else {
-                                    // This vector is deleted so we need to mark it as deleted in the liveGraphNodesPerReader
-                                    liveGraphNodesPerReader[i].clear(it.index());
+                                if (it.index() != JVectorFloatVectorValues.NO_VECTOR) /* no vector */ {
+                                    if ((liveDocs[i] == null || liveDocs[i].get(it.docID()))) {
+                                        liveVectorCountInReader++;
+                                    } else {
+                                        // This vector is deleted so we need to mark it as deleted in the liveGraphNodesPerReader
+                                        liveGraphNodesPerReader[i].clear(it.index());
+                                    }
                                 }
                             }
                             if (liveVectorCountInReader >= vectorsCountInLeadingReader) {
                                 vectorsCountInLeadingReader = liveVectorCountInReader;
-                                tempLeadingReaderIdx = i;
+                                tempLeadingReaderIdx = allReaders.size() - 1;
                             }
                             totalVectorsCount += vectorCountInReader;
                             totalLiveVectorsCount += liveVectorCountInReader;
