@@ -61,6 +61,234 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
     }
 
     /**
+     * Comprehensive test combining merges with one document that
+     * have no vector fields populated, multiple segments.
+     */
+    @Test
+    public void testMergesWithOneNullVector() throws IOException {
+        final int dimension = 64;
+        final int k = 3;
+
+        IndexWriterConfig config = newIndexWriterConfig();
+        config.setUseCompoundFile(false);
+        config.setCodec(getCodec(1));
+        config.setMergePolicy(new ForceMergesOnlyMergePolicy());
+        config.setMergeScheduler(new SerialMergeScheduler());
+
+        final Path indexPath = createTempDir();
+
+        try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter writer = new IndexWriter(dir, config)) {
+            int docId = 0;
+
+            // Segment 1: Updates document with no vector field populated
+            for (int i = 0; i < 1; i++) {
+                Document doc = new Document();
+                doc.add(new StringField(TEST_ID_FIELD, String.valueOf(docId), Field.Store.YES));
+                writer.addDocument(doc);
+                docId++;
+            }
+
+            // Segment 1: add 3 documents
+            log.info("Creating segment 1: 3 docs");
+            for (int i = 0; i < 3; i++) {
+                Document doc = new Document();
+                float[] vector = new float[dimension];
+                Arrays.fill(vector, docId * 0.01f);
+                doc.add(new KnnFloatVectorField(TEST_FIELD, vector, VectorSimilarityFunction.EUCLIDEAN));
+                doc.add(new StringField(TEST_ID_FIELD, String.valueOf(docId), Field.Store.YES));
+                writer.addDocument(doc);
+                docId++;
+            }
+            writer.commit();
+
+            // Segment 2: Add one more document
+            for (int i = 0; i < 1; i++) {
+                Document doc = new Document();
+                float[] vector = new float[dimension];
+                Arrays.fill(vector, docId * 0.01f);
+                doc.add(new KnnFloatVectorField(TEST_FIELD, vector, VectorSimilarityFunction.EUCLIDEAN));
+                doc.add(new StringField(TEST_ID_FIELD, String.valueOf(docId), Field.Store.YES));
+                writer.addDocument(doc);
+                docId++;
+
+            }
+            writer.commit();
+
+            log.info("Performing intermediate merge after segment 2");
+            writer.forceMerge(1);
+
+            // Verify the merged index
+            try (IndexReader reader = DirectoryReader.open(writer)) {
+                Assert.assertEquals("Should have 1 segment after merge", 1, reader.getContext().leaves().size());
+                Assert.assertEquals("Should have correct number of live docs", 3, reader.numDocs());
+
+                // Verify search works correctly
+                final float[] target = new float[dimension];
+                Arrays.fill(target, 0.5f);
+                final IndexSearcher searcher = newSearcher(reader);
+                TopDocs topDocs = searcher.search(new MatchAllDocsQuery(), k);
+                Assert.assertEquals("Should return k results", k, topDocs.totalHits.value());
+
+                for (int i = 0; i < topDocs.scoreDocs.length; i++) {
+                    Document doc = reader.storedFields().document(topDocs.scoreDocs[i].doc);
+                    String id = doc.get(TEST_ID_FIELD);
+                    log.info("Result {}: doc ID = {}", i, id);
+                }
+            }
+        }
+
+    }
+
+    /**
+     * Comprehensive test combining merges with documents that
+     * have no vector fields populated, multiple segments where leading is not the first one.
+     */
+    @Test
+    public void testMergesWithNullVectorsAndLastLeadingSegment() throws IOException {
+        final int dimension = 64;
+        final int k = 4;
+
+        IndexWriterConfig config = newIndexWriterConfig();
+        config.setUseCompoundFile(false);
+        config.setCodec(getCodec(1));
+        config.setMergePolicy(new ForceMergesOnlyMergePolicy());
+        config.setMergeScheduler(new SerialMergeScheduler());
+
+        final Path indexPath = createTempDir();
+
+        try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter writer = new IndexWriter(dir, config)) {
+            int docId = 0;
+
+            // Segment 1: 3 documents with one document having no vector field populated
+            log.info("Creating segment 1: 3 docs");
+            for (int i = 0; i < 2; i++) {
+                Document doc = new Document();
+                float[] vector = new float[dimension];
+                Arrays.fill(vector, docId * 0.01f);
+                doc.add(new KnnFloatVectorField(TEST_FIELD, vector, VectorSimilarityFunction.EUCLIDEAN));
+                doc.add(new StringField(TEST_ID_FIELD, String.valueOf(docId), Field.Store.YES));
+                writer.addDocument(doc);
+                docId++;
+            }
+            writer.commit();
+
+            // Segment 2: Add document with no vector field populated
+            for (int i = 2; i < 3; i++) {
+                Document doc = new Document();
+                float[] vector = new float[dimension];
+                Arrays.fill(vector, docId * 0.01f);
+                doc.add(new StringField(TEST_ID_FIELD, String.valueOf(docId), Field.Store.YES));
+                writer.addDocument(doc);
+                docId++;
+            }
+            writer.commit();
+
+            // Segment 3: 6 document
+            log.info("Creating segment 3: 6 docs");
+            for (int i = 4; i < 10; i++) {
+                Document doc = new Document();
+                float[] vector = new float[dimension];
+                Arrays.fill(vector, docId * 0.01f);
+                doc.add(new KnnFloatVectorField(TEST_FIELD, vector, VectorSimilarityFunction.EUCLIDEAN));
+                doc.add(new StringField(TEST_ID_FIELD, String.valueOf(docId), Field.Store.YES));
+                writer.addDocument(doc);
+                docId++;
+            }
+            writer.commit();
+
+            log.info("Performing intermediate merge after segment 2");
+            writer.forceMerge(1);
+
+            // Verify the merged index
+            try (IndexReader reader = DirectoryReader.open(writer)) {
+                Assert.assertEquals("Should have 1 segment after merge", 1, reader.getContext().leaves().size());
+                Assert.assertEquals("Should have correct number of live docs", 4, reader.numDocs());
+
+                // Verify search works correctly
+                final float[] target = new float[dimension];
+                Arrays.fill(target, 0.5f);
+                final IndexSearcher searcher = newSearcher(reader);
+                TopDocs topDocs = searcher.search(new MatchAllDocsQuery(), k);
+                Assert.assertEquals("Should return k results", k, topDocs.totalHits.value());
+
+                for (int i = 0; i < topDocs.scoreDocs.length; i++) {
+                    Document doc = reader.storedFields().document(topDocs.scoreDocs[i].doc);
+                    String id = doc.get(TEST_ID_FIELD);
+                    log.info("Result {}: doc ID = {}", i, id);
+                }
+            }
+        }
+    }
+
+    /**
+     * Comprehensive test combining merges with documents that
+     * have no vector fields populated.
+     */
+    @Test
+    public void testMergesWithNullVectors() throws IOException {
+        final int dimension = 64;
+        final int k = 2;
+
+        IndexWriterConfig config = newIndexWriterConfig();
+        config.setUseCompoundFile(false);
+        config.setCodec(getCodec(1));
+        config.setMergePolicy(new ForceMergesOnlyMergePolicy());
+        config.setMergeScheduler(new SerialMergeScheduler());
+
+        final Path indexPath = createTempDir();
+
+        try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter writer = new IndexWriter(dir, config)) {
+            int docId = 0;
+
+            // Segment 1: 3 documents with one document having no vector field populated
+            log.info("Creating segment 1: 3 docs");
+            for (int i = 0; i < 3; i++) {
+                Document doc = new Document();
+                if (i != 1) {
+                    float[] vector = new float[dimension];
+                    Arrays.fill(vector, docId * 0.01f);
+                    doc.add(new KnnFloatVectorField(TEST_FIELD, vector, VectorSimilarityFunction.EUCLIDEAN));
+                    doc.add(new StringField(TEST_ID_FIELD, String.valueOf(docId), Field.Store.YES));
+                } else {
+                    doc.add(new StringField(TEST_ID_FIELD, String.valueOf(docId), Field.Store.YES));
+                }
+                writer.addDocument(doc);
+                docId++;
+            }
+            writer.commit();
+
+            // Segment 2: Delete document with no vector field populated
+            writer.deleteDocuments(new Term(TEST_ID_FIELD, String.valueOf(1)));
+            writer.commit();
+
+            log.info("Performing intermediate merge after segment 2");
+            writer.forceMerge(1);
+            writer.commit();
+            log.info("First intermediate merge completed");
+
+            // Verify the merged index
+            try (IndexReader reader = DirectoryReader.open(writer)) {
+                Assert.assertEquals("Should have 1 segment after merge", 1, reader.getContext().leaves().size());
+                Assert.assertEquals("Should have correct number of live docs", 2, reader.numDocs());
+
+                // Verify search works correctly
+                final float[] target = new float[dimension];
+                Arrays.fill(target, 0.5f);
+                final IndexSearcher searcher = newSearcher(reader);
+                JVectorKnnFloatVectorQuery query = getJVectorKnnFloatVectorQuery(TEST_FIELD, target, k, new MatchAllDocsQuery());
+                TopDocs topDocs = searcher.search(query, k);
+                Assert.assertEquals("Should return k results", k, topDocs.totalHits.value());
+
+                for (int i = 0; i < topDocs.scoreDocs.length; i++) {
+                    Document doc = reader.storedFields().document(topDocs.scoreDocs[i].doc);
+                    String id = doc.get(TEST_ID_FIELD);
+                    log.info("Result {}: doc ID = {}", i, id);
+                }
+            }
+        }
+    }
+
+    /**
      * Comprehensive test combining multiple deletion patterns and document overwrites across multiple merge cycles.
      *
      * This validates that the opensearch-jvector codec handles complex scenarios with:
