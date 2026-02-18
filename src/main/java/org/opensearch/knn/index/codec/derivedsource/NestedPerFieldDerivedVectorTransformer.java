@@ -6,6 +6,7 @@
 package org.opensearch.knn.index.codec.derivedsource;
 
 import org.apache.lucene.index.FieldInfo;
+import org.apache.lucene.search.DocIdSetIterator;
 import org.opensearch.knn.index.vectorvalues.KNNVectorValues;
 import org.opensearch.knn.index.vectorvalues.KNNVectorValuesFactory;
 
@@ -16,6 +17,7 @@ public class NestedPerFieldDerivedVectorTransformer extends AbstractPerFieldDeri
     private final FieldInfo childFieldInfo;
     private final DerivedSourceReaders derivedSourceReaders;
     private KNNVectorValues<?> vectorValues;
+    private int docId = -1;
 
     /**
      *
@@ -31,6 +33,8 @@ public class NestedPerFieldDerivedVectorTransformer extends AbstractPerFieldDeri
     public Object apply(Object object) {
         if (object == null) {
             return object;
+        } else if (docId == DocIdSetIterator.NO_MORE_DOCS) {
+            return null;
         }
 
         try {
@@ -49,6 +53,6 @@ public class NestedPerFieldDerivedVectorTransformer extends AbstractPerFieldDeri
             derivedSourceReaders.getDocValuesProducer(),
             derivedSourceReaders.getKnnVectorsReader()
         );
-        vectorValues.advance(offset);
+        this.docId = vectorValues.advance(offset);
     }
 }

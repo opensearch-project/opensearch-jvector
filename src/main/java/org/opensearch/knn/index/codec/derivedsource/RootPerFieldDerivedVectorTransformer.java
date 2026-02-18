@@ -6,6 +6,7 @@
 package org.opensearch.knn.index.codec.derivedsource;
 
 import org.apache.lucene.index.FieldInfo;
+import org.apache.lucene.search.DocIdSetIterator;
 import org.opensearch.common.CheckedSupplier;
 import org.opensearch.knn.index.vectorvalues.KNNVectorValues;
 import org.opensearch.knn.index.vectorvalues.KNNVectorValuesFactory;
@@ -17,6 +18,7 @@ public class RootPerFieldDerivedVectorTransformer extends AbstractPerFieldDerive
     private final FieldInfo fieldInfo;
     private final CheckedSupplier<KNNVectorValues<?>, IOException> vectorValuesSupplier;
     private KNNVectorValues<?> vectorValues;
+    private int docId = -1;
 
     /**
      * Constructor for RootPerFieldDerivedVectorTransformer.
@@ -35,14 +37,16 @@ public class RootPerFieldDerivedVectorTransformer extends AbstractPerFieldDerive
 
     @Override
     public void setCurrentDoc(int offset, int docId) throws IOException {
-        vectorValues = vectorValuesSupplier.get();
-        vectorValues.advance(docId);
+        this.vectorValues = vectorValuesSupplier.get();
+        this.docId = vectorValues.advance(docId);
     }
 
     @Override
     public Object apply(Object object) {
         if (object == null) {
             return object;
+        } else if (docId == DocIdSetIterator.NO_MORE_DOCS) {
+            return null;
         }
 
         try {
