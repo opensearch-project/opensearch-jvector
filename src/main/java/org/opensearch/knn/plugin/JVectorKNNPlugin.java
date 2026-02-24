@@ -8,6 +8,7 @@ package org.opensearch.knn.plugin;
 import org.opensearch.core.action.ActionResponse;
 import org.opensearch.index.codec.CodecServiceFactory;
 import org.opensearch.index.engine.EngineFactory;
+import org.opensearch.index.query.QueryBuilder;
 import org.opensearch.knn.plugin.search.KNNConcurrentSearchRequestDecider;
 import org.opensearch.knn.index.util.KNNClusterUtil;
 import org.opensearch.knn.index.query.KNNQueryBuilder;
@@ -21,6 +22,11 @@ import org.opensearch.knn.plugin.script.KNNScoringScriptEngine;
 import org.opensearch.knn.plugin.stats.KNNStats;
 import org.opensearch.knn.plugin.transport.KNNStatsAction;
 import org.opensearch.knn.plugin.transport.KNNStatsTransportAction;
+import org.opensearch.knn.search.extension.MMRSearchExtBuilder;
+import org.opensearch.knn.search.processor.mmr.MMRKnnQueryTransformer;
+import org.opensearch.knn.search.processor.mmr.MMROverSampleProcessor;
+import org.opensearch.knn.search.processor.mmr.MMRQueryTransformer;
+import org.opensearch.knn.search.processor.mmr.MMRRerankProcessor;
 import com.google.common.collect.ImmutableList;
 
 import org.opensearch.action.ActionRequest;
@@ -49,19 +55,26 @@ import org.opensearch.plugins.Plugin;
 import org.opensearch.plugins.ScriptPlugin;
 import org.opensearch.plugins.SearchPlugin;
 import org.opensearch.plugins.SystemIndexPlugin;
+import org.opensearch.plugins.SearchPipelinePlugin;
 import org.opensearch.repositories.RepositoriesService;
 import org.opensearch.rest.RestController;
 import org.opensearch.rest.RestHandler;
 import org.opensearch.script.ScriptContext;
 import org.opensearch.script.ScriptEngine;
 import org.opensearch.script.ScriptService;
+import org.opensearch.search.SearchExtBuilder;
 import org.opensearch.search.deciders.ConcurrentSearchRequestDecider;
+import org.opensearch.search.pipeline.SearchRequestProcessor;
+import org.opensearch.search.pipeline.SearchResponseProcessor;
+import org.opensearch.search.pipeline.SystemGeneratedProcessor;
 import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.watcher.ResourceWatcherService;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Supplier;
@@ -106,10 +119,12 @@ public class JVectorKNNPlugin extends Plugin
         EnginePlugin,
         ScriptPlugin,
         ExtensiblePlugin,
-        SystemIndexPlugin {
+        SystemIndexPlugin,
+        SearchPipelinePlugin {
 
     public static final String LEGACY_KNN_BASE_URI = "/_opendistro/_knn";
     public static final String KNN_BASE_URI = "/_plugins/_knn";
+    private final Map<String, MMRQueryTransformer<? extends QueryBuilder>> mmrQueryTransformers = new HashMap<>();
 
     public JVectorKNNPlugin() {
         super();
@@ -126,6 +141,88 @@ public class JVectorKNNPlugin extends Plugin
     }
 
     @Override
+    public void loadExtensions(ExtensionLoader loader) {
+        // knn plugin cannot extend itself so we have to manually load the transformer implemented in knn plugin
+        mmrQueryTransformers.put(KNNQueryBuilder.NAME, new MMRKnnQueryTransformer());
+        for (MMRQueryTransformer<?> transformer : loader.loadExtensions(MMRQueryTransformer.class)) {
+            String queryName = transformer.getQueryName();
+            if (mmrQueryTransformers.containsKey(queryName)) {
+                throw new IllegalStateException(
+                    String.format(
+                        Locale.ROOT,
+                        "Already load the MMR query transformer %s for %s query. Cannot load another transformer %s for it.",
+                        mmrQueryTransformers.get(queryName).getClass().getName(),
+                        queryName,
+                        transformer.getClass().getName()
+                    )
+                );
+            }
+            mmrQueryTransformers.put(queryName, transformer);
+        }
+    }
+
+    @Override
+    public List<SearchExtSpec<?>> getSearchExts() {
+        return List.of(new SearchExtSpec<SearchExtBuilder>(MMRSearchExtBuilder.NAME, MMRSearchExtBuilder::new, MMRSearchExtBuilder::parse));
+    }
+
+    @Override
+    public Map<String, SystemGeneratedProcessor.SystemGeneratedFactory<SearchRequestProcessor>> getSystemGeneratedRequestProcessors(
+        Parameters parameters
+    ) {
+        KNNClusterUtil.instance().setSearchPipelineService(parameters.searchPipelineService);
+        return Map.of(
+            MMROverSampleProcessor.MMROverSampleProcessorFactory.TYPE,
+            new MMROverSampleProcessor.MMROverSampleProcessorFactory(parameters.client, mmrQueryTransformers)
+        );
+    }
+
+    @Override
+    public Map<String, SystemGeneratedProcessor.SystemGeneratedFactory<SearchResponseProcessor>> getSystemGeneratedResponseProcessors(
+        Parameters parameters
+    ) {
+        return Map.of(MMRRerankProcessor.MMRRerankProcessorFactory.TYPE, new MMRRerankProcessor.MMRRerankProcessorFactory());
+    }
+    /*@Override
+    public Map<String, org.opensearch.search.pipeline.Processor.Factory<SearchRequestProcessor>> getRequestProcessors(
+        Parameters parameters
+    ) {
+        // Set SearchPipelineService for MMR validation
+        if (parameters.searchPipelineService != null) {
+            KNNClusterUtil.instance().setSearchPipelineService(parameters.searchPipelineService);
+        }
+
+        // Create MMR query transformers map
+        Map<String, MMRQueryTransformer<? extends QueryBuilder>> mmrQueryTransformers = new HashMap<>();
+        mmrQueryTransformers.put(KNNQueryBuilder.NAME, new MMRKnnQueryTransformer());
+
+        // Create the system-generated processor factory
+        // Note: We return it here, but SearchPipelineService will filter it from user-facing APIs
+        // because it implements SystemGeneratedFactory
+        Map<String, org.opensearch.search.pipeline.Processor.Factory<SearchRequestProcessor>> processors = new HashMap<>();
+        processors.put(
+            MMROverSampleProcessor.MMROverSampleProcessorFactory.TYPE,
+            new MMROverSampleProcessor.MMROverSampleProcessorFactory(parameters.client, mmrQueryTransformers)
+        );
+
+        return processors;
+    }
+
+    @Override
+    public Map<String, org.opensearch.search.pipeline.Processor.Factory<SearchResponseProcessor>> getResponseProcessors(
+        Parameters parameters
+    ) {
+        // Create the system-generated processor factory
+        Map<String, org.opensearch.search.pipeline.Processor.Factory<SearchResponseProcessor>> processors = new HashMap<>();
+        processors.put(
+            MMRRerankProcessor.MMRRerankProcessorFactory.TYPE,
+            new MMRRerankProcessor.MMRRerankProcessorFactory()
+        );
+
+        return processors;
+    }*/
+
+    @Override
     public Collection<Object> createComponents(
         Client client,
         ClusterService clusterService,
@@ -140,7 +237,7 @@ public class JVectorKNNPlugin extends Plugin
         Supplier<RepositoriesService> repositoriesServiceSupplier
     ) {
         KNNSettings.state().initialize(client, clusterService);
-        KNNClusterUtil.instance().initialize(clusterService);
+        KNNClusterUtil.instance().initialize(clusterService, indexNameExpressionResolver);
         QuantizationStateCache.setThreadPool(threadPool);
 
         return ImmutableList.of(new KNNStats());
