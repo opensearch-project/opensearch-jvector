@@ -183,44 +183,6 @@ public class JVectorKNNPlugin extends Plugin
     ) {
         return Map.of(MMRRerankProcessor.MMRRerankProcessorFactory.TYPE, new MMRRerankProcessor.MMRRerankProcessorFactory());
     }
-    /*@Override
-    public Map<String, org.opensearch.search.pipeline.Processor.Factory<SearchRequestProcessor>> getRequestProcessors(
-        Parameters parameters
-    ) {
-        // Set SearchPipelineService for MMR validation
-        if (parameters.searchPipelineService != null) {
-            KNNClusterUtil.instance().setSearchPipelineService(parameters.searchPipelineService);
-        }
-
-        // Create MMR query transformers map
-        Map<String, MMRQueryTransformer<? extends QueryBuilder>> mmrQueryTransformers = new HashMap<>();
-        mmrQueryTransformers.put(KNNQueryBuilder.NAME, new MMRKnnQueryTransformer());
-
-        // Create the system-generated processor factory
-        // Note: We return it here, but SearchPipelineService will filter it from user-facing APIs
-        // because it implements SystemGeneratedFactory
-        Map<String, org.opensearch.search.pipeline.Processor.Factory<SearchRequestProcessor>> processors = new HashMap<>();
-        processors.put(
-            MMROverSampleProcessor.MMROverSampleProcessorFactory.TYPE,
-            new MMROverSampleProcessor.MMROverSampleProcessorFactory(parameters.client, mmrQueryTransformers)
-        );
-
-        return processors;
-    }
-
-    @Override
-    public Map<String, org.opensearch.search.pipeline.Processor.Factory<SearchResponseProcessor>> getResponseProcessors(
-        Parameters parameters
-    ) {
-        // Create the system-generated processor factory
-        Map<String, org.opensearch.search.pipeline.Processor.Factory<SearchResponseProcessor>> processors = new HashMap<>();
-        processors.put(
-            MMRRerankProcessor.MMRRerankProcessorFactory.TYPE,
-            new MMRRerankProcessor.MMRRerankProcessorFactory()
-        );
-
-        return processors;
-    }*/
 
     @Override
     public Collection<Object> createComponents(
