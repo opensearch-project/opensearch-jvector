@@ -21,14 +21,14 @@ import org.apache.lucene.store.FSDirectory;
 import org.openjdk.jmh.annotations.*;
 import org.openjdk.jmh.infra.Blackhole;
 
+import static org.opensearch.knn.index.codec.jvector.BenchmarkCommon.LUCENE104;
+
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
-
-import static org.opensearch.knn.index.codec.jvector.BenchmarkCommon.LUCENE103;
 
 /**
  * Benchmark to compare the performance of JVector and Lucene codecs with random vectors.
@@ -51,7 +51,7 @@ public class FormatBenchmarkQueryWithRandomVectors {
     private static final String FIELD_NAME = "vector_field";
     private static final int K = 100;
     private static final VectorSimilarityFunction SIMILARITY_FUNCTION = VectorSimilarityFunction.EUCLIDEAN;
-    @Param({ JVECTOR_NOT_QUANTIZED, JVECTOR_QUANTIZED, LUCENE103 })  // This will run the benchmark each codec type
+    @Param({ JVECTOR_NOT_QUANTIZED, JVECTOR_QUANTIZED, LUCENE104 })  // This will run the benchmark each codec type
     private String codecType;
     @Param({ /*"1000", "10000",*/ "100000" })
     private int numDocs;
