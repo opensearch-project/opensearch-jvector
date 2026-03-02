@@ -5,7 +5,6 @@
 
 package org.opensearch.knn.index.codec.KNN9120Codec;
 
-import org.apache.lucene.backward_codecs.lucene99.Lucene99HnswScalarQuantizedVectorsFormat;
 import org.apache.lucene.backward_codecs.lucene99.Lucene99RWHnswScalarQuantizedVectorsFormat;
 import org.apache.lucene.codecs.lucene99.Lucene99HnswVectorsFormat;
 import org.opensearch.common.collect.Tuple;
