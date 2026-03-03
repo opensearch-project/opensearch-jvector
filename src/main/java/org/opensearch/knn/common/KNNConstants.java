@@ -54,6 +54,15 @@ public class KNNConstants {
     public static final String MODEL_VERSION = "model_version";
     public static final String QUANTIZATION_STATE_FILE_SUFFIX = "osknnqstate";
 
+    // MMR (Maximal Marginal Relevance) constants
+    public static final String MMR = "mmr";
+    public static final String DIVERSITY = "diversity";
+    public static final String CANDIDATES = "candidates";
+    public static final String VECTOR_FIELD_PATH = "vector_field_path";
+    public static final String VECTOR_FIELD_DATA_TYPE = "vector_field_data_type";
+    public static final String VECTOR_FIELD_SPACE_TYPE = "vector_field_space_type";
+    public static final String MMR_RERANK_CONTEXT = "mmr.rerank_context";
+
     // Lucene specific constants
     public static final String LUCENE_NAME = "lucene";
     public static final String LUCENE_SQ_CONFIDENCE_INTERVAL = "confidence_interval";
