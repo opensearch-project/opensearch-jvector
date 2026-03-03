@@ -85,6 +85,14 @@ public class JVectorDiskANNMethod extends AbstractKNNMethod {
                     (v, context) -> v != null && v > 0 && v <= context.getDimension()
                 )
             )
+            .addParameter(
+                METHOD_PARAMETER_LEADING_SEGMENT_MERGE_DISABLED,
+                new Parameter.BooleanParameter(
+                    METHOD_PARAMETER_LEADING_SEGMENT_MERGE_DISABLED,
+                    DEFAULT_LEADING_SEGMENT_MERGE_DISABLED,
+                    (v, context) -> true
+                )
+            )
             .build();
     }
 

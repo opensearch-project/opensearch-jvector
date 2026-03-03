@@ -43,10 +43,15 @@ public class GraphNodeIdToDocMap {
 
         graphNodeIdsToDocIds = new int[size];
         docIdsToGraphNodeIds = new int[maxDocId];
+        Arrays.fill(graphNodeIdsToDocIds, -1);
+        Arrays.fill(docIdsToGraphNodeIds, -1);
         for (int ord = 0; ord < size; ord++) {
             final int docId = in.readVInt();
             graphNodeIdsToDocIds[ord] = docId;
-            docIdsToGraphNodeIds[docId] = ord;
+            if (docId != -1) {
+                // ignore deleted documents
+                docIdsToGraphNodeIds[docId] = ord;
+            }
         }
     }
 
@@ -67,19 +72,21 @@ public class GraphNodeIdToDocMap {
         final int maxDocs = maxDocId + 1;
         // We are going to assume that the number of ordinals is roughly the same as the number of documents in the segment, therefore,
         // the mapping will not be sparse.
-        if (maxDocs < graphNodeIdsToDocIds.length) {
-            throw new IllegalStateException("Max docs " + maxDocs + " is less than the number of ordinals " + graphNodeIdsToDocIds.length);
-        }
-        if (maxDocId > graphNodeIdsToDocIds.length) {
-            log.warn(
-                "Max doc id {} is greater than the number of ordinals {}, this implies a lot of deleted documents. Or that some documents are missing vectors. Wasting a lot of memory",
-                maxDocId,
+        // Note that the merge process may create ephemeral mappings that are sparse.
+        if (maxDocs < 0.8 * graphNodeIdsToDocIds.length) {
+            log.info(
+                "Max docs {} is less than 80% the number of ordinals {}. This is normal if many docs were recently deleted or overwritten. Otherwise if many docs are missing vectors this is a waste of memory.",
+                maxDocs,
                 graphNodeIdsToDocIds.length
             );
         }
         this.docIdsToGraphNodeIds = new int[maxDocs];
         Arrays.fill(this.docIdsToGraphNodeIds, -1); // -1 means no mapping to ordinal
         for (int ord = 0; ord < graphNodeIdsToDocIds.length; ord++) {
+            // -1 means no mapping to docId since document was deleted
+            if (graphNodeIdsToDocIds[ord] == -1) {
+                continue;
+            }
             this.docIdsToGraphNodeIds[graphNodeIdsToDocIds[ord]] = ord;
         }
     }

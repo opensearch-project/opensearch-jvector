@@ -104,6 +104,7 @@ public class JVectorEngineIT extends KNNRestTestCase {
             .field(KNNConstants.METHOD_PARAMETER_NEIGHBOR_OVERFLOW, 2.0)
             .field(KNNConstants.METHOD_PARAMETER_HIERARCHY_ENABLED, false)
             .field(KNNConstants.METHOD_PARAMETER_MIN_BATCH_SIZE_FOR_QUANTIZATION, 1000)
+            .field(KNNConstants.METHOD_PARAMETER_LEADING_SEGMENT_MERGE_DISABLED, false)
             .endObject()
             .endObject()
             .endObject()
