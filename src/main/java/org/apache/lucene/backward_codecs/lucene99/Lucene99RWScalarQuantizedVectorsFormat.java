@@ -13,6 +13,7 @@ import org.apache.lucene.codecs.lucene99.Lucene99FlatVectorsFormat;
 import org.apache.lucene.index.SegmentWriteState;
 
 import java.io.IOException;
+import java.util.logging.Logger;
 
 /**
  * A read-write implementation of {@link Lucene99ScalarQuantizedVectorsFormat}.
@@ -27,6 +28,8 @@ import java.io.IOException;
  * @see <a href="https://github.com/apache/lucene/pull/15223">Lucene PR #15223</a>
  */
 public class Lucene99RWScalarQuantizedVectorsFormat extends Lucene99ScalarQuantizedVectorsFormat {
+
+    Logger log = Logger.getLogger(Lucene99RWScalarQuantizedVectorsFormat.class.getName());
 
     private final Float confidenceInterval;
     private final byte bits;
@@ -52,6 +55,7 @@ public class Lucene99RWScalarQuantizedVectorsFormat extends Lucene99ScalarQuanti
 
     @Override
     public FlatVectorsWriter fieldsWriter(SegmentWriteState state) throws IOException {
+        log.info("Creating Lucene99ScalarQuantizedVectorsWriter");
         return new Lucene99ScalarQuantizedVectorsWriter(
             state,
             this.confidenceInterval,

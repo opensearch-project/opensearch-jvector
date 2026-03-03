@@ -13,6 +13,7 @@ import org.apache.lucene.search.TaskExecutor;
 
 import java.io.IOException;
 import java.util.concurrent.ExecutorService;
+import java.util.logging.Logger;
 
 /**
  * A read-write implementation of {@link Lucene99HnswScalarQuantizedVectorsFormat}.
@@ -27,6 +28,8 @@ import java.util.concurrent.ExecutorService;
  * @see <a href="https://github.com/apache/lucene/pull/15223">Lucene PR #15223</a>
  */
 public class Lucene99RWHnswScalarQuantizedVectorsFormat extends Lucene99HnswScalarQuantizedVectorsFormat {
+
+    Logger log = Logger.getLogger(Lucene99ScalarQuantizedVectorsWriter.class.getName());
 
     private final FlatVectorsFormat flatVectorsFormat;
     private final int maxConn;
@@ -68,6 +71,7 @@ public class Lucene99RWHnswScalarQuantizedVectorsFormat extends Lucene99HnswScal
 
     @Override
     public KnnVectorsWriter fieldsWriter(SegmentWriteState state) throws IOException {
+        log.info("Creating Lucene99HnswVectorsWriter");
         return new Lucene99HnswVectorsWriter(
             state,
             maxConn,
