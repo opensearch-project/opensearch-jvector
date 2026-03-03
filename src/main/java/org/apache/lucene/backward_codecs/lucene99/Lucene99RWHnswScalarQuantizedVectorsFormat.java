@@ -11,6 +11,8 @@ import org.apache.lucene.codecs.lucene99.Lucene99HnswVectorsWriter;
 import org.apache.lucene.index.SegmentWriteState;
 import org.apache.lucene.search.TaskExecutor;
 
+import lombok.extern.log4j.Log4j2;
+
 import java.io.IOException;
 import java.util.concurrent.ExecutorService;
 
@@ -26,6 +28,7 @@ import java.util.concurrent.ExecutorService;
  *
  * @see <a href="https://github.com/apache/lucene/pull/15223">Lucene PR #15223</a>
  */
+@Log4j2
 public class Lucene99RWHnswScalarQuantizedVectorsFormat extends Lucene99HnswScalarQuantizedVectorsFormat {
 
     private final FlatVectorsFormat flatVectorsFormat;
@@ -55,6 +58,7 @@ public class Lucene99RWHnswScalarQuantizedVectorsFormat extends Lucene99HnswScal
         ExecutorService executor
     ) {
         super(maxConn, beamWidth, numMergeThreads, bits, compressFlag, confidenceInterval, executor);
+        log.info("Writing using jvector-overridden writer");
         this.flatVectorsFormat = new Lucene99RWScalarQuantizedVectorsFormat(confidenceInterval, bits, compressFlag);
         this.maxConn = maxConn;
         this.beamWidth = beamWidth;
@@ -68,6 +72,7 @@ public class Lucene99RWHnswScalarQuantizedVectorsFormat extends Lucene99HnswScal
 
     @Override
     public KnnVectorsWriter fieldsWriter(SegmentWriteState state) throws IOException {
+        log.info("Writing using Lucene-based writer");
         return new Lucene99HnswVectorsWriter(
             state,
             maxConn,

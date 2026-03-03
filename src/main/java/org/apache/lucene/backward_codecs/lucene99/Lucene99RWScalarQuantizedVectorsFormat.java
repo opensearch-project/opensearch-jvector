@@ -12,6 +12,8 @@ import org.apache.lucene.codecs.hnsw.FlatVectorsWriter;
 import org.apache.lucene.codecs.lucene99.Lucene99FlatVectorsFormat;
 import org.apache.lucene.index.SegmentWriteState;
 
+import lombok.extern.log4j.Log4j2;
+
 import java.io.IOException;
 
 /**
@@ -26,6 +28,7 @@ import java.io.IOException;
  *
  * @see <a href="https://github.com/apache/lucene/pull/15223">Lucene PR #15223</a>
  */
+@Log4j2
 public class Lucene99RWScalarQuantizedVectorsFormat extends Lucene99ScalarQuantizedVectorsFormat {
 
     private final Float confidenceInterval;
@@ -52,6 +55,7 @@ public class Lucene99RWScalarQuantizedVectorsFormat extends Lucene99ScalarQuanti
 
     @Override
     public FlatVectorsWriter fieldsWriter(SegmentWriteState state) throws IOException {
+        log.info("Continuing write using jvector-overridden writer");
         return new Lucene99ScalarQuantizedVectorsWriter(
             state,
             this.confidenceInterval,
