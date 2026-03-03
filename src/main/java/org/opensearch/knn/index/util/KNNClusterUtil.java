@@ -11,10 +11,11 @@ import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.opensearch.Version;
-import org.opensearch.action.OriginalIndices;
+import org.opensearch.action.IndicesRequest;
 import org.opensearch.cluster.metadata.IndexMetadata;
 import org.opensearch.cluster.metadata.IndexNameExpressionResolver;
 import org.opensearch.cluster.service.ClusterService;
+import org.opensearch.core.index.Index;
 import org.opensearch.search.pipeline.SearchPipelineService;
 
 import java.util.Arrays;
@@ -48,6 +49,7 @@ public class KNNClusterUtil {
     /**
      * Initializes instance of cluster context by injecting dependencies
      * @param clusterService
+     * @param indexNameExpressionResolver
      */
     public void initialize(final ClusterService clusterService, final IndexNameExpressionResolver indexNameExpressionResolver) {
         this.clusterService = clusterService;
@@ -72,20 +74,13 @@ public class KNNClusterUtil {
 
     /**
      * Get index metadata for the given indices
-     * @param originalIndices the original indices to resolve
-     * @return List of IndexMetadata for the resolved indices
+     * @param searchRequest
+     * @return IndexMetadata of the indices of the search request
      */
-    public List<IndexMetadata> getIndexMetadataList(@NonNull final OriginalIndices originalIndices) {
-        // Resolve the index names from the OriginalIndices
-        String[] concreteIndexNames = indexNameExpressionResolver.concreteIndexNames(
-            clusterService.state(),
-            originalIndices.indicesOptions(),
-            originalIndices.indices()
-        );
-
-        // Get metadata for each resolved index
-        return Arrays.stream(concreteIndexNames)
-            .map(indexName -> clusterService.state().metadata().index(indexName))
+    public List<IndexMetadata> getIndexMetadataList(@NonNull final IndicesRequest searchRequest) {
+        final Index[] concreteIndices = this.indexNameExpressionResolver.concreteIndices(clusterService.state(), searchRequest);
+        return Arrays.stream(concreteIndices)
+            .map(concreteIndex -> clusterService.state().metadata().index(concreteIndex))
             .collect(Collectors.toList());
     }
 
