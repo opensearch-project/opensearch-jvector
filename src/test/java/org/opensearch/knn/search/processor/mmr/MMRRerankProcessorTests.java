@@ -5,50 +5,56 @@
 
 package org.opensearch.knn.search.processor.mmr;
 
-import org.apache.lucene.tests.util.LuceneTestCase;
-import org.junit.Before;
-import org.junit.Test;
+import org.apache.lucene.search.TotalHits;
 import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
+import org.opensearch.action.search.SearchResponseSections;
+import org.opensearch.action.search.ShardSearchFailure;
+import org.opensearch.common.xcontent.json.JsonXContent;
+import org.opensearch.core.common.bytes.BytesReference;
+import org.opensearch.core.xcontent.XContentBuilder;
+import org.opensearch.knn.KNNTestCase;
+import org.opensearch.knn.index.SpaceType;
+import org.opensearch.knn.index.VectorDataType;
+import org.opensearch.search.SearchHit;
+import org.opensearch.search.SearchHits;
+import org.opensearch.search.fetch.subphase.FetchSourceContext;
 import org.opensearch.search.pipeline.PipelineProcessingContext;
 
-import static org.mockito.Mockito.*;
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.Map;
 
-/**
- * Unit tests for {@link MMRRerankProcessor}
- */
-public class MMRRerankProcessorTests extends LuceneTestCase {
+import static org.mockito.Mockito.mock;
+import static org.opensearch.knn.common.KNNConstants.MMR_RERANK_CONTEXT;
 
+public class MMRRerankProcessorTests extends KNNTestCase {
     private MMRRerankProcessor processor;
-    private String testTag = "test-tag";
-    private boolean testIgnoreFailure = false;
+    private SearchRequest searchRequest;
 
-    @Before
+    @Override
     public void setUp() throws Exception {
         super.setUp();
-        processor = new MMRRerankProcessor(testTag, testIgnoreFailure);
+        processor = new MMRRerankProcessor("test-tag", false);
+        searchRequest = new SearchRequest();
     }
 
     // ============================================
     // Test: Public getter methods
     // ============================================
 
-    @Test
     public void testGetType_ReturnsCorrectType() {
         assertEquals("mmr_rerank", processor.getType());
         assertEquals(MMRRerankProcessor.TYPE, processor.getType());
     }
 
-    @Test
     public void testGetTag_ReturnsConfiguredTag() {
-        assertEquals(testTag, processor.getTag());
+        assertEquals("test-tag", processor.getTag());
         
-        // Test with different tag
         MMRRerankProcessor customProcessor = new MMRRerankProcessor("custom-tag", false);
         assertEquals("custom-tag", customProcessor.getTag());
     }
 
-    @Test
     public void testGetDescription_ReturnsNonEmptyDescription() {
         String description = processor.getDescription();
         assertNotNull(description);
@@ -58,16 +64,13 @@ public class MMRRerankProcessorTests extends LuceneTestCase {
         assertEquals(MMRRerankProcessor.DESCRIPTION, description);
     }
 
-    @Test
     public void testIsIgnoreFailure_ReturnsConfiguredValue() {
-        assertEquals(testIgnoreFailure, processor.isIgnoreFailure());
+        assertFalse(processor.isIgnoreFailure());
         
-        // Test with ignore failure enabled
         MMRRerankProcessor processorWithIgnoreFailure = new MMRRerankProcessor("tag", true);
         assertTrue(processorWithIgnoreFailure.isIgnoreFailure());
     }
 
-    @Test
     public void testGetExecutionStage_ReturnsPreUserDefined() {
         assertEquals(
             MMRRerankProcessor.ExecutionStage.PRE_USER_DEFINED,
@@ -76,45 +79,139 @@ public class MMRRerankProcessorTests extends LuceneTestCase {
     }
 
     // ============================================
-    // Test: processResponse without context throws exception
+    // Test: processResponse without context
     // ============================================
 
-    @Test
     public void testProcessResponse_WithoutContext_ThrowsUnsupportedOperationException() {
-        SearchRequest mockRequest = mock(SearchRequest.class);
-        SearchResponse mockResponse = mock(SearchResponse.class);
-        
-        try {
-            processor.processResponse(mockRequest, mockResponse);
-            fail("Expected UnsupportedOperationException");
-        } catch (UnsupportedOperationException e) {
-            assertTrue(e.getMessage().contains("mmr_rerank"));
-            assertTrue(e.getMessage().contains("PipelineProcessingContext"));
-        }
+        UnsupportedOperationException ex = assertThrows(
+            UnsupportedOperationException.class,
+            () -> processor.processResponse(searchRequest, mock(SearchResponse.class))
+        );
+
+        assertTrue(ex.getMessage().contains("mmr_rerank"));
+        assertTrue(ex.getMessage().contains("PipelineProcessingContext"));
     }
 
-    @Test
-    public void testProcessResponse_WithoutContext_ErrorMessageContainsProcessorType() {
-        SearchRequest mockRequest = mock(SearchRequest.class);
-        SearchResponse mockResponse = mock(SearchResponse.class);
-        
-        try {
-            processor.processResponse(mockRequest, mockResponse);
-            fail("Expected UnsupportedOperationException");
-        } catch (UnsupportedOperationException e) {
-            String message = e.getMessage();
-            assertTrue("Error message should contain processor type", 
-                      message.contains("mmr_rerank"));
-            assertTrue("Error message should mention PipelineProcessingContext", 
-                      message.contains("PipelineProcessingContext"));
-        }
+    // ============================================
+    // Test: Integration tests with actual reranking
+    // ============================================
+
+    public void testProcessResponse_whenEmptyHits_thenReturnOriginalResponse() throws IOException {
+        SearchResponse emptyResponse = createSearchResponse(new SearchHit[] {});
+
+        PipelineProcessingContext ctx = mock(PipelineProcessingContext.class);
+
+        SearchResponse result = processor.processResponse(searchRequest, emptyResponse, ctx);
+
+        assertEquals("Processor should return the same response when there are no hits.", emptyResponse, result);
+    }
+
+    public void testProcessResponse_whenHappyCaseFloatWithL2_thenRerank() throws IOException {
+        runProcessResponseRerankHappyCase(SpaceType.L2, VectorDataType.FLOAT);
+    }
+
+    public void testProcessResponse_whenHappyCaseBinaryWithHammingSpaceType_thenRerank() throws IOException {
+        runProcessResponseRerankHappyCase(SpaceType.HAMMING, VectorDataType.BINARY);
+    }
+
+    private void runProcessResponseRerankHappyCase(SpaceType spaceType, VectorDataType vectorDataType) throws IOException {
+        SearchResponse searchResponse = createSearchResponse();
+        assertEquals(10, searchResponse.getInternalResponse().hits().getHits().length);
+        assertEquals(0, searchResponse.getInternalResponse().hits().getHits()[0].docId());
+        assertNotNull(
+            "Should have the knn_vector in the source.",
+            searchResponse.getInternalResponse().hits().getHits()[0].getSourceAsMap().get("knn_vector")
+        );
+        assertEquals(1, searchResponse.getInternalResponse().hits().getHits()[1].docId());
+        assertEquals(2, searchResponse.getInternalResponse().hits().getHits()[2].docId());
+
+        MMRRerankContext mmrRerankContext = new MMRRerankContext();
+        mmrRerankContext.setDiversity(0.5f);
+        mmrRerankContext.setOriginalQuerySize(3);
+        mmrRerankContext.setSpaceType(spaceType);
+        mmrRerankContext.setVectorDataType(vectorDataType);
+        mmrRerankContext.setVectorFieldPath("knn_vector");
+        mmrRerankContext.setOriginalFetchSourceContext(new FetchSourceContext(true, new String[] {}, new String[] { "knn_vector" }));
+        PipelineProcessingContext ctx = new PipelineProcessingContext();
+        ctx.setAttribute(MMR_RERANK_CONTEXT, mmrRerankContext);
+
+        SearchResponse result = processor.processResponse(searchRequest, searchResponse, ctx);
+
+        assertEquals("Should reduce the hits to the original query size.", 3, result.getInternalResponse().hits().getHits().length);
+        assertEquals(0, result.getInternalResponse().hits().getHits()[0].docId());
+        assertNull(
+            "Should exclude the knn_vector from the source.",
+            result.getInternalResponse().hits().getHits()[0].getSourceAsMap().get("knn_vector")
+        );
+        assertEquals("Should pick the hit with diversity.", 8, result.getInternalResponse().hits().getHits()[1].docId());
+        assertEquals("Should pick the hit with diversity.", 9, result.getInternalResponse().hits().getHits()[2].docId());
+    }
+
+    public void testProcessResponse_whenMissingRerankContext_thenException() throws IOException {
+        SearchResponse searchResponse = createSearchResponse();
+
+        PipelineProcessingContext ctx = new PipelineProcessingContext();
+
+        IllegalStateException exception = assertThrows(
+            IllegalStateException.class,
+            () -> processor.processResponse(searchRequest, searchResponse, ctx)
+        );
+        String expectedMessage = "MMR rerank context cannot be null";
+        assertEquals(expectedMessage, exception.getMessage());
+    }
+
+    public void testProcessResponse_whenMissingSpaceType_thenException() throws IOException {
+        SearchResponse searchResponse = createSearchResponse();
+
+        MMRRerankContext mmrRerankContext = new MMRRerankContext();
+        PipelineProcessingContext ctx = new PipelineProcessingContext();
+        ctx.setAttribute(MMR_RERANK_CONTEXT, mmrRerankContext);
+
+        IllegalStateException exception = assertThrows(
+            IllegalStateException.class,
+            () -> processor.processResponse(searchRequest, searchResponse, ctx)
+        );
+        String expectedMessage = "Space type in MMR rerank context cannot be null";
+        assertEquals(expectedMessage, exception.getMessage());
+    }
+
+    public void testProcessResponse_whenMissingOriginalQuerySize_thenException() throws IOException {
+        SearchResponse searchResponse = createSearchResponse();
+
+        MMRRerankContext mmrRerankContext = new MMRRerankContext();
+        mmrRerankContext.setSpaceType(SpaceType.L2);
+        PipelineProcessingContext ctx = new PipelineProcessingContext();
+        ctx.setAttribute(MMR_RERANK_CONTEXT, mmrRerankContext);
+
+        IllegalStateException exception = assertThrows(
+            IllegalStateException.class,
+            () -> processor.processResponse(searchRequest, searchResponse, ctx)
+        );
+        String expectedMessage = "Original query size in MMR rerank context cannot be null";
+        assertEquals(expectedMessage, exception.getMessage());
+    }
+
+    public void testProcessResponse_whenMissingDiversity_thenException() throws IOException {
+        SearchResponse searchResponse = createSearchResponse();
+
+        MMRRerankContext mmrRerankContext = new MMRRerankContext();
+        mmrRerankContext.setSpaceType(SpaceType.L2);
+        mmrRerankContext.setOriginalQuerySize(3);
+        PipelineProcessingContext ctx = new PipelineProcessingContext();
+        ctx.setAttribute(MMR_RERANK_CONTEXT, mmrRerankContext);
+
+        IllegalStateException exception = assertThrows(
+            IllegalStateException.class,
+            () -> processor.processResponse(searchRequest, searchResponse, ctx)
+        );
+        String expectedMessage = "Diversity in MMR rerank context cannot be null";
+        assertEquals(expectedMessage, exception.getMessage());
     }
 
     // ============================================
     // Test: Constructor variations
     // ============================================
 
-    @Test
     public void testConstructor_WithAllParameters() {
         String tag = "custom-tag";
         boolean ignoreFailure = true;
@@ -127,7 +224,6 @@ public class MMRRerankProcessorTests extends LuceneTestCase {
         assertNotNull(proc.getDescription());
     }
 
-    @Test
     public void testConstructor_WithNullTag() {
         MMRRerankProcessor proc = new MMRRerankProcessor(null, false);
         
@@ -135,7 +231,6 @@ public class MMRRerankProcessorTests extends LuceneTestCase {
         assertEquals("mmr_rerank", proc.getType());
     }
 
-    @Test
     public void testConstructor_WithEmptyTag() {
         MMRRerankProcessor proc = new MMRRerankProcessor("", false);
         
@@ -143,7 +238,6 @@ public class MMRRerankProcessorTests extends LuceneTestCase {
         assertNotNull(proc.getType());
     }
 
-    @Test
     public void testConstructor_WithDifferentIgnoreFailureValues() {
         MMRRerankProcessor procTrue = new MMRRerankProcessor("tag1", true);
         MMRRerankProcessor procFalse = new MMRRerankProcessor("tag2", false);
@@ -153,21 +247,18 @@ public class MMRRerankProcessorTests extends LuceneTestCase {
     }
 
     // ============================================
-    // Test: Multiple processor instances are independent
+    // Test: Multiple processor instances
     // ============================================
 
-    @Test
     public void testMultipleInstances_AreIndependent() {
         MMRRerankProcessor proc1 = new MMRRerankProcessor("tag1", true);
         MMRRerankProcessor proc2 = new MMRRerankProcessor("tag2", false);
         
-        // Verify independence
         assertEquals("tag1", proc1.getTag());
         assertEquals("tag2", proc2.getTag());
         assertTrue(proc1.isIgnoreFailure());
         assertFalse(proc2.isIgnoreFailure());
         
-        // Both should have same type and execution stage (class-level constants)
         assertEquals(proc1.getType(), proc2.getType());
         assertEquals(proc1.getExecutionStage(), proc2.getExecutionStage());
         assertEquals(proc1.getDescription(), proc2.getDescription());
@@ -177,14 +268,12 @@ public class MMRRerankProcessorTests extends LuceneTestCase {
     // Test: Factory class
     // ============================================
 
-    @Test
     public void testFactory_TypeConstant() {
         assertEquals("mmr_rerank_factory", MMRRerankProcessor.MMRRerankProcessorFactory.TYPE);
     }
 
-    @Test
     public void testFactory_Constructor() {
-        MMRRerankProcessor.MMRRerankProcessorFactory factory = 
+        MMRRerankProcessor.MMRRerankProcessorFactory factory =
             new MMRRerankProcessor.MMRRerankProcessorFactory();
         
         assertNotNull(factory);
@@ -194,7 +283,6 @@ public class MMRRerankProcessorTests extends LuceneTestCase {
     // Test: Constants and default values
     // ============================================
 
-    @Test
     public void testConstants_HaveExpectedValues() {
         assertEquals("mmr_rerank", MMRRerankProcessor.TYPE);
         assertNotNull(MMRRerankProcessor.DESCRIPTION);
@@ -202,12 +290,10 @@ public class MMRRerankProcessorTests extends LuceneTestCase {
         assertTrue(MMRRerankProcessor.DESCRIPTION.length() > 20);
     }
 
-    @Test
     public void testTypeConstant_MatchesGetType() {
         assertEquals(MMRRerankProcessor.TYPE, processor.getType());
     }
 
-    @Test
     public void testDescriptionConstant_MatchesGetDescription() {
         assertEquals(MMRRerankProcessor.DESCRIPTION, processor.getDescription());
     }
@@ -216,7 +302,6 @@ public class MMRRerankProcessorTests extends LuceneTestCase {
     // Test: Execution stage behavior
     // ============================================
 
-    @Test
     public void testExecutionStage_IsConsistentAcrossInstances() {
         MMRRerankProcessor proc1 = new MMRRerankProcessor("tag1", true);
         MMRRerankProcessor proc2 = new MMRRerankProcessor("tag2", false);
@@ -225,10 +310,7 @@ public class MMRRerankProcessorTests extends LuceneTestCase {
         assertEquals(MMRRerankProcessor.ExecutionStage.PRE_USER_DEFINED, proc1.getExecutionStage());
     }
 
-    @Test
     public void testExecutionStage_IsPreUserDefined() {
-        // MMR reranking should happen BEFORE user-defined response processors
-        // This ensures the response is reranked and reduced to original size first
         assertEquals(
             MMRRerankProcessor.ExecutionStage.PRE_USER_DEFINED,
             processor.getExecutionStage()
@@ -239,15 +321,12 @@ public class MMRRerankProcessorTests extends LuceneTestCase {
     // Test: Edge cases
     // ============================================
 
-    @Test
     public void testGetters_ReturnNonNullValues() {
         assertNotNull(processor.getType());
         assertNotNull(processor.getDescription());
         assertNotNull(processor.getExecutionStage());
-        // getTag() can be null, so we don't assert it
     }
 
-    @Test
     public void testProcessorBehavior_WithDifferentTags() {
         String[] tags = {"tag1", "tag2", "tag3", null, ""};
         
@@ -258,7 +337,6 @@ public class MMRRerankProcessorTests extends LuceneTestCase {
         }
     }
 
-    @Test
     public void testProcessorBehavior_WithDifferentIgnoreFailureFlags() {
         boolean[] flags = {true, false};
         
@@ -270,25 +348,64 @@ public class MMRRerankProcessorTests extends LuceneTestCase {
     }
 
     // ============================================
-    // Test: Error message formatting
+    // Test: Helper methods for creating test data
     // ============================================
 
-    @Test
-    public void testErrorMessage_UseConsistentFormatting() {
-        SearchRequest mockRequest = mock(SearchRequest.class);
-        SearchResponse mockResponse = mock(SearchResponse.class);
-        
-        String message = null;
-        
-        try {
-            processor.processResponse(mockRequest, mockResponse);
-        } catch (UnsupportedOperationException e) {
-            message = e.getMessage();
+    private SearchResponse createSearchResponse() throws IOException {
+        SearchHit[] hits = new SearchHit[10];
+
+        // 8 similar hits, high score
+        float[] similarVector = new float[] { 1f, 1f };
+        for (int i = 0; i < 8; i++) {
+            XContentBuilder sourceBuilder = JsonXContent.contentBuilder().startObject().array("knn_vector", similarVector).endObject();
+
+            SearchHit hit = new SearchHit(i, String.valueOf(i), Map.of(), Map.of());
+            hit.sourceRef(BytesReference.bytes(sourceBuilder));
+            hit.score(1f);
+            hits[i] = hit;
         }
-        
-        assertNotNull(message);
-        assertTrue(message.contains("mmr_rerank"));
-        assertTrue(message.contains("PipelineProcessingContext"));
+
+        // 2 diverse hits, slightly lower score
+        float[][] diverseVectors = new float[][] { { 1f, 2f }, { 2f, 1f } };
+        for (int i = 0; i < 2; i++) {
+            int idx = i + 8;
+            XContentBuilder sourceBuilder = JsonXContent.contentBuilder().startObject().array("knn_vector", diverseVectors[i]).endObject();
+
+            SearchHit hit = new SearchHit(idx, String.valueOf(idx), Map.of(), Map.of());
+            hit.sourceRef(BytesReference.bytes(sourceBuilder));
+            hit.score(0.8f); // slightly lower than top similar hits
+            hits[idx] = hit;
+        }
+        return createSearchResponse(hits);
     }
 
+    private SearchResponse createSearchResponse(SearchHit... hits) {
+        TotalHits totalHits = new TotalHits(hits.length, TotalHits.Relation.EQUAL_TO);
+
+        float maxScore = Arrays.stream(hits).map(SearchHit::getScore).max(Float::compare).orElse(Float.NEGATIVE_INFINITY);
+
+        SearchHits searchHits = new SearchHits(hits, totalHits, maxScore);
+
+        SearchResponseSections sections = new SearchResponseSections(
+            searchHits,
+            null,   // aggregations
+            null,   // suggest
+            false,  // timedOut
+            false,  // terminatedEarly
+            null,   // profileShardResults
+            0       // numReducePhases
+        );
+
+        return new SearchResponse(
+            sections,
+            null,   // scrollId
+            1,      // totalShards
+            1,      // successfulShards
+            0,      // skippedShards
+            1,      // tookInMillis
+            new ShardSearchFailure[0],
+            new SearchResponse.Clusters(1, 1, 0),
+            null    // pitId
+        );
+    }
 }
