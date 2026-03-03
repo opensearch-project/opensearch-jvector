@@ -16,7 +16,6 @@ import org.opensearch.knn.index.mapper.KNNVectorFieldMapper;
 import org.opensearch.knn.index.query.KNNQueryBuilder;
 import org.opensearch.knn.search.extension.MMRSearchExtBuilder;
 import org.opensearch.search.builder.SearchSourceBuilder;
-import org.opensearch.search.fetch.subphase.FetchSourceContext;
 import org.opensearch.search.pipeline.PipelineProcessingContext;
 import org.opensearch.search.pipeline.SystemGeneratedProcessor;
 import org.opensearch.transport.client.Client;
@@ -264,14 +263,9 @@ public class MMROverSampleProcessorTests extends MMRTestCase {
 
     public void testGetTag_ReturnsConfiguredTag() {
         assertEquals("testTag", processor.getTag());
-        
+
         // Test with different tag
-        MMROverSampleProcessor customProcessor = new MMROverSampleProcessor(
-            "custom-tag",
-            true,
-            mockClient,
-            getMockMMRQueryTransformers()
-        );
+        MMROverSampleProcessor customProcessor = new MMROverSampleProcessor("custom-tag", true, mockClient, getMockMMRQueryTransformers());
         assertEquals("custom-tag", customProcessor.getTag());
     }
 
@@ -285,7 +279,7 @@ public class MMROverSampleProcessorTests extends MMRTestCase {
 
     public void testIsIgnoreFailure_ReturnsConfiguredValue() {
         assertTrue(processor.isIgnoreFailure());
-        
+
         // Test with ignore failure disabled
         MMROverSampleProcessor processorWithoutIgnoreFailure = new MMROverSampleProcessor(
             "tag",
@@ -297,15 +291,12 @@ public class MMROverSampleProcessorTests extends MMRTestCase {
     }
 
     public void testGetExecutionStage_ReturnsPostUserDefined() {
-        assertEquals(
-            SystemGeneratedProcessor.ExecutionStage.POST_USER_DEFINED,
-            processor.getExecutionStage()
-        );
+        assertEquals(SystemGeneratedProcessor.ExecutionStage.POST_USER_DEFINED, processor.getExecutionStage());
     }
 
     public void testProcessRequest_ThrowsUnsupportedOperationException() {
         SearchRequest mockRequest = mock(SearchRequest.class);
-        
+
         UnsupportedOperationException exception = assertThrows(
             UnsupportedOperationException.class,
             () -> processor.processRequest(mockRequest)
@@ -317,7 +308,7 @@ public class MMROverSampleProcessorTests extends MMRTestCase {
     public void testProcessRequestWithContext_ThrowsUnsupportedOperationException() {
         SearchRequest mockRequest = mock(SearchRequest.class);
         PipelineProcessingContext mockContext = mock(PipelineProcessingContext.class);
-        
+
         UnsupportedOperationException exception = assertThrows(
             UnsupportedOperationException.class,
             () -> processor.processRequest(mockRequest, mockContext)
@@ -328,16 +319,14 @@ public class MMROverSampleProcessorTests extends MMRTestCase {
 
     public void testSynchronousMethodsErrorMessage_ContainsProcessorType() {
         SearchRequest mockRequest = mock(SearchRequest.class);
-        
+
         UnsupportedOperationException exception = assertThrows(
             UnsupportedOperationException.class,
             () -> processor.processRequest(mockRequest)
         );
         String message = exception.getMessage();
-        assertTrue("Error message should contain processor type",
-                  message.contains("mmr_over_sample"));
-        assertTrue("Error message should mention synchronous operation",
-                  message.contains("synchronously"));
+        assertTrue("Error message should contain processor type", message.contains("mmr_over_sample"));
+        assertTrue("Error message should mention synchronous operation", message.contains("synchronously"));
     }
 
     public void testConstructor_WithAllParameters() {
@@ -345,9 +334,9 @@ public class MMROverSampleProcessorTests extends MMRTestCase {
         boolean ignoreFailure = true;
         Client client = mock(Client.class);
         Map<String, MMRQueryTransformer<? extends QueryBuilder>> transformers = getMockMMRQueryTransformers();
-        
+
         MMROverSampleProcessor proc = new MMROverSampleProcessor(tag, ignoreFailure, client, transformers);
-        
+
         assertEquals(tag, proc.getTag());
         assertEquals(ignoreFailure, proc.isIgnoreFailure());
         assertEquals("mmr_over_sample", proc.getType());
@@ -356,71 +345,41 @@ public class MMROverSampleProcessorTests extends MMRTestCase {
 
     public void testConstructor_WithEmptyTransformers() {
         Map<String, MMRQueryTransformer<? extends QueryBuilder>> emptyTransformers = Collections.emptyMap();
-        
-        MMROverSampleProcessor proc = new MMROverSampleProcessor(
-            "tag",
-            false,
-            mockClient,
-            emptyTransformers
-        );
-        
+
+        MMROverSampleProcessor proc = new MMROverSampleProcessor("tag", false, mockClient, emptyTransformers);
+
         assertNotNull(proc);
         assertEquals("tag", proc.getTag());
         assertEquals("mmr_over_sample", proc.getType());
     }
 
     public void testConstructor_WithNullTag() {
-        MMROverSampleProcessor proc = new MMROverSampleProcessor(
-            null,
-            false,
-            mockClient,
-            getMockMMRQueryTransformers()
-        );
-        
+        MMROverSampleProcessor proc = new MMROverSampleProcessor(null, false, mockClient, getMockMMRQueryTransformers());
+
         assertNull(proc.getTag());
         assertEquals("mmr_over_sample", proc.getType());
     }
 
     public void testConstructor_WithDifferentIgnoreFailureValues() {
-        MMROverSampleProcessor procTrue = new MMROverSampleProcessor(
-            "tag1",
-            true,
-            mockClient,
-            getMockMMRQueryTransformers()
-        );
-        
-        MMROverSampleProcessor procFalse = new MMROverSampleProcessor(
-            "tag2",
-            false,
-            mockClient,
-            getMockMMRQueryTransformers()
-        );
-        
+        MMROverSampleProcessor procTrue = new MMROverSampleProcessor("tag1", true, mockClient, getMockMMRQueryTransformers());
+
+        MMROverSampleProcessor procFalse = new MMROverSampleProcessor("tag2", false, mockClient, getMockMMRQueryTransformers());
+
         assertTrue(procTrue.isIgnoreFailure());
         assertFalse(procFalse.isIgnoreFailure());
     }
 
     public void testMultipleInstances_AreIndependent() {
-        MMROverSampleProcessor proc1 = new MMROverSampleProcessor(
-            "tag1",
-            true,
-            mockClient,
-            getMockMMRQueryTransformers()
-        );
-        
-        MMROverSampleProcessor proc2 = new MMROverSampleProcessor(
-            "tag2",
-            false,
-            mockClient,
-            getMockMMRQueryTransformers()
-        );
-        
+        MMROverSampleProcessor proc1 = new MMROverSampleProcessor("tag1", true, mockClient, getMockMMRQueryTransformers());
+
+        MMROverSampleProcessor proc2 = new MMROverSampleProcessor("tag2", false, mockClient, getMockMMRQueryTransformers());
+
         // Verify independence
         assertEquals("tag1", proc1.getTag());
         assertEquals("tag2", proc2.getTag());
         assertTrue(proc1.isIgnoreFailure());
         assertFalse(proc2.isIgnoreFailure());
-        
+
         // Both should have same type and execution stage (class-level constants)
         assertEquals(proc1.getType(), proc2.getType());
         assertEquals(proc1.getExecutionStage(), proc2.getExecutionStage());
@@ -434,28 +393,34 @@ public class MMROverSampleProcessorTests extends MMRTestCase {
     public void testFactory_Constructor() {
         Client client = mock(Client.class);
         Map<String, MMRQueryTransformer<? extends QueryBuilder>> transformers = getMockMMRQueryTransformers();
-        
-        MMROverSampleProcessor.MMROverSampleProcessorFactory factory =
-            new MMROverSampleProcessor.MMROverSampleProcessorFactory(client, transformers);
-        
+
+        MMROverSampleProcessor.MMROverSampleProcessorFactory factory = new MMROverSampleProcessor.MMROverSampleProcessorFactory(
+            client,
+            transformers
+        );
+
         assertNotNull(factory);
     }
 
     public void testFactory_ConstructorWithNullClient() {
         Map<String, MMRQueryTransformer<? extends QueryBuilder>> transformers = getMockMMRQueryTransformers();
-        
-        MMROverSampleProcessor.MMROverSampleProcessorFactory factory =
-            new MMROverSampleProcessor.MMROverSampleProcessorFactory(null, transformers);
-        
+
+        MMROverSampleProcessor.MMROverSampleProcessorFactory factory = new MMROverSampleProcessor.MMROverSampleProcessorFactory(
+            null,
+            transformers
+        );
+
         assertNotNull(factory);
     }
 
     public void testFactory_ConstructorWithNullTransformers() {
         Client client = mock(Client.class);
-        
-        MMROverSampleProcessor.MMROverSampleProcessorFactory factory =
-            new MMROverSampleProcessor.MMROverSampleProcessorFactory(client, null);
-        
+
+        MMROverSampleProcessor.MMROverSampleProcessorFactory factory = new MMROverSampleProcessor.MMROverSampleProcessorFactory(
+            client,
+            null
+        );
+
         assertNotNull(factory);
     }
 
@@ -475,32 +440,17 @@ public class MMROverSampleProcessorTests extends MMRTestCase {
     }
 
     public void testExecutionStage_IsConsistentAcrossInstances() {
-        MMROverSampleProcessor proc1 = new MMROverSampleProcessor(
-            "tag1",
-            true,
-            mockClient,
-            getMockMMRQueryTransformers()
-        );
-        
-        MMROverSampleProcessor proc2 = new MMROverSampleProcessor(
-            "tag2",
-            false,
-            mockClient,
-            getMockMMRQueryTransformers()
-        );
-        
+        MMROverSampleProcessor proc1 = new MMROverSampleProcessor("tag1", true, mockClient, getMockMMRQueryTransformers());
+
+        MMROverSampleProcessor proc2 = new MMROverSampleProcessor("tag2", false, mockClient, getMockMMRQueryTransformers());
+
         assertEquals(proc1.getExecutionStage(), proc2.getExecutionStage());
         assertEquals(SystemGeneratedProcessor.ExecutionStage.POST_USER_DEFINED, proc1.getExecutionStage());
     }
 
     public void testConstructor_WithEmptyTag() {
-        MMROverSampleProcessor proc = new MMROverSampleProcessor(
-            "",
-            false,
-            mockClient,
-            getMockMMRQueryTransformers()
-        );
-        
+        MMROverSampleProcessor proc = new MMROverSampleProcessor("", false, mockClient, getMockMMRQueryTransformers());
+
         assertEquals("", proc.getTag());
         assertNotNull(proc.getType());
     }
@@ -515,21 +465,11 @@ public class MMROverSampleProcessorTests extends MMRTestCase {
     public void testProcessorBehavior_WithDifferentClients() {
         Client client1 = mock(Client.class);
         Client client2 = mock(Client.class);
-        
-        MMROverSampleProcessor proc1 = new MMROverSampleProcessor(
-            "tag",
-            false,
-            client1,
-            getMockMMRQueryTransformers()
-        );
-        
-        MMROverSampleProcessor proc2 = new MMROverSampleProcessor(
-            "tag",
-            false,
-            client2,
-            getMockMMRQueryTransformers()
-        );
-        
+
+        MMROverSampleProcessor proc1 = new MMROverSampleProcessor("tag", false, client1, getMockMMRQueryTransformers());
+
+        MMROverSampleProcessor proc2 = new MMROverSampleProcessor("tag", false, client2, getMockMMRQueryTransformers());
+
         // Both should have same public behavior
         assertEquals(proc1.getType(), proc2.getType());
         assertEquals(proc1.getTag(), proc2.getTag());
@@ -539,21 +479,11 @@ public class MMROverSampleProcessorTests extends MMRTestCase {
     public void testProcessorBehavior_WithDifferentTransformers() {
         Map<String, MMRQueryTransformer<? extends QueryBuilder>> transformers1 = getMockMMRQueryTransformers();
         Map<String, MMRQueryTransformer<? extends QueryBuilder>> transformers2 = Collections.emptyMap();
-        
-        MMROverSampleProcessor proc1 = new MMROverSampleProcessor(
-            "tag",
-            false,
-            mockClient,
-            transformers1
-        );
-        
-        MMROverSampleProcessor proc2 = new MMROverSampleProcessor(
-            "tag",
-            false,
-            mockClient,
-            transformers2
-        );
-        
+
+        MMROverSampleProcessor proc1 = new MMROverSampleProcessor("tag", false, mockClient, transformers1);
+
+        MMROverSampleProcessor proc2 = new MMROverSampleProcessor("tag", false, mockClient, transformers2);
+
         // Both should have same public behavior
         assertEquals(proc1.getType(), proc2.getType());
         assertEquals(proc1.getTag(), proc2.getTag());
@@ -562,29 +492,29 @@ public class MMROverSampleProcessorTests extends MMRTestCase {
     public void testErrorMessages_UseConsistentFormatting() {
         SearchRequest mockRequest = mock(SearchRequest.class);
         PipelineProcessingContext mockContext = mock(PipelineProcessingContext.class);
-        
+
         String message1 = null;
         String message2 = null;
-        
+
         try {
             processor.processRequest(mockRequest);
         } catch (UnsupportedOperationException e) {
             message1 = e.getMessage();
         }
-        
+
         try {
             processor.processRequest(mockRequest, mockContext);
         } catch (UnsupportedOperationException e) {
             message2 = e.getMessage();
         }
-        
+
         assertNotNull(message1);
         assertNotNull(message2);
-        
+
         // Both messages should mention the processor type
         assertTrue(message1.contains("mmr_over_sample"));
         assertTrue(message2.contains("mmr_over_sample"));
-        
+
         // Both should mention synchronous operation
         assertTrue(message1.contains("synchronously"));
         assertTrue(message2.contains("synchronously"));

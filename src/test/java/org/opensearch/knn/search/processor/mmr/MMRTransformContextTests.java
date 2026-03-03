@@ -325,9 +325,7 @@ public class MMRTransformContextTests extends LuceneTestCase {
 
     @Test
     public void testContextWithMultipleLocalIndices() {
-        List<IndexMetadata> indexMetadataList = createIndexMetadataList(
-            "index1", "index2", "index3", "index4", "index5"
-        );
+        List<IndexMetadata> indexMetadataList = createIndexMetadataList("index1", "index2", "index3", "index4", "index5");
         MMRTransformContext context = createContextWithIndexMetadata(indexMetadataList);
 
         assertEquals(5, context.getLocalIndexMetadataList().size());
@@ -371,17 +369,7 @@ public class MMRTransformContextTests extends LuceneTestCase {
         List<String> remoteIndices = Collections.emptyList();
         Client client = mock(Client.class);
 
-        return new MMRTransformContext(
-            candidates,
-            rerankContext,
-            indexMetadataList,
-            remoteIndices,
-            null,
-            null,
-            null,
-            client,
-            false
-        );
+        return new MMRTransformContext(candidates, rerankContext, indexMetadataList, remoteIndices, null, null, null, client, false);
     }
 
     private MMRTransformContext createContextWithRerankContext(MMRRerankContext rerankContext) {
@@ -389,17 +377,7 @@ public class MMRTransformContextTests extends LuceneTestCase {
         List<String> remoteIndices = Collections.emptyList();
         Client client = mock(Client.class);
 
-        return new MMRTransformContext(
-            10,
-            rerankContext,
-            indexMetadataList,
-            remoteIndices,
-            null,
-            null,
-            null,
-            client,
-            false
-        );
+        return new MMRTransformContext(10, rerankContext, indexMetadataList, remoteIndices, null, null, null, client, false);
     }
 
     private MMRTransformContext createContextWithIndexMetadata(List<IndexMetadata> indexMetadataList) {
@@ -407,17 +385,7 @@ public class MMRTransformContextTests extends LuceneTestCase {
         List<String> remoteIndices = Collections.emptyList();
         Client client = mock(Client.class);
 
-        return new MMRTransformContext(
-            10,
-            rerankContext,
-            indexMetadataList,
-            remoteIndices,
-            null,
-            null,
-            null,
-            client,
-            false
-        );
+        return new MMRTransformContext(10, rerankContext, indexMetadataList, remoteIndices, null, null, null, client, false);
     }
 
     private MMRTransformContext createContextWithRemoteIndices(List<String> remoteIndices) {
@@ -425,17 +393,7 @@ public class MMRTransformContextTests extends LuceneTestCase {
         List<IndexMetadata> indexMetadataList = createIndexMetadataList("test-index");
         Client client = mock(Client.class);
 
-        return new MMRTransformContext(
-            10,
-            rerankContext,
-            indexMetadataList,
-            remoteIndices,
-            null,
-            null,
-            null,
-            client,
-            false
-        );
+        return new MMRTransformContext(10, rerankContext, indexMetadataList, remoteIndices, null, null, null, client, false);
     }
 
     private MMRTransformContext createContextWithSpaceType(SpaceType spaceType) {
@@ -444,17 +402,7 @@ public class MMRTransformContextTests extends LuceneTestCase {
         List<String> remoteIndices = Collections.emptyList();
         Client client = mock(Client.class);
 
-        return new MMRTransformContext(
-            10,
-            rerankContext,
-            indexMetadataList,
-            remoteIndices,
-            spaceType,
-            null,
-            null,
-            client,
-            false
-        );
+        return new MMRTransformContext(10, rerankContext, indexMetadataList, remoteIndices, spaceType, null, null, client, false);
     }
 
     private MMRTransformContext createContextWithVectorFieldPath(String vectorFieldPath) {
@@ -463,17 +411,7 @@ public class MMRTransformContextTests extends LuceneTestCase {
         List<String> remoteIndices = Collections.emptyList();
         Client client = mock(Client.class);
 
-        return new MMRTransformContext(
-            10,
-            rerankContext,
-            indexMetadataList,
-            remoteIndices,
-            null,
-            vectorFieldPath,
-            null,
-            client,
-            false
-        );
+        return new MMRTransformContext(10, rerankContext, indexMetadataList, remoteIndices, null, vectorFieldPath, null, client, false);
     }
 
     private MMRTransformContext createContextWithVectorDataType(VectorDataType vectorDataType) {
@@ -482,17 +420,7 @@ public class MMRTransformContextTests extends LuceneTestCase {
         List<String> remoteIndices = Collections.emptyList();
         Client client = mock(Client.class);
 
-        return new MMRTransformContext(
-            10,
-            rerankContext,
-            indexMetadataList,
-            remoteIndices,
-            null,
-            null,
-            vectorDataType,
-            client,
-            false
-        );
+        return new MMRTransformContext(10, rerankContext, indexMetadataList, remoteIndices, null, null, vectorDataType, client, false);
     }
 
     private MMRTransformContext createContextWithClient(Client client) {
@@ -500,17 +428,7 @@ public class MMRTransformContextTests extends LuceneTestCase {
         List<IndexMetadata> indexMetadataList = createIndexMetadataList("test-index");
         List<String> remoteIndices = Collections.emptyList();
 
-        return new MMRTransformContext(
-            10,
-            rerankContext,
-            indexMetadataList,
-            remoteIndices,
-            null,
-            null,
-            null,
-            client,
-            false
-        );
+        return new MMRTransformContext(10, rerankContext, indexMetadataList, remoteIndices, null, null, null, client, false);
     }
 
     private MMRTransformContext createContextWithResolvedFlag(boolean isResolved) {
@@ -519,17 +437,7 @@ public class MMRTransformContextTests extends LuceneTestCase {
         List<String> remoteIndices = Collections.emptyList();
         Client client = mock(Client.class);
 
-        return new MMRTransformContext(
-            10,
-            rerankContext,
-            indexMetadataList,
-            remoteIndices,
-            null,
-            null,
-            null,
-            client,
-            isResolved
-        );
+        return new MMRTransformContext(10, rerankContext, indexMetadataList, remoteIndices, null, null, null, client, isResolved);
     }
 
     private List<IndexMetadata> createIndexMetadataList(String... indexNames) {

@@ -195,11 +195,7 @@ public class MMRVectorFieldInfoTests extends LuceneTestCase {
 
     @Test
     public void testSetKnnConfig_WithAllSpaceTypes() {
-        String[][] spaceTypeTests = {
-            { "l2", "l2" },
-            { "cosinesimil", "cosinesimil" },
-            { "innerproduct", "innerproduct" }
-        };
+        String[][] spaceTypeTests = { { "l2", "l2" }, { "cosinesimil", "cosinesimil" }, { "innerproduct", "innerproduct" } };
 
         for (String[] test : spaceTypeTests) {
             MMRVectorFieldInfo info = new MMRVectorFieldInfo();
@@ -214,11 +210,7 @@ public class MMRVectorFieldInfoTests extends LuceneTestCase {
 
     @Test
     public void testSetKnnConfig_WithAllVectorDataTypes() {
-        String[][] dataTypeTests = {
-            { "float", "float" },
-            { "byte", "byte" },
-            { "binary", "binary" }
-        };
+        String[][] dataTypeTests = { { "float", "float" }, { "byte", "byte" }, { "binary", "binary" } };
 
         for (String[] test : dataTypeTests) {
             MMRVectorFieldInfo info = new MMRVectorFieldInfo();
@@ -268,7 +260,7 @@ public class MMRVectorFieldInfoTests extends LuceneTestCase {
     @Test
     public void testSetIndexNameByIndexMetadata() {
         MMRVectorFieldInfo info = new MMRVectorFieldInfo();
-        
+
         Index index = new Index("test-index", "test-uuid");
         IndexMetadata indexMetadata = IndexMetadata.builder("test-index")
             .settings(Settings.builder().put(IndexMetadata.SETTING_VERSION_CREATED, org.opensearch.Version.CURRENT))

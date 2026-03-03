@@ -227,7 +227,6 @@ public class MMRUtil {
         }
     }
 
-    
     /**
      * Resolves the space type and data type for a vector field, optionally using model metadata if model IDs exist.
      * It will collect the info from the localIndexMetadataList.

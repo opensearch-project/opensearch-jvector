@@ -257,7 +257,7 @@ public class MMRKnnQueryTransformerTests extends MMRTestCase {
     public void testTransform_CompleteWorkflowWithAllParameters() {
         String fieldName = "embeddings";
         Integer candidates = 200;
-        
+
         when(queryBuilder.getMaxDistance()).thenReturn(null);
         when(queryBuilder.getMinScore()).thenReturn(null);
         when(queryBuilder.fieldName()).thenReturn(fieldName);
@@ -270,16 +270,26 @@ public class MMRKnnQueryTransformerTests extends MMRTestCase {
     }
 
     public void testTransform_WithDifferentCandidateValues() {
-        int[] candidateValues = {10, 50, 100, 500, 1000};
-        
+        int[] candidateValues = { 10, 50, 100, 500, 1000 };
+
         for (int candidates : candidateValues) {
             reset(queryBuilder, listener);
             processingContext = new MMRRerankContext();
-            
+
             when(queryBuilder.getMaxDistance()).thenReturn(null);
             when(queryBuilder.getMinScore()).thenReturn(null);
             when(queryBuilder.fieldName()).thenReturn("vector_field");
-            transformContext = new MMRTransformContext(candidates, processingContext, List.of(), List.of(), null, "vector_field", null, client, true);
+            transformContext = new MMRTransformContext(
+                candidates,
+                processingContext,
+                List.of(),
+                List.of(),
+                null,
+                "vector_field",
+                null,
+                client,
+                true
+            );
 
             transformer.transform(queryBuilder, listener, transformContext);
 
@@ -325,12 +335,12 @@ public class MMRKnnQueryTransformerTests extends MMRTestCase {
     }
 
     public void testTransform_MultipleSequentialCalls() {
-        String[] fieldNames = {"field1", "field2", "field3"};
-        
+        String[] fieldNames = { "field1", "field2", "field3" };
+
         for (String fieldName : fieldNames) {
             reset(queryBuilder, listener);
             processingContext = new MMRRerankContext();
-            
+
             when(queryBuilder.getMaxDistance()).thenReturn(null);
             when(queryBuilder.getMinScore()).thenReturn(null);
             when(queryBuilder.fieldName()).thenReturn(fieldName);

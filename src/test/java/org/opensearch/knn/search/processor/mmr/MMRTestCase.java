@@ -31,7 +31,6 @@ import java.util.Map;
 import java.util.Set;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 public class MMRTestCase extends KNNTestCase {
@@ -72,28 +71,28 @@ public class MMRTestCase extends KNNTestCase {
 
     // Model mocking not needed for JVector (native library feature for FAISS/NMSLIB)
     // void mockModelMetadata(Client mockClient, Map<String, MMRVectorFieldInfo> modelIdToFieldInfoMap) {
-    //     doAnswer(invocation -> {
-    //         GetModelRequest request = (GetModelRequest) invocation.getArguments()[1];
-    //         String modelId = request.getModelID();
-    //         ActionListener<GetModelResponse> getModelListener = invocation.getArgument(2);
-    //         if (modelIdToFieldInfoMap != null && modelIdToFieldInfoMap.containsKey(modelId)) {
-    //             getModelListener.onResponse(createMockGetModelResponse(modelIdToFieldInfoMap.get(modelId)));
-    //         } else {
-    //             getModelListener.onFailure(new Exception("Model ID " + modelId + " not found"));
-    //         }
-    //         return null;
-    //     }).when(mockClient).execute(eq(GetModelAction.INSTANCE), any(GetModelRequest.class), any(ActionListener.class));
+    // doAnswer(invocation -> {
+    // GetModelRequest request = (GetModelRequest) invocation.getArguments()[1];
+    // String modelId = request.getModelID();
+    // ActionListener<GetModelResponse> getModelListener = invocation.getArgument(2);
+    // if (modelIdToFieldInfoMap != null && modelIdToFieldInfoMap.containsKey(modelId)) {
+    // getModelListener.onResponse(createMockGetModelResponse(modelIdToFieldInfoMap.get(modelId)));
+    // } else {
+    // getModelListener.onFailure(new Exception("Model ID " + modelId + " not found"));
+    // }
+    // return null;
+    // }).when(mockClient).execute(eq(GetModelAction.INSTANCE), any(GetModelRequest.class), any(ActionListener.class));
     // }
 
     // private GetModelResponse createMockGetModelResponse(MMRVectorFieldInfo mmrVectorFieldInfo) {
-    //     GetModelResponse mockResponse = mock(GetModelResponse.class);
-    //     Model mockModel = mock(Model.class);
-    //     ModelMetadata mockModelMetadata = mock(ModelMetadata.class);
-    //     when(mockResponse.getModel()).thenReturn(mockModel);
-    //     when(mockModel.getModelMetadata()).thenReturn(mockModelMetadata);
-    //     when(mockModelMetadata.getSpaceType()).thenReturn(mmrVectorFieldInfo.getSpaceType());
-    //     when(mockModelMetadata.getVectorDataType()).thenReturn(mmrVectorFieldInfo.getVectorDataType());
-    //     return mockResponse;
+    // GetModelResponse mockResponse = mock(GetModelResponse.class);
+    // Model mockModel = mock(Model.class);
+    // ModelMetadata mockModelMetadata = mock(ModelMetadata.class);
+    // when(mockResponse.getModel()).thenReturn(mockModel);
+    // when(mockModel.getModelMetadata()).thenReturn(mockModelMetadata);
+    // when(mockModelMetadata.getSpaceType()).thenReturn(mmrVectorFieldInfo.getSpaceType());
+    // when(mockModelMetadata.getVectorDataType()).thenReturn(mmrVectorFieldInfo.getVectorDataType());
+    // return mockResponse;
     // }
 
     <E extends Exception> void verifyException(ActionListener<?> listener, Class<E> expectedType, String expectedMessage) {

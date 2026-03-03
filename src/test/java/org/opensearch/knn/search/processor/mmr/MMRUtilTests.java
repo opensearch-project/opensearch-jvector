@@ -414,177 +414,178 @@ public class MMRUtilTests extends MMRTestCase {
 
     // Model-based tests not relevant for JVector (native library feature)
     // public void testResolveKnnVectorFieldInfo_whenMappedFieldWithModelId_thenFieldInfoFromModel() {
-    //     String vectorFieldPath = "field";
-    //     SpaceType userProvidedSpaceType = null;
-    //     VectorDataType userProvidedVectorDataType = null;
-    //     String modelId = "modelId";
-    //     Map<String, Object> mapping = Map.of(
-    //         "properties",
-    //         Map.of("field", Map.of(TYPE, KNNVectorFieldMapper.CONTENT_TYPE, MODEL_ID, modelId))
-    //     );
-    //     mockModelMetadata(mockClient, Map.of(modelId, new MMRVectorFieldInfo(SpaceType.HAMMING, VectorDataType.BINARY)));
+    // String vectorFieldPath = "field";
+    // SpaceType userProvidedSpaceType = null;
+    // VectorDataType userProvidedVectorDataType = null;
+    // String modelId = "modelId";
+    // Map<String, Object> mapping = Map.of(
+    // "properties",
+    // Map.of("field", Map.of(TYPE, KNNVectorFieldMapper.CONTENT_TYPE, MODEL_ID, modelId))
+    // );
+    // mockModelMetadata(mockClient, Map.of(modelId, new MMRVectorFieldInfo(SpaceType.HAMMING, VectorDataType.BINARY)));
     //
-    //     MMRUtil.resolveKnnVectorFieldInfo(
-    //         vectorFieldPath,
-    //         userProvidedSpaceType,
-    //         userProvidedVectorDataType,
-    //         List.of(createMockIndexMetadata(mapping)),
-    //         mockClient,
-    //         listener
-    //     );
+    // MMRUtil.resolveKnnVectorFieldInfo(
+    // vectorFieldPath,
+    // userProvidedSpaceType,
+    // userProvidedVectorDataType,
+    // List.of(createMockIndexMetadata(mapping)),
+    // mockClient,
+    // listener
+    // );
     //
-    //     verifyVectorFieldInfo(listener, new MMRVectorFieldInfo(SpaceType.HAMMING, VectorDataType.BINARY));
+    // verifyVectorFieldInfo(listener, new MMRVectorFieldInfo(SpaceType.HAMMING, VectorDataType.BINARY));
     // }
     //
     // public void testResolveKnnVectorFieldInfo_whenDifferentModelSpaceTypes_thenException() {
-    //     String vectorFieldPath = "field";
-    //     SpaceType userProvidedSpaceType = null;
-    //     VectorDataType userProvidedVectorDataType = null;
-    //     String modelId1 = "model1";
-    //     String modelId2 = "model2";
-    //     Map<String, Object> mapping = Map.of(
-    //         "properties",
-    //         Map.of("field", Map.of(TYPE, KNNVectorFieldMapper.CONTENT_TYPE, MODEL_ID, modelId1))
-    //     );
-    //     Map<String, Object> mapping1 = Map.of(
-    //         "properties",
-    //         Map.of("field", Map.of(TYPE, KNNVectorFieldMapper.CONTENT_TYPE, MODEL_ID, modelId2))
-    //     );
-    //     mockModelMetadata(
-    //         mockClient,
-    //         Map.of(
-    //             modelId1,
-    //             new MMRVectorFieldInfo(SpaceType.L2, VectorDataType.FLOAT),
-    //             modelId2,
-    //             new MMRVectorFieldInfo(SpaceType.COSINESIMIL, VectorDataType.FLOAT)
-    //         )
-    //     );
+    // String vectorFieldPath = "field";
+    // SpaceType userProvidedSpaceType = null;
+    // VectorDataType userProvidedVectorDataType = null;
+    // String modelId1 = "model1";
+    // String modelId2 = "model2";
+    // Map<String, Object> mapping = Map.of(
+    // "properties",
+    // Map.of("field", Map.of(TYPE, KNNVectorFieldMapper.CONTENT_TYPE, MODEL_ID, modelId1))
+    // );
+    // Map<String, Object> mapping1 = Map.of(
+    // "properties",
+    // Map.of("field", Map.of(TYPE, KNNVectorFieldMapper.CONTENT_TYPE, MODEL_ID, modelId2))
+    // );
+    // mockModelMetadata(
+    // mockClient,
+    // Map.of(
+    // modelId1,
+    // new MMRVectorFieldInfo(SpaceType.L2, VectorDataType.FLOAT),
+    // modelId2,
+    // new MMRVectorFieldInfo(SpaceType.COSINESIMIL, VectorDataType.FLOAT)
+    // )
+    // );
     //
-    //     MMRUtil.resolveKnnVectorFieldInfo(
-    //         vectorFieldPath,
-    //         userProvidedSpaceType,
-    //         userProvidedVectorDataType,
-    //         List.of(createMockIndexMetadata(mapping), createMockIndexMetadata(mapping1)),
-    //         mockClient,
-    //         listener
-    //     );
+    // MMRUtil.resolveKnnVectorFieldInfo(
+    // vectorFieldPath,
+    // userProvidedSpaceType,
+    // userProvidedVectorDataType,
+    // List.of(createMockIndexMetadata(mapping), createMockIndexMetadata(mapping1)),
+    // mockClient,
+    // listener
+    // );
     //
-    //     String expectedError =
-    //         "MMR query extension cannot support different space type [l2, cosinesimil] for the knn_vector field at path field.";
-    //     verifyException(listener, IllegalArgumentException.class, expectedError);
+    // String expectedError =
+    // "MMR query extension cannot support different space type [l2, cosinesimil] for the knn_vector field at path field.";
+    // verifyException(listener, IllegalArgumentException.class, expectedError);
     // }
     //
     // public void testResolveKnnVectorFieldInfo_whenDifferentModelVectorDataTypes_thenException() {
-    //     String vectorFieldPath = "field";
-    //     SpaceType userProvidedSpaceType = null;
-    //     VectorDataType userProvidedVectorDataType = null;
-    //     String modelId1 = "model1";
-    //     String modelId2 = "model2";
-    //     Map<String, Object> mapping = Map.of(
-    //         "properties",
-    //         Map.of("field", Map.of(TYPE, KNNVectorFieldMapper.CONTENT_TYPE, MODEL_ID, modelId1))
-    //     );
-    //     Map<String, Object> mapping1 = Map.of(
-    //         "properties",
-    //         Map.of("field", Map.of(TYPE, KNNVectorFieldMapper.CONTENT_TYPE, MODEL_ID, modelId2))
-    //     );
-    //     mockModelMetadata(
-    //         mockClient,
-    //         Map.of(
-    //             modelId1,
-    //             new MMRVectorFieldInfo(SpaceType.L2, VectorDataType.FLOAT),
-    //             modelId2,
-    //             new MMRVectorFieldInfo(SpaceType.L2, VectorDataType.BINARY)
-    //         )
-    //     );
+    // String vectorFieldPath = "field";
+    // SpaceType userProvidedSpaceType = null;
+    // VectorDataType userProvidedVectorDataType = null;
+    // String modelId1 = "model1";
+    // String modelId2 = "model2";
+    // Map<String, Object> mapping = Map.of(
+    // "properties",
+    // Map.of("field", Map.of(TYPE, KNNVectorFieldMapper.CONTENT_TYPE, MODEL_ID, modelId1))
+    // );
+    // Map<String, Object> mapping1 = Map.of(
+    // "properties",
+    // Map.of("field", Map.of(TYPE, KNNVectorFieldMapper.CONTENT_TYPE, MODEL_ID, modelId2))
+    // );
+    // mockModelMetadata(
+    // mockClient,
+    // Map.of(
+    // modelId1,
+    // new MMRVectorFieldInfo(SpaceType.L2, VectorDataType.FLOAT),
+    // modelId2,
+    // new MMRVectorFieldInfo(SpaceType.L2, VectorDataType.BINARY)
+    // )
+    // );
     //
-    //     MMRUtil.resolveKnnVectorFieldInfo(
-    //         vectorFieldPath,
-    //         userProvidedSpaceType,
-    //         userProvidedVectorDataType,
-    //         List.of(createMockIndexMetadata(mapping), createMockIndexMetadata(mapping1)),
-    //         mockClient,
-    //         listener
-    //     );
+    // MMRUtil.resolveKnnVectorFieldInfo(
+    // vectorFieldPath,
+    // userProvidedSpaceType,
+    // userProvidedVectorDataType,
+    // List.of(createMockIndexMetadata(mapping), createMockIndexMetadata(mapping1)),
+    // mockClient,
+    // listener
+    // );
     //
-    //     String expectedError =
-    //         "MMR query extension cannot support different vector data type [float, binary] for the knn_vector field at path field.";
-    //     verifyException(listener, IllegalArgumentException.class, expectedError);
+    // String expectedError =
+    // "MMR query extension cannot support different vector data type [float, binary] for the knn_vector field at path field.";
+    // verifyException(listener, IllegalArgumentException.class, expectedError);
     // }
     //
     // public void testResolveKnnVectorFieldInfo_whenDifferentSpaceTypeFromModelAndUser_thenException() {
-    //     String vectorFieldPath = "field";
-    //     SpaceType userProvidedSpaceType = SpaceType.COSINESIMIL;
-    //     VectorDataType userProvidedVectorDataType = null;
-    //     String modelId1 = "model1";
-    //     Map<String, Object> mapping = Map.of(
-    //         "properties",
-    //         Map.of("field", Map.of(TYPE, KNNVectorFieldMapper.CONTENT_TYPE, MODEL_ID, modelId1))
-    //     );
-    //     mockModelMetadata(mockClient, Map.of(modelId1, new MMRVectorFieldInfo(SpaceType.L2, VectorDataType.FLOAT)));
+    // String vectorFieldPath = "field";
+    // SpaceType userProvidedSpaceType = SpaceType.COSINESIMIL;
+    // VectorDataType userProvidedVectorDataType = null;
+    // String modelId1 = "model1";
+    // Map<String, Object> mapping = Map.of(
+    // "properties",
+    // Map.of("field", Map.of(TYPE, KNNVectorFieldMapper.CONTENT_TYPE, MODEL_ID, modelId1))
+    // );
+    // mockModelMetadata(mockClient, Map.of(modelId1, new MMRVectorFieldInfo(SpaceType.L2, VectorDataType.FLOAT)));
     //
-    //     MMRUtil.resolveKnnVectorFieldInfo(
-    //         vectorFieldPath,
-    //         userProvidedSpaceType,
-    //         userProvidedVectorDataType,
-    //         List.of(createMockIndexMetadata(mapping)),
-    //         mockClient,
-    //         listener
-    //     );
+    // MMRUtil.resolveKnnVectorFieldInfo(
+    // vectorFieldPath,
+    // userProvidedSpaceType,
+    // userProvidedVectorDataType,
+    // List.of(createMockIndexMetadata(mapping)),
+    // mockClient,
+    // listener
+    // );
     //
-    //     String expectedError =
-    //         "The space type [cosinesimil] provided in the MMR query extension does not match the space type [l2] in target indices.";
-    //     verifyException(listener, IllegalArgumentException.class, expectedError);
+    // String expectedError =
+    // "The space type [cosinesimil] provided in the MMR query extension does not match the space type [l2] in target indices.";
+    // verifyException(listener, IllegalArgumentException.class, expectedError);
     // }
     //
     // public void testResolveKnnVectorFieldInfo_whenDifferentVectorDataTypeFromModelAndUser_thenException() {
-    //     String vectorFieldPath = "field";
-    //     SpaceType userProvidedSpaceType = null;
-    //     VectorDataType userProvidedVectorDataType = VectorDataType.BINARY;
-    //     String modelId1 = "model1";
-    //     Map<String, Object> mapping = Map.of(
-    //         "properties",
-    //         Map.of("field", Map.of(TYPE, KNNVectorFieldMapper.CONTENT_TYPE, MODEL_ID, modelId1))
-    //     );
-    //     mockModelMetadata(mockClient, Map.of(modelId1, new MMRVectorFieldInfo(SpaceType.L2, VectorDataType.FLOAT)));
+    // String vectorFieldPath = "field";
+    // SpaceType userProvidedSpaceType = null;
+    // VectorDataType userProvidedVectorDataType = VectorDataType.BINARY;
+    // String modelId1 = "model1";
+    // Map<String, Object> mapping = Map.of(
+    // "properties",
+    // Map.of("field", Map.of(TYPE, KNNVectorFieldMapper.CONTENT_TYPE, MODEL_ID, modelId1))
+    // );
+    // mockModelMetadata(mockClient, Map.of(modelId1, new MMRVectorFieldInfo(SpaceType.L2, VectorDataType.FLOAT)));
     //
-    //     MMRUtil.resolveKnnVectorFieldInfo(
-    //         vectorFieldPath,
-    //         userProvidedSpaceType,
-    //         userProvidedVectorDataType,
-    //         List.of(createMockIndexMetadata(mapping)),
-    //         mockClient,
-    //         listener
-    //     );
+    // MMRUtil.resolveKnnVectorFieldInfo(
+    // vectorFieldPath,
+    // userProvidedSpaceType,
+    // userProvidedVectorDataType,
+    // List.of(createMockIndexMetadata(mapping)),
+    // mockClient,
+    // listener
+    // );
     //
-    //     String expectedError =
-    //         "The vector data type [binary] provided in the MMR query extension does not match the vector data type [float] in target indices.";
-    //     verifyException(listener, IllegalArgumentException.class, expectedError);
+    // String expectedError =
+    // "The vector data type [binary] provided in the MMR query extension does not match the vector data type [float] in target indices.";
+    // verifyException(listener, IllegalArgumentException.class, expectedError);
     // }
     //
     // public void testResolveKnnVectorFieldInfo_whenModelNotFount_thenException() {
-    //     String vectorFieldPath = "field";
-    //     SpaceType userProvidedSpaceType = null;
-    //     VectorDataType userProvidedVectorDataType = null;
-    //     String modelId1 = "model1";
-    //     Map<String, Object> mapping = Map.of(
-    //         "properties",
-    //         Map.of("field", Map.of(TYPE, KNNVectorFieldMapper.CONTENT_TYPE, MODEL_ID, modelId1))
-    //     );
-    //     mockModelMetadata(mockClient, Collections.emptyMap());
+    // String vectorFieldPath = "field";
+    // SpaceType userProvidedSpaceType = null;
+    // VectorDataType userProvidedVectorDataType = null;
+    // String modelId1 = "model1";
+    // Map<String, Object> mapping = Map.of(
+    // "properties",
+    // Map.of("field", Map.of(TYPE, KNNVectorFieldMapper.CONTENT_TYPE, MODEL_ID, modelId1))
+    // );
+    // mockModelMetadata(mockClient, Collections.emptyMap());
     //
-    //     MMRUtil.resolveKnnVectorFieldInfo(
-    //         vectorFieldPath,
-    //         userProvidedSpaceType,
-    //         userProvidedVectorDataType,
-    //         List.of(createMockIndexMetadata(mapping)),
-    //         mockClient,
-    //         listener
-    //     );
+    // MMRUtil.resolveKnnVectorFieldInfo(
+    // vectorFieldPath,
+    // userProvidedSpaceType,
+    // userProvidedVectorDataType,
+    // List.of(createMockIndexMetadata(mapping)),
+    // mockClient,
+    // listener
+    // );
     //
-    //     String expectedError =
-    //         "Failed to retrieve model(s) to resolve the space type and vector data type for the MMR query extension. Errors: Model ID model1 not found.";
-    //     verifyException(listener, RuntimeException.class, expectedError);
+    // String expectedError =
+    // "Failed to retrieve model(s) to resolve the space type and vector data type for the MMR query extension. Errors: Model ID model1 not
+    // found.";
+    // verifyException(listener, RuntimeException.class, expectedError);
     // }
 
     private IndexMetadata createMockIndexMetadata(Map<String, Object> mappings) {

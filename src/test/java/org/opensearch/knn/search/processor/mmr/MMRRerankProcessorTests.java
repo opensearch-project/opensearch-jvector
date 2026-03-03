@@ -50,7 +50,7 @@ public class MMRRerankProcessorTests extends KNNTestCase {
 
     public void testGetTag_ReturnsConfiguredTag() {
         assertEquals("test-tag", processor.getTag());
-        
+
         MMRRerankProcessor customProcessor = new MMRRerankProcessor("custom-tag", false);
         assertEquals("custom-tag", customProcessor.getTag());
     }
@@ -66,16 +66,13 @@ public class MMRRerankProcessorTests extends KNNTestCase {
 
     public void testIsIgnoreFailure_ReturnsConfiguredValue() {
         assertFalse(processor.isIgnoreFailure());
-        
+
         MMRRerankProcessor processorWithIgnoreFailure = new MMRRerankProcessor("tag", true);
         assertTrue(processorWithIgnoreFailure.isIgnoreFailure());
     }
 
     public void testGetExecutionStage_ReturnsPreUserDefined() {
-        assertEquals(
-            MMRRerankProcessor.ExecutionStage.PRE_USER_DEFINED,
-            processor.getExecutionStage()
-        );
+        assertEquals(MMRRerankProcessor.ExecutionStage.PRE_USER_DEFINED, processor.getExecutionStage());
     }
 
     // ============================================
@@ -215,9 +212,9 @@ public class MMRRerankProcessorTests extends KNNTestCase {
     public void testConstructor_WithAllParameters() {
         String tag = "custom-tag";
         boolean ignoreFailure = true;
-        
+
         MMRRerankProcessor proc = new MMRRerankProcessor(tag, ignoreFailure);
-        
+
         assertEquals(tag, proc.getTag());
         assertEquals(ignoreFailure, proc.isIgnoreFailure());
         assertEquals("mmr_rerank", proc.getType());
@@ -226,14 +223,14 @@ public class MMRRerankProcessorTests extends KNNTestCase {
 
     public void testConstructor_WithNullTag() {
         MMRRerankProcessor proc = new MMRRerankProcessor(null, false);
-        
+
         assertNull(proc.getTag());
         assertEquals("mmr_rerank", proc.getType());
     }
 
     public void testConstructor_WithEmptyTag() {
         MMRRerankProcessor proc = new MMRRerankProcessor("", false);
-        
+
         assertEquals("", proc.getTag());
         assertNotNull(proc.getType());
     }
@@ -241,7 +238,7 @@ public class MMRRerankProcessorTests extends KNNTestCase {
     public void testConstructor_WithDifferentIgnoreFailureValues() {
         MMRRerankProcessor procTrue = new MMRRerankProcessor("tag1", true);
         MMRRerankProcessor procFalse = new MMRRerankProcessor("tag2", false);
-        
+
         assertTrue(procTrue.isIgnoreFailure());
         assertFalse(procFalse.isIgnoreFailure());
     }
@@ -253,12 +250,12 @@ public class MMRRerankProcessorTests extends KNNTestCase {
     public void testMultipleInstances_AreIndependent() {
         MMRRerankProcessor proc1 = new MMRRerankProcessor("tag1", true);
         MMRRerankProcessor proc2 = new MMRRerankProcessor("tag2", false);
-        
+
         assertEquals("tag1", proc1.getTag());
         assertEquals("tag2", proc2.getTag());
         assertTrue(proc1.isIgnoreFailure());
         assertFalse(proc2.isIgnoreFailure());
-        
+
         assertEquals(proc1.getType(), proc2.getType());
         assertEquals(proc1.getExecutionStage(), proc2.getExecutionStage());
         assertEquals(proc1.getDescription(), proc2.getDescription());
@@ -273,9 +270,8 @@ public class MMRRerankProcessorTests extends KNNTestCase {
     }
 
     public void testFactory_Constructor() {
-        MMRRerankProcessor.MMRRerankProcessorFactory factory =
-            new MMRRerankProcessor.MMRRerankProcessorFactory();
-        
+        MMRRerankProcessor.MMRRerankProcessorFactory factory = new MMRRerankProcessor.MMRRerankProcessorFactory();
+
         assertNotNull(factory);
     }
 
@@ -305,16 +301,13 @@ public class MMRRerankProcessorTests extends KNNTestCase {
     public void testExecutionStage_IsConsistentAcrossInstances() {
         MMRRerankProcessor proc1 = new MMRRerankProcessor("tag1", true);
         MMRRerankProcessor proc2 = new MMRRerankProcessor("tag2", false);
-        
+
         assertEquals(proc1.getExecutionStage(), proc2.getExecutionStage());
         assertEquals(MMRRerankProcessor.ExecutionStage.PRE_USER_DEFINED, proc1.getExecutionStage());
     }
 
     public void testExecutionStage_IsPreUserDefined() {
-        assertEquals(
-            MMRRerankProcessor.ExecutionStage.PRE_USER_DEFINED,
-            processor.getExecutionStage()
-        );
+        assertEquals(MMRRerankProcessor.ExecutionStage.PRE_USER_DEFINED, processor.getExecutionStage());
     }
 
     // ============================================
@@ -328,8 +321,8 @@ public class MMRRerankProcessorTests extends KNNTestCase {
     }
 
     public void testProcessorBehavior_WithDifferentTags() {
-        String[] tags = {"tag1", "tag2", "tag3", null, ""};
-        
+        String[] tags = { "tag1", "tag2", "tag3", null, "" };
+
         for (String tag : tags) {
             MMRRerankProcessor proc = new MMRRerankProcessor(tag, false);
             assertEquals(tag, proc.getTag());
@@ -338,8 +331,8 @@ public class MMRRerankProcessorTests extends KNNTestCase {
     }
 
     public void testProcessorBehavior_WithDifferentIgnoreFailureFlags() {
-        boolean[] flags = {true, false};
-        
+        boolean[] flags = { true, false };
+
         for (boolean flag : flags) {
             MMRRerankProcessor proc = new MMRRerankProcessor("tag", flag);
             assertEquals(flag, proc.isIgnoreFailure());

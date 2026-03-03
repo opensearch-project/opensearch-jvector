@@ -279,22 +279,26 @@ public class KNNRestTestCase extends ODFERestTestCase {
             responseBody
         ).map().get("hits")).get("hits");
 
-        @SuppressWarnings("unchecked")
-        List<KNNResult> knnSearchResponses = hits.stream().map(hit -> {
-            @SuppressWarnings("unchecked")
-            final float[] vector = Floats.toArray(
-                Arrays.stream(
-                    ((ArrayList<Float>) ((Map<String, Object>) ((Map<String, Object>) hit).get("_source")).get(fieldName)).toArray()
-                ).map(Object::toString).map(Float::valueOf).collect(Collectors.toList())
-            );
+        return hits.stream().map(hit -> {
+            Object sourceObj = ((Map<String, Object>) hit).get("_source");
+            float[] vector = null;
+            if (sourceObj != null) {
+                Object vectorObj = ((Map<String, Object>) ((Map<String, Object>) hit).get("_source")).get(fieldName);
+                vector = vectorObj == null
+                    ? null
+                    : Floats.toArray(
+                        Arrays.stream(((ArrayList<Float>) vectorObj).toArray())
+                            .map(Object::toString)
+                            .map(Float::valueOf)
+                            .collect(Collectors.toList())
+                    );
+            }
             return new KNNResult(
                 (String) ((Map<String, Object>) hit).get("_id"),
                 vector,
                 ((Double) ((Map<String, Object>) hit).get("_score")).floatValue()
             );
         }).collect(Collectors.toList());
-
-        return knnSearchResponses;
     }
 
     protected List<Float> parseSearchResponseScore(String responseBody, String fieldName) throws IOException {
