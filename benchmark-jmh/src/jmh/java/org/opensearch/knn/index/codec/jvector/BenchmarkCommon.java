@@ -7,8 +7,8 @@ package org.opensearch.knn.index.codec.jvector;
 import org.apache.lucene.codecs.Codec;
 import org.apache.lucene.codecs.FilterCodec;
 import org.apache.lucene.codecs.KnnVectorsFormat;
+import org.apache.lucene.codecs.lucene104.Lucene104Codec;
 import org.apache.lucene.backward_codecs.lucene101.Lucene101Codec;
-import org.apache.lucene.codecs.lucene103.Lucene103Codec;
 import org.apache.lucene.codecs.perfield.PerFieldKnnVectorsFormat;
 import org.apache.lucene.index.VectorSimilarityFunction;
 import org.apache.lucene.search.TopDocs;
@@ -20,14 +20,14 @@ import java.util.PriorityQueue;
 public class BenchmarkCommon {
     public static final String JVECTOR_NOT_QUANTIZED = "jvector_not_quantized";
     public static final String JVECTOR_QUANTIZED = "jvector_quantized";
-    public static final String LUCENE103 = "Lucene103";
+    public static final String LUCENE104 = "Lucene104";
     public static final String FIELD_NAME = "vector_field";
 
     public static Codec getCodec(String codecType) {
         return switch (codecType) {
             case JVECTOR_NOT_QUANTIZED -> getFilterJvectorCodec(Integer.MAX_VALUE);
             case JVECTOR_QUANTIZED -> getFilterJvectorCodec(KNNConstants.DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION);
-            case LUCENE103 -> new Lucene103Codec();
+            case LUCENE104 -> new Lucene104Codec();
             default -> throw new IllegalStateException("Unexpected codec type: " + codecType);
         };
     }
