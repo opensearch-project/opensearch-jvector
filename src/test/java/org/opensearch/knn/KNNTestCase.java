@@ -163,21 +163,6 @@ public class KNNTestCase extends OpenSearchTestCase {
         return () -> dimension;
     }
 
-    // Model-based mapping not used in JVector (native library feature)
-    // public static KNNMappingConfig getMappingConfigForModelMapping(String modelId, int dimension) {
-    // return new KNNMappingConfig() {
-    // @Override
-    // public Optional<String> getModelId() {
-    // return Optional.of(modelId);
-    // }
-    //
-    // @Override
-    // public int getDimension() {
-    // return dimension;
-    // }
-    // };
-    // }
-
     /**
      * Adjust the provided dimension based on {@link VectorDataType} during ingestion.
      * @param dimension int
