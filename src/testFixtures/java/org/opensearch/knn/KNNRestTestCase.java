@@ -283,15 +283,15 @@ public class KNNRestTestCase extends ODFERestTestCase {
             Object sourceObj = ((Map<String, Object>) hit).get("_source");
             float[] vector = null;
             if (sourceObj != null) {
-                Object vectorObj = ((Map<String, Object>) ((Map<String, Object>) hit).get("_source")).get(fieldName);
-                vector = vectorObj == null
-                    ? null
-                    : Floats.toArray(
+                Object vectorObj = ((Map<String, Object>) sourceObj).get(fieldName);
+                vector = vectorObj != null
+                    ? Floats.toArray(
                         Arrays.stream(((ArrayList<Float>) vectorObj).toArray())
                             .map(Object::toString)
                             .map(Float::valueOf)
                             .collect(Collectors.toList())
-                    );
+                    )
+                    : null;
             }
             return new KNNResult(
                 (String) ((Map<String, Object>) hit).get("_id"),

@@ -142,7 +142,7 @@ public class JVectorKNNPlugin extends Plugin
 
     @Override
     public void loadExtensions(ExtensionLoader loader) {
-        // knn plugin cannot extend itself so we have to manually load the transformer implemented in knn plugin
+        // jvector plugin cannot extend itself so we have to manually load the transformer implemented in jvector plugin
         mmrQueryTransformers.put(KNNQueryBuilder.NAME, new MMRKnnQueryTransformer());
         for (MMRQueryTransformer<?> transformer : loader.loadExtensions(MMRQueryTransformer.class)) {
             String queryName = transformer.getQueryName();
