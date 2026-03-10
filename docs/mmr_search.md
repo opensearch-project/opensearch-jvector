@@ -121,7 +121,7 @@ A system-generated search response processor that reranks results using MMR.
 
 **Key Methods**:
 - `processResponse()`: Main entry point for response processing
-- `extractVectors()`: Extracts embeddings from search hits using [`MMRUtil.extractVectorFromHit()`](../src/main/java/org/opensearch/knn/search/processor/mmr/MMRUtil.java:312)
+- `extractVectors()`: Extracts embeddings from search hits using [`MMRUtil.extractVectorFromHit()`](../src/main/java/org/opensearch/knn/search/processor/mmr/MMRUtil.java)
 - `selectHitsWithMMR()`: Implements the core MMR selection algorithm
 - `applyFetchSourceFilterIfNeeded()`: Restores user's original `_source` preferences
 
