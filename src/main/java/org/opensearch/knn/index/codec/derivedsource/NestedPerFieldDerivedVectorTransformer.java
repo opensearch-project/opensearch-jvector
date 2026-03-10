@@ -38,9 +38,15 @@ public class NestedPerFieldDerivedVectorTransformer extends AbstractPerFieldDeri
         }
 
         try {
-            Object vector = formatVector(childFieldInfo, vectorValues::getVector, vectorValues::conditionalCloneVector);
-            vectorValues.nextDoc();
-            return vector;
+            // Check if we're at a valid document position
+            if (docId == vectorValues.docId()) {
+                Object vector = formatVector(childFieldInfo, vectorValues::getVector, vectorValues::conditionalCloneVector);
+                // Advance to next document for subsequent calls
+                this.docId = vectorValues.nextDoc();
+                return vector;
+            }
+            // If not at the expected position, return null
+            return null;
         } catch (IOException e) {
             throw new RuntimeException(e);
         }

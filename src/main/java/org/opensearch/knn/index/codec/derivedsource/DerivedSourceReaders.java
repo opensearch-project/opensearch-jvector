@@ -49,6 +49,7 @@ public final class DerivedSourceReaders implements Closeable {
         // readers, so it should only be handled by the original code. See
         // https://github.com/apache/lucene/blob/main/lucene/core/src/java/org/apache/lucene/index/IndexWriter.java#L3372
         // for more details
+        incRef();
         return this;
     }
 

@@ -30,6 +30,10 @@ public abstract class AbstractPerFieldDerivedVectorTransformer implements PerFie
         CheckedSupplier<Object, IOException> vectorCloneSupplier
     ) throws IOException {
         Object vectorValue = vectorSupplier.get();
+        // Handle null vectors - return null immediately
+        if (vectorValue == null) {
+            return null;
+        }
         // If the vector value is a byte[], we must deserialize
         if (vectorValue instanceof byte[]) {
             BytesRef vectorBytesRef = new BytesRef((byte[]) vectorValue);

@@ -127,7 +127,7 @@ public class KNNTestCase extends OpenSearchTestCase {
     }
 
     public static KNNMethodContext getDefaultKNNMethodContextForModel() {
-        MethodComponentContext methodComponentContext = new MethodComponentContext(METHOD_IVF, Collections.emptyMap());
+        MethodComponentContext methodComponentContext = new MethodComponentContext(METHOD_HNSW, Collections.emptyMap());
         return new KNNMethodContext(KNNEngine.DEFAULT, SpaceType.DEFAULT, methodComponentContext);
     }
 

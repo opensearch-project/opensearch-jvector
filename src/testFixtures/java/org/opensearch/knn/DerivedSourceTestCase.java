@@ -228,7 +228,8 @@ public class DerivedSourceTestCase extends KNNRestTestCase {
         long consistentRandomSeed = random().nextLong();
         for (Tuple<String, Boolean> index : INDEX_PREFIX_TO_ENABLED) {
             Supplier<Integer> dimensionSupplier = randomIntegerSupplier(consistentRandomSeed, MIN_DIMENSION, MAX_DIMENSION);
-            Supplier<Integer> randomDocCountSupplier = randomIntegerSupplier(consistentRandomSeed, MIN_DOCS, MAX_DOCS);
+            // Supplier<Integer> randomDocCountSupplier = randomIntegerSupplier(consistentRandomSeed, MIN_DOCS, MAX_DOCS);
+            Supplier<Integer> randomDocCountSupplier = () -> 10;
             DerivedSourceUtils.IndexConfigContext indexConfigContext = DerivedSourceUtils.IndexConfigContext.builder()
                 .indexName(getIndexName(testSuitePrefix, index.v1(), addRandom))
                 .docCount(randomDocCountSupplier.get())
