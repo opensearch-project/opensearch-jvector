@@ -84,21 +84,18 @@ public class DerivedSourceIT extends DerivedSourceTestCase {
         }
     }
 
-    @Ignore
     @SneakyThrows
     public void testObjectField() {
         List<DerivedSourceUtils.IndexConfigContext> indexConfigContexts = getObjectIndexContexts("derivedit", true);
         testDerivedSourceE2E(indexConfigContexts);
     }
 
-    @Ignore
     @SneakyThrows
     public void testNestedField() {
         List<DerivedSourceUtils.IndexConfigContext> indexConfigContexts = getNestedIndexContexts("derivedit", true);
         testDerivedSourceE2E(indexConfigContexts);
     }
 
-    @Ignore
     @SneakyThrows
     public void testDerivedSource_whenSegrepLocal_thenDisabled() {
         // Set the data type input for float fields as byte. If derived source gets enabled, the original and derived

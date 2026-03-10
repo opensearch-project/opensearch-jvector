@@ -23,6 +23,8 @@ import java.util.Arrays;
  */
 @Log4j2
 public class GraphNodeIdToDocMap {
+    public static final int NO_VECTOR_OR_DOC = -1;
+
     private static final int VERSION = 1;
     private int[] graphNodeIdsToDocIds;
     private int[] docIdsToGraphNodeIds;
@@ -43,13 +45,13 @@ public class GraphNodeIdToDocMap {
 
         graphNodeIdsToDocIds = new int[size];
         docIdsToGraphNodeIds = new int[maxDocId];
-        Arrays.fill(graphNodeIdsToDocIds, -1);
-        Arrays.fill(docIdsToGraphNodeIds, -1);
+        Arrays.fill(graphNodeIdsToDocIds, NO_VECTOR_OR_DOC);
+        Arrays.fill(docIdsToGraphNodeIds, NO_VECTOR_OR_DOC);
         for (int ord = 0; ord < size; ord++) {
             final int docId = in.readVInt();
-            graphNodeIdsToDocIds[ord] = docId;
+            // ignore deleted documents
             if (docId != -1) {
-                // ignore deleted documents
+                graphNodeIdsToDocIds[ord] = docId;
                 docIdsToGraphNodeIds[docId] = ord;
             }
         }
