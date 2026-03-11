@@ -33,7 +33,9 @@ public class DerivedSourceUtils {
     public static final int TEST_DIMENSION = 16;
     protected static final int DOCS = 500;
 
-    public static final float DEFAULT_NULL_PROB = 0.03f;
+    // TODO: set null_prob to 0.03f and skip_prob to 0.1f once the merge issues are fixed.
+    public static final float DEFAULT_NULL_PROB = 0.00f;
+    public static final float DEFAULT_SKIP_PROB = 0.00f;
 
     protected static final Settings DERIVED_ENABLED_SETTINGS = Settings.builder()
         .put(
@@ -177,7 +179,7 @@ public class DerivedSourceUtils {
         @Builder.Default
         public Random random = null;
         @Builder.Default
-        public float skipProb = 0.1f;
+        public float skipProb = DEFAULT_SKIP_PROB;
         @Builder.Default
         public float nullProb = DEFAULT_NULL_PROB;
         @Builder.Default

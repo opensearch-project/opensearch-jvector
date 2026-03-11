@@ -584,8 +584,6 @@ public class JVectorWriter extends KnnVectorsWriter {
         // during leading segment merge.
         private static final double MIN_HEAP_GRAPH_ORDINAL_DENSITY = 0.4;
 
-        private final VectorTypeSupport VECTOR_TYPE_SUPPORT = VectorizationProvider.getInstance().getVectorTypeSupport();
-
         // Array of sub-readers
         private final KnnVectorsReader[] readers;
         private final JVectorFloatVectorValues[] perReaderFloatVectorValues;
@@ -771,7 +769,7 @@ public class JVectorWriter extends KnnVectorsWriter {
                 graphNodeId++;
                 if (newGlobalDocId == -1) {
                     log.debug(
-                        "Document {} in reader {} is not mapped to a global ordinal from the merge docMaps. This means it's deleted, Will skip this document for now",
+                        "Document {} in reader {} is not mapped to a global ordinal from the merge docMaps. This means it's deleted or the vector is null, Will skip this document for now",
                         docId,
                         LEADING_READER_IDX
                     );
