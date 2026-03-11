@@ -33,6 +33,7 @@ public abstract class AbstractPerFieldDerivedVectorTransformer implements PerFie
         // If the vector value is a byte[], we must deserialize
         if (vectorValue instanceof byte[]) {
             BytesRef vectorBytesRef = new BytesRef((byte[]) vectorValue);
+            // Determine the vector data type based on the vector encoding to ensure proper deserialization
             VectorDataType vectorDataType = FieldInfoExtractor.extractVectorDataType(fieldInfo);
             return KNNVectorFieldMapperUtil.deserializeStoredVector(vectorBytesRef, vectorDataType);
         }

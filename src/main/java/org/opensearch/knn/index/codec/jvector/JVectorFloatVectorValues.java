@@ -17,6 +17,7 @@ import org.apache.lucene.search.VectorScorer;
 import java.io.IOException;
 
 public class JVectorFloatVectorValues extends FloatVectorValues {
+    public static final int NO_VECTOR = -1;
     private static final VectorTypeSupport VECTOR_TYPE_SUPPORT = VectorizationProvider.getInstance().getVectorTypeSupport();
 
     private final OnDiskGraphIndex.View view;
@@ -74,9 +75,10 @@ public class JVectorFloatVectorValues extends FloatVectorValues {
 
             @Override
             public int nextDoc() throws IOException {
-                // Advance to the next node docId starts from -1 which is why we need to increment docId by 1 "size"
-                // times
-                while (docId < size - 1) {
+                // Advance to the next node docId starts from -1 which is why we need to increment docId by 1
+                // until maxDoc is reached. If the document has vector field but no value (== null), there will
+                // gaps in the document <-> node maps, we use index() == -1 to filter such documents out.
+                while (docId < graphNodeIdToDocMap.getMaxDoc() - 1) {
                     docId++;
                     if (liveNodes.get(docId)) {
                         return docId;

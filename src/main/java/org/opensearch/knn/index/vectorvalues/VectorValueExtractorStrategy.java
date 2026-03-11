@@ -107,14 +107,19 @@ public interface VectorValueExtractorStrategy {
             }
             docIdsIteratorValues.setLastOrd(ord);
 
+            KnnVectorValues knnVectorValues = docIdsIteratorValues.getKnnVectorValues();
+
+            // Check the actual instance type of knnVectorValues to determine how to extract the vector
             if (vectorDataType == VectorDataType.FLOAT) {
-                FloatVectorValues knnVectorValues = (FloatVectorValues) docIdsIteratorValues.getKnnVectorValues();
-                docIdsIteratorValues.setLastAccessedVector(knnVectorValues.vectorValue(ord));
+                FloatVectorValues floatVectorValues = (FloatVectorValues) knnVectorValues;
+                docIdsIteratorValues.setLastAccessedVector(floatVectorValues.vectorValue(ord));
             } else if (vectorDataType == VectorDataType.BYTE || vectorDataType == VectorDataType.BINARY) {
-                ByteVectorValues byteVectorValues = (ByteVectorValues) docIdsIteratorValues.getKnnVectorValues();
+                ByteVectorValues byteVectorValues = (ByteVectorValues) knnVectorValues;
                 docIdsIteratorValues.setLastAccessedVector(byteVectorValues.vectorValue(ord));
             } else {
-                throw new IllegalArgumentException("Invalid vector data type for KnnVectorValues");
+                throw new IllegalArgumentException(
+                    "KnnVectorValues is not of a valid type. Valid Types are: FloatVectorValues and ByteVectorValues"
+                );
             }
 
             return (T) docIdsIteratorValues.getLastAccessedVector();

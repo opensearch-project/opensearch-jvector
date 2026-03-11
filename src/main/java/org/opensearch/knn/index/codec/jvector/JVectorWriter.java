@@ -584,8 +584,6 @@ public class JVectorWriter extends KnnVectorsWriter {
         // during leading segment merge.
         private static final double MIN_HEAP_GRAPH_ORDINAL_DENSITY = 0.4;
 
-        private final VectorTypeSupport VECTOR_TYPE_SUPPORT = VectorizationProvider.getInstance().getVectorTypeSupport();
-
         // Array of sub-readers
         private final KnnVectorsReader[] readers;
         private final JVectorFloatVectorValues[] perReaderFloatVectorValues;
@@ -670,16 +668,18 @@ public class JVectorWriter extends KnnVectorsWriter {
                             int liveVectorCountInReader = 0;
                             KnnVectorValues.DocIndexIterator it = values.iterator();
                             while (it.nextDoc() != DocIdSetIterator.NO_MORE_DOCS) {
-                                if (liveDocs[i] == null || liveDocs[i].get(it.docID())) {
-                                    liveVectorCountInReader++;
-                                } else {
-                                    // This vector is deleted so we need to mark it as deleted in the liveGraphNodesPerReader
-                                    liveGraphNodesPerReader[i].clear(it.index());
+                                if (it.index() != JVectorFloatVectorValues.NO_VECTOR) /* no vector */ {
+                                    if ((liveDocs[i] == null || liveDocs[i].get(it.docID()))) {
+                                        liveVectorCountInReader++;
+                                    } else {
+                                        // This vector is deleted so we need to mark it as deleted in the liveGraphNodesPerReader
+                                        liveGraphNodesPerReader[i].clear(it.index());
+                                    }
                                 }
                             }
                             if (liveVectorCountInReader >= vectorsCountInLeadingReader) {
                                 vectorsCountInLeadingReader = liveVectorCountInReader;
-                                tempLeadingReaderIdx = i;
+                                tempLeadingReaderIdx = allReaders.size() - 1;
                             }
                             totalVectorsCount += vectorCountInReader;
                             totalLiveVectorsCount += liveVectorCountInReader;
@@ -769,7 +769,7 @@ public class JVectorWriter extends KnnVectorsWriter {
                 graphNodeId++;
                 if (newGlobalDocId == -1) {
                     log.debug(
-                        "Document {} in reader {} is not mapped to a global ordinal from the merge docMaps. This means it's deleted, Will skip this document for now",
+                        "Document {} in reader {} is not mapped to a global ordinal from the merge docMaps. This means it's deleted or the vector is null, Will skip this document for now",
                         docId,
                         LEADING_READER_IDX
                     );
