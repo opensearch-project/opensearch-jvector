@@ -52,7 +52,6 @@ public class MethodFieldMapper extends KNNVectorFieldMapper {
         boolean stored,
         boolean hasDocValues,
         OriginalMappingParameters originalMappingParameters
-        // boolean isDerivedSourceEnabled
     ) {
 
         KNNMethodContext knnMethodContext = originalMappingParameters.getResolvedKnnMethodContext();

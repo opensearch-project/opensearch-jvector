@@ -44,9 +44,7 @@ public class DerivedSourceIT extends DerivedSourceTestCase {
     @SneakyThrows
     public void testFlatFields() {
         try {
-            // TODO: change "addNull: true" to introduce randomness in testing, after merge issues are fixed. Docs with null values are
-            // causing issues presently.
-            List<DerivedSourceUtils.IndexConfigContext> indexConfigContexts = getFlatIndexContexts("derivedit", true, false);
+            List<DerivedSourceUtils.IndexConfigContext> indexConfigContexts = getFlatIndexContexts("derivedit", true, true);
             testDerivedSourceE2E(indexConfigContexts);
         } catch (Exception excp) {
             // TODO: Byte vectors is not supported. Remove the catch checks once BQ (Binary quantization) support is added to Jvector
@@ -62,9 +60,7 @@ public class DerivedSourceIT extends DerivedSourceTestCase {
 
     @SneakyThrows
     public void testMetaFields() {
-        // TODO: change "addNull: true" to introduce randomness in testing, after merge issues are fixed. Docs with null values are causing
-        // issues presently.
-        List<DerivedSourceUtils.IndexConfigContext> indexConfigContexts = getIndexContextsWithMetaFields("derivedit", true, false);
+        List<DerivedSourceUtils.IndexConfigContext> indexConfigContexts = getIndexContextsWithMetaFields("derivedit", true, true);
         List<String> metaFields = List.of(ROUTING_FIELD, "_id", "_score");
 
         assertEquals("Expected 6 index contexts for meta fields test", 6, indexConfigContexts.size());
