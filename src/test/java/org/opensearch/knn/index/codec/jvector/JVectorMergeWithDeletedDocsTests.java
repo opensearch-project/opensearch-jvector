@@ -6,11 +6,15 @@
 package org.opensearch.knn.index.codec.jvector;
 
 import static org.opensearch.knn.index.engine.CommonTestUtils.getCodec;
+import static org.hamcrest.Matchers.equalTo;
 
 import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+
 import lombok.extern.log4j.Log4j2;
 import org.apache.lucene.document.*;
 import org.apache.lucene.index.*;
@@ -65,6 +69,7 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
      */
     @Test
     public void testMergesWithOneDeleteAndOneNullVector() throws IOException {
+        final Map<String, float[]> docs = new HashMap<>();
         final int dimension = 64;
         final int k = 4;
 
@@ -92,9 +97,10 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
             for (int i = 0; i < 3; i++) {
                 Document doc = new Document();
                 float[] vector = new float[dimension];
-                Arrays.fill(vector, docId * 0.01f);
+                Arrays.fill(vector, docId * random().nextFloat(1.0f));
                 doc.add(new KnnFloatVectorField(TEST_FIELD, vector, VectorSimilarityFunction.EUCLIDEAN));
                 doc.add(new StringField(TEST_ID_FIELD, String.valueOf(docId), Field.Store.YES));
+                docs.put(Integer.toString(docId), vector);
                 writer.addDocument(doc);
                 docId++;
             }
@@ -104,9 +110,10 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
             for (int i = 0; i < 1; i++) {
                 Document doc = new Document();
                 float[] vector = new float[dimension];
-                Arrays.fill(vector, docId * 0.01f);
+                Arrays.fill(vector, docId * random().nextFloat(1.0f));
                 doc.add(new KnnFloatVectorField(TEST_FIELD, vector, VectorSimilarityFunction.EUCLIDEAN));
                 doc.add(new StringField(TEST_ID_FIELD, String.valueOf(docId), Field.Store.YES));
+                docs.put(Integer.toString(docId), vector);
                 writer.addDocument(doc);
                 docId++;
 
@@ -124,8 +131,6 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
                 Assert.assertEquals("Should have correct number of live docs", 4, reader.numDocs());
 
                 // Verify search works correctly
-                final float[] target = new float[dimension];
-                Arrays.fill(target, 0.5f);
                 final IndexSearcher searcher = newSearcher(reader);
                 TopDocs topDocs = searcher.search(new MatchAllDocsQuery(), k);
                 Assert.assertEquals("Should return k results", k, topDocs.totalHits.value());
@@ -133,11 +138,11 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
                 for (int i = 0; i < topDocs.scoreDocs.length; i++) {
                     Document doc = reader.storedFields().document(topDocs.scoreDocs[i].doc);
                     String id = doc.get(TEST_ID_FIELD);
+                    assertThat(getVector(reader, TEST_FIELD, topDocs.scoreDocs[i].doc), equalTo(docs.get(id)));
                     log.info("Result {}: doc ID = {}", i, id);
                 }
             }
         }
-
     }
 
     /**
@@ -146,6 +151,7 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
      */
     @Test
     public void testMergesWithOneNullVector() throws IOException {
+        final Map<String, float[]> docs = new HashMap<>();
         final int dimension = 64;
         final int k = 5;
 
@@ -173,9 +179,10 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
             for (int i = 0; i < 3; i++) {
                 Document doc = new Document();
                 float[] vector = new float[dimension];
-                Arrays.fill(vector, docId * 0.01f);
+                Arrays.fill(vector, docId * random().nextFloat(1.0f));
                 doc.add(new KnnFloatVectorField(TEST_FIELD, vector, VectorSimilarityFunction.EUCLIDEAN));
                 doc.add(new StringField(TEST_ID_FIELD, String.valueOf(docId), Field.Store.YES));
+                docs.put(Integer.toString(docId), vector);
                 writer.addDocument(doc);
                 docId++;
             }
@@ -185,9 +192,10 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
             for (int i = 0; i < 1; i++) {
                 Document doc = new Document();
                 float[] vector = new float[dimension];
-                Arrays.fill(vector, docId * 0.01f);
+                Arrays.fill(vector, docId * random().nextFloat(1.0f));
                 doc.add(new KnnFloatVectorField(TEST_FIELD, vector, VectorSimilarityFunction.EUCLIDEAN));
                 doc.add(new StringField(TEST_ID_FIELD, String.valueOf(docId), Field.Store.YES));
+                docs.put(Integer.toString(docId), vector);
                 writer.addDocument(doc);
                 docId++;
 
@@ -203,8 +211,6 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
                 Assert.assertEquals("Should have correct number of live docs", 5, reader.numDocs());
 
                 // Verify search works correctly
-                final float[] target = new float[dimension];
-                Arrays.fill(target, 0.5f);
                 final IndexSearcher searcher = newSearcher(reader);
                 TopDocs topDocs = searcher.search(new MatchAllDocsQuery(), k);
                 Assert.assertEquals("Should return k results", k, topDocs.totalHits.value());
@@ -212,6 +218,7 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
                 for (int i = 0; i < topDocs.scoreDocs.length; i++) {
                     Document doc = reader.storedFields().document(topDocs.scoreDocs[i].doc);
                     String id = doc.get(TEST_ID_FIELD);
+                    assertThat(getVector(reader, TEST_FIELD, topDocs.scoreDocs[i].doc), equalTo(docs.get(id)));
                     log.info("Result {}: doc ID = {}", i, id);
                 }
             }
@@ -225,6 +232,7 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
      */
     @Test
     public void testMergesWithNullVectorsAndLastLeadingSegment() throws IOException {
+        final Map<String, float[]> docs = new HashMap<>();
         final int dimension = 64;
         final int k = 9;
 
@@ -244,9 +252,10 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
             for (int i = 0; i < 2; i++) {
                 Document doc = new Document();
                 float[] vector = new float[dimension];
-                Arrays.fill(vector, docId * 0.01f);
+                Arrays.fill(vector, docId * random().nextFloat(1.0f));
                 doc.add(new KnnFloatVectorField(TEST_FIELD, vector, VectorSimilarityFunction.EUCLIDEAN));
                 doc.add(new StringField(TEST_ID_FIELD, String.valueOf(docId), Field.Store.YES));
+                docs.put(Integer.toString(docId), vector);
                 writer.addDocument(doc);
                 docId++;
             }
@@ -255,8 +264,6 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
             // Segment 2: Add document with no vector field populated
             for (int i = 2; i < 3; i++) {
                 Document doc = new Document();
-                float[] vector = new float[dimension];
-                Arrays.fill(vector, docId * 0.01f);
                 doc.add(new StringField(TEST_ID_FIELD, String.valueOf(docId), Field.Store.YES));
                 writer.addDocument(doc);
                 docId++;
@@ -268,9 +275,10 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
             for (int i = 4; i < 10; i++) {
                 Document doc = new Document();
                 float[] vector = new float[dimension];
-                Arrays.fill(vector, docId * 0.01f);
+                Arrays.fill(vector, docId * random().nextFloat(1.0f));
                 doc.add(new KnnFloatVectorField(TEST_FIELD, vector, VectorSimilarityFunction.EUCLIDEAN));
                 doc.add(new StringField(TEST_ID_FIELD, String.valueOf(docId), Field.Store.YES));
+                docs.put(Integer.toString(docId), vector);
                 writer.addDocument(doc);
                 docId++;
             }
@@ -285,8 +293,6 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
                 Assert.assertEquals("Should have correct number of live docs", 9, reader.numDocs());
 
                 // Verify search works correctly
-                final float[] target = new float[dimension];
-                Arrays.fill(target, 0.5f);
                 final IndexSearcher searcher = newSearcher(reader);
                 TopDocs topDocs = searcher.search(new MatchAllDocsQuery(), k);
                 Assert.assertEquals("Should return k results", k, topDocs.totalHits.value());
@@ -294,6 +300,7 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
                 for (int i = 0; i < topDocs.scoreDocs.length; i++) {
                     Document doc = reader.storedFields().document(topDocs.scoreDocs[i].doc);
                     String id = doc.get(TEST_ID_FIELD);
+                    assertThat(getVector(reader, TEST_FIELD, topDocs.scoreDocs[i].doc), equalTo(docs.get(id)));
                     log.info("Result {}: doc ID = {}", i, id);
                 }
             }
@@ -306,6 +313,7 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
      */
     @Test
     public void testMergesWithNullVectors() throws IOException {
+        final Map<String, float[]> docs = new HashMap<>();
         final int dimension = 64;
         final int k = 2;
 
@@ -326,9 +334,10 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
                 Document doc = new Document();
                 if (i != 1) {
                     float[] vector = new float[dimension];
-                    Arrays.fill(vector, docId * 0.01f);
+                    Arrays.fill(vector, docId * random().nextFloat(1.0f));
                     doc.add(new KnnFloatVectorField(TEST_FIELD, vector, VectorSimilarityFunction.EUCLIDEAN));
                     doc.add(new StringField(TEST_ID_FIELD, String.valueOf(docId), Field.Store.YES));
+                    docs.put(Integer.toString(docId), vector);
                 } else {
                     doc.add(new StringField(TEST_ID_FIELD, String.valueOf(docId), Field.Store.YES));
                 }
@@ -343,8 +352,6 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
 
             log.info("Performing intermediate merge after segment 2");
             writer.forceMerge(1);
-            writer.commit();
-            log.info("First intermediate merge completed");
 
             // Verify the merged index
             try (IndexReader reader = DirectoryReader.open(writer)) {
@@ -362,6 +369,7 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
                 for (int i = 0; i < topDocs.scoreDocs.length; i++) {
                     Document doc = reader.storedFields().document(topDocs.scoreDocs[i].doc);
                     String id = doc.get(TEST_ID_FIELD);
+                    assertThat(getVector(reader, TEST_FIELD, topDocs.scoreDocs[i].doc), equalTo(docs.get(id)));
                     log.info("Result {}: doc ID = {}", i, id);
                 }
             }
@@ -882,4 +890,25 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
         }
     }
 
+    private static float[] getVector(final IndexReader reader, final String field, final int doc) throws IOException {
+        for (LeafReaderContext context : reader.leaves()) {
+            final FloatVectorValues vectorValues = context.reader().getFloatVectorValues(field);
+            if (vectorValues != null) {
+                final var docIdSetIterator = vectorValues.iterator(); // iterator for all the vectors with values
+                int docId = -1;
+                for (docId = docIdSetIterator.nextDoc(); docId != DocIdSetIterator.NO_MORE_DOCS; docId = docIdSetIterator.nextDoc()) {
+                    if (docId == doc) {
+                        final int index = docIdSetIterator.index();
+                        if (index == GraphNodeIdToDocMap.NO_VECTOR_OR_DELETED_DOC) {
+                            return null; /* no vector value set */
+                        } else {
+                            return vectorValues.vectorValue(index);
+                        }
+                    }
+                }
+            }
+        }
+
+        throw new IllegalStateException("The docId " + doc + " expected but was not found");
+    }
 }

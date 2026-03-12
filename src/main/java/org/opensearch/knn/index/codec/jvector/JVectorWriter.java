@@ -741,11 +741,11 @@ public class JVectorWriter extends KnnVectorsWriter {
             final int[] compactOrdToDocIds = new int[totalLiveVectorsCount];
             Arrays.fill(graphNodeIdToDocIds, -1);
             Arrays.fill(compactOrdToDocIds, -1);
-            // The graph node id to ravv ordinal mapping, for the leading reader this mapping is always identity, for the other readers we
-            // only need to map the live vectors
-            // Therefore the size of this array is the total number of vectors in the leading reader + the number of live vectors in all
-            // other readers
 
+            // The graph node id to ravv ordinal mapping, for the leading reader this mapping is always identity, for the other readers we
+            // only need to map the live documents, which may not be the same as the number of live vectors - the documents that do not have
+            // vectors set (nullable) are still live. Therefore the size of this array is the total number of documents in the leading
+            // reader + the number of documents in all other readers.
             this.graphNodeIdsToRavvOrds = new int[totalDocsCount];
             this.compactOrdsToRavvOrds = new int[totalLiveVectorsCount];
             // initialize the graphNodeIdsToRavvOrds with -1 to indicate that there is no mapping
