@@ -1132,7 +1132,9 @@ public class JVectorWriter extends KnnVectorsWriter {
                     // parallel graph construction from the merge documents Ids
                     SIMD_POOL_MERGE.submit(
                         () -> IntStream.range(leadingGraph.getIdUpperBound(), heapRavv.size()).parallel().forEach(ord -> {
-                            builder.addGraphNode(ord, vv.get().getVector(ord));
+                            if (heapToGlobalRavvOrds[ord] != GraphNodeIdToDocMap.NO_VECTOR_OR_DELETED_DOC) {
+                                builder.addGraphNode(ord, vv.get().getVector(ord));
+                            }
                         })
                     ).join();
 
