@@ -515,7 +515,6 @@ public class InternalKNNEngineTests extends OpenSearchIntegTestCase {
      * @throws Exception exception
      */
     @Test
-    @Ignore
     public void testQuantizationWithOverQueryParameter() throws Exception {
         int dimension = 512;
         final SpaceType spaceType = SpaceType.L2;
