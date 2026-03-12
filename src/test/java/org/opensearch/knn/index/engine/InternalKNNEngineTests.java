@@ -9,7 +9,6 @@ import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.lucene.codecs.perfield.PerFieldKnnVectorsFormat;
 import org.apache.lucene.index.SegmentReader;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.opensearch.client.Request;
 import org.opensearch.client.Response;
