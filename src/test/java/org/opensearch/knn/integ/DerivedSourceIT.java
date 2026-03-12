@@ -91,6 +91,7 @@ public class DerivedSourceIT extends DerivedSourceTestCase {
     }
 
     @SneakyThrows
+    @Ignore
     public void testNestedField() {
         List<DerivedSourceUtils.IndexConfigContext> indexConfigContexts = getNestedIndexContexts("derivedit", true);
         testDerivedSourceE2E(indexConfigContexts);

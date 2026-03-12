@@ -668,7 +668,7 @@ public class JVectorWriter extends KnnVectorsWriter {
                             KnnVectorValues.DocIndexIterator it = values.iterator();
                             while (it.nextDoc() != DocIdSetIterator.NO_MORE_DOCS) {
                                 final int index = it.index();
-                                if (index != GraphNodeIdToDocMap.NO_VECTOR_OR_DOC /* no vector or doc */) {
+                                if (index != GraphNodeIdToDocMap.NO_VECTOR_OR_DELETED_DOC /* no vector or doc */) {
                                     if (liveDocs[i] == null || liveDocs[i].get(it.docID())) {
                                         liveVectorCountInReader++;
                                     } else {
@@ -779,7 +779,7 @@ public class JVectorWriter extends KnnVectorsWriter {
                 }
 
                 final int ravvLocalOrd = leadingReaderIt.index();
-                if (ravvLocalOrd != GraphNodeIdToDocMap.NO_VECTOR_OR_DOC) {
+                if (ravvLocalOrd != GraphNodeIdToDocMap.NO_VECTOR_OR_DELETED_DOC) {
                     final int ravvGlobalOrd = ravvLocalOrd + baseOrds[LEADING_READER_IDX];
                     graphNodeIdToDocIds[ravvLocalOrd] = newGlobalDocId;
                     graphNodeIdsToRavvOrds[ravvLocalOrd] = ravvGlobalOrd;
@@ -820,7 +820,7 @@ public class JVectorWriter extends KnnVectorsWriter {
                         // Map graph node id to ravv ordinal
                         // Map graph node id to doc id
                         final int ravvLocalOrd = it.index();
-                        if (ravvLocalOrd != GraphNodeIdToDocMap.NO_VECTOR_OR_DOC) {
+                        if (ravvLocalOrd != GraphNodeIdToDocMap.NO_VECTOR_OR_DELETED_DOC) {
                             final int ravvGlobalOrd = ravvLocalOrd + baseOrds[readerIdx];
                             graphNodeIdToDocIds[graphNodeId] = newGlobalDocId;
                             graphNodeIdsToRavvOrds[graphNodeId] = ravvGlobalOrd;
