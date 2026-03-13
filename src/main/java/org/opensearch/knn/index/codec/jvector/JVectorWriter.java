@@ -624,6 +624,7 @@ public class JVectorWriter extends KnnVectorsWriter {
          * @param mergeState Merge state containing readers and doc maps
          */
         public RandomAccessMergedFloatVectorValues(FieldInfo fieldInfo, MergeState mergeState) throws IOException {
+            log.info("Start initializing RandomAccessMergedFloatVectorValues for field {} in segment {}", fieldInfo.name, segmentWriteState.segmentInfo.name);
             this.totalDocsCount = Math.toIntExact(Arrays.stream(mergeState.maxDocs).asLongStream().sum());
             this.fieldInfo = fieldInfo;
             this.mergeState = mergeState;
@@ -688,6 +689,10 @@ public class JVectorWriter extends KnnVectorsWriter {
                     }
                 }
             }
+
+            log.info("Total vectors count across all segments for field {}: {}", fieldName, totalVectorsCount);
+            log.info("Total live vectors count across all segments for field {}: {}", fieldName, totalLiveVectorsCount);
+            log.info("Base ordinals for each reader: {}", Arrays.toString(baseOrds));
 
             assert (totalVectorsCount <= totalDocsCount) : "Total number of vectors exceeds the total number of documents";
             assert (totalLiveVectorsCount <= totalVectorsCount) : "Total number of live vectors exceeds the total number of vectors";
@@ -840,6 +845,8 @@ public class JVectorWriter extends KnnVectorsWriter {
             this.graphNodeIdToDocMap = new GraphNodeIdToDocMap(graphNodeIdToDocIds);
             this.compactOrdToDocMap = new GraphNodeIdToDocMap(compactOrdToDocIds);
             log.debug("Created RandomAccessMergedFloatVectorValues with {} total vectors from {} readers", size, readers.length);
+            log.info("Created RandomAccessMergedFloatVectorValues with {} total vectors from {} readers", size, readers.length);
+            log.info("End initializing RandomAccessMergedFloatVectorValues for field {} in segment {}", fieldInfo.name, segmentWriteState.segmentInfo.name);
 
         }
 
@@ -1113,6 +1120,7 @@ public class JVectorWriter extends KnnVectorsWriter {
                     SIMD_POOL_MERGE.submit(
                         () -> IntStream.range(leadingGraph.getIdUpperBound(), heapRavv.size()).parallel().forEach(ord -> {
                             builder.addGraphNode(ord, vv.get().getVector(ord));
+                            log.info("Adding node {} with vector {}", ord, vv.get().getVector(ord));
                         })
                     ).join();
 
@@ -1121,17 +1129,20 @@ public class JVectorWriter extends KnnVectorsWriter {
                         if (!liveGraphNodesPerReader[LEADING_READER_IDX].get(i)) {
                             // we need to convert from the "mid" to the "heap" ordinal space to avoid errors
                             builder.markNodeDeleted(midToHeapOrds[i]);
+                            log.info("Node {} marked as deleted", midToHeapOrds[i]);
                         }
                     }
 
                     builder.cleanup();
 
                     graph = (OnHeapGraphIndex) builder.getGraph();
+                    log.info("Graph Structure after getting graph from merged float vector: {}", graph);
                 }
 
                 // Note that the ordinals for the OnDiskGraphIndex will automatically be compacted
                 // But the OnHeapGraphIndex will not
                 var finalOrdToDocMap = new GraphNodeIdToDocMap(finalOrdToDocId);
+                log.info("Final ordinal mapping for graph index: {}", finalOrdToDocMap);
                 writeField(fieldInfo, heapRavv, null, finalOrdToDocMap, graph);
                 return true;
             }
