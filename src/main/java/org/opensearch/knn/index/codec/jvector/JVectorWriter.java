@@ -727,26 +727,26 @@ public class JVectorWriter extends KnnVectorsWriter {
             this.ravvOrdToReaderMapping = new int[totalDocsCount][2];
 
             // Will be used to build the new graphNodeIdToDocMap with the new graph node id to docId mapping.
-
+            // This mapping should not be used to access the vectors at any time during construction, but only after the merge is complete
+            // and the new segment is created and used by searchers.
+            // note: totalVectorsCount is an unnecessarily loose bound for the "graphNodeId" space, see init of graphNodeIdsToRavvOrds below
+            final int[] graphNodeIdToDocIds = new int[totalVectorsCount];
+            final int[] compactOrdToDocIds = new int[totalLiveVectorsCount];
+            Arrays.fill(graphNodeIdToDocIds, -1);
+            Arrays.fill(compactOrdToDocIds, -1);
+            // The graph node id to ravv ordinal mapping, for the leading reader this mapping is always identity, for the other readers we
+            // only need to map the live vectors
+            // Therefore the size of this array is the total number of vectors in the leading reader + the number of live vectors in all
+            // other readers
             this.totalLiveVectorsInLeadingReader = vectorsCountInLeadingReader;
             this.totalLiveVectorsInOtherReaders = totalLiveVectorsCount - totalLiveVectorsInLeadingReader;
             this.totalLiveVectorsCount = totalLiveVectorsCount;
             this.totalLiveDocsCount = Arrays.stream(liveGraphNodesPerReader).mapToInt(FixedBitSet::cardinality).sum();
             assert (totalLiveDocsCount <= totalDocsCount) : "Total number of live docs exceeds the total number of documents";
 
-            // This mapping should not be used to access the vectors at any time during construction, but only after the merge is complete
-            // and the new segment is created and used by searchers.
-            // note: totalVectorsCount is an unnecessarily loose bound for the "graphNodeId" space, see init of graphNodeIdsToRavvOrds below
-            final int[] graphNodeIdToDocIds = new int[totalDocsCount];
-            final int[] compactOrdToDocIds = new int[totalLiveVectorsCount];
-            Arrays.fill(graphNodeIdToDocIds, -1);
-            Arrays.fill(compactOrdToDocIds, -1);
-
-            // The graph node id to ravv ordinal mapping, for the leading reader this mapping is always identity, for the other readers we
-            // only need to map the live documents, which may not be the same as the number of live vectors - the documents that do not have
-            // vectors set (nullable) are still live. Therefore the size of this array is the total number of documents in the leading
-            // reader + the number of documents in all other readers.
-            this.graphNodeIdsToRavvOrds = new int[totalDocsCount];
+            this.graphNodeIdsToRavvOrds = new int[totalLiveVectorsInOtherReaders + readers[LEADING_READER_IDX].getFloatVectorValues(
+                fieldName
+            ).size()];
             this.compactOrdsToRavvOrds = new int[totalLiveVectorsCount];
             // initialize the graphNodeIdsToRavvOrds with -1 to indicate that there is no mapping
             Arrays.fill(graphNodeIdsToRavvOrds, -1);
@@ -767,9 +767,6 @@ public class JVectorWriter extends KnnVectorsWriter {
             var leadingReaderIt = leadingReaderValues.iterator();
             for (int docId = leadingReaderIt.nextDoc(); docId != DocIdSetIterator.NO_MORE_DOCS; docId = leadingReaderIt.nextDoc()) {
                 final int newGlobalDocId = docMaps[LEADING_READER_IDX].get(docId);
-                // we increment anyway even if deleted because we are going to apply cleanup later to remove deleted nodes from the leading
-                // graph that will be used incremented
-                graphNodeId++;
                 if (newGlobalDocId == -1) {
                     log.debug(
                         "Document {} in reader {} is not mapped to a global ordinal from the merge docMaps. This means it's deleted or the vector is null, Will skip this document for now",
@@ -791,6 +788,7 @@ public class JVectorWriter extends KnnVectorsWriter {
                     }
                     ravvOrdToReaderMapping[ravvGlobalOrd][READER_ID] = LEADING_READER_IDX; // Reader index
                     ravvOrdToReaderMapping[ravvGlobalOrd][READER_ORD] = ravvLocalOrd; // Ordinal in reader
+                    graphNodeId++;
                 }
 
                 documentsIterated++;
@@ -832,10 +830,8 @@ public class JVectorWriter extends KnnVectorsWriter {
 
                             ravvOrdToReaderMapping[ravvGlobalOrd][READER_ID] = readerIdx; // Reader index
                             ravvOrdToReaderMapping[ravvGlobalOrd][READER_ORD] = ravvLocalOrd; // Ordinal in reader
+                            graphNodeId++;
                         }
-
-                        graphNodeId++;
-
                     }
 
                     documentsIterated++;
@@ -1017,7 +1013,6 @@ public class JVectorWriter extends KnnVectorsWriter {
 
                 int leadingGraphIdUpperBound = leadingGraph.getIdUpperBound();
                 long heapOrdUpperBoundLong = leadingGraphIdUpperBound + (long) totalLiveVectorsInOtherReaders;
-                final int leadingGraphLiveVectors = leadingGraph.size(0);
 
                 // even though Lucene should ensure that the sum of maxDoc across all segments
                 // is under IndexWriter.MAX_DOCS, our leading segment heap graph has holes
@@ -1057,7 +1052,7 @@ public class JVectorWriter extends KnnVectorsWriter {
                 // The "mid" ordinal space is the same as the "graphNodeId" ordinal space
                 // which includes all vectors from the leading segment and live vectors from other segments.
                 // We need this mapping to delete vectors later.
-                var midToHeapOrds = new int[leadingGraphLiveVectors + totalLiveVectorsInOtherReaders];
+                var midToHeapOrds = new int[graphNodeIdsToRavvOrds.length];
                 var heapToGlobalRavvOrds = new int[heapOrdUpperBound];
                 Arrays.fill(midToHeapOrds, -1);
                 Arrays.fill(heapToGlobalRavvOrds, -1);
@@ -1132,9 +1127,9 @@ public class JVectorWriter extends KnnVectorsWriter {
                     // parallel graph construction from the merge documents Ids
                     SIMD_POOL_MERGE.submit(
                         () -> IntStream.range(leadingGraph.getIdUpperBound(), heapRavv.size()).parallel().forEach(ord -> {
-                            if (heapToGlobalRavvOrds[ord] != GraphNodeIdToDocMap.NO_VECTOR_OR_DELETED_DOC) {
-                                builder.addGraphNode(ord, vv.get().getVector(ord));
-                            }
+                            assert heapToGlobalRavvOrds[ord] != GraphNodeIdToDocMap.NO_VECTOR_OR_DELETED_DOC
+                                : "Should be a valid graph node / vector";
+                            builder.addGraphNode(ord, vv.get().getVector(ord));
                         })
                     ).join();
 
