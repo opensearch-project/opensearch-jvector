@@ -23,6 +23,9 @@ import java.util.Arrays;
  */
 @Log4j2
 public class GraphNodeIdToDocMap {
+    // The marker for documents without vectors (== null) or deleted documents
+    public static final int NO_VECTOR_OR_DELETED_DOC = -1;
+
     private static final int VERSION = 1;
     private int[] graphNodeIdsToDocIds;
     private int[] docIdsToGraphNodeIds;
@@ -43,13 +46,13 @@ public class GraphNodeIdToDocMap {
 
         graphNodeIdsToDocIds = new int[size];
         docIdsToGraphNodeIds = new int[maxDocId];
-        Arrays.fill(graphNodeIdsToDocIds, -1);
-        Arrays.fill(docIdsToGraphNodeIds, -1);
+        Arrays.fill(graphNodeIdsToDocIds, NO_VECTOR_OR_DELETED_DOC);
+        Arrays.fill(docIdsToGraphNodeIds, NO_VECTOR_OR_DELETED_DOC);
         for (int ord = 0; ord < size; ord++) {
             final int docId = in.readVInt();
-            graphNodeIdsToDocIds[ord] = docId;
-            if (docId != -1) {
-                // ignore deleted documents
+            // ignore deleted documents
+            if (docId != NO_VECTOR_OR_DELETED_DOC) {
+                graphNodeIdsToDocIds[ord] = docId;
                 docIdsToGraphNodeIds[docId] = ord;
             }
         }
