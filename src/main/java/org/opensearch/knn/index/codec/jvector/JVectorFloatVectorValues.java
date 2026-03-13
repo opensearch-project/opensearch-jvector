@@ -76,7 +76,7 @@ public class JVectorFloatVectorValues extends FloatVectorValues {
             public int nextDoc() throws IOException {
                 // Advance to the next node docId starts from -1 which is why we need to increment docId by 1 "size"
                 // times
-                while (docId < size - 1) {
+                while (docId < graphNodeIdToDocMap.size() - 1) {
                     docId++;
                     if (liveNodes.get(docId)) {
                         return docId;

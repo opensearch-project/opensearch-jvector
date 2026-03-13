@@ -154,4 +154,13 @@ public class GraphNodeIdToDocMap {
             out.writeVInt(graphNodeIdsToDocIds[ord]);
         }
     }
+
+    public int size() {
+        return docIdsToGraphNodeIds.length;
+    }
+
+    @Override
+    public String toString() {
+        return "GraphNodeIdToDocMap{" + "graphNodeIdsToDocIds=" + Arrays.toString(graphNodeIdsToDocIds) + ", docIdsToGraphNodeIds=" + Arrays.toString(docIdsToGraphNodeIds) + '}';
+    }
 }
