@@ -25,6 +25,7 @@ import org.opensearch.core.rest.RestStatus;
 import org.opensearch.core.xcontent.*;
 import org.opensearch.knn.KNNResult;
 import org.opensearch.knn.common.KNNConstants;
+import org.opensearch.knn.index.KNNSettings;
 import org.opensearch.knn.index.KNNVectorSimilarityFunction;
 import org.opensearch.knn.index.SpaceType;
 import org.opensearch.knn.index.VectorDataType;
@@ -97,7 +98,12 @@ public class CommonTestUtils {
     public static final String NON_EXISTENT_INTEGER_FIELD_NAME = "nonexistent_int_field";
 
     public static Settings getDefaultIndexSettings() {
-        return Settings.builder().put("number_of_shards", 1).put("number_of_replicas", 0).put(KNN_INDEX, true).build();
+        return Settings.builder()
+            .put("number_of_shards", 1)
+            .put("number_of_replicas", 0)
+            .put(KNN_INDEX, true)
+            .put(KNNSettings.KNN_DERIVED_SOURCE_ENABLED, true)
+            .build();
     }
 
     public static String createIndexMapping(int dimension, SpaceType spaceType, VectorDataType vectorDataType) throws IOException {
