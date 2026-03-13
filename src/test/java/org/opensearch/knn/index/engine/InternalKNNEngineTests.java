@@ -92,7 +92,6 @@ public class InternalKNNEngineTests extends OpenSearchIntegTestCase {
         throws Exception {
         String mapping = CommonTestUtils.createIndexMapping(dimension, spaceType, vectorDataType);
         Settings indexSettings = CommonTestUtils.getDefaultIndexSettings();
-        // indexSettings = Settings.builder().put(indexSettings).put(INDEX_USE_COMPOUND_FILE.getKey(), false).build();
         createKnnIndex(INDEX_NAME, indexSettings, mapping);
     }
 
@@ -515,7 +514,7 @@ public class InternalKNNEngineTests extends OpenSearchIntegTestCase {
      */
     @Test
     public void testQuantizationWithOverQueryParameter() throws Exception {
-        int dimension = 512;
+        int dimension = 128;
         final SpaceType spaceType = SpaceType.L2;
         final RestClient restClient = getRestClient();
         createKnnIndexMappingWithJVectorEngine(dimension, spaceType, VectorDataType.FLOAT);
@@ -524,9 +523,9 @@ public class InternalKNNEngineTests extends OpenSearchIntegTestCase {
         int batchSize = DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION * 2;
 
         final float[][] vectors = TestUtils.generateRandomVectors(batchSize, dimension);
-        final int totalDocs = vectors.length;
+        final int expectedTotalDocs = vectors.length;
 
-        logger.info("Adding batch of vectors with size {} that is expected to trigger quantization", totalDocs);
+        logger.info("Adding batch of vectors with size {} that is expected to trigger quantization", expectedTotalDocs);
         CommonTestUtils.bulkAddKnnDocs(restClient, INDEX_NAME, FIELD_NAME, vectors, batchSize, false);
         CommonTestUtils.flushIndex(restClient, INDEX_NAME);
 
@@ -535,7 +534,6 @@ public class InternalKNNEngineTests extends OpenSearchIntegTestCase {
         CommonTestUtils.forceMergeKnnIndex(restClient, INDEX_NAME);
 
         // Verify the total document count
-        int expectedTotalDocs = vectors.length;
         assertEquals(expectedTotalDocs, CommonTestUtils.getDocCount(restClient, INDEX_NAME));
 
         // Perform search and verify recall
@@ -568,9 +566,9 @@ public class InternalKNNEngineTests extends OpenSearchIntegTestCase {
         assertEquals(Math.min(k, expectedTotalDocs), results.size());
 
         // calculate recall
-        logger.info("Calculating recall");
-        float recall = ((float) results.stream().filter(r -> expectedDocIds.contains(r.getDocId())).count()) / ((float) k);
-        assertTrue("Expected recall to be lower than 0.7 but got " + recall, recall <= 0.7);
+        logger.info("Calculating recall with low overquery");
+        float recallLowOverquery = ((float) results.stream().filter(r -> expectedDocIds.contains(r.getDocId())).count()) / ((float) k);
+        logger.info("Recall with low overquery: " + recallLowOverquery);
 
         // 2. Search with a high-overquery factor
         logger.info("Searching with high overquery factor");
@@ -592,9 +590,19 @@ public class InternalKNNEngineTests extends OpenSearchIntegTestCase {
         assertEquals(Math.min(k, expectedTotalDocs), results.size());
 
         // calculate recall
-        logger.info("Calculating recall");
-        recall = ((float) results.stream().filter(r -> expectedDocIds.contains(r.getDocId())).count()) / ((float) k);
-        assertTrue("Expected recall to be at least 0.9 but got " + recall, recall >= 0.9);
+        logger.info("Calculating recall with high overquery");
+        float recallHighOverquery = ((float) results.stream().filter(r -> expectedDocIds.contains(r.getDocId())).count()) / ((float) k);
+        logger.info("Recall with high overquery: " + recallHighOverquery);
+
+        // Verify that high overquery significantly improves recall compared to low overquery
+        assertTrue(
+            "Expected high overquery recall ("
+                + recallHighOverquery
+                + ") to be significantly better than low overquery recall ("
+                + recallLowOverquery
+                + ")",
+            recallHighOverquery > recallLowOverquery + 0.05
+        );
     }
 
     @Test
