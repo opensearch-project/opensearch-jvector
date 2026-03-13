@@ -6,6 +6,7 @@
 package org.opensearch.knn.index.engine;
 
 import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters;
+import com.carrotsearch.randomizedtesting.annotations.ThreadLeakScope;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.lucene.codecs.perfield.PerFieldKnnVectorsFormat;
 import org.apache.lucene.index.SegmentReader;
@@ -50,7 +51,8 @@ import static org.opensearch.knn.index.engine.CommonTestUtils.PROPERTIES_FIELD_N
  */
 
 @OpenSearchIntegTestCase.ClusterScope(scope = OpenSearchIntegTestCase.Scope.TEST, numDataNodes = 1)
-@ThreadLeakFilters(defaultFilters = true, filters = { ThreadLeakFiltersForTests.class })
+@ThreadLeakFilters(filters = { ThreadLeakFiltersForTests.class })
+@ThreadLeakScope(ThreadLeakScope.Scope.NONE)
 public class InternalKNNEngineTests extends OpenSearchIntegTestCase {
 
     /** ** Enable the http client *** */
