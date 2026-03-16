@@ -810,7 +810,7 @@ public class JVectorWriter extends KnnVectorsWriter {
                 // For each vector in this reader
                 KnnVectorValues.DocIndexIterator it = values.iterator();
 
-                for (int docId = it.nextDoc(); docId != DocIdSetIterator.NO_MORE_DOCS; docId = it.nextDoc()) {
+                for (int docId = it.nextDoc(); docId != DocIdSetIterator.NO_MORE_DOCS; docId = it.nextDoc(), documentsIterated++) {
                     final int newGlobalDocId = docMaps[readerIdx].get(docId);
                     if (newGlobalDocId == GraphNodeIdToDocMap.NO_VECTOR_OR_DELETED_DOC) {
                         log.debug(
@@ -838,8 +838,6 @@ public class JVectorWriter extends KnnVectorsWriter {
                             graphNodeId++;
                         }
                     }
-
-                    documentsIterated++;
                 }
             }
 
