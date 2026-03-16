@@ -13,6 +13,7 @@ import org.apache.lucene.search.DocIdSetIterator;
 import org.apache.lucene.util.ArrayUtil;
 import org.apache.lucene.util.BytesRef;
 import org.opensearch.knn.index.VectorDataType;
+import org.opensearch.knn.index.codec.jvector.GraphNodeIdToDocMap;
 import org.opensearch.knn.index.codec.util.KNNVectorSerializer;
 import org.opensearch.knn.index.codec.util.KNNVectorSerializerFactory;
 
@@ -104,6 +105,8 @@ public interface VectorValueExtractorStrategy {
             int ord = docIdSetIterator.index();
             if (ord == docIdsIteratorValues.getLastOrd()) {
                 return (T) docIdsIteratorValues.getLastAccessedVector();
+            } else if (ord == GraphNodeIdToDocMap.NO_VECTOR_OR_DELETED_DOC) {
+                return null; /* no vector */
             }
             docIdsIteratorValues.setLastOrd(ord);
 

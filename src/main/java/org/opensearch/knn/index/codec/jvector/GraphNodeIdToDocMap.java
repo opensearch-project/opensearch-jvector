@@ -62,12 +62,16 @@ public class GraphNodeIdToDocMap {
         return docIdsToGraphNodeIds.length;
     }
 
+    public GraphNodeIdToDocMap(int[] graphNodeIdsToDocIds) {
+        this(graphNodeIdsToDocIds, graphNodeIdsToDocIds.length > 0 ? Arrays.stream(graphNodeIdsToDocIds).max().getAsInt() : 0);
+    }
+
     /**
      * Constructor that creates a new mapping between ordinals and docIds
      *
      * @param graphNodeIdsToDocIds The mapping from ordinals to docIds
      */
-    public GraphNodeIdToDocMap(int[] graphNodeIdsToDocIds) {
+    public GraphNodeIdToDocMap(int[] graphNodeIdsToDocIds, int maxDocId) {
         if (graphNodeIdsToDocIds.length == 0) {
             this.graphNodeIdsToDocIds = new int[0];
             this.docIdsToGraphNodeIds = new int[0];
@@ -75,7 +79,14 @@ public class GraphNodeIdToDocMap {
         }
         this.graphNodeIdsToDocIds = new int[graphNodeIdsToDocIds.length];
         System.arraycopy(graphNodeIdsToDocIds, 0, this.graphNodeIdsToDocIds, 0, graphNodeIdsToDocIds.length);
-        final int maxDocId = Arrays.stream(graphNodeIdsToDocIds).max().getAsInt();
+
+        final int observedMaxDocId = Arrays.stream(graphNodeIdsToDocIds).max().getAsInt();
+        // The graphNodeIdsToDocIds may only contain graphNodes for document with vectors,
+        // the documents without vectors have to be accounted for as well.
+        if (maxDocId < observedMaxDocId) {
+            throw new IllegalArgumentException("The maxDocId is incorrect, provided " + maxDocId + ", expected " + observedMaxDocId);
+        }
+
         final int maxDocs = maxDocId + 1;
         // We are going to assume that the number of ordinals is roughly the same as the number of documents in the segment, therefore,
         // the mapping will not be sparse.

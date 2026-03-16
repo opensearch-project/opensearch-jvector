@@ -17,6 +17,7 @@ import org.apache.lucene.index.KnnVectorValues;
 import org.apache.lucene.search.DocIdSetIterator;
 import org.opensearch.ExceptionsHelper;
 import org.opensearch.index.fielddata.ScriptDocValues;
+import org.opensearch.knn.index.codec.jvector.GraphNodeIdToDocMap;
 
 @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
 public abstract class KNNVectorScriptDocValues extends ScriptDocValues<float[]> {
@@ -111,6 +112,8 @@ public abstract class KNNVectorScriptDocValues extends ScriptDocValues<float[]> 
             int docId = this.iterator.index();
             if (docId == KnnVectorValues.DocIndexIterator.NO_MORE_DOCS) {
                 throw new IllegalStateException("No more ordinals to retrieve vector values.");
+            } else if (docId == GraphNodeIdToDocMap.NO_VECTOR_OR_DELETED_DOC) {
+                return null; /* no value */
             }
 
             // Use the correct method to retrieve the byte vector for the current ordinal

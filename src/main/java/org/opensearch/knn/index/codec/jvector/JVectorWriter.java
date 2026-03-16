@@ -234,7 +234,9 @@ public class JVectorWriter extends KnnVectorsWriter {
             for (int ord = 0; ord < randomAccessVectorValues.size(); ord++) {
                 ordinalsToDocIds[ord] = field.docIds.get(ord);
             }
-            final GraphNodeIdToDocMap graphNodeIdToDocMap = new GraphNodeIdToDocMap(ordinalsToDocIds);
+            // The ordinalsToDocIds will only track the documents that have vectors,
+            // so we pass the maxDoc to keep the precise number of documents.
+            final GraphNodeIdToDocMap graphNodeIdToDocMap = new GraphNodeIdToDocMap(ordinalsToDocIds, maxDoc - 1);
             if (sortMap != null) {
                 graphNodeIdToDocMap.update(sortMap);
             }
@@ -852,10 +854,11 @@ public class JVectorWriter extends KnnVectorsWriter {
                 );
             }
 
-            this.graphNodeIdToDocMap = new GraphNodeIdToDocMap(graphNodeIdToDocIds);
-            this.compactOrdToDocMap = new GraphNodeIdToDocMap(compactOrdToDocIds);
+            // The graphNodeIdToDocIds and compactOrdToDocIds will only track the documents that have vectors,
+            // so we pass the maxDoc to keep the precise number of documents.
+            this.graphNodeIdToDocMap = new GraphNodeIdToDocMap(graphNodeIdToDocIds, totalLiveDocsCount - 1);
+            this.compactOrdToDocMap = new GraphNodeIdToDocMap(compactOrdToDocIds, totalLiveDocsCount - 1);
             log.debug("Created RandomAccessMergedFloatVectorValues with {} total vectors from {} readers", size, readers.length);
-
         }
 
         /**
