@@ -616,7 +616,6 @@ public class JVectorWriter extends KnnVectorsWriter {
         // "graphNode" and "compact" ordinal spaces may not have the same relative order in certain cases.
         // The RavvOrd space is the keyspace of ravvOrdToReaderMapping[][] declared earlier.
         private final GraphNodeIdToDocMap graphNodeIdToDocMap;
-        // Compacted ordinal map that only includes live vectors
         private final GraphNodeIdToDocMap compactOrdToDocMap;
         private final int[] graphNodeIdsToRavvOrds;
         private final int[] compactOrdsToRavvOrds;
