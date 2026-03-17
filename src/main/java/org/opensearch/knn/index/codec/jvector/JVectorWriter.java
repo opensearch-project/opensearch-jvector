@@ -641,6 +641,7 @@ public class JVectorWriter extends KnnVectorsWriter {
             // between global ordinals and global lucene doc ids
             int totalVectorsCount = 0;
             int totalLiveVectorsCount = 0;
+            int liveDocsCount = 0;
             int dimension = 0;
             int tempLeadingReaderIdx = -1;
             int vectorsCountInLeadingReader = -1;
@@ -652,8 +653,16 @@ public class JVectorWriter extends KnnVectorsWriter {
                 final int length;
                 if (liveDocs[i] == null) {
                     length = mergeState.maxDocs[i];
+                    liveDocsCount += length;
                 } else {
                     length = liveDocs[i].length();
+                    // We may have segments without vectors, but we still have to count live docs,
+                    // so counting it by calculating how many bits are set
+                    for (int b = 0; b < length; ++b) {
+                        if (liveDocs[i].get(b) == true) {
+                            liveDocsCount += 1;
+                        }
+                    }
                 }
                 liveGraphNodesPerReader[i] = new FixedBitSet(length);
                 liveGraphNodesPerReader[i].set(0, length);
@@ -748,7 +757,7 @@ public class JVectorWriter extends KnnVectorsWriter {
             this.totalLiveVectorsInLeadingReader = vectorsCountInLeadingReader;
             this.totalLiveVectorsInOtherReaders = totalLiveVectorsCount - totalLiveVectorsInLeadingReader;
             this.totalLiveVectorsCount = totalLiveVectorsCount;
-            this.totalLiveDocsCount = Arrays.stream(liveGraphNodesPerReader).mapToInt(FixedBitSet::cardinality).sum();
+            this.totalLiveDocsCount = liveDocsCount;
             assert (totalLiveDocsCount <= totalDocsCount) : "Total number of live docs exceeds the total number of documents";
 
             this.graphNodeIdsToRavvOrds = new int[totalLiveVectorsInOtherReaders + readers[LEADING_READER_IDX].getFloatVectorValues(

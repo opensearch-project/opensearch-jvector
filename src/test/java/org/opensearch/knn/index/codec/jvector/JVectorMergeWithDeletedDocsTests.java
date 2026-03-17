@@ -1003,7 +1003,7 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
 
         try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter writer = new IndexWriter(dir, config)) {
             int parentDocId = 0;
-            final int parentDocIdWithoutVector = random().nextInt(2);
+            final int parentDocIdWithoutVector = random().nextInt(3);
 
             // Segment 1: 3 parent documents, each with 1-3 nested child documents
             log.info("Creating segment 1: 2 parent docs with nested children");
@@ -1154,7 +1154,7 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
 
         try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter writer = new IndexWriter(dir, config)) {
             int parentDocId = 0;
-            final int parentDocIdWithoutVector = random().nextInt(2);
+            final int parentDocIdWithoutVector = random().nextInt(3);
 
             // Segment 1: 3 parent documents, each with 1-3 nested child documents
             log.info("Creating segment 1: 2 parent docs with nested children");
@@ -1311,7 +1311,7 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
 
         try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter writer = new IndexWriter(dir, config)) {
             int parentDocId = 0;
-            final int parentDocIdWithoutVector = random().nextInt(2);
+            final int parentDocIdWithoutVector = random().nextInt(3);
 
             // Segment 1: 3 parent documents, each with 1-3 nested child documents
             log.info("Creating segment 1: 2 parent docs with nested children");
