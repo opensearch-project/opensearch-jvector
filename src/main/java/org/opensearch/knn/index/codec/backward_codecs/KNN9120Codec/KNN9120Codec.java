@@ -13,7 +13,6 @@ import org.apache.lucene.codecs.FilterCodec;
 import org.apache.lucene.codecs.KnnVectorsFormat;
 import org.apache.lucene.codecs.StoredFieldsFormat;
 import org.apache.lucene.codecs.perfield.PerFieldKnnVectorsFormat;
-import org.opensearch.index.mapper.MapperService;
 import org.opensearch.knn.index.codec.KNN80Codec.KNN80CompoundFormat;
 import org.opensearch.knn.index.codec.KNN80Codec.KNN80DocValuesFormat;
 import org.opensearch.knn.index.codec.KNN9120Codec.KNN9120PerFieldKnnVectorsFormat;
@@ -31,13 +30,11 @@ public class KNN9120Codec extends FilterCodec {
     private final PerFieldKnnVectorsFormat perFieldKnnVectorsFormat;
     private final StoredFieldsFormat storedFieldsFormat;
 
-    private final MapperService mapperService;
-
     /**
      * No arg constructor that uses Lucene99 as the delegate
      */
     public KNN9120Codec() {
-        this(DEFAULT_DELEGATE, DEFAULT_KNN_VECTOR_FORMAT, null);
+        this(DEFAULT_DELEGATE, DEFAULT_KNN_VECTOR_FORMAT);
     }
 
     /**
@@ -47,10 +44,9 @@ public class KNN9120Codec extends FilterCodec {
      * @param delegate codec that will perform all operations this codec does not override
      * @param knnVectorsFormat per field format for KnnVector
      */
-    private KNN9120Codec(Codec delegate, PerFieldKnnVectorsFormat knnVectorsFormat, MapperService mapperService) {
+    private KNN9120Codec(Codec delegate, PerFieldKnnVectorsFormat knnVectorsFormat) {
         super(NAME, delegate);
         perFieldKnnVectorsFormat = knnVectorsFormat;
-        this.mapperService = mapperService;
         this.storedFieldsFormat = getStoredFieldsFormat();
     }
 
