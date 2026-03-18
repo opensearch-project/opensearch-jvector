@@ -75,7 +75,10 @@ public class KNNJVectorTests extends LuceneTestCase {
             w.commit();
 
             try (IndexReader reader = DirectoryReader.open(w)) {
-                int expectedNumOfSegments = indexWriterConfig.getMaxBufferedDocs() < 0 ? 1 : totalNumberOfDocs > indexWriterConfig.getMaxBufferedDocs() ? totalNumberOfDocs/indexWriterConfig.getMaxBufferedDocs() + 1 : 1;
+                int expectedNumOfSegments = indexWriterConfig.getMaxBufferedDocs() < 0 ? 1
+                    : totalNumberOfDocs > indexWriterConfig.getMaxBufferedDocs()
+                        ? totalNumberOfDocs / indexWriterConfig.getMaxBufferedDocs() + 1
+                    : 1;
                 log.info("We should now have a {} segment(s) with 10 documents", expectedNumOfSegments);
                 Assert.assertEquals(expectedNumOfSegments, reader.getContext().leaves().size());
                 Assert.assertEquals(totalNumberOfDocs, reader.numDocs());
