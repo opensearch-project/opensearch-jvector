@@ -84,7 +84,9 @@ public class GraphNodeIdToDocMap {
         // The graphNodeIdsToDocIds may only contain graphNodes for document with vectors,
         // the documents without vectors have to be accounted for as well.
         if (maxDocId < observedMaxDocId) {
-            throw new IllegalArgumentException("The maxDocId is incorrect, provided " + maxDocId + ", expected " + observedMaxDocId);
+            throw new IllegalArgumentException(
+                "The maxDocId is incorrect, provided " + maxDocId + ", expected at least " + observedMaxDocId
+            );
         }
 
         final int maxDocs = maxDocId + 1;
