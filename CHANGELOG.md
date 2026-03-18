@@ -10,7 +10,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * Enable derived sources for vectors to save storage costs. [241] (https://github.com/opensearch-project/opensearch-jvector/pull/241)
 ### Enhancements
 ### Bug Fixes
-* Fix flaky test KNNJVectorTests.testJVectorKnnIndex_simpleCase
 ### Infrastructure
 * Upgrade Lucene to 10.4.0 [292] (https://github.com/opensearch-project/opensearch-jvector/pull/292)
 ### Documentation
