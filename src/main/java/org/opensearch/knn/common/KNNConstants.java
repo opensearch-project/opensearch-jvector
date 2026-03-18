@@ -17,9 +17,6 @@ public class KNNConstants {
     public static final String METHOD_HNSW = "hnsw";
     public static final String DISK_ANN = "disk_ann";
     public static final String TYPE = "type";
-    public static final String TYPE_NESTED = "nested";
-    public static final String PATH = "path";
-    public static final String QUERY = "query";
     public static final String KNN = "knn";
     public static final String VECTOR = "vector";
     public static final String K = "k";
@@ -29,13 +26,11 @@ public class KNNConstants {
     public static final String METHOD_PARAMETER_EF_SEARCH = "ef_search";
     public static final String METHOD_PARAMETER_EF_CONSTRUCTION = "ef_construction";
     public static final String METHOD_PARAMETER_M = "m";
-    public static final String METHOD_IVF = "ivf";
     public static final String METHOD_PARAMETER_NLIST = "nlist";
     public static final String METHOD_PARAMETER_SPACE_TYPE = "space_type"; // used for mapping parameter
     // used for defining toplevel parameter
     public static final String TOP_LEVEL_PARAMETER_SPACE_TYPE = METHOD_PARAMETER_SPACE_TYPE;
     public static final String COMPOUND_EXTENSION = "c";
-    public static final String PLUGIN_NAME = "knn";
     public static final Integer BYTES_PER_KILOBYTES = 1024;
 
     public static final String MODEL_NODE_ASSIGNMENT = "training_node_assignment";
