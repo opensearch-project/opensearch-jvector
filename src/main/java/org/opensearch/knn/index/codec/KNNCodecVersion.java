@@ -165,6 +165,7 @@ public enum KNNCodecVersion {
     );
 
     private static final KNNCodecVersion CURRENT = V_10_04_0;
+    public static final Codec CURRENT_DEFAULT_DELEGATE = KNN1040Codec.DEFAULT_DELEGATE;
     private final String codecName;
     private final Codec defaultCodecDelegate;
     private final PerFieldKnnVectorsFormat perFieldKnnVectorsFormat;

@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Enhancements
 ### Bug Fixes
 * Fix issues handling documents without vector fields being populated [288] (https://github.com/opensearch-project/opensearch-jvector/issues/288)
+* The KNN1030Codec does not properly support delegation for non-default codec(s). [310] (https://github.com/opensearch-project/opensearch-jvector/pull/310)
 ### Infrastructure
 * Upgrade Lucene to 10.4.0 [292] (https://github.com/opensearch-project/opensearch-jvector/pull/292)
 ### Documentation
