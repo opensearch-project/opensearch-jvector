@@ -113,11 +113,15 @@ public abstract class KNNVectorScriptDocValues extends ScriptDocValues<float[]> 
 
         @Override
         protected float[] doGetValue() throws IOException {
-            int docId = this.iterator.index();
+            int docId = this.iterator.docID();
             if (docId == KnnVectorValues.DocIndexIterator.NO_MORE_DOCS) {
                 throw new IllegalStateException("No more ordinals to retrieve vector values.");
-            } else if (docId == GraphNodeIdToDocMap.NO_VECTOR_OR_DELETED_DOC) {
-                return null; /* no value */
+            }
+
+            int ord = this.iterator.index();    // Fetch ordinal (index of vector)
+            if (ord == GraphNodeIdToDocMap.NO_VECTOR_OR_DELETED_DOC) {
+                log.debug("No vector value for docId {}, index is {}", docId, ord);
+                return null; /* no vector value */
             }
 
             // Use the correct method to retrieve the byte vector for the current ordinal
