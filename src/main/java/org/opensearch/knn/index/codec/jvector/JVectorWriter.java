@@ -234,7 +234,10 @@ public class JVectorWriter extends KnnVectorsWriter {
             for (int ord = 0; ord < randomAccessVectorValues.size(); ord++) {
                 ordinalsToDocIds[ord] = field.docIds.get(ord);
             }
-            final GraphNodeIdToDocMap graphNodeIdToDocMap = new GraphNodeIdToDocMap(ordinalsToDocIds);
+            // The ordinalsToDocIds will only track the documents that have vectors,
+            // so we pass the maxDoc to keep the precise number of documents. To calculate the last docId we
+            // subtract 1 from maxDoc since docId start from 0: [0 .. maxDoc - 1]
+            final GraphNodeIdToDocMap graphNodeIdToDocMap = new GraphNodeIdToDocMap(ordinalsToDocIds, maxDoc - 1);
             if (sortMap != null) {
                 graphNodeIdToDocMap.update(sortMap);
             }
@@ -597,8 +600,13 @@ public class JVectorWriter extends KnnVectorsWriter {
         // Total number of documents including those without values
         private final int totalDocsCount;
 
+        // Total number of live (non-deleted) documents
+        private final int totalLiveDocsCount;
+        // Total number of live vectors in leading reader
         private final int totalLiveVectorsInLeadingReader;
+        // Total number of live vectors in all other readers
         private final int totalLiveVectorsInOtherReaders;
+        // Total number of live vectors in all readers
         private final int totalLiveVectorsCount;
 
         // Vector dimension
@@ -634,10 +642,10 @@ public class JVectorWriter extends KnnVectorsWriter {
             // between global ordinals and global lucene doc ids
             int totalVectorsCount = 0;
             int totalLiveVectorsCount = 0;
+            int liveDocsCount = 0;
             int dimension = 0;
             int tempLeadingReaderIdx = -1;
             int vectorsCountInLeadingReader = -1;
-            List<KnnVectorsReader> allReaders = new ArrayList<>();
             final MergeState.DocMap[] docMaps = mergeState.docMaps.clone();
             final Bits[] liveDocs = mergeState.liveDocs.clone();
             this.liveGraphNodesPerReader = new FixedBitSet[liveDocs.length];
@@ -646,8 +654,16 @@ public class JVectorWriter extends KnnVectorsWriter {
                 final int length;
                 if (liveDocs[i] == null) {
                     length = mergeState.maxDocs[i];
+                    liveDocsCount += length;
                 } else {
                     length = liveDocs[i].length();
+                    // We may have segments without vectors, but we still have to count live docs,
+                    // so counting it by calculating how many bits are set
+                    for (int b = 0; b < length; ++b) {
+                        if (liveDocs[i].get(b) == true) {
+                            liveDocsCount += 1;
+                        }
+                    }
                 }
                 liveGraphNodesPerReader[i] = new FixedBitSet(length);
                 liveGraphNodesPerReader[i].set(0, length);
@@ -663,23 +679,24 @@ public class JVectorWriter extends KnnVectorsWriter {
                     if (reader != null) {
                         FloatVectorValues values = reader.getFloatVectorValues(fieldName);
                         if (values != null) {
-                            allReaders.add(reader);
                             int vectorCountInReader = values.size();
                             int liveVectorCountInReader = 0;
                             KnnVectorValues.DocIndexIterator it = values.iterator();
                             while (it.nextDoc() != DocIdSetIterator.NO_MORE_DOCS) {
-                                if (it.index() != JVectorFloatVectorValues.NO_VECTOR) /* no vector */ {
-                                    if ((liveDocs[i] == null || liveDocs[i].get(it.docID()))) {
+                                final int index = it.index();
+                                // We have a document without vector value (or deleted), skipping over it
+                                if (index != GraphNodeIdToDocMap.NO_VECTOR_OR_DELETED_DOC /* no vector or doc */) {
+                                    if (liveDocs[i] == null || liveDocs[i].get(it.docID())) {
                                         liveVectorCountInReader++;
                                     } else {
                                         // This vector is deleted so we need to mark it as deleted in the liveGraphNodesPerReader
-                                        liveGraphNodesPerReader[i].clear(it.index());
+                                        liveGraphNodesPerReader[i].clear(index);
                                     }
                                 }
                             }
                             if (liveVectorCountInReader >= vectorsCountInLeadingReader) {
                                 vectorsCountInLeadingReader = liveVectorCountInReader;
-                                tempLeadingReaderIdx = allReaders.size() - 1;
+                                tempLeadingReaderIdx = i;
                             }
                             totalVectorsCount += vectorCountInReader;
                             totalLiveVectorsCount += liveVectorCountInReader;
@@ -694,9 +711,9 @@ public class JVectorWriter extends KnnVectorsWriter {
             assert (dimension > 0) : "No vectors found for field " + fieldName;
 
             this.size = totalVectorsCount;
-            this.readers = new KnnVectorsReader[allReaders.size()];
+            this.readers = new KnnVectorsReader[mergeState.knnVectorsReaders.length];
             for (int i = 0; i < readers.length; i++) {
-                readers[i] = allReaders.get(i);
+                readers[i] = mergeState.knnVectorsReaders[i];
             }
 
             // always swap the leading reader to the first position
@@ -738,9 +755,12 @@ public class JVectorWriter extends KnnVectorsWriter {
             // only need to map the live vectors
             // Therefore the size of this array is the total number of vectors in the leading reader + the number of live vectors in all
             // other readers
-            totalLiveVectorsInLeadingReader = liveGraphNodesPerReader[LEADING_READER_IDX].cardinality();
-            totalLiveVectorsInOtherReaders = totalLiveVectorsCount - totalLiveVectorsInLeadingReader;
+            this.totalLiveVectorsInLeadingReader = vectorsCountInLeadingReader;
+            this.totalLiveVectorsInOtherReaders = totalLiveVectorsCount - totalLiveVectorsInLeadingReader;
             this.totalLiveVectorsCount = totalLiveVectorsCount;
+            this.totalLiveDocsCount = liveDocsCount;
+            assert (totalLiveDocsCount <= totalDocsCount) : "Total number of live docs exceeds the total number of documents";
+
             this.graphNodeIdsToRavvOrds = new int[totalLiveVectorsInOtherReaders + readers[LEADING_READER_IDX].getFloatVectorValues(
                 fieldName
             ).size()];
@@ -762,11 +782,9 @@ public class JVectorWriter extends KnnVectorsWriter {
                 .getFloatVectorValues(fieldName);
             perReaderFloatVectorValues[LEADING_READER_IDX] = leadingReaderValues;
             var leadingReaderIt = leadingReaderValues.iterator();
-            for (int docId = leadingReaderIt.nextDoc(); docId != DocIdSetIterator.NO_MORE_DOCS; docId = leadingReaderIt.nextDoc()) {
+            for (int docId = leadingReaderIt.nextDoc(); docId != DocIdSetIterator.NO_MORE_DOCS; docId = leadingReaderIt
+                .nextDoc(), documentsIterated++) {
                 final int newGlobalDocId = docMaps[LEADING_READER_IDX].get(docId);
-                // we increment anyway even if deleted because we are going to apply cleanup later to remove deleted nodes from the leading
-                // graph that will be used incremented
-                graphNodeId++;
                 if (newGlobalDocId == -1) {
                     log.debug(
                         "Document {} in reader {} is not mapped to a global ordinal from the merge docMaps. This means it's deleted or the vector is null, Will skip this document for now",
@@ -776,30 +794,41 @@ public class JVectorWriter extends KnnVectorsWriter {
                 }
 
                 final int ravvLocalOrd = leadingReaderIt.index();
-                final int ravvGlobalOrd = ravvLocalOrd + baseOrds[LEADING_READER_IDX];
-                graphNodeIdToDocIds[ravvLocalOrd] = newGlobalDocId;
-                graphNodeIdsToRavvOrds[ravvLocalOrd] = ravvGlobalOrd;
-                if (newGlobalDocId != -1) {
-                    // the "compact" ordinal space doesn't include any deletes
-                    compactOrdsToRavvOrds[compactNodeId] = ravvGlobalOrd;
-                    compactOrdToDocIds[compactNodeId] = newGlobalDocId;
-                    compactNodeId += 1;
-                }
-                ravvOrdToReaderMapping[ravvGlobalOrd][READER_ID] = LEADING_READER_IDX; // Reader index
-                ravvOrdToReaderMapping[ravvGlobalOrd][READER_ORD] = ravvLocalOrd; // Ordinal in reader
+                if (ravvLocalOrd != GraphNodeIdToDocMap.NO_VECTOR_OR_DELETED_DOC) {
+                    final int ravvGlobalOrd = ravvLocalOrd + baseOrds[LEADING_READER_IDX];
+                    graphNodeIdToDocIds[ravvLocalOrd] = newGlobalDocId;
+                    graphNodeIdsToRavvOrds[ravvLocalOrd] = ravvGlobalOrd;
+                    if (newGlobalDocId != -1) {
+                        // the "compact" ordinal space doesn't include any deletes
+                        compactOrdsToRavvOrds[compactNodeId] = ravvGlobalOrd;
+                        compactOrdToDocIds[compactNodeId] = newGlobalDocId;
+                        compactNodeId += 1;
+                    }
+                    ravvOrdToReaderMapping[ravvGlobalOrd][READER_ID] = LEADING_READER_IDX; // Reader index
+                    ravvOrdToReaderMapping[ravvGlobalOrd][READER_ORD] = ravvLocalOrd; // Ordinal in reader
 
-                documentsIterated++;
+                    // we increment anyway even if deleted because we are going to apply cleanup later to remove deleted nodes from the
+                    // leading
+                    // graph that will be used incremented
+                    graphNodeId++;
+                }
             }
 
             // For the remaining readers we map the graph node id to the ravv ordinal in the order they appear
             for (int readerIdx = 1; readerIdx < readers.length; readerIdx++) {
+                // We skip over readers that have no vectors
+                if (readers[readerIdx] == null) {
+                    continue;
+                }
+
                 final JVectorFloatVectorValues values = (JVectorFloatVectorValues) readers[readerIdx].getFloatVectorValues(fieldName);
                 perReaderFloatVectorValues[readerIdx] = values;
                 // For each vector in this reader
                 KnnVectorValues.DocIndexIterator it = values.iterator();
 
-                for (int docId = it.nextDoc(); docId != DocIdSetIterator.NO_MORE_DOCS; docId = it.nextDoc()) {
-                    if (docMaps[readerIdx].get(docId) == -1) {
+                for (int docId = it.nextDoc(); docId != DocIdSetIterator.NO_MORE_DOCS; docId = it.nextDoc(), documentsIterated++) {
+                    final int newGlobalDocId = docMaps[readerIdx].get(docId);
+                    if (newGlobalDocId == -1) {
                         log.debug(
                             "Document {} in reader {} is not mapped to a global ordinal from the merge docMaps. Will skip this document for now",
                             docId,
@@ -809,20 +838,21 @@ public class JVectorWriter extends KnnVectorsWriter {
                         // Mapping from ravv ordinals to [readerIndex, readerOrd]
                         // Map graph node id to ravv ordinal
                         // Map graph node id to doc id
-                        final int newGlobalDocId = docMaps[readerIdx].get(docId);
                         final int ravvLocalOrd = it.index();
-                        final int ravvGlobalOrd = ravvLocalOrd + baseOrds[readerIdx];
-                        graphNodeIdToDocIds[graphNodeId] = newGlobalDocId;
-                        graphNodeIdsToRavvOrds[graphNodeId] = ravvGlobalOrd;
-                        compactOrdsToRavvOrds[compactNodeId] = ravvGlobalOrd;
-                        compactOrdToDocIds[compactNodeId] = newGlobalDocId;
-                        compactNodeId++;
-                        graphNodeId++;
-                        ravvOrdToReaderMapping[ravvGlobalOrd][READER_ID] = readerIdx; // Reader index
-                        ravvOrdToReaderMapping[ravvGlobalOrd][READER_ORD] = ravvLocalOrd; // Ordinal in reader
-                    }
+                        if (ravvLocalOrd != GraphNodeIdToDocMap.NO_VECTOR_OR_DELETED_DOC) {
+                            final int ravvGlobalOrd = ravvLocalOrd + baseOrds[readerIdx];
+                            graphNodeIdToDocIds[graphNodeId] = newGlobalDocId;
+                            graphNodeIdsToRavvOrds[graphNodeId] = ravvGlobalOrd;
 
-                    documentsIterated++;
+                            compactOrdsToRavvOrds[compactNodeId] = ravvGlobalOrd;
+                            compactOrdToDocIds[compactNodeId] = newGlobalDocId;
+                            compactNodeId++;
+
+                            ravvOrdToReaderMapping[ravvGlobalOrd][READER_ID] = readerIdx; // Reader index
+                            ravvOrdToReaderMapping[ravvGlobalOrd][READER_ORD] = ravvLocalOrd; // Ordinal in reader
+                            graphNodeId++;
+                        }
+                    }
                 }
             }
 
@@ -837,10 +867,12 @@ public class JVectorWriter extends KnnVectorsWriter {
                 );
             }
 
-            this.graphNodeIdToDocMap = new GraphNodeIdToDocMap(graphNodeIdToDocIds);
-            this.compactOrdToDocMap = new GraphNodeIdToDocMap(compactOrdToDocIds);
+            // The graphNodeIdToDocIds and compactOrdToDocIds will only track the documents that have vectors,
+            // so we pass the maxDoc to keep the precise number of documents. To calculate the last docId we
+            // subtract 1 from totalLiveDocsCount since docId start from 0: [0 .. totalLiveDocsCount - 1]
+            this.graphNodeIdToDocMap = new GraphNodeIdToDocMap(graphNodeIdToDocIds, totalLiveDocsCount - 1);
+            this.compactOrdToDocMap = new GraphNodeIdToDocMap(compactOrdToDocIds, totalLiveDocsCount - 1);
             log.debug("Created RandomAccessMergedFloatVectorValues with {} total vectors from {} readers", size, readers.length);
-
         }
 
         /**
@@ -911,6 +943,9 @@ public class JVectorWriter extends KnnVectorsWriter {
                 // used to create the leadingCompressor
                 // We assume the leading reader is ALWAYS the first one in the readers array
                 for (int i = LEADING_READER_IDX + 1; i < readers.length; i++) {
+                    if (readers[i] == null) {
+                        continue;
+                    }
                     final FloatVectorValues values = readers[i].getFloatVectorValues(fieldName);
                     final RandomAccessVectorValues randomAccessVectorValues = new RandomAccessVectorValuesOverVectorValues(values);
                     leadingCompressor.refine(randomAccessVectorValues);
@@ -1112,6 +1147,8 @@ public class JVectorWriter extends KnnVectorsWriter {
                     // parallel graph construction from the merge documents Ids
                     SIMD_POOL_MERGE.submit(
                         () -> IntStream.range(leadingGraph.getIdUpperBound(), heapRavv.size()).parallel().forEach(ord -> {
+                            assert heapToGlobalRavvOrds[ord] != GraphNodeIdToDocMap.NO_VECTOR_OR_DELETED_DOC
+                                : "Should be a valid graph node / vector";
                             builder.addGraphNode(ord, vv.get().getVector(ord));
                         })
                     ).join();

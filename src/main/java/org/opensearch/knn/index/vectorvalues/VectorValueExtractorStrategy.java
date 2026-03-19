@@ -5,6 +5,8 @@
 
 package org.opensearch.knn.index.vectorvalues;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.apache.lucene.index.BinaryDocValues;
 import org.apache.lucene.index.ByteVectorValues;
 import org.apache.lucene.index.FloatVectorValues;
@@ -13,6 +15,7 @@ import org.apache.lucene.search.DocIdSetIterator;
 import org.apache.lucene.util.ArrayUtil;
 import org.apache.lucene.util.BytesRef;
 import org.opensearch.knn.index.VectorDataType;
+import org.opensearch.knn.index.codec.jvector.GraphNodeIdToDocMap;
 import org.opensearch.knn.index.codec.util.KNNVectorSerializer;
 import org.opensearch.knn.index.codec.util.KNNVectorSerializerFactory;
 
@@ -67,6 +70,8 @@ public interface VectorValueExtractorStrategy {
      * Strategy to extract the vector from {@link KNNVectorValuesIterator.DocIdsIteratorValues}
      */
     class DISIVectorExtractor implements VectorValueExtractorStrategy {
+        private static final Logger log = LogManager.getLogger(DISIVectorExtractor.class);
+
         @Override
         public <T> T extract(final VectorDataType vectorDataType, final KNNVectorValuesIterator vectorValuesIterator) throws IOException {
             final DocIdSetIterator docIdSetIterator = vectorValuesIterator.getDocIdSetIterator();
@@ -104,6 +109,9 @@ public interface VectorValueExtractorStrategy {
             int ord = docIdSetIterator.index();
             if (ord == docIdsIteratorValues.getLastOrd()) {
                 return (T) docIdsIteratorValues.getLastAccessedVector();
+            } else if (ord == GraphNodeIdToDocMap.NO_VECTOR_OR_DELETED_DOC) {
+                log.debug("No vector value for docId {}, index is {}", docIdSetIterator.docID(), ord);
+                return null; /* no vector */
             }
             docIdsIteratorValues.setLastOrd(ord);
 
