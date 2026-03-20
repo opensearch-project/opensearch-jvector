@@ -74,9 +74,10 @@ public class JVectorFloatVectorValues extends FloatVectorValues {
 
             @Override
             public int nextDoc() throws IOException {
-                // Advance to the next node docId starts from -1 which is why we need to increment docId by 1 "size"
-                // times
-                while (docId < size - 1) {
+                // Advance to the next node docId starts from -1 which is why we need to increment docId by 1
+                // until maxDoc is reached. If the document has vector field but no value (== null), there will
+                // gaps in the document <-> node maps, index() will return NO_VECTOR_OR_DELETED_DOC in such cases.
+                while (docId < graphNodeIdToDocMap.getMaxDoc() - 1) {
                     docId++;
                     if (liveNodes.get(docId)) {
                         return docId;
