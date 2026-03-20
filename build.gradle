@@ -21,7 +21,7 @@ buildscript {
         common_utils_version = System.getProperty("common_utils.version", opensearch_build)
         version_qualifier = System.getProperty("build.version_qualifier", "")
         opensearch_group = "org.opensearch"
-        isSnapshot = "true" == System.getProperty("build.snapshot", "false")
+        isSnapshot = "true" == System.getProperty("build.snapshot", "true")
 
         version_tokens = opensearch_version.tokenize('-')
         opensearch_build = version_tokens[0] + '.0'
@@ -341,6 +341,7 @@ dependencies {
     implementation "org.apache.logging.log4j:log4j-slf4j2-impl:${versions.log4j}"
 
     zipArchive group: 'org.opensearch.plugin', name:'opensearch-security', version: "${opensearch_build}"
+    zipArchive group: 'org.opensearch.plugin', name:'opensearch-custom-codecs', version: "${opensearch_build}"
 }
 
 test {
@@ -428,7 +429,7 @@ integTest {
     systemProperty propertyKeys.breaker.useRealMemory, getBreakerSetting()
 }
 
-testClusters.integTest {
+testClusters.integTest { cluster ->
     testDistribution = "ARCHIVE"
     systemProperty "java.security.policy", "file://${project.rootDir}/src/main/plugin-metadata/plugin-security.policy"
     systemProperty 'log4j.configurationFile', "${project.rootDir}/src/test/resources/log4j2.properties"
@@ -436,6 +437,21 @@ testClusters.integTest {
     // Optionally install security
     if (System.getProperty("security.enabled") != null) {
         configureSecurityPlugin(testClusters.integTest)
+    } else {
+        // Only install custom codecs plugin
+        configurations.zipArchive.asFileTree.filter(f -> f.name.contains("custom-codecs")).each {
+            cluster.plugin(provider(new Callable<RegularFile>() {
+                @Override
+                RegularFile call() throws Exception {
+                    return new RegularFile() {
+                        @Override
+                        File getAsFile() {
+                            return it
+                        }
+                }
+            }
+          }))
+      }
     }
 
     plugin(project.tasks.bundlePlugin.archiveFile)
