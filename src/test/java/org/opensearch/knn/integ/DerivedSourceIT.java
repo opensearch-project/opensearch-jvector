@@ -7,7 +7,6 @@ package org.opensearch.knn.integ;
 
 import lombok.SneakyThrows;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.opensearch.client.ResponseException;
 import org.opensearch.common.collect.Tuple;
 import org.opensearch.common.settings.Settings;
@@ -91,7 +90,6 @@ public class DerivedSourceIT extends DerivedSourceTestCase {
     }
 
     @SneakyThrows
-    @Ignore
     public void testNestedField() {
         List<DerivedSourceUtils.IndexConfigContext> indexConfigContexts = getNestedIndexContexts("derivedit", true);
         testDerivedSourceE2E(indexConfigContexts);
@@ -175,7 +173,6 @@ public class DerivedSourceIT extends DerivedSourceTestCase {
      * Tests that kNN handles bad documents the same when derived source is enabled and disabled.
      * @throws IOException
      */
-    @Ignore
     public void testDerivedSource_HandlesInvalidDocuments() throws IOException {
         // TODO: change "addNull: true" to introduce randomness in testing, after merge issues are fixed. Docs with null values are causing
         // issues presently.
