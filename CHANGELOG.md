@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Enhancements
 ### Bug Fixes
 * Fix issues handling documents without vector fields being populated [288] (https://github.com/opensearch-project/opensearch-jvector/issues/288)
+* Remove usage of the commons-lang 2.6 [317] (https://github.com/opensearch-project/opensearch-jvector/pull/317)
 ### Infrastructure
 ### Documentation
 ### Maintenance
