@@ -17,4 +17,5 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * Upgrade Lucene to 10.4.0 [292] (https://github.com/opensearch-project/opensearch-jvector/pull/292)
 ### Documentation
 ### Maintenance
+* Update `com.google.guava:failureaccess` from 1.0.1 to 1.0.2
 ### Refactoring
