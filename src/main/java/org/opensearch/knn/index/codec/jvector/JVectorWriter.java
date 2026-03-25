@@ -817,7 +817,7 @@ public class JVectorWriter extends KnnVectorsWriter {
             // For the remaining readers we map the graph node id to the ravv ordinal in the order they appear
             for (int readerIdx = 1; readerIdx < readers.length; readerIdx++) {
                 // We skip over readers that have no vectors
-                if (readers[readerIdx] == null) {
+                if (readers[readerIdx] == null || readers[readerIdx].getFloatVectorValues(fieldName) == null) {
                     continue;
                 }
 
