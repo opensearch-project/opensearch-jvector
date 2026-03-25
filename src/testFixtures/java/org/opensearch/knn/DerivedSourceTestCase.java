@@ -496,8 +496,7 @@ public class DerivedSourceTestCase extends KNNRestTestCase {
      */
     protected List<DerivedSourceUtils.IndexConfigContext> getNestedIndexContexts(
         String testSuitePrefix,
-        boolean addRandom,
-        boolean derivedSourcesDisabled
+        boolean addRandom
     ) {
         List<DerivedSourceUtils.IndexConfigContext> indexConfigContexts = new ArrayList<>();
         long consistentRandomSeed = random().nextLong();
@@ -507,7 +506,7 @@ public class DerivedSourceTestCase extends KNNRestTestCase {
             DerivedSourceUtils.IndexConfigContext indexConfigContext = DerivedSourceUtils.IndexConfigContext.builder()
                 .indexName(getIndexName(testSuitePrefix, index.v1(), addRandom))
                 .docCount(randomDocCountSupplier.get())
-                .derivedEnabled(!derivedSourcesDisabled && index.v2())
+                .derivedEnabled(index.v2())
                 .random(new Random(consistentRandomSeed))
                 .fields(
                     List.of(

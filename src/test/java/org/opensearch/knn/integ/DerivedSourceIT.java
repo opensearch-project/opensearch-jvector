@@ -93,15 +93,7 @@ public class DerivedSourceIT extends DerivedSourceTestCase {
     @SneakyThrows
     @Ignore
     public void testNestedField() {
-        List<DerivedSourceUtils.IndexConfigContext> indexConfigContexts = getNestedIndexContexts("derivedit", true, false);
-        testDerivedSourceE2E(indexConfigContexts);
-    }
-
-    @SneakyThrows
-    @Ignore
-    // TODO: Fix this test, it does not disable derived sources feature completely.
-    public void testNestedField_DerivedSourceDisabled() {
-        List<DerivedSourceUtils.IndexConfigContext> indexConfigContexts = getNestedIndexContexts("derivedit", true, true);
+        List<DerivedSourceUtils.IndexConfigContext> indexConfigContexts = getNestedIndexContexts("derivedit", true);
         testDerivedSourceE2E(indexConfigContexts);
     }
 
