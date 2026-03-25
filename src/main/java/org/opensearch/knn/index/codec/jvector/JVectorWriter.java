@@ -819,7 +819,7 @@ public class JVectorWriter extends KnnVectorsWriter {
             // For the remaining readers we map the graph node id to the ravv ordinal in the order they appear
             for (int readerIdx = 1; readerIdx < readers.length; readerIdx++) {
                 // We skip over readers that have no vectors
-                if (readers[readerIdx] == null) {
+                if (readers[readerIdx] == null || readers[readerIdx].getFloatVectorValues(fieldName) == null) {
                     continue;
                 }
 
@@ -945,7 +945,7 @@ public class JVectorWriter extends KnnVectorsWriter {
                 // used to create the leadingCompressor
                 // We assume the leading reader is ALWAYS the first one in the readers array
                 for (int i = LEADING_READER_IDX + 1; i < readers.length; i++) {
-                    if (readers[i] == null) {
+                    if (readers[i] == null || readers[i].getFloatVectorValues(fieldName) == null) {
                         continue;
                     }
                     final FloatVectorValues values = readers[i].getFloatVectorValues(fieldName);
