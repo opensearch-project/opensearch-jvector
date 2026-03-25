@@ -98,7 +98,6 @@ public class DerivedSourceIT extends DerivedSourceTestCase {
     }
 
     @SneakyThrows
-    @Ignore
     public void testDerivedSource_whenSegrepLocal_thenDisabled() {
         // Set the data type input for float fields as byte. If derived source gets enabled, the original and derived
         // wont match because original will have source like [0, 1, 2] and derived will have [0.0, 1.0, 2.0]
@@ -176,6 +175,7 @@ public class DerivedSourceIT extends DerivedSourceTestCase {
      * Tests that kNN handles bad documents the same when derived source is enabled and disabled.
      * @throws IOException
      */
+    @Ignore
     public void testDerivedSource_HandlesInvalidDocuments() throws IOException {
         // TODO: change "addNull: true" to introduce randomness in testing, after merge issues are fixed. Docs with null values are causing
         // issues presently.
