@@ -494,10 +494,7 @@ public class DerivedSourceTestCase extends KNNRestTestCase {
      *     }
      *   }
      */
-    protected List<DerivedSourceUtils.IndexConfigContext> getNestedIndexContexts(
-        String testSuitePrefix,
-        boolean addRandom
-    ) {
+    protected List<DerivedSourceUtils.IndexConfigContext> getNestedIndexContexts(String testSuitePrefix, boolean addRandom) {
         List<DerivedSourceUtils.IndexConfigContext> indexConfigContexts = new ArrayList<>();
         long consistentRandomSeed = random().nextLong();
         for (Tuple<String, Boolean> index : INDEX_PREFIX_TO_ENABLED) {
