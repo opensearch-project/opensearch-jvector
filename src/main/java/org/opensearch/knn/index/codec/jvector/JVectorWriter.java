@@ -943,7 +943,7 @@ public class JVectorWriter extends KnnVectorsWriter {
                 // used to create the leadingCompressor
                 // We assume the leading reader is ALWAYS the first one in the readers array
                 for (int i = LEADING_READER_IDX + 1; i < readers.length; i++) {
-                    if (readers[i] == null) {
+                    if (readers[i] == null || readers[i].getFloatVectorValues(fieldName) == null) {
                         continue;
                     }
                     final FloatVectorValues values = readers[i].getFloatVectorValues(fieldName);
