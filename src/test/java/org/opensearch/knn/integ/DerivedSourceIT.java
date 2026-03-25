@@ -93,7 +93,13 @@ public class DerivedSourceIT extends DerivedSourceTestCase {
     @SneakyThrows
     @Ignore
     public void testNestedField() {
-        List<DerivedSourceUtils.IndexConfigContext> indexConfigContexts = getNestedIndexContexts("derivedit", true);
+        List<DerivedSourceUtils.IndexConfigContext> indexConfigContexts = getNestedIndexContexts("derivedit", true, false);
+        testDerivedSourceE2E(indexConfigContexts);
+    }
+
+    @SneakyThrows
+    public void testNestedField_DerivedSourceDisabled() {
+        List<DerivedSourceUtils.IndexConfigContext> indexConfigContexts = getNestedIndexContexts("derivedit", true, true);
         testDerivedSourceE2E(indexConfigContexts);
     }
 
@@ -175,7 +181,6 @@ public class DerivedSourceIT extends DerivedSourceTestCase {
      * Tests that kNN handles bad documents the same when derived source is enabled and disabled.
      * @throws IOException
      */
-    @Ignore
     public void testDerivedSource_HandlesInvalidDocuments() throws IOException {
         // TODO: change "addNull: true" to introduce randomness in testing, after merge issues are fixed. Docs with null values are causing
         // issues presently.
