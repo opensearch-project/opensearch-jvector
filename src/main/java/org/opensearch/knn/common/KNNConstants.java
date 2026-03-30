@@ -108,6 +108,10 @@ public class KNNConstants {
     public static final String METHOD_PARAMETER_LEADING_SEGMENT_MERGE_DISABLED = "advanced.leading_segment_merge_disabled";
     public static final boolean DEFAULT_LEADING_SEGMENT_MERGE_DISABLED = false;
 
+    // Parameters that only affect search
+    public static final String METHOD_PARAMETER_ENTRY_POINT_SELECTION_DISABLED = "advanced.entry_point_selection_disabled";
+    public static final Boolean DEFAULT_ENTRY_POINT_SELECTION_DISABLED = false;
+
     // API Constants
     public static final String CLEAR_CACHE = "clear_cache";
 

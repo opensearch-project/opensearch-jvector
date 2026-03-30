@@ -205,7 +205,7 @@ public class JVectorReader extends KnnVectorsReader {
                 KNNCounter.KNN_QUERY_EXPANDED_NODES.add(expandedCount);
                 KNNCounter.KNN_QUERY_EXPANDED_BASE_LAYER_NODES.add(expandedBaseLayerCount);
                 KNNCounter.KNN_QUERY_GRAPH_SEARCH_TIME.add(searchTime);
-                log.debug(
+                log.info(
                     "rerankedCount: {}, visitedNodesCount: {}, expandedCount: {}, expandedBaseLayerCount: {}",
                     rerankedCount,
                     visitedNodesCount,
