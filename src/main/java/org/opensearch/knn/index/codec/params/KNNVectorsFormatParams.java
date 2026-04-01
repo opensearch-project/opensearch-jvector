@@ -127,7 +127,7 @@ public class KNNVectorsFormatParams {
 
     private void initLeadingSegmentMergeDisabled(final Map<String, Object> params, boolean defaultLsmDisabled) {
         if (params != null && params.containsKey(KNNConstants.METHOD_PARAMETER_LEADING_SEGMENT_MERGE_DISABLED)) {
-            this.hierarchyEnabled = (boolean) params.get(KNNConstants.METHOD_PARAMETER_LEADING_SEGMENT_MERGE_DISABLED);
+            this.leadingSegmentMergeDisabled = (boolean) params.get(KNNConstants.METHOD_PARAMETER_LEADING_SEGMENT_MERGE_DISABLED);
             return;
         }
         this.leadingSegmentMergeDisabled = defaultLsmDisabled;
@@ -135,7 +135,7 @@ public class KNNVectorsFormatParams {
 
     private void initEntryPointSelectionDisabled(final Map<String, Object> params, boolean defaultEpsDisabled) {
         if (params != null && params.containsKey(KNNConstants.METHOD_PARAMETER_ENTRY_POINT_SELECTION_DISABLED)) {
-            this.hierarchyEnabled = (boolean) params.get(KNNConstants.METHOD_PARAMETER_ENTRY_POINT_SELECTION_DISABLED);
+            this.entryPointSelectionDisabled = (boolean) params.get(KNNConstants.METHOD_PARAMETER_ENTRY_POINT_SELECTION_DISABLED);
             return;
         }
         this.entryPointSelectionDisabled = defaultEpsDisabled;

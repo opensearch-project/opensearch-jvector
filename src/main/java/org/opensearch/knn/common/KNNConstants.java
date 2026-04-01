@@ -109,6 +109,9 @@ public class KNNConstants {
     public static final boolean DEFAULT_LEADING_SEGMENT_MERGE_DISABLED = false;
 
     // Parameters that only affect search
+    // By default, the entry point is selected more or less "randomly" (due to the concurrent graph construction) which sometimes
+    // causes difficulties getting reproducible, stable results. By disabling entry point selection, the fixed value (0, 0)
+    // will be always selected instead. This setting is not supposed to be used in production.
     public static final String METHOD_PARAMETER_ENTRY_POINT_SELECTION_DISABLED = "advanced.entry_point_selection_disabled";
     public static final Boolean DEFAULT_ENTRY_POINT_SELECTION_DISABLED = false;
 
