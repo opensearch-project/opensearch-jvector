@@ -27,6 +27,7 @@ public class KNNVectorsFormatParams {
     private Function<Integer, Integer> numberOfSubspacesPerVectorSupplier;
     private final SpaceType spaceType;
     private boolean leadingSegmentMergeDisabled;
+    private boolean entryPointSelectionDisabled;
 
     public KNNVectorsFormatParams(final Map<String, Object> params, int defaultMaxConnections, int defaultBeamWidth) {
         this(
@@ -60,6 +61,7 @@ public class KNNVectorsFormatParams {
         initNumberOfSubspacesPerVectorSupplier(params);
         this.spaceType = spaceType;
         initLeadingSegmentMergeDisabled(params, KNNConstants.DEFAULT_LEADING_SEGMENT_MERGE_DISABLED);
+        initEntryPointSelectionDisabled(params, KNNConstants.DEFAULT_ENTRY_POINT_SELECTION_DISABLED);
     }
 
     public boolean validate(final Map<String, Object> params) {
@@ -125,9 +127,17 @@ public class KNNVectorsFormatParams {
 
     private void initLeadingSegmentMergeDisabled(final Map<String, Object> params, boolean defaultLsmDisabled) {
         if (params != null && params.containsKey(KNNConstants.METHOD_PARAMETER_LEADING_SEGMENT_MERGE_DISABLED)) {
-            this.hierarchyEnabled = (boolean) params.get(KNNConstants.METHOD_PARAMETER_LEADING_SEGMENT_MERGE_DISABLED);
+            this.leadingSegmentMergeDisabled = (boolean) params.get(KNNConstants.METHOD_PARAMETER_LEADING_SEGMENT_MERGE_DISABLED);
             return;
         }
         this.leadingSegmentMergeDisabled = defaultLsmDisabled;
+    }
+
+    private void initEntryPointSelectionDisabled(final Map<String, Object> params, boolean defaultEpsDisabled) {
+        if (params != null && params.containsKey(KNNConstants.METHOD_PARAMETER_ENTRY_POINT_SELECTION_DISABLED)) {
+            this.entryPointSelectionDisabled = (boolean) params.get(KNNConstants.METHOD_PARAMETER_ENTRY_POINT_SELECTION_DISABLED);
+            return;
+        }
+        this.entryPointSelectionDisabled = defaultEpsDisabled;
     }
 }
