@@ -186,11 +186,11 @@ public class KNNJVectorTests extends LuceneTestCase {
         final String sortFieldName = "sorted_field";
         IndexWriterConfig indexWriterConfig = LuceneTestCase.newIndexWriterConfig();
         indexWriterConfig.setUseCompoundFile(false);
-        indexWriterConfig.setCodec(getCodec());
+        indexWriterConfig.setCodec(getCodec(DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION, DEFAULT_LEADING_SEGMENT_MERGE_DISABLED, true));
         indexWriterConfig.setMergePolicy(new ForceMergesOnlyMergePolicy());
         // Add index sorting configuration
         indexWriterConfig.setIndexSort(new Sort(new SortField(sortFieldName, SortField.Type.INT, true))); // true = reverse order
-
+        indexWriterConfig.setMaxBufferedDocs(totalNumberOfDocs);
         final Path indexPath = createTempDir();
         log.info("Index path: {}", indexPath);
         try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter w = new IndexWriter(dir, indexWriterConfig)) {
@@ -212,9 +212,13 @@ public class KNNJVectorTests extends LuceneTestCase {
                 Assert.assertEquals(1, reader.getContext().leaves().size());
                 Assert.assertEquals(totalNumberOfDocs, reader.numDocs());
 
-                final Query filterQuery = new MatchAllDocsQuery();
                 final IndexSearcher searcher = newSearcher(reader);
-                KnnFloatVectorQuery knnFloatVectorQuery = getJVectorKnnFloatVectorQuery("test_field", target, k, filterQuery);
+                KnnFloatVectorQuery knnFloatVectorQuery = getJVectorKnnFloatVectorQuery(
+                    "test_field",
+                    target,
+                    k,
+                    MatchAllDocsQuery.INSTANCE
+                );
                 TopDocs topDocs = searcher.search(knnFloatVectorQuery, k);
                 assertEquals(k, topDocs.totalHits.value());
                 assertEquals(9, topDocs.scoreDocs[0].doc);
