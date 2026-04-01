@@ -97,6 +97,8 @@ public class JVectorWriter extends KnnVectorsWriter {
     private final int minimumBatchSizeForQuantization; // Threshold for the vector count above which we will trigger PQ quantization
     private final boolean hierarchyEnabled;
     private final boolean leadingSegmentMergeDisabled;
+    // The entry point selection is randomized, allow to disable it for predictable test runs
+    private final boolean entryPointSelectionDisabled;
 
     private boolean finished = false;
 
@@ -109,7 +111,8 @@ public class JVectorWriter extends KnnVectorsWriter {
         Function<Integer, Integer> numberOfSubspacesPerVectorSupplier,
         int minimumBatchSizeForQuantization,
         boolean hierarchyEnabled,
-        boolean leadingSegmentMergeDisabled
+        boolean leadingSegmentMergeDisabled,
+        boolean entryPointSelectionDisabled
     ) throws IOException {
         this.segmentWriteState = segmentWriteState;
         this.maxConn = maxConn;
@@ -120,6 +123,7 @@ public class JVectorWriter extends KnnVectorsWriter {
         this.minimumBatchSizeForQuantization = minimumBatchSizeForQuantization;
         this.hierarchyEnabled = hierarchyEnabled;
         this.leadingSegmentMergeDisabled = leadingSegmentMergeDisabled;
+        this.entryPointSelectionDisabled = entryPointSelectionDisabled;
 
         String metaFileName = IndexFileNames.segmentFileName(
             segmentWriteState.segmentInfo.name,
@@ -1163,6 +1167,10 @@ public class JVectorWriter extends KnnVectorsWriter {
 
                     builder.cleanup();
 
+                    if (entryPointSelectionDisabled == true) {
+                        builder.setEntryPoint(0, 0);
+                    }
+
                     graph = (OnHeapGraphIndex) builder.getGraph();
                 }
 
@@ -1247,6 +1255,11 @@ public class JVectorWriter extends KnnVectorsWriter {
             graphIndexBuilder.addGraphNode(ord, vv.get().getVector(ord));
         })).join();
         graphIndexBuilder.cleanup();
+
+        if (entryPointSelectionDisabled == true) {
+            graphIndexBuilder.setEntryPoint(0, 0);
+        }
+
         graphIndex = (OnHeapGraphIndex) graphIndexBuilder.getGraph();
         final long end = Clock.systemDefaultZone().millis();
 
