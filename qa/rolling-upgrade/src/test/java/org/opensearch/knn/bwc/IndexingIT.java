@@ -11,7 +11,7 @@ public class IndexingIT extends AbstractRollingUpgradeTestCase {
     private static final String TEST_FIELD = "test-field";
     private static final int DIMENSIONS = 5;
     private static final int K = 5;
-    private static final int NUM_DOCS = 10;
+    private static final int NUM_DOCS = 100;
 
     private static final String ALGO = "hnsw";
 
