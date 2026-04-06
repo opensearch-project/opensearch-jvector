@@ -356,21 +356,49 @@ public class InternalKNNEngineTests extends OpenSearchIntegTestCase {
         int baseDocId = 0;
         final float[][] vectorsForBatch = new float[vectorsCount / 2][dimension];
         System.arraycopy(vectors, 0, vectorsForBatch, 0, vectorsCount / 2);
-        CommonTestUtils.bulkAddKnnDocs(getRestClient(), INDEX_NAME, FIELD_NAME, vectorsForBatch, baseDocId, vectorsForBatch.length, true);
+        CommonTestUtils.bulkAddKnnDocs(
+            getRestClient(),
+            INDEX_NAME,
+            FIELD_NAME,
+            vectorsForBatch,
+            baseDocId,
+            vectorsForBatch.length,
+            true,
+            1500
+        );
         flush(INDEX_NAME);
+
         baseDocId += vectorsForBatch.length;
         System.arraycopy(vectors, baseDocId, vectorsForBatch, 0, vectorsCount / 2);
-        CommonTestUtils.bulkAddKnnDocs(getRestClient(), INDEX_NAME, FIELD_NAME, vectorsForBatch, baseDocId, vectorsForBatch.length, true);
+        CommonTestUtils.bulkAddKnnDocs(
+            getRestClient(),
+            INDEX_NAME,
+            FIELD_NAME,
+            vectorsForBatch,
+            baseDocId,
+            vectorsForBatch.length,
+            true,
+            1500
+        );
+        flush(INDEX_NAME);
+
+        // Force merge
         forceMerge();
 
         /* ---------------------------------------------------
          * 3.  Execute KNN queries
          * --------------------------------------------------- */
         // We will execute 10 KNN queries to make sure we are not just looking at race conditions or cache effects
+        final Map<String, ?> params = Map.of(KNNConstants.METHOD_PARAMETER_OVERQUERY_FACTOR, 1);
         for (int i = 0; i < 10; i++) {
             final float[] searchVector = TestUtils.generateRandomVectors(1, dimension)[0];
             int k = 5;
-            var response = CommonTestUtils.searchKNNIndex(getRestClient(), INDEX_NAME, new KNNQueryBuilder(FIELD_NAME, searchVector, k), k);
+            var response = CommonTestUtils.searchKNNIndex(
+                getRestClient(),
+                INDEX_NAME,
+                new KNNQueryBuilder.Builder().fieldName(FIELD_NAME).vector(searchVector).k(k).methodParameters(params).build(),
+                k
+            );
             final String responseBody = EntityUtils.toString(response.getEntity());
             final List<KNNResult> knnResults = CommonTestUtils.parseSearchResponse(responseBody, FIELD_NAME);
             assertNotNull(knnResults);
@@ -445,7 +473,8 @@ public class InternalKNNEngineTests extends OpenSearchIntegTestCase {
             firstSmallBatchOffset,
             firstSmallBatchOffset,
             smallBatchSize,
-            true
+            true,
+            1000
         );
         CommonTestUtils.flushIndex(restClient, INDEX_NAME);
 
@@ -459,7 +488,8 @@ public class InternalKNNEngineTests extends OpenSearchIntegTestCase {
             largeBatchOffset,
             largeBatchOffset,
             largeBatchSize,
-            true
+            true,
+            1000
         );
         CommonTestUtils.flushIndex(restClient, INDEX_NAME);
 
@@ -473,7 +503,8 @@ public class InternalKNNEngineTests extends OpenSearchIntegTestCase {
             secondSmallBatchOffset,
             secondSmallBatchOffset,
             smallBatchSize,
-            true
+            true,
+            1000
         );
         CommonTestUtils.flushIndex(restClient, INDEX_NAME);
 
@@ -529,7 +560,7 @@ public class InternalKNNEngineTests extends OpenSearchIntegTestCase {
         final int totalDocs = vectors.length;
 
         logger.info("Adding batch of vectors with size {} that is expected to trigger quantization", totalDocs);
-        CommonTestUtils.bulkAddKnnDocs(restClient, INDEX_NAME, FIELD_NAME, vectors, batchSize, false);
+        CommonTestUtils.bulkAddKnnDocs(restClient, INDEX_NAME, FIELD_NAME, vectors, batchSize, false, 1000);
         CommonTestUtils.flushIndex(restClient, INDEX_NAME);
 
         // Force merge to trigger quantization for all segments
@@ -617,17 +648,47 @@ public class InternalKNNEngineTests extends OpenSearchIntegTestCase {
         // Add the first small batch (below quantization threshold)
         logger.info("Adding first small batch");
         final RestClient restClient = getRestClient();
-        CommonTestUtils.bulkAddKnnDocs(restClient, INDEX_NAME, FIELD_NAME, vectors, firstBatchOffset, firstBatchOffset, batchSize, true);
+        CommonTestUtils.bulkAddKnnDocs(
+            restClient,
+            INDEX_NAME,
+            FIELD_NAME,
+            vectors,
+            firstBatchOffset,
+            firstBatchOffset,
+            batchSize,
+            true,
+            1000
+        );
         CommonTestUtils.flushIndex(restClient, INDEX_NAME);
 
         logger.info("Adding large batch");
         // Add the large batch (above quantization threshold)
-        CommonTestUtils.bulkAddKnnDocs(restClient, INDEX_NAME, FIELD_NAME, vectors, secondBatchOffset, secondBatchOffset, batchSize, true);
+        CommonTestUtils.bulkAddKnnDocs(
+            restClient,
+            INDEX_NAME,
+            FIELD_NAME,
+            vectors,
+            secondBatchOffset,
+            secondBatchOffset,
+            batchSize,
+            true,
+            1000
+        );
         CommonTestUtils.flushIndex(restClient, INDEX_NAME);
 
         logger.info("Adding second small batch");
         // Add another small batch
-        CommonTestUtils.bulkAddKnnDocs(restClient, INDEX_NAME, FIELD_NAME, vectors, thirdBatchOffset, thirdBatchOffset, batchSize, true);
+        CommonTestUtils.bulkAddKnnDocs(
+            restClient,
+            INDEX_NAME,
+            FIELD_NAME,
+            vectors,
+            thirdBatchOffset,
+            thirdBatchOffset,
+            batchSize,
+            true,
+            1000
+        );
         CommonTestUtils.flushIndex(restClient, INDEX_NAME);
 
         // Force merge to trigger leading segment merge for all segments
