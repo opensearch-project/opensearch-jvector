@@ -14,7 +14,9 @@ import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.tests.index.RandomIndexWriter;
 import org.apache.lucene.tests.util.LuceneTestCase;
+import org.junit.After;
 import org.junit.Assert;
+import org.junit.Before;
 import org.junit.Test;
 import org.opensearch.knn.TestUtils;
 import org.opensearch.knn.common.KNNConstants;
@@ -44,6 +46,22 @@ import static org.opensearch.knn.index.engine.CommonTestUtils.getCodec;
 public class KNNJVectorTests extends LuceneTestCase {
     private static final String TEST_FIELD = "test_field";
     private static final String TEST_ID_FIELD = "id";
+    private ForkJoinPool mergePool;
+
+    @Before
+    public void setUp() throws Exception {
+        super.setUp();
+        mergePool = new ForkJoinPool(1); /* single threaded */
+    }
+
+    @After
+    public void tearDown() throws Exception {
+        super.tearDown();
+        mergePool.shutdown();
+        if (mergePool.awaitTermination(30, TimeUnit.SECONDS) == false) {
+            mergePool.shutdownNow();
+        }
+    }
 
     /**
      * Test to verify that the JVector codec is able to successfully search for the nearest neighbours
@@ -186,7 +204,9 @@ public class KNNJVectorTests extends LuceneTestCase {
         final String sortFieldName = "sorted_field";
         IndexWriterConfig indexWriterConfig = LuceneTestCase.newIndexWriterConfig();
         indexWriterConfig.setUseCompoundFile(false);
-        indexWriterConfig.setCodec(getCodec(DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION, DEFAULT_LEADING_SEGMENT_MERGE_DISABLED, true));
+        indexWriterConfig.setCodec(
+            getCodec(DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION, DEFAULT_LEADING_SEGMENT_MERGE_DISABLED, mergePool)
+        );
         indexWriterConfig.setMergePolicy(new ForceMergesOnlyMergePolicy());
         // Add index sorting configuration
         indexWriterConfig.setIndexSort(new Sort(new SortField(sortFieldName, SortField.Type.INT, true))); // true = reverse order
@@ -327,7 +347,9 @@ public class KNNJVectorTests extends LuceneTestCase {
         int totalNumberOfDocs = 1000;
         IndexWriterConfig indexWriterConfig = LuceneTestCase.newIndexWriterConfig();
         indexWriterConfig.setUseCompoundFile(false);
-        indexWriterConfig.setCodec(getCodec(DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION, DEFAULT_LEADING_SEGMENT_MERGE_DISABLED, true));
+        indexWriterConfig.setCodec(
+            getCodec(DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION, DEFAULT_LEADING_SEGMENT_MERGE_DISABLED, mergePool)
+        );
         indexWriterConfig.setMergePolicy(new ForceMergesOnlyMergePolicy());
         indexWriterConfig.setMergeScheduler(new SerialMergeScheduler());
         indexWriterConfig.setMaxBufferedDocs(totalNumberOfDocs / 10);
@@ -394,7 +416,9 @@ public class KNNJVectorTests extends LuceneTestCase {
         int totalNumberOfDocs = 10;
         IndexWriterConfig indexWriterConfig = LuceneTestCase.newIndexWriterConfig();
         indexWriterConfig.setUseCompoundFile(false);
-        indexWriterConfig.setCodec(getCodec(DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION, DEFAULT_LEADING_SEGMENT_MERGE_DISABLED, true));
+        indexWriterConfig.setCodec(
+            getCodec(DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION, DEFAULT_LEADING_SEGMENT_MERGE_DISABLED, mergePool)
+        );
         indexWriterConfig.setMergePolicy(NoMergePolicy.INSTANCE);
         indexWriterConfig.setMergeScheduler(new SerialMergeScheduler());
         indexWriterConfig.setMaxBufferedDocs(10);
