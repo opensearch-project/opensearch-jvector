@@ -14,7 +14,9 @@ import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.tests.index.RandomIndexWriter;
 import org.apache.lucene.tests.util.LuceneTestCase;
+import org.junit.After;
 import org.junit.Assert;
+import org.junit.Before;
 import org.junit.Test;
 import org.opensearch.knn.TestUtils;
 import org.opensearch.knn.common.KNNConstants;
@@ -44,6 +46,22 @@ import static org.opensearch.knn.index.engine.CommonTestUtils.getCodec;
 public class KNNJVectorTests extends LuceneTestCase {
     private static final String TEST_FIELD = "test_field";
     private static final String TEST_ID_FIELD = "id";
+    private ForkJoinPool singleThreadGraphMergePool;
+
+    @Before
+    public void setUp() throws Exception {
+        super.setUp();
+        singleThreadGraphMergePool = new ForkJoinPool(1); /* single threaded */
+    }
+
+    @After
+    public void tearDown() throws Exception {
+        super.tearDown();
+        singleThreadGraphMergePool.shutdown();
+        if (singleThreadGraphMergePool.awaitTermination(30, TimeUnit.SECONDS) == false) {
+            singleThreadGraphMergePool.shutdownNow();
+        }
+    }
 
     /**
      * Test to verify that the JVector codec is able to successfully search for the nearest neighbours
@@ -186,7 +204,9 @@ public class KNNJVectorTests extends LuceneTestCase {
         final String sortFieldName = "sorted_field";
         IndexWriterConfig indexWriterConfig = LuceneTestCase.newIndexWriterConfig();
         indexWriterConfig.setUseCompoundFile(false);
-        indexWriterConfig.setCodec(getCodec(DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION, DEFAULT_LEADING_SEGMENT_MERGE_DISABLED, true));
+        indexWriterConfig.setCodec(
+            getCodec(DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION, DEFAULT_LEADING_SEGMENT_MERGE_DISABLED, singleThreadGraphMergePool)
+        );
         indexWriterConfig.setMergePolicy(new ForceMergesOnlyMergePolicy());
         // Add index sorting configuration
         indexWriterConfig.setIndexSort(new Sort(new SortField(sortFieldName, SortField.Type.INT, true))); // true = reverse order
@@ -321,16 +341,15 @@ public class KNNJVectorTests extends LuceneTestCase {
     @Test
     public void testJVectorKnnIndex_mergeEnabled() throws IOException {
         int k = 3; // The number of nearest neighbours to gather
-        // The graph construction (and consequently, search) is non-deterministic and, with small amount
-        // of the document, has high variance, making this particular test case unstable (flaky). As such,
-        // the amount of the ingested documents has to be sufficiently large.
-        int totalNumberOfDocs = 1000;
+        int totalNumberOfDocs = 10;
         IndexWriterConfig indexWriterConfig = LuceneTestCase.newIndexWriterConfig();
         indexWriterConfig.setUseCompoundFile(false);
-        indexWriterConfig.setCodec(getCodec(DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION, DEFAULT_LEADING_SEGMENT_MERGE_DISABLED, true));
+        indexWriterConfig.setCodec(
+            getCodec(DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION, DEFAULT_LEADING_SEGMENT_MERGE_DISABLED, singleThreadGraphMergePool)
+        );
         indexWriterConfig.setMergePolicy(new ForceMergesOnlyMergePolicy());
         indexWriterConfig.setMergeScheduler(new SerialMergeScheduler());
-        indexWriterConfig.setMaxBufferedDocs(totalNumberOfDocs / 10);
+        indexWriterConfig.setMaxBufferedDocs(totalNumberOfDocs);
         final Path indexPath = createTempDir();
         log.info("Index path: {}", indexPath);
         try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter w = new IndexWriter(dir, indexWriterConfig)) {
@@ -341,9 +360,7 @@ public class KNNJVectorTests extends LuceneTestCase {
                 doc.add(new KnnFloatVectorField("test_field", source, VectorSimilarityFunction.EUCLIDEAN));
                 doc.add(new StringField("my_doc_id", Integer.toString(i, 10), Field.Store.YES));
                 w.addDocument(doc);
-                if (i % 10 == 0) {
-                    w.commit(); // this creates a new segment without triggering a merge
-                }
+                w.commit(); // this creates a new segment without triggering a merge
             }
             log.info("Done writing all files to the file system");
 
@@ -394,7 +411,9 @@ public class KNNJVectorTests extends LuceneTestCase {
         int totalNumberOfDocs = 10;
         IndexWriterConfig indexWriterConfig = LuceneTestCase.newIndexWriterConfig();
         indexWriterConfig.setUseCompoundFile(false);
-        indexWriterConfig.setCodec(getCodec(DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION, DEFAULT_LEADING_SEGMENT_MERGE_DISABLED, true));
+        indexWriterConfig.setCodec(
+            getCodec(DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION, DEFAULT_LEADING_SEGMENT_MERGE_DISABLED, singleThreadGraphMergePool)
+        );
         indexWriterConfig.setMergePolicy(NoMergePolicy.INSTANCE);
         indexWriterConfig.setMergeScheduler(new SerialMergeScheduler());
         indexWriterConfig.setMaxBufferedDocs(10);
