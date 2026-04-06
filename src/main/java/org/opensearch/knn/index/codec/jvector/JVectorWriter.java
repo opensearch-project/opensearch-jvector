@@ -46,9 +46,6 @@ import java.util.stream.IntStream;
 
 import static io.github.jbellis.jvector.quantization.KMeansPlusPlusClusterer.UNWEIGHTED;
 import static org.apache.lucene.codecs.lucene99.Lucene99HnswVectorsReader.readVectorEncoding;
-import static org.opensearch.knn.index.codec.jvector.JVectorFormat.PARALLELISM_POOL;
-import static org.opensearch.knn.index.codec.jvector.JVectorFormat.SIMD_POOL_FLUSH;
-import static org.opensearch.knn.index.codec.jvector.JVectorFormat.SIMD_POOL_MERGE;
 
 /**
  * JVectorWriter is responsible for writing vector data into index segments using the JVector library.
@@ -98,6 +95,10 @@ public class JVectorWriter extends KnnVectorsWriter {
     private final boolean hierarchyEnabled;
     private final boolean leadingSegmentMergeDisabled;
 
+    private final ForkJoinPool simdPoolMerge;
+    private final ForkJoinPool simdPoolFlush;
+    private final ForkJoinPool parallelismPool;
+
     private boolean finished = false;
 
     public JVectorWriter(
@@ -109,7 +110,10 @@ public class JVectorWriter extends KnnVectorsWriter {
         Function<Integer, Integer> numberOfSubspacesPerVectorSupplier,
         int minimumBatchSizeForQuantization,
         boolean hierarchyEnabled,
-        boolean leadingSegmentMergeDisabled
+        boolean leadingSegmentMergeDisabled,
+        final ForkJoinPool simdPoolMerge,
+        final ForkJoinPool simdPoolFlush,
+        final ForkJoinPool parallelismPool
     ) throws IOException {
         this.segmentWriteState = segmentWriteState;
         this.maxConn = maxConn;
@@ -120,6 +124,9 @@ public class JVectorWriter extends KnnVectorsWriter {
         this.minimumBatchSizeForQuantization = minimumBatchSizeForQuantization;
         this.hierarchyEnabled = hierarchyEnabled;
         this.leadingSegmentMergeDisabled = leadingSegmentMergeDisabled;
+        this.simdPoolMerge = simdPoolMerge;
+        this.simdPoolFlush = simdPoolFlush;
+        this.parallelismPool = parallelismPool;
 
         String metaFileName = IndexFileNames.segmentFileName(
             segmentWriteState.segmentInfo.name,
@@ -247,7 +254,7 @@ public class JVectorWriter extends KnnVectorsWriter {
                 randomAccessVectorValues,
                 fieldInfo,
                 segmentWriteState.segmentInfo.name,
-                SIMD_POOL_FLUSH
+                simdPoolFlush
             );
             writeField(field.fieldInfo, randomAccessVectorValues, pqVectors, graphNodeIdToDocMap, graph);
 
@@ -388,7 +395,7 @@ public class JVectorWriter extends KnnVectorsWriter {
             numberOfClustersPerSubspace, // number of centroids per subspace
             vectorSimilarityFunction == VectorSimilarityFunction.EUCLIDEAN, // center the dataset
             UNWEIGHTED,
-            SIMD_POOL_MERGE,
+            simdPoolMerge,
             ForkJoinPool.commonPool()
         );
 
@@ -398,7 +405,7 @@ public class JVectorWriter extends KnnVectorsWriter {
         KNNCounter.KNN_QUANTIZATION_TRAINING_TIME.add(trainingTime);
         log.info("Encoding and building PQ vectors for field {} for {} vectors", fieldName, randomAccessVectorValues.size());
         // PQVectors pqVectors = pq.encodeAll(randomAccessVectorValues, SIMD_POOL);
-        PQVectors pqVectors = PQVectors.encodeAndBuild(pq, randomAccessVectorValues.size(), randomAccessVectorValues, SIMD_POOL_MERGE);
+        PQVectors pqVectors = PQVectors.encodeAndBuild(pq, randomAccessVectorValues.size(), randomAccessVectorValues, simdPoolMerge);
         log.info(
             "Encoded and built PQ vectors for field {}, original size: {} bytes, compressed size: {} bytes",
             fieldName,
@@ -963,7 +970,7 @@ public class JVectorWriter extends KnnVectorsWriter {
                     compactOrdsToRavvOrds.length,
                     compactOrdsToRavvOrds,
                     this,
-                    SIMD_POOL_MERGE
+                    simdPoolMerge
                 );
             }
 
@@ -980,7 +987,7 @@ public class JVectorWriter extends KnnVectorsWriter {
                         fieldName
                     );
                     var bsp = BuildScoreProvider.randomAccessScoreProvider(compactRavv, getVectorSimilarityFunction(fieldInfo));
-                    var graph = getGraph(bsp, compactRavv, fieldInfo, segmentWriteState.segmentInfo.name, SIMD_POOL_MERGE);
+                    var graph = getGraph(bsp, compactRavv, fieldInfo, segmentWriteState.segmentInfo.name, simdPoolMerge);
                     writeField(fieldInfo, compactRavv, null, compactOrdToDocMap, graph);
                 }
             } else {
@@ -989,7 +996,7 @@ public class JVectorWriter extends KnnVectorsWriter {
                 var buildScoreProvider = BuildScoreProvider.pqBuildScoreProvider(getVectorSimilarityFunction(fieldInfo), compactPqVectors);
                 // Pre-init the diversity provider here to avoid doing it lazily (as it could block the SIMD threads)
                 buildScoreProvider.diversityProviderFor(0);
-                var graph = getGraph(buildScoreProvider, compactRavv, fieldInfo, segmentWriteState.segmentInfo.name, SIMD_POOL_MERGE);
+                var graph = getGraph(buildScoreProvider, compactRavv, fieldInfo, segmentWriteState.segmentInfo.name, simdPoolMerge);
                 writeField(fieldInfo, compactRavv, compactPqVectors, compactOrdToDocMap, graph);
             }
         }
@@ -1140,20 +1147,18 @@ public class JVectorWriter extends KnnVectorsWriter {
                         degreeOverflow,
                         alpha,
                         true,
-                        SIMD_POOL_MERGE,
-                        PARALLELISM_POOL
+                        simdPoolMerge,
+                        parallelismPool
                     )
                 ) {
                     var vv = heapRavv.threadLocalSupplier();
 
                     // parallel graph construction from the merge documents Ids
-                    SIMD_POOL_MERGE.submit(
-                        () -> IntStream.range(leadingGraph.getIdUpperBound(), heapRavv.size()).parallel().forEach(ord -> {
-                            assert heapToGlobalRavvOrds[ord] != GraphNodeIdToDocMap.NO_VECTOR_OR_DELETED_DOC
-                                : "Should be a valid graph node / vector";
-                            builder.addGraphNode(ord, vv.get().getVector(ord));
-                        })
-                    ).join();
+                    simdPoolMerge.submit(() -> IntStream.range(leadingGraph.getIdUpperBound(), heapRavv.size()).parallel().forEach(ord -> {
+                        assert heapToGlobalRavvOrds[ord] != GraphNodeIdToDocMap.NO_VECTOR_OR_DELETED_DOC
+                            : "Should be a valid graph node / vector";
+                        builder.addGraphNode(ord, vv.get().getVector(ord));
+                    })).join();
 
                     // mark deleted nodes
                     for (int i = 0; i < numBaseVectors; i++) {
@@ -1249,6 +1254,7 @@ public class JVectorWriter extends KnnVectorsWriter {
             graphIndexBuilder.addGraphNode(ord, vv.get().getVector(ord));
         })).join();
         graphIndexBuilder.cleanup();
+
         graphIndex = (OnHeapGraphIndex) graphIndexBuilder.getGraph();
         final long end = Clock.systemDefaultZone().millis();
 
