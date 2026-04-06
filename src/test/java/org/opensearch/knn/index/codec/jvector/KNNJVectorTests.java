@@ -46,20 +46,20 @@ import static org.opensearch.knn.index.engine.CommonTestUtils.getCodec;
 public class KNNJVectorTests extends LuceneTestCase {
     private static final String TEST_FIELD = "test_field";
     private static final String TEST_ID_FIELD = "id";
-    private ForkJoinPool mergePool;
+    private ForkJoinPool singleThreadGraphMergePool;
 
     @Before
     public void setUp() throws Exception {
         super.setUp();
-        mergePool = new ForkJoinPool(1); /* single threaded */
+        singleThreadGraphMergePool = new ForkJoinPool(1); /* single threaded */
     }
 
     @After
     public void tearDown() throws Exception {
         super.tearDown();
-        mergePool.shutdown();
-        if (mergePool.awaitTermination(30, TimeUnit.SECONDS) == false) {
-            mergePool.shutdownNow();
+        singleThreadGraphMergePool.shutdown();
+        if (singleThreadGraphMergePool.awaitTermination(30, TimeUnit.SECONDS) == false) {
+            singleThreadGraphMergePool.shutdownNow();
         }
     }
 
@@ -205,7 +205,7 @@ public class KNNJVectorTests extends LuceneTestCase {
         IndexWriterConfig indexWriterConfig = LuceneTestCase.newIndexWriterConfig();
         indexWriterConfig.setUseCompoundFile(false);
         indexWriterConfig.setCodec(
-            getCodec(DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION, DEFAULT_LEADING_SEGMENT_MERGE_DISABLED, mergePool)
+            getCodec(DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION, DEFAULT_LEADING_SEGMENT_MERGE_DISABLED, singleThreadGraphMergePool)
         );
         indexWriterConfig.setMergePolicy(new ForceMergesOnlyMergePolicy());
         // Add index sorting configuration
@@ -345,7 +345,7 @@ public class KNNJVectorTests extends LuceneTestCase {
         IndexWriterConfig indexWriterConfig = LuceneTestCase.newIndexWriterConfig();
         indexWriterConfig.setUseCompoundFile(false);
         indexWriterConfig.setCodec(
-            getCodec(DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION, DEFAULT_LEADING_SEGMENT_MERGE_DISABLED, mergePool)
+            getCodec(DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION, DEFAULT_LEADING_SEGMENT_MERGE_DISABLED, singleThreadGraphMergePool)
         );
         indexWriterConfig.setMergePolicy(new ForceMergesOnlyMergePolicy());
         indexWriterConfig.setMergeScheduler(new SerialMergeScheduler());
@@ -412,7 +412,7 @@ public class KNNJVectorTests extends LuceneTestCase {
         IndexWriterConfig indexWriterConfig = LuceneTestCase.newIndexWriterConfig();
         indexWriterConfig.setUseCompoundFile(false);
         indexWriterConfig.setCodec(
-            getCodec(DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION, DEFAULT_LEADING_SEGMENT_MERGE_DISABLED, mergePool)
+            getCodec(DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION, DEFAULT_LEADING_SEGMENT_MERGE_DISABLED, singleThreadGraphMergePool)
         );
         indexWriterConfig.setMergePolicy(NoMergePolicy.INSTANCE);
         indexWriterConfig.setMergeScheduler(new SerialMergeScheduler());
