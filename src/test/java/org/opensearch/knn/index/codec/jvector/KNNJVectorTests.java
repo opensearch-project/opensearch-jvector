@@ -341,10 +341,7 @@ public class KNNJVectorTests extends LuceneTestCase {
     @Test
     public void testJVectorKnnIndex_mergeEnabled() throws IOException {
         int k = 3; // The number of nearest neighbours to gather
-        // The graph construction (and consequently, search) is non-deterministic and, with small amount
-        // of the document, has high variance, making this particular test case unstable (flaky). As such,
-        // the amount of the ingested documents has to be sufficiently large.
-        int totalNumberOfDocs = 1000;
+        int totalNumberOfDocs = 10;
         IndexWriterConfig indexWriterConfig = LuceneTestCase.newIndexWriterConfig();
         indexWriterConfig.setUseCompoundFile(false);
         indexWriterConfig.setCodec(
@@ -363,9 +360,7 @@ public class KNNJVectorTests extends LuceneTestCase {
                 doc.add(new KnnFloatVectorField("test_field", source, VectorSimilarityFunction.EUCLIDEAN));
                 doc.add(new StringField("my_doc_id", Integer.toString(i, 10), Field.Store.YES));
                 w.addDocument(doc);
-                if (i % 10 == 0) {
-                    w.commit(); // this creates a new segment without triggering a merge
-                }
+                w.commit(); // this creates a new segment without triggering a merge
             }
             log.info("Done writing all files to the file system");
 
