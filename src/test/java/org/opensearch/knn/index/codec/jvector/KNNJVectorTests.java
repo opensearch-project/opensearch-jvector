@@ -349,7 +349,7 @@ public class KNNJVectorTests extends LuceneTestCase {
         );
         indexWriterConfig.setMergePolicy(new ForceMergesOnlyMergePolicy());
         indexWriterConfig.setMergeScheduler(new SerialMergeScheduler());
-        indexWriterConfig.setMaxBufferedDocs(totalNumberOfDocs / 10);
+        indexWriterConfig.setMaxBufferedDocs(totalNumberOfDocs);
         final Path indexPath = createTempDir();
         log.info("Index path: {}", indexPath);
         try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter w = new IndexWriter(dir, indexWriterConfig)) {

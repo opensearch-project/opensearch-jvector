@@ -152,7 +152,7 @@ public class CommonTestUtils {
         };
     }
 
-    public static Codec getCodec(int minBatchSizeForQuantization, boolean leadingSegmentMergeDisabled, ForkJoinPool mergePool) {
+    public static Codec getCodec(int minBatchSizeForQuantization, boolean leadingSegmentMergeDisabled, ForkJoinPool graphMergePool) {
         return new FilterCodec(KNNCodecVersion.V_10_04_0.getCodecName(), new Lucene104Codec()) {
             @Override
             public KnnVectorsFormat knnVectorsFormat() {
@@ -160,7 +160,13 @@ public class CommonTestUtils {
 
                     @Override
                     public KnnVectorsFormat getKnnVectorsFormatForField(String field) {
-                        return new JVectorFormat(minBatchSizeForQuantization, leadingSegmentMergeDisabled, mergePool, mergePool, mergePool);
+                        return new JVectorFormat(
+                            minBatchSizeForQuantization,
+                            leadingSegmentMergeDisabled,
+                            graphMergePool,
+                            graphMergePool,
+                            graphMergePool
+                        );
                     }
                 };
             }
