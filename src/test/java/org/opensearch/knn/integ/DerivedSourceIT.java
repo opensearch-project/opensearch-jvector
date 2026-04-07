@@ -176,8 +176,6 @@ public class DerivedSourceIT extends DerivedSourceTestCase {
      * @throws IOException
      */
     public void testDerivedSource_HandlesInvalidDocuments() throws IOException {
-        // TODO: change "addNull: true" to introduce randomness in testing, after merge issues are fixed. Docs with null values are causing
-        // issues presently.
         List<DerivedSourceUtils.IndexConfigContext> indexConfigContexts = getCustomAnalyzerIndexContexts("derivedit", true, true);
 
         assertTrue(1 < indexConfigContexts.size());
