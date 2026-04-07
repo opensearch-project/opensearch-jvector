@@ -560,21 +560,24 @@ public class InternalKNNEngineTests extends OpenSearchIntegTestCase {
         final RestClient restClient = getRestClient();
         createKnnIndexMappingWithJVectorEngine(dimension, spaceType, VectorDataType.FLOAT);
 
-        // Choosing a batch size that will trigger quantization
+        // Disable refresh for the index
+        client().admin()
+            .indices()
+            .prepareUpdateSettings(INDEX_NAME)
+            .setSettings(Settings.builder().put(IndexSettings.INDEX_REFRESH_INTERVAL_SETTING.getKey(), -1))
+            .get();
+
+        // Choosing a batch size that should definitely trigger quantization
         int batchSize = DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION * 2;
 
         final float[][] vectors = TestUtils.generateRandomVectors(batchSize, dimension);
         final int expectedTotalDocs = vectors.length;
 
         logger.info("Adding batch of vectors with size {} that is expected to trigger quantization", expectedTotalDocs);
-        CommonTestUtils.bulkAddKnnDocs(restClient, INDEX_NAME, FIELD_NAME, vectors, batchSize, false, 1000);
-        CommonTestUtils.flushIndex(restClient, INDEX_NAME);
+        CommonTestUtils.bulkAddKnnDocs(restClient, INDEX_NAME, FIELD_NAME, vectors, batchSize, false, batchSize);
+        flushAndRefresh(INDEX_NAME);
 
-        // Force merge to trigger quantization for all segments
-        logger.info("Force merging just in case quantization didn't happen because of segment fragmentation");
-        CommonTestUtils.forceMergeKnnIndex(restClient, INDEX_NAME);
-
-        // Verify the total document count
+        // Verify the total document count (we expect 1 segment)
         assertEquals(expectedTotalDocs, CommonTestUtils.getDocCount(restClient, INDEX_NAME));
 
         // Perform search and verify recall
