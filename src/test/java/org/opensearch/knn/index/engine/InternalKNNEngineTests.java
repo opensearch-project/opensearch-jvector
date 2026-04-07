@@ -21,6 +21,7 @@ import org.opensearch.common.xcontent.XContentFactory;
 import org.opensearch.core.rest.RestStatus;
 import org.opensearch.core.xcontent.MediaTypeRegistry;
 import org.opensearch.core.xcontent.XContentBuilder;
+import org.opensearch.index.IndexSettings;
 import org.opensearch.index.engine.Engine;
 import org.opensearch.knn.common.KNNConstants;
 import org.opensearch.knn.index.SpaceType;
@@ -313,7 +314,6 @@ public class InternalKNNEngineTests extends OpenSearchIntegTestCase {
      */
     @Test
     public void testJVectorSearchStatsIncrement() throws Exception {
-
         /* ---------------------------------------------------
          * 1.  Read initial stats
          * --------------------------------------------------- */
@@ -351,6 +351,14 @@ public class InternalKNNEngineTests extends OpenSearchIntegTestCase {
         int dimension = 128;
         int vectorsCount = 2050; // we create 2050 docs to have PQ and re-rank kick in
         createKnnIndexMappingWithJVectorEngine(dimension, SpaceType.L2, VectorDataType.FLOAT);
+
+        // Disable refresh for the index
+        client().admin()
+            .indices()
+            .prepareUpdateSettings(INDEX_NAME)
+            .setSettings(Settings.builder().put(IndexSettings.INDEX_REFRESH_INTERVAL_SETTING.getKey(), -1))
+            .get();
+
         final float[][] vectors = TestUtils.generateRandomVectors(vectorsCount, dimension);
         // We will split the vectors into two batches so we can actually force a merge
         int baseDocId = 0;
