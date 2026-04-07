@@ -175,11 +175,10 @@ public class DerivedSourceIT extends DerivedSourceTestCase {
      * Tests that kNN handles bad documents the same when derived source is enabled and disabled.
      * @throws IOException
      */
-    @Ignore
     public void testDerivedSource_HandlesInvalidDocuments() throws IOException {
         // TODO: change "addNull: true" to introduce randomness in testing, after merge issues are fixed. Docs with null values are causing
         // issues presently.
-        List<DerivedSourceUtils.IndexConfigContext> indexConfigContexts = getCustomAnalyzerIndexContexts("derivedit", true, false);
+        List<DerivedSourceUtils.IndexConfigContext> indexConfigContexts = getCustomAnalyzerIndexContexts("derivedit", true, true);
 
         assertTrue(1 < indexConfigContexts.size());
         DerivedSourceUtils.IndexConfigContext derivedSourceEnabledContext = indexConfigContexts.get(0);
