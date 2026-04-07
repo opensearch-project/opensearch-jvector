@@ -961,15 +961,7 @@ public class JVectorWriter extends KnnVectorsWriter {
                 final long trainingTime = end - start;
                 log.info("Refined PQ codebooks for field {}, in {} millis", fieldName, trainingTime);
                 KNNCounter.KNN_QUANTIZATION_TRAINING_TIME.add(trainingTime);
-                compactPqVectors = PQVectors.encodeAndBuild(
-                    leadingCompressor,
-                    // graphNodeIdsToRavvOrds.length,
-                    // graphNodeIdsToRavvOrds,
-                    compactOrdsToRavvOrds.length,
-                    compactOrdsToRavvOrds,
-                    this,
-                    simdPoolMerge
-                );
+                compactPqVectors = PQVectors.encodeAndBuild(leadingCompressor, compactRavv.size(), compactRavv, simdPoolMerge);
             }
 
             if (compactPqVectors == null) {
