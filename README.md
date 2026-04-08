@@ -6,7 +6,9 @@
 
 # opensearch-jvector-plugin
 - [Welcome!](#welcome)
+- [Documentation](#documentation)
 - [Project Resources](#project-resources)
+- [Benchmarks](#benchmarks)
 - [Credits and  Acknowledgments](#credits-and-acknowledgments)
 - [Code of Conduct](#code-of-conduct)
 - [License](#license)
@@ -33,6 +35,30 @@
 - _**PQ and BQ support**_  - As part of (3) JVector supports PQ as well as the BQ that Lucene offers, it seems that this is fairly rare (pgvector doesn't do PQ either) because (1) the code required to get high performance ADC with SIMD is a bit involved and (2) it requires a separate codebook which Lucene isn't set up to easily accommodate.  PQ at 64x compression gives you higher relevance than BQ at 32x
 - _**Fused ADC**_ - Features that nobody else has like Fused ADC and NVQ and Anisotropic PQ
 - _**Compatibility**_ - JVector is compatible with Cassandra. Which allows to more easily transfer vector encoded data from Cassandra to OpenSearch and vice versa.
+
+## Documentation
+
+### Getting Started
+
+**[User Guide](docs/USER_GUIDE.md)** - Complete guide to using the JVector plugin
+- Quick start and installation
+- Creating indices and indexing data
+- Search operations and queries
+- Performance optimization and tuning
+- Memory management and quantization
+
+### Development
+
+**[Developer Guide](DEVELOPER_GUIDE.md)** - Build, test, and contribute
+- Building from source
+- Running tests and debugging
+- Code formatting guidelines
+- Submitting changes
+
+**[Testing Scripts](scripts/jvector_index_and_search/README.md)** - Benchmarking and testing tools
+- Large-scale indexing tests
+- Recall measurement utilities
+- Performance visualization
 
 ## Project Resources
 
