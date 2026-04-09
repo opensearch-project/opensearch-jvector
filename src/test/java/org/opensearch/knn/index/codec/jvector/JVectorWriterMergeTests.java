@@ -13,6 +13,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.PriorityQueue;
 import java.util.Set;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import org.apache.lucene.document.Document;
@@ -28,7 +30,9 @@ import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.tests.util.LuceneTestCase;
 import org.apache.lucene.util.BitSet;
 import org.apache.lucene.util.FixedBitSet;
+import org.junit.After;
 import org.junit.Assert;
+import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -91,8 +95,28 @@ public class JVectorWriterMergeTests extends LuceneTestCase {
 
     @Rule
     public TemporaryFolder tempDir = new TemporaryFolder();
+    private ForkJoinPool singleThreadGraphMergePool;
+
+    @Before
+    public void setUp() throws Exception {
+        super.setUp();
+        singleThreadGraphMergePool = new ForkJoinPool(1); /* single threaded */
+    }
+
+    @After
+    public void tearDown() throws Exception {
+        super.tearDown();
+        singleThreadGraphMergePool.shutdown();
+        if (singleThreadGraphMergePool.awaitTermination(30, TimeUnit.SECONDS) == false) {
+            singleThreadGraphMergePool.shutdownNow();
+        }
+    }
 
     void runScenario(MergeTestScenario scenario) throws IOException {
+        runScenarioWithPool(scenario, null);
+    }
+
+    void runScenarioWithPool(MergeTestScenario scenario, ForkJoinPool mergePool) throws IOException {
         // don't worry about deletions when generating base vectors, they will just become holes in the ids later
         int nBase = scenario.rounds.stream().mapToInt(r -> r.segmentSizes.stream().mapToInt(x -> x).sum()).sum();
         var baseVecs = TestUtils.randomlyGenerateStandardVectors(nBase, scenario.dimension, RANDOM_SEED);
@@ -104,8 +128,9 @@ public class JVectorWriterMergeTests extends LuceneTestCase {
         // Path indexPath = createTempDir();
         IndexWriterConfig iwc = LuceneTestCase.newIndexWriterConfig();
         iwc.setUseCompoundFile(false);
-        iwc.setCodec(getCodec(scenario.minPqThreshold, scenario.leadingSegmentMergeDisabled));
+        iwc.setCodec(getCodec(scenario.minPqThreshold, scenario.leadingSegmentMergeDisabled, mergePool));
         iwc.setMergePolicy(new ForceMergesOnlyMergePolicy(false));
+        iwc.setMaxBufferedDocs(-1);
 
         try (var fsd = FSDirectory.open(tempDir.getRoot().toPath()); var writer = new IndexWriter(fsd, iwc);) {
             int vectorOffset = 0;
@@ -243,7 +268,7 @@ public class JVectorWriterMergeTests extends LuceneTestCase {
             .round(MergeTestRound.builder().segmentSizes(List.of(100, 200, 50, 250, 1)).build())
             .minimumRecall(1.0)
             .build();
-        runScenario(scenario);
+        runScenarioWithPool(scenario, singleThreadGraphMergePool);
     }
 
     @Test
@@ -437,6 +462,6 @@ public class JVectorWriterMergeTests extends LuceneTestCase {
             .overqueryFactor(20)
             .minimumRecall(0.99)
             .build();
-        runScenario(scenario);
+        runScenarioWithPool(scenario, singleThreadGraphMergePool);
     }
 }
