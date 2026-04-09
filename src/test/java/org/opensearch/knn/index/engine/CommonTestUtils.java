@@ -147,24 +147,27 @@ public class CommonTestUtils {
     }
 
     public static Codec getCodec(int minBatchSizeForQuantization, boolean leadingSegmentMergeDisabled, ForkJoinPool graphMergePool) {
-        return new FilterCodec(KNNCodecVersion.V_10_03_0.getCodecName(), new Lucene103Codec()) {
-            @Override
-            public KnnVectorsFormat knnVectorsFormat() {
-                return new PerFieldKnnVectorsFormat() {
-
-                    @Override
-                    public KnnVectorsFormat getKnnVectorsFormatForField(String field) {
-                        return new JVectorFormat(
-                            minBatchSizeForQuantization,
-                            leadingSegmentMergeDisabled,
-                            graphMergePool,
-                            graphMergePool,
-                            graphMergePool
-                        );
-                    }
-                };
-            }
-        };
+        if (graphMergePool == null) {
+            return getCodec(minBatchSizeForQuantization, leadingSegmentMergeDisabled);
+        } else {
+            return new FilterCodec(KNNCodecVersion.V_10_03_0.getCodecName(), new Lucene103Codec()) {
+                @Override
+                public KnnVectorsFormat knnVectorsFormat() {
+                    return new PerFieldKnnVectorsFormat() {
+                        @Override
+                        public KnnVectorsFormat getKnnVectorsFormatForField(String field) {
+                            return new JVectorFormat(
+                                minBatchSizeForQuantization,
+                                leadingSegmentMergeDisabled,
+                                graphMergePool,
+                                graphMergePool,
+                                graphMergePool
+                            );
+                        }
+                    };
+                }
+            };
+        }
     }
 
     /**
