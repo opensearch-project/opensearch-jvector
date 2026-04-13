@@ -9,7 +9,7 @@
  * GitHub history for details.
  */
 
-package org.opensearch.knn.index.codec.KNN990Codec;
+package org.opensearch.knn.index.codec.util;
 
 import org.apache.lucene.codecs.FilterCodec;
 import org.apache.lucene.codecs.KnnVectorsFormat;

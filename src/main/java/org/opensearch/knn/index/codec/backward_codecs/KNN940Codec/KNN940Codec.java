@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package org.opensearch.knn.index.codec.KNN940Codec;
+package org.opensearch.knn.index.codec.backward_codecs.KNN940Codec;
 
 import lombok.Builder;
 import org.apache.lucene.codecs.CompoundFormat;

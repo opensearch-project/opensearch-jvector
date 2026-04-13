@@ -3,9 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package org.opensearch.knn.index.codec.KNN920Codec;
+package org.opensearch.knn.index.codec.backward_codecs.KNN940Codec;
 
-import org.apache.lucene.backward_codecs.lucene92.Lucene92HnswVectorsFormat;
+import org.apache.lucene.backward_codecs.lucene94.Lucene94HnswVectorsFormat;
 import org.opensearch.index.mapper.MapperService;
 import org.opensearch.knn.common.KNNConstants;
 import org.opensearch.knn.index.codec.BasePerFieldKnnVectorsFormat;
@@ -15,19 +15,19 @@ import java.util.Optional;
 /**
  * Class provides per field format implementation for Lucene Knn vector type
  */
-public class KNN920PerFieldKnnVectorsFormat extends BasePerFieldKnnVectorsFormat {
+public class KNN940PerFieldKnnVectorsFormat extends BasePerFieldKnnVectorsFormat {
 
-    public KNN920PerFieldKnnVectorsFormat(final Optional<MapperService> mapperService) {
+    public KNN940PerFieldKnnVectorsFormat(final Optional<MapperService> mapperService) {
         super(
             mapperService,
-            Lucene92HnswVectorsFormat.DEFAULT_MAX_CONN,
-            Lucene92HnswVectorsFormat.DEFAULT_BEAM_WIDTH,
+            Lucene94HnswVectorsFormat.DEFAULT_MAX_CONN,
+            Lucene94HnswVectorsFormat.DEFAULT_BEAM_WIDTH,
             KNNConstants.DEFAULT_ALPHA_VALUE.floatValue(),
             KNNConstants.DEFAULT_NEIGHBOR_OVERFLOW_VALUE.floatValue(),
             KNNConstants.DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION,
             KNNConstants.DEFAULT_HIERARCHY_ENABLED,
-            () -> new Lucene92HnswVectorsFormat(),
-            (knnEngine, knnVectorsFormatParams) -> new Lucene92HnswVectorsFormat(
+            () -> new Lucene94HnswVectorsFormat(),
+            (knnEngine, knnVectorsFormatParams) -> new Lucene94HnswVectorsFormat(
                 knnVectorsFormatParams.getMaxConnections(),
                 knnVectorsFormatParams.getBeamWidth()
             )
