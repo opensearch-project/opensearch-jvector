@@ -645,7 +645,9 @@ public class InternalKNNEngineTests extends OpenSearchIntegTestCase {
                 + ") to be significantly better than low overquery recall ("
                 + recallLowOverquery
                 + ")",
-            recallHighOverquery > recallLowOverquery + 0.05
+            // At rare conditions, the recallLowOverquery covers the same docs / vectors as recallHighOverquery,
+            // so both metrics are equal to 1.0f
+            recallHighOverquery >= Math.min(1.0f, recallLowOverquery + 0.05)
         );
     }
 
