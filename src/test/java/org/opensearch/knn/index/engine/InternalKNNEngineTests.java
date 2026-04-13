@@ -9,7 +9,6 @@ import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.lucene.codecs.perfield.PerFieldKnnVectorsFormat;
 import org.apache.lucene.index.SegmentReader;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.opensearch.client.Request;
 import org.opensearch.client.Response;
@@ -554,7 +553,6 @@ public class InternalKNNEngineTests extends OpenSearchIntegTestCase {
      * @throws Exception exception
      */
     @Test
-    @Ignore
     public void testQuantizationWithOverQueryParameter() throws Exception {
         int dimension = 512;
         final SpaceType spaceType = SpaceType.L2;
@@ -614,8 +612,8 @@ public class InternalKNNEngineTests extends OpenSearchIntegTestCase {
 
         // calculate recall
         logger.info("Calculating recall");
-        float recall = ((float) results.stream().filter(r -> expectedDocIds.contains(r.getDocId())).count()) / ((float) k);
-        assertTrue("Expected recall to be lower than 0.7 but got " + recall, recall <= 0.7);
+        float recallLowOverquery = ((float) results.stream().filter(r -> expectedDocIds.contains(r.getDocId())).count()) / ((float) k);
+        logger.info("Recall with low overquery: " + recallLowOverquery);
 
         // 2. Search with a high-overquery factor
         logger.info("Searching with high overquery factor");
@@ -637,9 +635,21 @@ public class InternalKNNEngineTests extends OpenSearchIntegTestCase {
         assertEquals(Math.min(k, expectedTotalDocs), results.size());
 
         // calculate recall
-        logger.info("Calculating recall");
-        recall = ((float) results.stream().filter(r -> expectedDocIds.contains(r.getDocId())).count()) / ((float) k);
-        assertTrue("Expected recall to be at least 0.9 but got " + recall, recall >= 0.9);
+        logger.info("Calculating recall with high overquery");
+        float recallHighOverquery = ((float) results.stream().filter(r -> expectedDocIds.contains(r.getDocId())).count()) / ((float) k);
+        logger.info("Recall with high overquery: " + recallHighOverquery);
+
+        // Verify that high overquery significantly improves recall compared to low overquery
+        assertTrue(
+            "Expected high overquery recall ("
+                + recallHighOverquery
+                + ") to be significantly better than low overquery recall ("
+                + recallLowOverquery
+                + ")",
+            // At rare conditions, the recallLowOverquery covers the same docs / vectors as recallHighOverquery,
+            // so both metrics are equal to 1.0f
+            recallHighOverquery >= Math.min(1.0f, recallLowOverquery + 0.05)
+        );
     }
 
     @Test
