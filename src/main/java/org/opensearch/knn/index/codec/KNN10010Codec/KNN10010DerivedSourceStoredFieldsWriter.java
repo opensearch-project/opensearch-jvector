@@ -11,6 +11,7 @@ import org.apache.lucene.index.FieldInfo;
 import org.apache.lucene.index.MergeState;
 import org.apache.lucene.index.StoredFieldDataInput;
 import org.apache.lucene.util.BytesRef;
+import org.opensearch.OpenSearchParseException;
 import org.opensearch.common.collect.Tuple;
 import org.opensearch.common.io.stream.BytesStreamOutput;
 import org.opensearch.common.xcontent.XContentHelper;
@@ -33,7 +34,7 @@ import java.util.stream.Collectors;
 
 @Log4j2
 public class KNN10010DerivedSourceStoredFieldsWriter extends StoredFieldsWriter {
-
+    private final String name;
     private final StoredFieldsWriter delegate;
     private final Function<Map<String, Object>, Map<String, Object>> vectorMask;
 
@@ -45,7 +46,8 @@ public class KNN10010DerivedSourceStoredFieldsWriter extends StoredFieldsWriter 
      * @param delegate StoredFieldsWriter to wrap
      * @param vectorFieldTypesArg List of vector field types to mask. If empty, no masking will be done
      */
-    public KNN10010DerivedSourceStoredFieldsWriter(StoredFieldsWriter delegate, List<String> vectorFieldTypesArg) {
+    public KNN10010DerivedSourceStoredFieldsWriter(String name, StoredFieldsWriter delegate, List<String> vectorFieldTypesArg) {
+        this.name = name;
         this.delegate = delegate;
         List<String> vectorFieldTypes = vectorFieldTypesArg.stream().map(String::toLowerCase).toList();
         if (vectorFieldTypes.isEmpty() == false) {
@@ -102,6 +104,9 @@ public class KNN10010DerivedSourceStoredFieldsWriter extends StoredFieldsWriter 
         for (int i = 0; i < mergeState.storedFieldsReaders.length; i++) {
             mergeState.storedFieldsReaders[i] = KNN10010DerivedSourceStoredFieldsReader.wrapForMerge(mergeState.storedFieldsReaders[i]);
         }
+
+        // Store delegate codec name to be used by reader side
+        mergeState.segmentInfo.putAttribute(KNN10010DerivedSourceStoredFieldsFormat.KNN_DELEGATE_CODEC_NAME, name);
         return delegate.merge(mergeState);
     }
 
@@ -131,6 +136,15 @@ public class KNN10010DerivedSourceStoredFieldsWriter extends StoredFieldsWriter 
                     "Encountered NotXContent while deserializing _source field. Instead found String: [{}]",
                     // Limit max string length in case of long bytes object
                     new String(bytesRef.bytes, 0, Math.min(bytesRef.bytes.length, 512)),
+                    e
+                );
+                return;
+            } catch (OpenSearchParseException e) {
+                // Catch any other parsing exceptions (e.g., OpenSearchParseException for invalid JSON)
+                log.warn(
+                    "Failed to parse _source field as XContent. Instead found bytes: [{}]",
+                    // Limit max string length in case of long bytes object
+                    new String(bytesRef.bytes, bytesRef.offset, Math.min(bytesRef.length, 512)),
                     e
                 );
                 return;

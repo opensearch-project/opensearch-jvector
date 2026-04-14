@@ -25,6 +25,7 @@ import org.opensearch.core.rest.RestStatus;
 import org.opensearch.core.xcontent.*;
 import org.opensearch.knn.KNNResult;
 import org.opensearch.knn.common.KNNConstants;
+import org.opensearch.knn.index.KNNSettings;
 import org.opensearch.knn.index.KNNVectorSimilarityFunction;
 import org.opensearch.knn.index.SpaceType;
 import org.opensearch.knn.index.VectorDataType;
@@ -97,7 +98,12 @@ public class CommonTestUtils {
     public static final String NON_EXISTENT_INTEGER_FIELD_NAME = "nonexistent_int_field";
 
     public static Settings getDefaultIndexSettings() {
-        return Settings.builder().put("number_of_shards", 1).put("number_of_replicas", 0).put(KNN_INDEX, true).build();
+        return Settings.builder()
+            .put("number_of_shards", 1)
+            .put("number_of_replicas", 0)
+            .put(KNN_INDEX, true)
+            .put(KNNSettings.KNN_DERIVED_SOURCE_ENABLED, true)
+            .build();
     }
 
     public static String createIndexMapping(int dimension, SpaceType spaceType, VectorDataType vectorDataType) throws IOException {
@@ -144,6 +150,31 @@ public class CommonTestUtils {
                 };
             }
         };
+    }
+
+    public static Codec getCodec(int minBatchSizeForQuantization, boolean leadingSegmentMergeDisabled, ForkJoinPool graphMergePool) {
+        if (graphMergePool == null) {
+            return getCodec(minBatchSizeForQuantization, leadingSegmentMergeDisabled);
+        } else {
+            return new FilterCodec(KNNCodecVersion.V_10_04_0.getCodecName(), new Lucene104Codec()) {
+                @Override
+                public KnnVectorsFormat knnVectorsFormat() {
+                    return new PerFieldKnnVectorsFormat() {
+
+                        @Override
+                        public KnnVectorsFormat getKnnVectorsFormatForField(String field) {
+                            return new JVectorFormat(
+                                minBatchSizeForQuantization,
+                                leadingSegmentMergeDisabled,
+                                graphMergePool,
+                                graphMergePool,
+                                graphMergePool
+                            );
+                        }
+                    };
+                }
+            };
+        }
     }
 
     /**
@@ -269,9 +300,10 @@ public class CommonTestUtils {
         String fieldName,
         float[][] indexVectors,
         int docCount,
-        boolean refresh
+        boolean refresh,
+        int batchSize /* max docs per bulk request */
     ) throws IOException {
-        bulkAddKnnDocs(restClient, index, fieldName, indexVectors, 0, docCount, refresh);
+        bulkAddKnnDocs(restClient, index, fieldName, indexVectors, 0, docCount, refresh, batchSize);
     }
 
     // Method that adds multiple documents into the index using Bulk API
@@ -282,9 +314,10 @@ public class CommonTestUtils {
         float[][] indexVectors,
         int baseDocId,
         int docCount,
-        boolean refresh
+        boolean refresh,
+        int batchSize /* max docs per bulk request */
     ) throws IOException {
-        bulkAddKnnDocs(restClient, index, fieldName, indexVectors, 0, baseDocId, docCount, refresh);
+        bulkAddKnnDocs(restClient, index, fieldName, indexVectors, 0, baseDocId, docCount, refresh, batchSize);
     }
 
     public static void bulkAddKnnDocs(
@@ -295,12 +328,10 @@ public class CommonTestUtils {
         int sourceOffset,
         int baseDocId,
         int docCount,
-        boolean refresh
+        boolean refresh,
+        int batchSize /* max docs per bulk request */
     ) throws IOException {
-
-        // max docs per bulk request and max parallel bulk requests
-        final int batchSize = 1000; // adjust to your payload size / network characteristics
-        final int maxConcurrency = 4;
+        final int maxConcurrency = 4; /* and max parallel bulk requests */
 
         int totalBatches = (docCount + batchSize - 1) / batchSize;
         int poolSize = Math.min(maxConcurrency, Math.max(1, totalBatches));

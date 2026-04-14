@@ -28,7 +28,11 @@ public class JVectorVectorScorer implements VectorScorer {
 
     @Override
     public float score() throws IOException {
-        return similarityFunction.compare(target, floatVectorValues.vectorFloatValue(docIndexIterator.index()));
+        int index = docIndexIterator.index();
+        if (index == GraphNodeIdToDocMap.NO_VECTOR_OR_DELETED_DOC) {
+            return 0.0f;
+        }
+        return similarityFunction.compare(target, floatVectorValues.vectorFloatValue(index));
     }
 
     @Override

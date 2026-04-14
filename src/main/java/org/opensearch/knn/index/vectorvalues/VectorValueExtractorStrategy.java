@@ -5,6 +5,8 @@
 
 package org.opensearch.knn.index.vectorvalues;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.apache.lucene.index.BinaryDocValues;
 import org.apache.lucene.index.ByteVectorValues;
 import org.apache.lucene.index.FloatVectorValues;
@@ -13,6 +15,7 @@ import org.apache.lucene.search.DocIdSetIterator;
 import org.apache.lucene.util.ArrayUtil;
 import org.apache.lucene.util.BytesRef;
 import org.opensearch.knn.index.VectorDataType;
+import org.opensearch.knn.index.codec.jvector.GraphNodeIdToDocMap;
 import org.opensearch.knn.index.codec.util.KNNVectorSerializer;
 import org.opensearch.knn.index.codec.util.KNNVectorSerializerFactory;
 
@@ -67,6 +70,8 @@ public interface VectorValueExtractorStrategy {
      * Strategy to extract the vector from {@link KNNVectorValuesIterator.DocIdsIteratorValues}
      */
     class DISIVectorExtractor implements VectorValueExtractorStrategy {
+        private static final Logger log = LogManager.getLogger(DISIVectorExtractor.class);
+
         @Override
         public <T> T extract(final VectorDataType vectorDataType, final KNNVectorValuesIterator vectorValuesIterator) throws IOException {
             final DocIdSetIterator docIdSetIterator = vectorValuesIterator.getDocIdSetIterator();
@@ -104,17 +109,25 @@ public interface VectorValueExtractorStrategy {
             int ord = docIdSetIterator.index();
             if (ord == docIdsIteratorValues.getLastOrd()) {
                 return (T) docIdsIteratorValues.getLastAccessedVector();
+            } else if (ord == GraphNodeIdToDocMap.NO_VECTOR_OR_DELETED_DOC) {
+                log.debug("No vector value for docId {}, index is {}", docIdSetIterator.docID(), ord);
+                return null; /* no vector */
             }
             docIdsIteratorValues.setLastOrd(ord);
 
+            KnnVectorValues knnVectorValues = docIdsIteratorValues.getKnnVectorValues();
+
+            // Check the actual instance type of knnVectorValues to determine how to extract the vector
             if (vectorDataType == VectorDataType.FLOAT) {
-                FloatVectorValues knnVectorValues = (FloatVectorValues) docIdsIteratorValues.getKnnVectorValues();
-                docIdsIteratorValues.setLastAccessedVector(knnVectorValues.vectorValue(ord));
+                FloatVectorValues floatVectorValues = (FloatVectorValues) knnVectorValues;
+                docIdsIteratorValues.setLastAccessedVector(floatVectorValues.vectorValue(ord));
             } else if (vectorDataType == VectorDataType.BYTE || vectorDataType == VectorDataType.BINARY) {
-                ByteVectorValues byteVectorValues = (ByteVectorValues) docIdsIteratorValues.getKnnVectorValues();
+                ByteVectorValues byteVectorValues = (ByteVectorValues) knnVectorValues;
                 docIdsIteratorValues.setLastAccessedVector(byteVectorValues.vectorValue(ord));
             } else {
-                throw new IllegalArgumentException("Invalid vector data type for KnnVectorValues");
+                throw new IllegalArgumentException(
+                    "KnnVectorValues is not of a valid type. Valid Types are: FloatVectorValues and ByteVectorValues"
+                );
             }
 
             return (T) docIdsIteratorValues.getLastAccessedVector();

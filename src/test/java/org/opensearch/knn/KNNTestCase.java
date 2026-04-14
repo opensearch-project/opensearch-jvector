@@ -24,7 +24,6 @@ import org.opensearch.knn.index.engine.KNNLibrarySearchContext;
 import org.opensearch.knn.index.engine.KNNMethodContext;
 import org.opensearch.knn.index.engine.MethodComponentContext;
 import org.opensearch.knn.index.mapper.KNNMappingConfig;
-// import org.opensearch.knn.index.memory.NativeMemoryCacheManager;
 import org.opensearch.knn.plugin.stats.KNNCounter;
 import org.opensearch.knn.quantization.models.quantizationState.QuantizationStateCache;
 import org.opensearch.knn.quantization.models.quantizationState.QuantizationStateCacheManager;
@@ -42,7 +41,6 @@ import java.util.stream.Collectors;
 
 import static org.mockito.Mockito.when;
 import static org.opensearch.knn.common.KNNConstants.METHOD_HNSW;
-import static org.opensearch.knn.common.KNNConstants.METHOD_IVF;
 
 /**
  * Base class for integration tests for KNN plugin. Contains several methods for testing KNN ES functionality.
@@ -88,9 +86,7 @@ public class KNNTestCase extends OpenSearchTestCase {
         }
         initKNNSettings();
 
-        // Clean up the cache (NativeMemoryCacheManager not available in JVector)
-        // NativeMemoryCacheManager.getInstance().invalidateAll();
-        // NativeMemoryCacheManager.getInstance().close();
+        // Clean up the cache
         try {
             QuantizationStateCacheManager.getInstance().close();
         } catch (OpenSearchRejectedExecutionException e) {
@@ -131,7 +127,7 @@ public class KNNTestCase extends OpenSearchTestCase {
     }
 
     public static KNNMethodContext getDefaultKNNMethodContextForModel() {
-        MethodComponentContext methodComponentContext = new MethodComponentContext(METHOD_IVF, Collections.emptyMap());
+        MethodComponentContext methodComponentContext = new MethodComponentContext(METHOD_HNSW, Collections.emptyMap());
         return new KNNMethodContext(KNNEngine.DEFAULT, SpaceType.DEFAULT, methodComponentContext);
     }
 

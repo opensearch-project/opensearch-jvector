@@ -10,6 +10,9 @@ import java.util.Objects;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.apache.lucene.index.BinaryDocValues;
 import org.apache.lucene.index.ByteVectorValues;
 import org.apache.lucene.index.FloatVectorValues;
@@ -17,9 +20,11 @@ import org.apache.lucene.index.KnnVectorValues;
 import org.apache.lucene.search.DocIdSetIterator;
 import org.opensearch.ExceptionsHelper;
 import org.opensearch.index.fielddata.ScriptDocValues;
+import org.opensearch.knn.index.codec.jvector.GraphNodeIdToDocMap;
 
 @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
 public abstract class KNNVectorScriptDocValues extends ScriptDocValues<float[]> {
+    private static final Logger log = LogManager.getLogger(KNNVectorScriptDocValues.class);
 
     private final DocIdSetIterator vectorValues;
     private final String fieldName;
@@ -108,9 +113,15 @@ public abstract class KNNVectorScriptDocValues extends ScriptDocValues<float[]> 
 
         @Override
         protected float[] doGetValue() throws IOException {
-            int docId = this.iterator.index();
+            int docId = this.iterator.docID();
             if (docId == KnnVectorValues.DocIndexIterator.NO_MORE_DOCS) {
                 throw new IllegalStateException("No more ordinals to retrieve vector values.");
+            }
+
+            int ord = this.iterator.index();    // Fetch ordinal (index of vector)
+            if (ord == GraphNodeIdToDocMap.NO_VECTOR_OR_DELETED_DOC) {
+                log.debug("No vector value for docId {}, index is {}", docId, ord);
+                return null; /* no vector value */
             }
 
             // Use the correct method to retrieve the byte vector for the current ordinal
@@ -138,9 +149,14 @@ public abstract class KNNVectorScriptDocValues extends ScriptDocValues<float[]> 
 
         @Override
         protected float[] doGetValue() throws IOException {
-            int ord = iterator.index();    // Fetch ordinal (index of vector)
-            if (ord == KnnVectorValues.DocIndexIterator.NO_MORE_DOCS) {
+            int docId = iterator.docID();
+            if (docId == KnnVectorValues.DocIndexIterator.NO_MORE_DOCS) {
                 throw new IllegalStateException("No more ordinals to retrieve vector values.");
+            }
+            int ord = iterator.index();    // Fetch ordinal (index of vector)
+            if (ord == GraphNodeIdToDocMap.NO_VECTOR_OR_DELETED_DOC) {
+                log.debug("No vector value for docId {}, index is {}", docId, ord);
+                return null; /* no vector value */
             }
             return values.vectorValue(ord);
         }

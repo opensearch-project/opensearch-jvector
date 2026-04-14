@@ -23,16 +23,16 @@ import org.opensearch.knn.index.codec.backward_codecs.KNN1030Codec.KNN1030Codec;
 import org.opensearch.knn.index.codec.KNN1040Codec.KNN1040Codec;
 import org.opensearch.knn.index.codec.KNN80Codec.KNN80CompoundFormat;
 import org.opensearch.knn.index.codec.KNN80Codec.KNN80DocValuesFormat;
-import org.opensearch.knn.index.codec.KNN910Codec.KNN910Codec;
+import org.opensearch.knn.index.codec.backward_codecs.KNN910Codec.KNN910Codec;
 import org.opensearch.knn.index.codec.KNN9120Codec.KNN9120PerFieldKnnVectorsFormat;
-import org.opensearch.knn.index.codec.KNN920Codec.KNN920Codec;
-import org.opensearch.knn.index.codec.KNN920Codec.KNN920PerFieldKnnVectorsFormat;
-import org.opensearch.knn.index.codec.KNN940Codec.KNN940Codec;
-import org.opensearch.knn.index.codec.KNN940Codec.KNN940PerFieldKnnVectorsFormat;
-import org.opensearch.knn.index.codec.KNN950Codec.KNN950Codec;
-import org.opensearch.knn.index.codec.KNN950Codec.KNN950PerFieldKnnVectorsFormat;
-import org.opensearch.knn.index.codec.KNN990Codec.KNN990Codec;
-import org.opensearch.knn.index.codec.KNN990Codec.KNN990PerFieldKnnVectorsFormat;
+import org.opensearch.knn.index.codec.backward_codecs.KNN920Codec.KNN920Codec;
+import org.opensearch.knn.index.codec.backward_codecs.KNN920Codec.KNN920PerFieldKnnVectorsFormat;
+import org.opensearch.knn.index.codec.backward_codecs.KNN940Codec.KNN940Codec;
+import org.opensearch.knn.index.codec.backward_codecs.KNN940Codec.KNN940PerFieldKnnVectorsFormat;
+import org.opensearch.knn.index.codec.backward_codecs.KNN950Codec.KNN950Codec;
+import org.opensearch.knn.index.codec.backward_codecs.KNN950Codec.KNN950PerFieldKnnVectorsFormat;
+import org.opensearch.knn.index.codec.backward_codecs.KNN990Codec.KNN990Codec;
+import org.opensearch.knn.index.codec.backward_codecs.KNN990Codec.KNN990PerFieldKnnVectorsFormat;
 
 import java.util.Optional;
 import java.util.function.BiFunction;
@@ -165,6 +165,7 @@ public enum KNNCodecVersion {
     );
 
     private static final KNNCodecVersion CURRENT = V_10_04_0;
+    public static final Codec CURRENT_DEFAULT_DELEGATE = KNN1040Codec.DEFAULT_DELEGATE;
     private final String codecName;
     private final Codec defaultCodecDelegate;
     private final PerFieldKnnVectorsFormat perFieldKnnVectorsFormat;

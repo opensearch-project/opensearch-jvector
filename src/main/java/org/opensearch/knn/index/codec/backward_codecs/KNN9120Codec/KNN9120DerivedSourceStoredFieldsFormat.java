@@ -15,12 +15,13 @@ import org.apache.lucene.index.SegmentInfo;
 import org.apache.lucene.index.SegmentReadState;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.IOContext;
-import org.opensearch.common.Nullable;
-import org.opensearch.index.mapper.MapperService;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+
+import static org.opensearch.knn.common.KNNConstants.DERIVED_VECTOR_FIELD_ATTRIBUTE_KEY;
+import static org.opensearch.knn.common.KNNConstants.DERIVED_VECTOR_FIELD_ATTRIBUTE_TRUE_VALUE;
 
 @AllArgsConstructor
 public class KNN9120DerivedSourceStoredFieldsFormat extends StoredFieldsFormat {
@@ -28,11 +29,6 @@ public class KNN9120DerivedSourceStoredFieldsFormat extends StoredFieldsFormat {
     private final StoredFieldsFormat delegate;
     private final KNN9120DerivedSourceReadersSupplier derivedSourceReadersSupplier;
     // IMPORTANT Do not rely on this for the reader, it will be null if SPI is used
-    @Nullable
-    private final MapperService mapperService;
-
-    static final String DERIVED_VECTOR_FIELD_ATTRIBUTE_KEY = "knn-derived-source-enabled";
-    static final String DERIVED_VECTOR_FIELD_ATTRIBUTE_TRUE_VALUE = "true";
 
     @Override
     public StoredFieldsReader fieldsReader(Directory directory, SegmentInfo segmentInfo, FieldInfos fieldInfos, IOContext ioContext)

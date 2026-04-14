@@ -8,7 +8,7 @@ package org.opensearch.knn.index.engine;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import lombok.SneakyThrows;
-import org.apache.commons.lang.math.RandomUtils;
+import org.apache.commons.lang3.RandomUtils;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.lucene.util.VectorUtil;
 import org.junit.After;
@@ -209,6 +209,7 @@ public class LuceneEngineIT extends KNNRestTestCase {
         assertEquals(new TreeMap<>(mappingMap), new TreeMap<>(getIndexMappingAsMap(INDEX_NAME)));
 
         Float[] vector = new Float[] { 2.0f, 4.5f, 6.5f };
+
         addKnnDoc(INDEX_NAME, DOC_ID, FIELD_NAME, vector);
 
         refreshIndex(INDEX_NAME);
@@ -456,7 +457,7 @@ public class LuceneEngineIT extends KNNRestTestCase {
         }
 
         final float[] searchVector = TEST_QUERY_VECTORS[0];
-        final int k = 1 + RandomUtils.nextInt(TEST_INDEX_VECTORS.length);
+        final int k = 1 + RandomUtils.secure().randomInt(0, TEST_INDEX_VECTORS.length);
 
         final List<float[]> knnResultsBeforeIndexClosure = queryResults(searchVector, k);
 
