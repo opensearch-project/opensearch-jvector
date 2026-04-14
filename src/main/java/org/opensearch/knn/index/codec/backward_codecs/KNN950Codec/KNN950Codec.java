@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package org.opensearch.knn.index.codec.KNN990Codec;
+package org.opensearch.knn.index.codec.backward_codecs.KNN950Codec;
 
 import lombok.Builder;
 import org.apache.lucene.codecs.Codec;
@@ -15,18 +15,15 @@ import org.apache.lucene.codecs.perfield.PerFieldKnnVectorsFormat;
 import org.opensearch.knn.index.codec.KNNCodecVersion;
 import org.opensearch.knn.index.codec.KNNFormatFacade;
 
-/**
- * KNN Codec that wraps the Lucene Codec which is part of Lucene 9.9
- */
-public class KNN990Codec extends FilterCodec {
-    private static final KNNCodecVersion VERSION = KNNCodecVersion.V_9_9_0;
+public class KNN950Codec extends FilterCodec {
+    private static final KNNCodecVersion VERSION = KNNCodecVersion.V_9_5_0;
     private final KNNFormatFacade knnFormatFacade;
     private final PerFieldKnnVectorsFormat perFieldKnnVectorsFormat;
 
     /**
-     * No arg constructor that uses Lucene99 as the delegate
+     * No arg constructor that uses Lucene95 as the delegate
      */
-    public KNN990Codec() {
+    public KNN950Codec() {
         this(VERSION.getDefaultCodecDelegate(), VERSION.getPerFieldKnnVectorsFormat());
     }
 
@@ -38,7 +35,7 @@ public class KNN990Codec extends FilterCodec {
      * @param knnVectorsFormat per field format for KnnVector
      */
     @Builder
-    protected KNN990Codec(Codec delegate, PerFieldKnnVectorsFormat knnVectorsFormat) {
+    protected KNN950Codec(Codec delegate, PerFieldKnnVectorsFormat knnVectorsFormat) {
         super(VERSION.getCodecName(), delegate);
         knnFormatFacade = VERSION.getKnnFormatFacadeSupplier().apply(delegate);
         perFieldKnnVectorsFormat = knnVectorsFormat;
