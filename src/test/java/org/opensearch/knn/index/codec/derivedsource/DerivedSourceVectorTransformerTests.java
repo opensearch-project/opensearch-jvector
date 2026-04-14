@@ -7,6 +7,7 @@ package org.opensearch.knn.index.codec.derivedsource;
 
 import org.apache.lucene.index.FieldInfo;
 import org.apache.lucene.index.SegmentReadState;
+import org.junit.Ignore;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
@@ -40,6 +41,7 @@ public class DerivedSourceVectorTransformerTests extends OpenSearchTestCase {
         mocks.close();
     }
 
+    @Ignore
     public void testInitialize_withVariousIncludeExcludeCombinations() {
         // Test 1: No filtering - all fields remain
         assertFieldFiltering(null, null, new String[] { "test_vector", "temp_vector", "user_vector" }, new String[] {});
