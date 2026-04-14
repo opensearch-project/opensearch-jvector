@@ -129,7 +129,7 @@ public class JVectorRandomAccessReader implements RandomAccessReader {
         private final IndexInput currentInput;
         private final long sliceStartOffset;
         private final long sliceLength;
- 
+
         public Supplier(IndexInput indexInput) throws IOException {
             this(indexInput, indexInput.getFilePointer(), indexInput.length() - indexInput.getFilePointer());
         }
