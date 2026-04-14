@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * The KNN1030Codec does not properly support delegation for non-default codec(s). [310] (https://github.com/opensearch-project/opensearch-jvector/pull/310)
 * Remove usage of the commons-lang 2.6 [317] (https://github.com/opensearch-project/opensearch-jvector/pull/317)
 * Fixing guava dependency scope, since the dependency is provided by transport-grpc plugin [344] (https://github.com/opensearch-project/opensearch-jvector/pull/344)
+* Remove manual ref counting and simplify DeriveSourceReaders [397] (https://github.com/opensearch-project/opensearch-jvector/pull/397)
 ### Infrastructure
 * Upgrade Lucene to 10.4.0 [292] (https://github.com/opensearch-project/opensearch-jvector/pull/292)
 ### Documentation
