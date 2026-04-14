@@ -2,10 +2,10 @@
  * Copyright OpenSearch Contributors
  * SPDX-License-Identifier: Apache-2.0
  */
-
-package org.opensearch.knn.index.codec.KNN950Codec;
+package org.opensearch.knn.index.codec.backward_codecs.KNN920Codec;
 
 import lombok.Builder;
+import lombok.extern.log4j.Log4j2;
 import org.apache.lucene.codecs.Codec;
 import org.apache.lucene.codecs.CompoundFormat;
 import org.apache.lucene.codecs.DocValuesFormat;
@@ -15,27 +15,30 @@ import org.apache.lucene.codecs.perfield.PerFieldKnnVectorsFormat;
 import org.opensearch.knn.index.codec.KNNCodecVersion;
 import org.opensearch.knn.index.codec.KNNFormatFacade;
 
-public class KNN950Codec extends FilterCodec {
-    private static final KNNCodecVersion VERSION = KNNCodecVersion.V_9_5_0;
+/**
+ * KNN codec that is based on Lucene92 codec
+ */
+@Log4j2
+public final class KNN920Codec extends FilterCodec {
+    private static final KNNCodecVersion VERSION = KNNCodecVersion.V_9_2_0;
     private final KNNFormatFacade knnFormatFacade;
     private final PerFieldKnnVectorsFormat perFieldKnnVectorsFormat;
 
     /**
-     * No arg constructor that uses Lucene95 as the delegate
+     * No arg constructor that uses Lucene91 as the delegate
      */
-    public KNN950Codec() {
+    public KNN920Codec() {
         this(VERSION.getDefaultCodecDelegate(), VERSION.getPerFieldKnnVectorsFormat());
     }
 
     /**
-     * Sole constructor. When subclassing this codec, create a no-arg ctor and pass the delegate codec
-     * and a unique name to this ctor.
+     * Constructor that takes a Codec delegate to delegate all methods this code does not implement to.
      *
      * @param delegate codec that will perform all operations this codec does not override
      * @param knnVectorsFormat per field format for KnnVector
      */
     @Builder
-    protected KNN950Codec(Codec delegate, PerFieldKnnVectorsFormat knnVectorsFormat) {
+    public KNN920Codec(Codec delegate, PerFieldKnnVectorsFormat knnVectorsFormat) {
         super(VERSION.getCodecName(), delegate);
         knnFormatFacade = VERSION.getKnnFormatFacadeSupplier().apply(delegate);
         perFieldKnnVectorsFormat = knnVectorsFormat;
