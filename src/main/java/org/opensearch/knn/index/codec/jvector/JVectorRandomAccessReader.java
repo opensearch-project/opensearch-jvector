@@ -153,8 +153,8 @@ public class JVectorRandomAccessReader implements RandomAccessReader {
 
         @Override
         public void close() throws IOException {
-            // Readers are closed by their users via try-with-resources
             IOUtils.closeWhileHandlingException(currentInput);
+            // Readers are closed by their users via try-with-resources
         }
     }
 }
