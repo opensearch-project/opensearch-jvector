@@ -128,12 +128,10 @@ public class JVectorRandomAccessReader implements RandomAccessReader {
      * The header offset, on the other hand, is flexible because we can provide it as a parameter to {@link io.github.jbellis.jvector.graph.disk.OnDiskGraphIndex#load(ReaderSupplier, long)}
      */
     public static class Supplier implements ReaderSupplier {
-        private final AtomicInteger readerCount = new AtomicInteger(0);
         private final IndexInput currentInput;
         private final long sliceStartOffset;
         private final long sliceLength;
-        private final ConcurrentHashMap<Integer, RandomAccessReader> readers = new ConcurrentHashMap<>();
-
+ 
         public Supplier(IndexInput indexInput) throws IOException {
             this(indexInput, indexInput.getFilePointer(), indexInput.length() - indexInput.getFilePointer());
         }
@@ -149,26 +147,14 @@ public class JVectorRandomAccessReader implements RandomAccessReader {
             synchronized (this) {
                 final IndexInput input = currentInput.slice("Input Slice for the jVector graph or PQ", sliceStartOffset, sliceLength)
                     .clone();
-
-                var reader = new JVectorRandomAccessReader(input);
-                int readerId = readerCount.getAndIncrement();
-                readers.put(readerId, reader);
-                return reader;
+                return new JVectorRandomAccessReader(input);
             }
-
         }
 
         @Override
         public void close() throws IOException {
-            // Close source of all cloned inputs
+            // Readers are closed by their users via try-with-resources
             IOUtils.closeWhileHandlingException(currentInput);
-
-            // Close all readers
-            for (RandomAccessReader reader : readers.values()) {
-                IOUtils.closeWhileHandlingException(reader::close);
-            }
-            readers.clear();
-            readerCount.set(0);
         }
     }
 }
