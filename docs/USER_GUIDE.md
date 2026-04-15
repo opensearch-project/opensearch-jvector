@@ -1149,7 +1149,5 @@ See [benchmarks](../README.md#incremental-merges) for detailed performance compa
 
 ## Next Steps
 
-- **API Reference**: See [REFERENCE.md](REFERENCE.md) for complete API documentation
-- **Migration Guide**: See [MIGRATION_GUIDE.md](MIGRATION_GUIDE.md) for migrating from other solutions
 - **Developer Guide**: See [DEVELOPER_GUIDE.md](../DEVELOPER_GUIDE.md) for contributing to the plugin
 - **Testing Scripts**: See [scripts/jvector_index_and_search/README.md](../scripts/jvector_index_and_search/README.md) for benchmarking tools
