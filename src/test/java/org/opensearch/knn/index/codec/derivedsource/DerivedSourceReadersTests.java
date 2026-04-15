@@ -35,7 +35,7 @@ public class DerivedSourceReadersTests extends KNNTestCase {
     @SneakyThrows
     public void testCloneDoesNotClose() {
         readers = new DerivedSourceReaders(mockKnnVectorsReader, mockDocValuesProducer);
-        DerivedSourceReaders clone = readers.clone();
+        DerivedSourceReaders clone = readers.cloneWithMerge();
         clone.close(); // should be no-op
         verify(mockKnnVectorsReader, never()).close();
         verify(mockDocValuesProducer, never()).close();
@@ -44,7 +44,7 @@ public class DerivedSourceReadersTests extends KNNTestCase {
     @SneakyThrows
     public void testGetMergeInstanceDoesNotClose() {
         readers = new DerivedSourceReaders(mockKnnVectorsReader, mockDocValuesProducer);
-        DerivedSourceReaders mergeInstance = readers.getMergeInstance();
+        DerivedSourceReaders mergeInstance = readers.cloneWithMerge();
         mergeInstance.close(); // no-op
         verify(mockKnnVectorsReader, never()).close();
         verify(mockDocValuesProducer, never()).close();
@@ -54,14 +54,14 @@ public class DerivedSourceReadersTests extends KNNTestCase {
     public void testCloneAfterCloseThrows() {
         readers = new DerivedSourceReaders(mockKnnVectorsReader, mockDocValuesProducer);
         readers.close();
-        expectThrows(AlreadyClosedException.class, () -> readers.clone());
+        expectThrows(AlreadyClosedException.class, () -> readers.cloneWithMerge());
     }
 
     @SneakyThrows
     public void testGetMergeInstanceAfterCloseThrows() {
         readers = new DerivedSourceReaders(mockKnnVectorsReader, mockDocValuesProducer);
         readers.close();
-        expectThrows(AlreadyClosedException.class, () -> readers.getMergeInstance());
+        expectThrows(AlreadyClosedException.class, () -> readers.cloneWithMerge());
     }
 
     @SneakyThrows
