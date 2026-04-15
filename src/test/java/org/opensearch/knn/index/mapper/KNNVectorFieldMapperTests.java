@@ -443,8 +443,6 @@ public class KNNVectorFieldMapperTests extends KNNTestCase {
 
     public void testBuilder_build_fromLegacy() throws IOException {
         // Check legacy is picked up if method context are not set
-        int m = 17;
-        int efConstruction = 17;
         KNNVectorFieldMapper.TypeParser typeParser = new KNNVectorFieldMapper.TypeParser();
 
         XContentBuilder xContentBuilder = XContentFactory.jsonBuilder()
@@ -469,8 +467,8 @@ public class KNNVectorFieldMapperTests extends KNNTestCase {
     }
 
     public void testBuilder_parse_fromKnnMethodContext_luceneEngine() throws IOException {
-        String fieldName = "test-field-name";
-        String indexName = "test-index-name";
+        String fieldName = TEST_FIELD_NAME;
+        String indexName = TEST_INDEX_NAME;
 
         Settings settings = Settings.builder().put(settings(CURRENT).build()).put(KNN_INDEX, true).build();
 
@@ -555,8 +553,8 @@ public class KNNVectorFieldMapperTests extends KNNTestCase {
 
     @SneakyThrows
     public void testTypeParser_parse_compressionAndModeParameter() {
-        String fieldName = "test-field-name-vec";
-        String indexName = "test-index-name-vec";
+        String fieldName = TEST_FIELD_NAME;
+        String indexName = TEST_INDEX_NAME;
 
         Settings settings = Settings.builder().put(settings(CURRENT).build()).put(KNN_INDEX, true).build();
 
@@ -624,8 +622,8 @@ public class KNNVectorFieldMapperTests extends KNNTestCase {
 
     public void testTypeParser_parse_fromKnnMethodContext() throws IOException {
         // Check that knnMethodContext is set
-        String fieldName = "test-field-name";
-        String indexName = "test-index-name";
+        String fieldName = TEST_FIELD_NAME;
+        String indexName = TEST_INDEX_NAME;
 
         Settings settings = Settings.builder().put(settings(CURRENT).build()).put(KNN_INDEX, true).build();
 
@@ -719,12 +717,9 @@ public class KNNVectorFieldMapperTests extends KNNTestCase {
 
     public void testTypeParser_parse_fromLegacy() throws IOException {
         // Check that the particular values are set in builder
-        String fieldName = "test-field-name";
-        String indexName = "test-index-name";
+        String fieldName = TEST_FIELD_NAME;
+        String indexName = TEST_INDEX_NAME;
 
-        int m = 144;
-        int efConstruction = 123;
-        SpaceType spaceType = SpaceType.L2;
         Settings settings = Settings.builder().put(settings(CURRENT).build()).build();
 
         KNNVectorFieldMapper.TypeParser typeParser = new KNNVectorFieldMapper.TypeParser();
@@ -785,18 +780,6 @@ public class KNNVectorFieldMapperTests extends KNNTestCase {
 
     public Mapper.TypeParser.ParserContext buildParserContext(String indexName, Settings settings) {
         return dobuildParserContext(indexName, settings, CURRENT);
-    }
-
-    private static float[] createInitializedFloatArray(int dimension, float value) {
-        float[] array = new float[dimension];
-        Arrays.fill(array, value);
-        return array;
-    }
-
-    private static byte[] createInitializedByteArray(int dimension, byte value) {
-        byte[] array = new byte[dimension];
-        Arrays.fill(array, value);
-        return array;
     }
 
     public void testTypeParser_whenBinaryLuceneHNSW_thenValid() throws IOException {
@@ -868,8 +851,8 @@ public class KNNVectorFieldMapperTests extends KNNTestCase {
     ) throws IOException {
         // Check legacy is picked up if model context and method context are not set
         KNNVectorFieldMapper.TypeParser typeParser = new KNNVectorFieldMapper.TypeParser();
-        String fieldName = "test-field-name-1";
-        String indexName = "test-index";
+        String fieldName = TEST_FIELD_NAME;
+        String indexName = TEST_INDEX_NAME;
 
         // Setup settings
         Settings settings = Settings.builder().put(settings(CURRENT).build()).put(KNN_INDEX, true).build();
