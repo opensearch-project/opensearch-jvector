@@ -19,7 +19,6 @@ import java.nio.FloatBuffer;
 @Log4j2
 public class JVectorRandomAccessReader implements RandomAccessReader {
     private final byte[] internalBuffer = new byte[Long.BYTES];
-    private final byte[] internalFloatBuffer = new byte[Float.BYTES];
     private final IndexInput indexInputDelegate;
     private volatile boolean closed = false;
 
@@ -107,6 +106,10 @@ public class JVectorRandomAccessReader implements RandomAccessReader {
 
     @Override
     public void close() throws IOException {
+        if (this.closed == true) {
+            log.debug("JVectorRandomAccessReader already closed for file: {}", indexInputDelegate);
+            return;
+        }
         log.debug("Closing JVectorRandomAccessReader for file: {}", indexInputDelegate);
         this.closed = true;
         // no need to really close the index input delegate since it is a clone
@@ -152,7 +155,6 @@ public class JVectorRandomAccessReader implements RandomAccessReader {
         @Override
         public void close() throws IOException {
             IOUtils.closeWhileHandlingException(currentInput);
-            // Readers are closed by their users via try-with-resources
         }
     }
 }
