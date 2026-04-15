@@ -37,26 +37,17 @@ OpenSearch JVector Plugin is a pure Java implementation of vector similarity sea
 
 **High-Level Benefits:**
 - **Scalable**: Handle billions of documents across thousands of dimensions using DiskANN
-- **Fast**: Blazing fast pure Java implementation with minimal overhead
+- **Fast**: Pure Java implementation with minimal overhead
 - **Lightweight**: Self-contained, no native dependencies, builds in seconds
 
-**Technical Advantages:**
-- **DiskANN**: Optimized for RAM-constrained environments with minimal overhead
-- **Thread Safety**: Concurrent modification and inserts with near-perfect scalability
-- **Incremental Merges**: Update large graphs without full rebuilds (massive performance gain)
-- **Advanced Quantization**: PQ, BQ, and scalar quantization with refinement during merge
-- **SIMD Support**: Hardware-accelerated vector operations
-
-### Key Features
-
-1. **DiskANN Implementation**: Pure Java ANN search optimized for disk-based operations
+**Key Features:**
+1. **DiskANN Implementation**: Pure Java ANN search optimized for disk-based operations and RAM-constrained environments
 2. **Thread-Safe Indexing**: Concurrent writes with excellent scalability
-3. **Quantized Index Construction**: Build indices with quantized vectors to save memory
-4. **Quantization Refinement**: Refine codebooks during merge for better accuracy
-5. **Incremental Merges**: Insert vectors into existing indices without full rebuild
-6. **Product Quantization (PQ)**: 64x compression with higher relevance than BQ at 32x
-7. **Fused ADC**: Advanced distance computation optimizations
-8. **Cassandra Compatibility**: Easy data transfer between Cassandra and OpenSearch
+3. **Incremental Merges**: Update large graphs without full rebuilds for faster updates
+4. **Product Quantization (PQ)**: Compress vectors to significantly reduce memory usage with quantization refinement during merge
+5. **SIMD Support**: Hardware-accelerated vector operations
+6. **Fused ADC**: Advanced distance computation optimizations
+7. **Cassandra Compatibility**: Easy data transfer between Cassandra and OpenSearch
 
 ---
 
@@ -76,13 +67,17 @@ If you don't have OpenSearch installed yet, choose one of these options:
 
 **Option A: Download and Install OpenSearch**
 
+Download OpenSearch 3.3.2 or later from the [OpenSearch downloads page](https://opensearch.org/downloads.html). Choose the distribution appropriate for your platform and OS.
+
+Example for macOS:
+
 ```bash
-# Download OpenSearch 3.2.0 (or later)
-wget https://artifacts.opensearch.org/releases/bundle/opensearch/3.2.0/opensearch-3.2.0-linux-x64.tar.gz
+# Download OpenSearch 3.3.2 (example for macOS)
+curl -O https://artifacts.opensearch.org/releases/bundle/opensearch/3.3.2/opensearch-3.3.2-darwin-x64.tar.gz
 
 # Extract
-tar -xzf opensearch-3.2.0-linux-x64.tar.gz
-cd opensearch-3.2.0
+tar -xzf opensearch-3.3.2-darwin-x64.tar.gz
+cd opensearch-3.3.2
 
 # Start OpenSearch
 ./bin/opensearch
@@ -91,11 +86,11 @@ cd opensearch-3.2.0
 **Option B: Use Docker**
 
 ```bash
-docker pull opensearchproject/opensearch:3.2.0
+docker pull opensearchproject/opensearch:3.3.2
 docker run -d -p 9200:9200 -p 9600:9600 \
   -e "discovery.type=single-node" \
   -e "OPENSEARCH_INITIAL_ADMIN_PASSWORD=YourStrongPassword123!" \
-  opensearchproject/opensearch:3.2.0
+  opensearchproject/opensearch:3.3.2
 ```
 
 **Verify OpenSearch is Running:**
@@ -107,17 +102,22 @@ curl http://localhost:9200
 
 #### Installing JVector Plugin
 
+**Important:** JVector plugin replaces the official OpenSearch k-NN plugin. You must remove the following plugins before installing JVector:
+- `opensearch-knn` (official k-NN plugin)
+- `opensearch-neural-search` (depends on opensearch-knn)
+
 #### Option 1: Install from Maven Repository
 
 ```bash
 # Navigate to your OpenSearch directory
 cd /path/to/opensearch
 
-# Remove existing k-NN plugin (if installed)
+# Remove existing k-NN and neural-search plugins (if installed)
+bin/opensearch-plugin remove opensearch-neural-search
 bin/opensearch-plugin remove opensearch-knn
 
 # Download and install JVector plugin
-curl https://repo1.maven.org/maven2/org/opensearch/plugin/opensearch-jvector-plugin/3.2.0.0/opensearch-jvector-plugin-3.2.0.0.zip -o opensearch-jvector-plugin.zip
+curl https://repo1.maven.org/maven2/org/opensearch/plugin/opensearch-jvector-plugin/3.3.2.0/opensearch-jvector-plugin-3.3.2.0.zip -o opensearch-jvector-plugin.zip
 bin/opensearch-plugin install file://`pwd`/opensearch-jvector-plugin.zip
 
 # Start OpenSearch
@@ -129,14 +129,14 @@ bin/opensearch
 Create a `Dockerfile`:
 
 ```dockerfile
-FROM opensearchproject/opensearch:3.2.0
+FROM opensearchproject/opensearch:3.3.2
 
 # Remove default KNN plugin
 RUN /usr/share/opensearch/bin/opensearch-plugin remove opensearch-neural-search && \
     /usr/share/opensearch/bin/opensearch-plugin remove opensearch-knn
 
 # Install JVector plugin
-RUN curl https://repo1.maven.org/maven2/org/opensearch/plugin/opensearch-jvector-plugin/3.2.0.0/opensearch-jvector-plugin-3.2.0.0.zip -o opensearch-jvector-plugin.zip && \
+RUN curl https://repo1.maven.org/maven2/org/opensearch/plugin/opensearch-jvector-plugin/3.3.2.0/opensearch-jvector-plugin-3.3.2.0.zip -o opensearch-jvector-plugin.zip && \
     /usr/share/opensearch/bin/opensearch-plugin install --batch file://`pwd`/opensearch-jvector-plugin.zip
 ```
 
@@ -155,15 +155,23 @@ docker run -p 9200:9200 -p 9600:9600 \
 Check that the plugin is installed:
 
 ```bash
-curl -X GET "localhost:9200/_cat/plugins?v"
+# For local development (with security disabled)
+curl -X GET "http://localhost:9200/_cat/plugins?v"
+
+# For production (with security enabled - default)
+curl -X GET "https://localhost:9200/_cat/plugins?v" \
+  -u admin:admin \
+  --insecure
 ```
 
 Expected output should include:
 
 ```
 name       component           version
-node-1     opensearch-jvector  3.2.0.0
+node-1     opensearch-jvector  3.3.2.0
 ```
+
+**Note:** Replace `admin:admin` with your actual credentials. Use `--insecure` only for development with self-signed certificates.
 
 ### Your First Index and Search
 
@@ -364,13 +372,13 @@ curl -X PUT "localhost:9200/optimized-index" -H 'Content-Type: application/json'
 
 #### Space Types
 
-JVector supports multiple distance metrics:
+JVector supports the following distance metrics:
 
 | Space Type | Description | Use Case |
 |------------|-------------|----------|
 | `l2` | Euclidean distance (L2 norm) | General purpose, geometric similarity |
 | `cosinesimil` | Cosine similarity | Text embeddings, normalized vectors |
-| `inner_product` | Inner product (dot product) | When vectors are already normalized |
+
 
 **Example with cosine similarity:**
 
@@ -403,40 +411,7 @@ curl -X PUT "localhost:9200/text-embeddings" -H 'Content-Type: application/json'
 
 #### Quantization Options
 
-JVector supports advanced quantization for memory efficiency:
-
-**Scalar Quantization (8-bit):**
-
-```bash
-curl -X PUT "localhost:9200/quantized-index" -H 'Content-Type: application/json' -d'
-{
-  "settings": {
-    "index.knn": true
-  },
-  "mappings": {
-    "properties": {
-      "vector_field": {
-        "type": "knn_vector",
-        "dimension": 768,
-        "method": {
-          "name": "disk_ann",
-          "engine": "jvector",
-          "space_type": "l2",
-          "parameters": {
-            "m": 16,
-            "ef_construction": 100,
-            "compression": {
-              "type": "scalar_quantization",
-              "bits": 8
-            }
-          }
-        }
-      }
-    }
-  }
-}
-'
-```
+JVector supports Product Quantization (PQ) for memory efficiency:
 
 **Product Quantization (PQ):**
 
@@ -508,41 +483,82 @@ curl -X POST "localhost:9200/_bulk" -H 'Content-Type: application/x-ndjson' -d'
 - **Medium vectors (256-768 dims)**: 500-1000 documents per batch
 - **Large vectors (> 768 dims)**: 100-500 documents per batch
 
-**Python Example for Bulk Indexing:**
+**Java Example for Bulk Indexing:**
 
-```python
-from opensearchpy import OpenSearch
-from opensearchpy.helpers import bulk
-import numpy as np
+```java
+import org.opensearch.client.opensearch.OpenSearchClient;
+import org.opensearch.client.opensearch.core.BulkRequest;
+import org.opensearch.client.opensearch.core.BulkResponse;
+import org.opensearch.client.opensearch.core.bulk.BulkOperation;
+import org.opensearch.client.json.jackson.JacksonJsonpMapper;
+import org.opensearch.client.transport.OpenSearchTransport;
+import org.opensearch.client.transport.rest_client.RestClientTransport;
+import org.apache.http.HttpHost;
+import org.opensearch.client.RestClient;
 
-# Connect to OpenSearch
-client = OpenSearch(
-    hosts=[{'host': 'localhost', 'port': 9200}],
-    http_auth=('admin', 'admin'),
-    use_ssl=False
-)
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Random;
 
-# Generate sample data
-def generate_documents(num_docs, dimension):
-    for i in range(num_docs):
-        yield {
-            "_index": "my-index",
-            "_id": i,
-            "_source": {
-                "vector_field": np.random.rand(dimension).tolist(),
-                "title": f"Document {i}"
+public class BulkIndexExample {
+    public static void main(String[] args) throws Exception {
+        // Create OpenSearch client
+        RestClient restClient = RestClient.builder(
+            new HttpHost("localhost", 9200, "http")
+        ).build();
+        
+        OpenSearchTransport transport = new RestClientTransport(
+            restClient, new JacksonJsonpMapper()
+        );
+        OpenSearchClient client = new OpenSearchClient(transport);
+        
+        // Bulk index documents
+        int batchSize = 1000;
+        int totalDocs = 10000;
+        int dimension = 768;
+        Random random = new Random();
+        
+        for (int batch = 0; batch < totalDocs / batchSize; batch++) {
+            List<BulkOperation> operations = new ArrayList<>();
+            
+            for (int i = 0; i < batchSize; i++) {
+                int docId = batch * batchSize + i;
+                float[] vector = new float[dimension];
+                for (int j = 0; j < dimension; j++) {
+                    vector[j] = random.nextFloat();
+                }
+                
+                operations.add(BulkOperation.of(op -> op
+                    .index(idx -> idx
+                        .index("my-index")
+                        .id(String.valueOf(docId))
+                        .document(new Document(vector, "Document " + docId))
+                    )
+                ));
             }
+            
+            BulkResponse response = client.bulk(BulkRequest.of(b -> b
+                .operations(operations)
+            ));
+            
+            System.out.println("Batch " + batch + ": " +
+                (batchSize - response.errors()) + " succeeded, " +
+                response.errors() + " failed");
         }
-
-# Bulk index
-success, failed = bulk(
-    client,
-    generate_documents(10000, 768),
-    chunk_size=1000,
-    request_timeout=300
-)
-
-print(f"Indexed {success} documents, {failed} failed")
+        
+        transport.close();
+    }
+    
+    static class Document {
+        public float[] vector_field;
+        public String title;
+        
+        public Document(float[] vector, String title) {
+            this.vector_field = vector;
+            this.title = title;
+        }
+    }
+}
 ```
 
 #### Incremental Updates
@@ -572,7 +588,7 @@ curl -X POST "localhost:9200/my-index/_update/1" -H 'Content-Type: application/j
 **Why JVector is Better for Updates:**
 - Traditional HNSW requires full graph rebuild on merge
 - JVector performs incremental merges, adding new vectors to existing graph
-- Result: 10-100x faster merge times for large indices
+- Result: Significantly faster merge times for large indices (see [benchmarks](../README.md#incremental-merges))
 
 ### Force Merge Operations
 
@@ -613,19 +629,14 @@ curl -X GET "localhost:9200/_nodes/stats/indices/knn?pretty"
 
 #### Incremental Merge Advantage
 
-**Without Incremental Merges (Traditional HNSW):**
-- Merge time grows exponentially with index size
-- 1M vectors: ~10 minutes
-- 2M vectors: ~40 minutes
-- 3M vectors: ~90 minutes
+JVector's incremental merge capability provides significant performance improvements over traditional HNSW implementations that require full graph rebuilds on every merge.
 
-**With Incremental Merges (JVector):**
-- Merge time grows linearly
-- 1M vectors: ~2 minutes
-- 2M vectors: ~4 minutes
-- 3M vectors: ~6 minutes
+**Key Benefits:**
+- Merge time grows more linearly with index size
+- Faster updates for large indices
+- Reduced resource consumption during merges
 
-See [benchmarks](../README.md#incremental-merges) for detailed comparison.
+See [benchmarks](../README.md#incremental-merges) for detailed performance comparisons with graphs showing merge time scaling.
 
 ---
 
@@ -792,38 +803,14 @@ curl -X POST "localhost:9200/my-index/_search" -H 'Content-Type: application/jso
 
 #### Hybrid Search (Vector + Text)
 
-Combine vector similarity with text search:
+To combine vector similarity search with traditional text search, OpenSearch provides a dedicated [Hybrid Search](https://opensearch.org/docs/latest/search-plugins/hybrid-search/) feature. This feature properly normalizes and combines scores from different query types (vector and lexical) to produce meaningful results.
 
-```bash
-curl -X POST "localhost:9200/my-index/_search" -H 'Content-Type: application/json' -d'
-{
-  "size": 10,
-  "query": {
-    "bool": {
-      "should": [
-        {
-          "knn": {
-            "vector_field": {
-              "vector": [0.1, 0.2, ..., 0.768],
-              "k": 10,
-              "boost": 2.0
-            }
-          }
-        },
-        {
-          "match": {
-            "title": {
-              "query": "machine learning",
-              "boost": 1.0
-            }
-          }
-        }
-      ]
-    }
-  }
-}
-'
-```
+**Key benefits of Hybrid Search:**
+- Proper score normalization across different query types
+- Combines semantic (vector) and lexical (keyword) search
+- Configurable score combination strategies
+
+Please refer to the [OpenSearch Hybrid Search documentation](https://opensearch.org/docs/latest/search-plugins/hybrid-search/) for setup instructions and examples.
 
 #### Nested Field Search
 
@@ -894,7 +881,9 @@ curl -X GET "localhost:9200/_nodes/stats/indices/knn?pretty"
 
 #### Query Profiling
 
-Profile a search query:
+OpenSearch provides built-in query profiling capabilities. For detailed information on profiling queries, see the [OpenSearch Query Profiling documentation](https://opensearch.org/docs/latest/api-reference/profile/).
+
+**Example:**
 
 ```bash
 curl -X POST "localhost:9200/my-index/_search" -H 'Content-Type: application/json' -d'
@@ -911,6 +900,8 @@ curl -X POST "localhost:9200/my-index/_search" -H 'Content-Type: application/jso
 }
 '
 ```
+
+The profile output will include timing information for the k-NN query execution.
 
 ---
 
@@ -944,17 +935,11 @@ The `ef_construction` parameter affects index quality:
 
 #### Quantization Trade-offs
 
-**Scalar Quantization (8-bit):**
-- Memory: 4x reduction (32-bit → 8-bit)
-- Recall: ~95-98% of original
-- Speed: Slightly faster (less data to read)
-- **Use when:** Memory is limited, slight recall loss acceptable
-
 **Product Quantization:**
-- Memory: 8-64x reduction (configurable)
+- Memory: Significant reduction (configurable compression ratio)
 - Recall: ~90-95% of original (depends on configuration)
 - Speed: Faster for large datasets
-- **Use when:** Very large datasets, significant memory constraints
+- **Use when:** Large datasets with memory constraints
 
 **No Quantization:**
 - Memory: Full precision
@@ -986,33 +971,27 @@ curl -X PUT "localhost:9200/my-index/_settings" -H 'Content-Type: application/js
 
 #### ef_search Parameter Tuning
 
-Tune `ef_search` based on your recall requirements:
+Tune `ef_search` based on your recall requirements by testing different values:
 
-```python
-# Test different ef_search values
-ef_search_values = [50, 100, 150, 200, 300]
-results = {}
-
-for ef in ef_search_values:
-    response = client.search(
-        index="my-index",
-        body={
-            "size": 10,
-            "query": {
-                "knn": {
-                    "vector_field": {
-                        "vector": query_vector,
-                        "k": 10,
-                        "ef_search": ef
-                    }
-                }
-            }
-        }
-    )
-    results[ef] = {
-        "latency": response["took"],
-        "hits": response["hits"]["hits"]
+```bash
+# Test with ef_search=50
+curl -X POST "localhost:9200/my-index/_search" -H 'Content-Type: application/json' -d'
+{
+  "size": 10,
+  "query": {
+    "knn": {
+      "vector_field": {
+        "vector": [0.1, 0.2, ..., 0.768],
+        "k": 10,
+        "ef_search": 50
+      }
     }
+  }
+}
+'
+
+# Test with ef_search=100
+# ... (repeat with different values: 150, 200, 300)
 ```
 
 **Guidelines:**
@@ -1053,39 +1032,12 @@ JVector's DiskANN implementation is optimized for RAM-constrained environments:
 
 #### Quantization for Memory Reduction
 
-**When to use quantization:**
+**When to use Product Quantization:**
 - Index size exceeds available RAM
 - Cost optimization (smaller instances)
-- Acceptable recall trade-off (95-98%)
+- Acceptable recall trade-off (90-95%)
 
-**Quantization configuration:**
-
-```bash
-# 8-bit scalar quantization (4x reduction)
-curl -X PUT "localhost:9200/quantized-index" -H 'Content-Type: application/json' -d'
-{
-  "mappings": {
-    "properties": {
-      "vector_field": {
-        "type": "knn_vector",
-        "dimension": 768,
-        "method": {
-          "name": "disk_ann",
-          "engine": "jvector",
-          "space_type": "l2",
-          "parameters": {
-            "compression": {
-              "type": "scalar_quantization",
-              "bits": 8
-            }
-          }
-        }
-      }
-    }
-  }
-}
-'
-```
+**Product Quantization is automatically applied by JVector** when the vector count exceeds the minimum batch size threshold. You can configure PQ parameters in the index settings (see [Quantization Options](#quantization-options) section).
 
 #### OS Cache Considerations
 
@@ -1145,31 +1097,7 @@ print(f"Recall@10: {recall:.3f}")
 
 #### Measuring Latency and Throughput
 
-```python
-import time
-
-# Measure search latency
-start = time.time()
-response = client.search(
-    index="my-index",
-    body={"query": {"knn": {"vector_field": {"vector": query_vector, "k": 10}}}}
-)
-latency = (time.time() - start) * 1000  # ms
-
-# Measure throughput
-num_queries = 1000
-start = time.time()
-for query in queries:
-    client.search(
-        index="my-index",
-        body={"query": {"knn": {"vector_field": {"vector": query, "k": 10}}}}
-    )
-duration = time.time() - start
-throughput = num_queries / duration  # queries per second
-
-print(f"Latency: {latency:.2f} ms")
-print(f"Throughput: {throughput:.2f} QPS")
-```
+For comprehensive performance measurements including latency, throughput, and recall, see the [Benchmarking](#benchmarking) section which provides detailed instructions on using the provided benchmarking tools.
 
 #### Performance Comparison
 
@@ -1210,10 +1138,12 @@ curl -X PUT "localhost:9200/lucene-index" -H 'Content-Type: application/json' -d
 # Run benchmarks and compare
 ```
 
-**Expected Results (from benchmarks):**
-- JVector: 3-5x faster search for large datasets
-- JVector: 10-100x faster merges with incremental updates
-- JVector: Better performance in RAM-constrained environments
+**Expected Results:**
+- JVector provides faster search for large datasets
+- JVector provides significantly faster merges with incremental updates
+- JVector performs well in RAM-constrained environments
+
+See [benchmarks](../README.md#incremental-merges) for detailed performance comparisons.
 
 ---
 
