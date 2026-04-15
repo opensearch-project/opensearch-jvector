@@ -151,7 +151,9 @@ public class DerivedSourceVectorTransformer {
         int offset = 0;
         if (isNested) {
             ValidationException validationException = new ValidationException();
-            validationException.addValidationError(String.format("Nested fields are not supported when [%s] is true.", KNN_DERIVED_SOURCE_ENABLED));
+            validationException.addValidationError(
+                String.format("Nested fields are not supported when [%s] is true.", KNN_DERIVED_SOURCE_ENABLED)
+            );
             throw validationException;
 
             // TODO: Uncomment this when derived source nested field is fixed.

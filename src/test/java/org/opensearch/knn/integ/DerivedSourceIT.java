@@ -7,7 +7,6 @@ package org.opensearch.knn.integ;
 
 import lombok.SneakyThrows;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.opensearch.client.ResponseException;
 import org.opensearch.common.collect.Tuple;
 import org.opensearch.common.settings.Settings;
@@ -96,11 +95,12 @@ public class DerivedSourceIT extends DerivedSourceTestCase {
         try {
             List<DerivedSourceUtils.IndexConfigContext> indexConfigContexts = getNestedIndexContexts("derivedit", true);
             testDerivedSourceE2E(indexConfigContexts);
-        }
-        catch (Exception excp) {
+        } catch (Exception excp) {
             // TODO: Remove this check when nested fields are supported with derived sources.
             assertTrue(excp.getMessage().contains("validation_exception"));
-            assertTrue(excp.getMessage().contains(String.format("Nested fields are not supported when [%s] is true.", KNN_DERIVED_SOURCE_ENABLED)));
+            assertTrue(
+                excp.getMessage().contains(String.format("Nested fields are not supported when [%s] is true.", KNN_DERIVED_SOURCE_ENABLED))
+            );
         }
     }
 
