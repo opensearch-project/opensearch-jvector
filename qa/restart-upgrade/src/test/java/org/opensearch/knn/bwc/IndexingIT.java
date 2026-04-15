@@ -37,7 +37,7 @@ public class IndexingIT extends AbstractRestartUpgradeTestCase {
     private static final int K = 5;
     private static final int M = 50;
     private static final int EF_CONSTRUCTION = 1024;
-    private static final int NUM_DOCS = 10;
+    private static final int NUM_DOCS = 100;
     private static int QUERY_COUNT = 0;
 
     // Default Legacy Field Mapping

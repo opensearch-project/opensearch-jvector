@@ -152,6 +152,31 @@ public class CommonTestUtils {
         };
     }
 
+    public static Codec getCodec(int minBatchSizeForQuantization, boolean leadingSegmentMergeDisabled, ForkJoinPool graphMergePool) {
+        if (graphMergePool == null) {
+            return getCodec(minBatchSizeForQuantization, leadingSegmentMergeDisabled);
+        } else {
+            return new FilterCodec(KNNCodecVersion.V_10_04_0.getCodecName(), new Lucene104Codec()) {
+                @Override
+                public KnnVectorsFormat knnVectorsFormat() {
+                    return new PerFieldKnnVectorsFormat() {
+
+                        @Override
+                        public KnnVectorsFormat getKnnVectorsFormatForField(String field) {
+                            return new JVectorFormat(
+                                minBatchSizeForQuantization,
+                                leadingSegmentMergeDisabled,
+                                graphMergePool,
+                                graphMergePool,
+                                graphMergePool
+                            );
+                        }
+                    };
+                }
+            };
+        }
+    }
+
     /**
      * Get Stats from KNN Plugin
      */
@@ -275,9 +300,10 @@ public class CommonTestUtils {
         String fieldName,
         float[][] indexVectors,
         int docCount,
-        boolean refresh
+        boolean refresh,
+        int batchSize /* max docs per bulk request */
     ) throws IOException {
-        bulkAddKnnDocs(restClient, index, fieldName, indexVectors, 0, docCount, refresh);
+        bulkAddKnnDocs(restClient, index, fieldName, indexVectors, 0, docCount, refresh, batchSize);
     }
 
     // Method that adds multiple documents into the index using Bulk API
@@ -288,9 +314,10 @@ public class CommonTestUtils {
         float[][] indexVectors,
         int baseDocId,
         int docCount,
-        boolean refresh
+        boolean refresh,
+        int batchSize /* max docs per bulk request */
     ) throws IOException {
-        bulkAddKnnDocs(restClient, index, fieldName, indexVectors, 0, baseDocId, docCount, refresh);
+        bulkAddKnnDocs(restClient, index, fieldName, indexVectors, 0, baseDocId, docCount, refresh, batchSize);
     }
 
     public static void bulkAddKnnDocs(
@@ -301,12 +328,10 @@ public class CommonTestUtils {
         int sourceOffset,
         int baseDocId,
         int docCount,
-        boolean refresh
+        boolean refresh,
+        int batchSize /* max docs per bulk request */
     ) throws IOException {
-
-        // max docs per bulk request and max parallel bulk requests
-        final int batchSize = 1000; // adjust to your payload size / network characteristics
-        final int maxConcurrency = 4;
+        final int maxConcurrency = 4; /* and max parallel bulk requests */
 
         int totalBatches = (docCount + batchSize - 1) / batchSize;
         int poolSize = Math.min(maxConcurrency, Math.max(1, totalBatches));

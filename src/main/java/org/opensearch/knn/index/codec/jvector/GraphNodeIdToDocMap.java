@@ -23,6 +23,9 @@ import java.util.Arrays;
  */
 @Log4j2
 public class GraphNodeIdToDocMap {
+    // The marker for documents without vectors (== null) or deleted documents
+    public static final int NO_VECTOR_OR_DELETED_DOC = -1;
+
     private static final int VERSION = 1;
     private int[] graphNodeIdsToDocIds;
     private int[] docIdsToGraphNodeIds;
@@ -43,13 +46,13 @@ public class GraphNodeIdToDocMap {
 
         graphNodeIdsToDocIds = new int[size];
         docIdsToGraphNodeIds = new int[maxDocId];
-        Arrays.fill(graphNodeIdsToDocIds, -1);
-        Arrays.fill(docIdsToGraphNodeIds, -1);
+        Arrays.fill(graphNodeIdsToDocIds, NO_VECTOR_OR_DELETED_DOC);
+        Arrays.fill(docIdsToGraphNodeIds, NO_VECTOR_OR_DELETED_DOC);
         for (int ord = 0; ord < size; ord++) {
             final int docId = in.readVInt();
-            graphNodeIdsToDocIds[ord] = docId;
-            if (docId != -1) {
-                // ignore deleted documents
+            // ignore deleted documents
+            if (docId != NO_VECTOR_OR_DELETED_DOC) {
+                graphNodeIdsToDocIds[ord] = docId;
                 docIdsToGraphNodeIds[docId] = ord;
             }
         }
@@ -59,12 +62,16 @@ public class GraphNodeIdToDocMap {
         return docIdsToGraphNodeIds.length;
     }
 
+    public GraphNodeIdToDocMap(int[] graphNodeIdsToDocIds) {
+        this(graphNodeIdsToDocIds, graphNodeIdsToDocIds.length > 0 ? Arrays.stream(graphNodeIdsToDocIds).max().getAsInt() : 0);
+    }
+
     /**
      * Constructor that creates a new mapping between ordinals and docIds
      *
      * @param graphNodeIdsToDocIds The mapping from ordinals to docIds
      */
-    public GraphNodeIdToDocMap(int[] graphNodeIdsToDocIds) {
+    public GraphNodeIdToDocMap(int[] graphNodeIdsToDocIds, int maxDocId) {
         if (graphNodeIdsToDocIds.length == 0) {
             this.graphNodeIdsToDocIds = new int[0];
             this.docIdsToGraphNodeIds = new int[0];
@@ -72,7 +79,16 @@ public class GraphNodeIdToDocMap {
         }
         this.graphNodeIdsToDocIds = new int[graphNodeIdsToDocIds.length];
         System.arraycopy(graphNodeIdsToDocIds, 0, this.graphNodeIdsToDocIds, 0, graphNodeIdsToDocIds.length);
-        final int maxDocId = Arrays.stream(graphNodeIdsToDocIds).max().getAsInt();
+
+        final int observedMaxDocId = Arrays.stream(graphNodeIdsToDocIds).max().getAsInt();
+        // The graphNodeIdsToDocIds may only contain graphNodes for document with vectors,
+        // the documents without vectors have to be accounted for as well.
+        if (maxDocId < observedMaxDocId) {
+            throw new IllegalArgumentException(
+                "The maxDocId is incorrect, provided " + maxDocId + ", expected at least " + observedMaxDocId
+            );
+        }
+
         final int maxDocs = maxDocId + 1;
         // We are going to assume that the number of ordinals is roughly the same as the number of documents in the segment, therefore,
         // the mapping will not be sparse.

@@ -84,21 +84,19 @@ public class DerivedSourceIT extends DerivedSourceTestCase {
         }
     }
 
-    @Ignore
     @SneakyThrows
     public void testObjectField() {
         List<DerivedSourceUtils.IndexConfigContext> indexConfigContexts = getObjectIndexContexts("derivedit", true);
         testDerivedSourceE2E(indexConfigContexts);
     }
 
-    @Ignore
     @SneakyThrows
+    @Ignore
     public void testNestedField() {
         List<DerivedSourceUtils.IndexConfigContext> indexConfigContexts = getNestedIndexContexts("derivedit", true);
         testDerivedSourceE2E(indexConfigContexts);
     }
 
-    @Ignore
     @SneakyThrows
     public void testDerivedSource_whenSegrepLocal_thenDisabled() {
         // Set the data type input for float fields as byte. If derived source gets enabled, the original and derived
@@ -177,11 +175,8 @@ public class DerivedSourceIT extends DerivedSourceTestCase {
      * Tests that kNN handles bad documents the same when derived source is enabled and disabled.
      * @throws IOException
      */
-    @Ignore
     public void testDerivedSource_HandlesInvalidDocuments() throws IOException {
-        // TODO: change "addNull: true" to introduce randomness in testing, after merge issues are fixed. Docs with null values are causing
-        // issues presently.
-        List<DerivedSourceUtils.IndexConfigContext> indexConfigContexts = getCustomAnalyzerIndexContexts("derivedit", true, false);
+        List<DerivedSourceUtils.IndexConfigContext> indexConfigContexts = getCustomAnalyzerIndexContexts("derivedit", true, true);
 
         assertTrue(1 < indexConfigContexts.size());
         DerivedSourceUtils.IndexConfigContext derivedSourceEnabledContext = indexConfigContexts.get(0);

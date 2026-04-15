@@ -14,7 +14,9 @@ import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.tests.index.RandomIndexWriter;
 import org.apache.lucene.tests.util.LuceneTestCase;
+import org.junit.After;
 import org.junit.Assert;
+import org.junit.Before;
 import org.junit.Test;
 import org.opensearch.knn.TestUtils;
 import org.opensearch.knn.common.KNNConstants;
@@ -28,6 +30,7 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static org.opensearch.knn.common.KNNConstants.DEFAULT_LEADING_SEGMENT_MERGE_DISABLED;
 import static org.opensearch.knn.common.KNNConstants.DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION;
 import static org.opensearch.knn.index.engine.CommonTestUtils.getCodec;
 
@@ -43,6 +46,22 @@ import static org.opensearch.knn.index.engine.CommonTestUtils.getCodec;
 public class KNNJVectorTests extends LuceneTestCase {
     private static final String TEST_FIELD = "test_field";
     private static final String TEST_ID_FIELD = "id";
+    private ForkJoinPool singleThreadGraphMergePool;
+
+    @Before
+    public void setUp() throws Exception {
+        super.setUp();
+        singleThreadGraphMergePool = new ForkJoinPool(1); /* single threaded */
+    }
+
+    @After
+    public void tearDown() throws Exception {
+        super.tearDown();
+        singleThreadGraphMergePool.shutdown();
+        if (singleThreadGraphMergePool.awaitTermination(30, TimeUnit.SECONDS) == false) {
+            singleThreadGraphMergePool.shutdownNow();
+        }
+    }
 
     /**
      * Test to verify that the JVector codec is able to successfully search for the nearest neighbours
@@ -123,6 +142,7 @@ public class KNNJVectorTests extends LuceneTestCase {
         indexWriterConfig.setUseCompoundFile(false);
         indexWriterConfig.setCodec(getCodec());
         indexWriterConfig.setMergePolicy(new ForceMergesOnlyMergePolicy());
+        indexWriterConfig.setMaxBufferedDocs(totalNumberOfDocs);
         final Path indexPath = createTempDir();
         log.info("Index path: {}", indexPath);
         try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter w = new IndexWriter(dir, indexWriterConfig)) {
@@ -185,11 +205,13 @@ public class KNNJVectorTests extends LuceneTestCase {
         final String sortFieldName = "sorted_field";
         IndexWriterConfig indexWriterConfig = LuceneTestCase.newIndexWriterConfig();
         indexWriterConfig.setUseCompoundFile(false);
-        indexWriterConfig.setCodec(getCodec());
+        indexWriterConfig.setCodec(
+            getCodec(DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION, DEFAULT_LEADING_SEGMENT_MERGE_DISABLED, singleThreadGraphMergePool)
+        );
         indexWriterConfig.setMergePolicy(new ForceMergesOnlyMergePolicy());
         // Add index sorting configuration
         indexWriterConfig.setIndexSort(new Sort(new SortField(sortFieldName, SortField.Type.INT, true))); // true = reverse order
-
+        indexWriterConfig.setMaxBufferedDocs(totalNumberOfDocs);
         final Path indexPath = createTempDir();
         log.info("Index path: {}", indexPath);
         try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter w = new IndexWriter(dir, indexWriterConfig)) {
@@ -211,9 +233,13 @@ public class KNNJVectorTests extends LuceneTestCase {
                 Assert.assertEquals(1, reader.getContext().leaves().size());
                 Assert.assertEquals(totalNumberOfDocs, reader.numDocs());
 
-                final Query filterQuery = new MatchAllDocsQuery();
                 final IndexSearcher searcher = newSearcher(reader);
-                KnnFloatVectorQuery knnFloatVectorQuery = getJVectorKnnFloatVectorQuery("test_field", target, k, filterQuery);
+                KnnFloatVectorQuery knnFloatVectorQuery = getJVectorKnnFloatVectorQuery(
+                    "test_field",
+                    target,
+                    k,
+                    MatchAllDocsQuery.INSTANCE
+                );
                 TopDocs topDocs = searcher.search(knnFloatVectorQuery, k);
                 assertEquals(k, topDocs.totalHits.value());
                 assertEquals(9, topDocs.scoreDocs[0].doc);
@@ -319,9 +345,12 @@ public class KNNJVectorTests extends LuceneTestCase {
         int totalNumberOfDocs = 10;
         IndexWriterConfig indexWriterConfig = LuceneTestCase.newIndexWriterConfig();
         indexWriterConfig.setUseCompoundFile(false);
-        indexWriterConfig.setCodec(getCodec());
+        indexWriterConfig.setCodec(
+            getCodec(DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION, DEFAULT_LEADING_SEGMENT_MERGE_DISABLED, singleThreadGraphMergePool)
+        );
         indexWriterConfig.setMergePolicy(new ForceMergesOnlyMergePolicy());
         indexWriterConfig.setMergeScheduler(new SerialMergeScheduler());
+        indexWriterConfig.setMaxBufferedDocs(totalNumberOfDocs);
         final Path indexPath = createTempDir();
         log.info("Index path: {}", indexPath);
         try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter w = new IndexWriter(dir, indexWriterConfig)) {
@@ -339,12 +368,16 @@ public class KNNJVectorTests extends LuceneTestCase {
             w.forceMerge(1); // this merges all segments into a single segment
             log.info("Done merging all segments");
             try (IndexReader reader = DirectoryReader.open(w)) {
-                log.info("We should now have 1 segment with 10 documents");
+                log.info("We should now have 1 segment with {} documents", totalNumberOfDocs);
                 Assert.assertEquals(1, reader.getContext().leaves().size());
                 Assert.assertEquals(totalNumberOfDocs, reader.numDocs());
-                final Query filterQuery = new MatchAllDocsQuery();
                 final IndexSearcher searcher = newSearcher(reader);
-                KnnFloatVectorQuery knnFloatVectorQuery = getJVectorKnnFloatVectorQuery("test_field", target, k, filterQuery);
+                KnnFloatVectorQuery knnFloatVectorQuery = getJVectorKnnFloatVectorQuery(
+                    "test_field",
+                    target,
+                    k,
+                    MatchAllDocsQuery.INSTANCE
+                );
                 TopDocs topDocs = searcher.search(knnFloatVectorQuery, k);
                 assertEquals(k, topDocs.totalHits.value());
                 Document doc = reader.storedFields().document(topDocs.scoreDocs[0].doc);
@@ -370,6 +403,73 @@ public class KNNJVectorTests extends LuceneTestCase {
                 );
                 log.info("successfully completed search tests");
             }
+        }
+    }
+
+    @Test
+    public void testJVectorKnnIndex_mergeDisabled() throws IOException {
+        int k = 3; // The number of nearest neighbours to gather
+        int totalNumberOfDocs = 10;
+        IndexWriterConfig indexWriterConfig = LuceneTestCase.newIndexWriterConfig();
+        indexWriterConfig.setUseCompoundFile(false);
+        indexWriterConfig.setCodec(
+            getCodec(DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION, DEFAULT_LEADING_SEGMENT_MERGE_DISABLED, singleThreadGraphMergePool)
+        );
+        indexWriterConfig.setMergePolicy(NoMergePolicy.INSTANCE);
+        indexWriterConfig.setMergeScheduler(new SerialMergeScheduler());
+        indexWriterConfig.setMaxBufferedDocs(10);
+        log.info("Max buffered docs: {}", indexWriterConfig.getMaxBufferedDocs());
+
+        final Path indexPath = createTempDir();
+        final float[] target = new float[] { 0.0f, 0.0f };
+
+        log.info("Index path: {}", indexPath);
+        try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter w = new IndexWriter(dir, indexWriterConfig)) {
+            for (int i = 1; i < totalNumberOfDocs + 1; i++) {
+                final float[] source = new float[] { 0.0f, 1.0f * i };
+                final Document doc = new Document();
+                doc.add(new KnnFloatVectorField("test_field", source, VectorSimilarityFunction.EUCLIDEAN));
+                doc.add(new StringField("my_doc_id", Integer.toString(i, 10), Field.Store.YES));
+                w.addDocument(doc);
+            }
+            log.info("Done writing all files to the file system");
+
+            w.commit();
+            w.flush();
+        }
+        try (FSDirectory dir = FSDirectory.open(indexPath); IndexReader reader = DirectoryReader.open(dir)) {
+            log.info("We should now have 1 segment with 10 documents");
+            Assert.assertEquals(1, reader.getContext().leaves().size());
+            Assert.assertEquals(totalNumberOfDocs, reader.numDocs());
+
+            final IndexSearcher searcher = newSearcher(reader);
+            KnnFloatVectorQuery knnFloatVectorQuery = getJVectorKnnFloatVectorQuery("test_field", target, k, MatchAllDocsQuery.INSTANCE);
+            TopDocs topDocs = searcher.search(knnFloatVectorQuery, k);
+            assertEquals(k, topDocs.totalHits.value());
+            Document doc = reader.storedFields().document(topDocs.scoreDocs[0].doc);
+
+            assertEquals("1", doc.get("my_doc_id"));
+            Assert.assertEquals(
+                VectorSimilarityFunction.EUCLIDEAN.compare(target, new float[] { 0.0f, 1.0f }),
+                topDocs.scoreDocs[0].score,
+                0.001f
+            );
+            doc = reader.storedFields().document(topDocs.scoreDocs[1].doc);
+            assertEquals("2", doc.get("my_doc_id"));
+            Assert.assertEquals(
+                VectorSimilarityFunction.EUCLIDEAN.compare(target, new float[] { 0.0f, 2.0f }),
+                topDocs.scoreDocs[1].score,
+                0.001f
+            );
+            doc = reader.storedFields().document(topDocs.scoreDocs[2].doc);
+            assertEquals("3", doc.get("my_doc_id"));
+            Assert.assertEquals(
+                VectorSimilarityFunction.EUCLIDEAN.compare(target, new float[] { 0.0f, 3.0f }),
+                topDocs.scoreDocs[2].score,
+                0.001f
+            );
+            log.info("successfully completed search tests");
+
         }
     }
 
