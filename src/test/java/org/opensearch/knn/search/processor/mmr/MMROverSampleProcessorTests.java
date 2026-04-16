@@ -5,6 +5,7 @@
 
 package org.opensearch.knn.search.processor.mmr;
 
+import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters;
 import org.mockito.ArgumentCaptor;
 import org.opensearch.action.search.SearchRequest;
 import org.opensearch.core.action.ActionListener;
@@ -14,6 +15,7 @@ import org.opensearch.knn.index.SpaceType;
 import org.opensearch.knn.index.VectorDataType;
 import org.opensearch.knn.index.mapper.KNNVectorFieldMapper;
 import org.opensearch.knn.index.query.KNNQueryBuilder;
+import org.opensearch.knn.index.ThreadLeakFiltersForTests;
 import org.opensearch.knn.search.extension.MMRSearchExtBuilder;
 import org.opensearch.search.builder.SearchSourceBuilder;
 import org.opensearch.search.pipeline.PipelineProcessingContext;
@@ -28,6 +30,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 import static org.opensearch.knn.common.KNNConstants.*;
 
+@ThreadLeakFilters(defaultFilters = true, filters = { ThreadLeakFiltersForTests.class })
 public class MMROverSampleProcessorTests extends MMRTestCase {
     private Client mockClient;
     private MMROverSampleProcessor processor;
