@@ -1019,163 +1019,172 @@ public class JVectorWriter extends KnnVectorsWriter {
 
             var leadingFieldsReader = (PerFieldKnnVectorsFormat.FieldsReader) readers[LEADING_READER_IDX];
             var leadingReader = (JVectorReader) leadingFieldsReader.getFieldReader(fieldInfo.name);
-            var graphReader = leadingReader.getNeighborsScoreCacheForField(fieldInfo.name);
+            try (var graphReader = leadingReader.getNeighborsScoreCacheForField(fieldInfo.name)) {
 
-            // A diversity provider is a required argument to OnHeapGraphIndex::load,
-            // however creating a VamanaDiversityProvider requires a buildScore provider
-            // which in turn requires knowledge of the ordinal -> vector mapping.
-            // Since the heap graph can contain ordinal "holes", this information
-            // is not available until AFTER the graph is loaded.
-            // Using a DelayedInitDiversityProvider avoids this chicken-and-egg problem.
-            // This is okay since the diversity provider is only used during mutations.
-            var diversityProvider = new DelayedInitDiversityProvider();
+                // A diversity provider is a required argument to OnHeapGraphIndex::load,
+                // however creating a VamanaDiversityProvider requires a buildScore provider
+                // which in turn requires knowledge of the ordinal -> vector mapping.
+                // Since the heap graph can contain ordinal "holes", this information
+                // is not available until AFTER the graph is loaded.
+                // Using a DelayedInitDiversityProvider avoids this chicken-and-egg problem.
+                // This is okay since the diversity provider is only used during mutations.
+                var diversityProvider = new DelayedInitDiversityProvider();
 
-            var numBaseVectors = leadingReader.getFloatVectorValues(fieldInfo.name).size();
+                var numBaseVectors = leadingReader.getFloatVectorValues(fieldInfo.name).size();
 
-            try (OnHeapGraphIndex leadingGraph = OnHeapGraphIndex.load(graphReader, this.dimension(), degreeOverflow, diversityProvider)) {
-                // Since we're performing leading segment merge, we need to load the OnHeapGraphIndex
-                // corresponding to the leading segment, then mutate it.
-                // Since ordinals of OnHeapGraphIndex cannot be compacted, holes in the ordinals
-                // will build up over time.
+                try (
+                    OnHeapGraphIndex leadingGraph = OnHeapGraphIndex.load(graphReader, this.dimension(), degreeOverflow, diversityProvider)
+                ) {
+                    // Since we're performing leading segment merge, we need to load the OnHeapGraphIndex
+                    // corresponding to the leading segment, then mutate it.
+                    // Since ordinals of OnHeapGraphIndex cannot be compacted, holes in the ordinals
+                    // will build up over time.
 
-                int leadingGraphIdUpperBound = leadingGraph.getIdUpperBound();
-                long heapOrdUpperBoundLong = leadingGraphIdUpperBound + (long) totalLiveVectorsInOtherReaders;
+                    int leadingGraphIdUpperBound = leadingGraph.getIdUpperBound();
+                    long heapOrdUpperBoundLong = leadingGraphIdUpperBound + (long) totalLiveVectorsInOtherReaders;
 
-                // even though Lucene should ensure that the sum of maxDoc across all segments
-                // is under IndexWriter.MAX_DOCS, our leading segment heap graph has holes
-                // that Lucene won't know about, which may push heapOrdUpperBound out of range.
-                // IndexWriter.MAX_DOCS = Integer.MAX_VALUE - 128
-                if (heapOrdUpperBoundLong > IndexWriter.MAX_DOCS) {
-                    log.warn(
-                        "New ordinal upper bound for neighbor score cache is too large. "
-                            + "This may indicate many deletes, or that you're approaching the maximum segment size. "
-                            + "Will skip leading segment merge."
-                    );
-                    return false; // indicate skipped
-                }
-
-                var heapGraphOrdinalDensity = totalLiveVectorsCount / (double) heapOrdUpperBoundLong;
-                if (heapGraphOrdinalDensity < MIN_HEAP_GRAPH_ORDINAL_DENSITY) {
-                    log.warn(
-                        "Heap ordinals will be insufficiently dense ({} < {}). "
-                            + "Will skip leading segment merge. (totalLiveVectors={}, heapOrdUpperBound={})",
-                        heapGraphOrdinalDensity,
-                        MIN_HEAP_GRAPH_ORDINAL_DENSITY,
-                        totalLiveVectorsCount,
-                        heapOrdUpperBoundLong
-                    );
-                    return false;
-                }
-
-                log.info("Starting leading segment merge for segment {} on field {}", segmentWriteState.segmentInfo.name, fieldInfo.name);
-
-                // we already checked that heapOrdUpperBoundLong <= IndexWriter.MAX_DOCS < Integer.MAX_VALUE
-                int heapOrdUpperBound = Math.toIntExact(heapOrdUpperBoundLong);
-
-                // While creating score providers and updating the graph, we need to supply a RAVV that
-                // takes account the accumulated holes in the OnHeapGraph, so we need some mappings
-                // to and from the ordinal space of the OnHeapGraphIndex (the heap ordinals)
-
-                // The "mid" ordinal space is the same as the "graphNodeId" ordinal space
-                // which includes all vectors from the leading segment and live vectors from other segments.
-                // We need this mapping to delete vectors later.
-                var midToHeapOrds = new int[graphNodeIdsToRavvOrds.length];
-                var heapToGlobalRavvOrds = new int[heapOrdUpperBound];
-                Arrays.fill(midToHeapOrds, -1);
-                Arrays.fill(heapToGlobalRavvOrds, -1);
-
-                // The "final" ord space is what happens to the ordinals on the heap graph
-                // on being written as an OnDiskGraphIndex.
-                // JVector automatically compacts the ordinals while preserving the order.
-                // Note that this may NOT be the same as the "compact" ordinal space calculated earler,
-                // (although it is also compact)
-                var finalOrdToDocId = new int[totalLiveVectorsCount];
-
-                int midOrd = 0;
-                int finalOrd = 0;
-                for (int heapOrd = 0; heapOrd < leadingGraphIdUpperBound; heapOrd++) {
-                    if (!leadingGraph.containsNode(heapOrd)) {
-                        continue;
+                    // even though Lucene should ensure that the sum of maxDoc across all segments
+                    // is under IndexWriter.MAX_DOCS, our leading segment heap graph has holes
+                    // that Lucene won't know about, which may push heapOrdUpperBound out of range.
+                    // IndexWriter.MAX_DOCS = Integer.MAX_VALUE - 128
+                    if (heapOrdUpperBoundLong > IndexWriter.MAX_DOCS) {
+                        log.warn(
+                            "New ordinal upper bound for neighbor score cache is too large. "
+                                + "This may indicate many deletes, or that you're approaching the maximum segment size. "
+                                + "Will skip leading segment merge."
+                        );
+                        return false; // indicate skipped
                     }
-                    midToHeapOrds[midOrd] = heapOrd;
-                    heapToGlobalRavvOrds[heapOrd] = graphNodeIdsToRavvOrds[midOrd];
-                    // the old ordinal space of the leading reader is not exactly the "mid" ordinal space
-                    // but by definition they match for the leading reader, so `.get(midOrd)` is valid
-                    if (liveGraphNodesPerReader[LEADING_READER_IDX].get(midOrd)) {
+
+                    var heapGraphOrdinalDensity = totalLiveVectorsCount / (double) heapOrdUpperBoundLong;
+                    if (heapGraphOrdinalDensity < MIN_HEAP_GRAPH_ORDINAL_DENSITY) {
+                        log.warn(
+                            "Heap ordinals will be insufficiently dense ({} < {}). "
+                                + "Will skip leading segment merge. (totalLiveVectors={}, heapOrdUpperBound={})",
+                            heapGraphOrdinalDensity,
+                            MIN_HEAP_GRAPH_ORDINAL_DENSITY,
+                            totalLiveVectorsCount,
+                            heapOrdUpperBoundLong
+                        );
+                        return false;
+                    }
+
+                    log.info(
+                        "Starting leading segment merge for segment {} on field {}",
+                        segmentWriteState.segmentInfo.name,
+                        fieldInfo.name
+                    );
+
+                    // we already checked that heapOrdUpperBoundLong <= IndexWriter.MAX_DOCS < Integer.MAX_VALUE
+                    int heapOrdUpperBound = Math.toIntExact(heapOrdUpperBoundLong);
+
+                    // While creating score providers and updating the graph, we need to supply a RAVV that
+                    // takes account the accumulated holes in the OnHeapGraph, so we need some mappings
+                    // to and from the ordinal space of the OnHeapGraphIndex (the heap ordinals)
+
+                    // The "mid" ordinal space is the same as the "graphNodeId" ordinal space
+                    // which includes all vectors from the leading segment and live vectors from other segments.
+                    // We need this mapping to delete vectors later.
+                    var midToHeapOrds = new int[graphNodeIdsToRavvOrds.length];
+                    var heapToGlobalRavvOrds = new int[heapOrdUpperBound];
+                    Arrays.fill(midToHeapOrds, -1);
+                    Arrays.fill(heapToGlobalRavvOrds, -1);
+
+                    // The "final" ord space is what happens to the ordinals on the heap graph
+                    // on being written as an OnDiskGraphIndex.
+                    // JVector automatically compacts the ordinals while preserving the order.
+                    // Note that this may NOT be the same as the "compact" ordinal space calculated earler,
+                    // (although it is also compact)
+                    var finalOrdToDocId = new int[totalLiveVectorsCount];
+
+                    int midOrd = 0;
+                    int finalOrd = 0;
+                    for (int heapOrd = 0; heapOrd < leadingGraphIdUpperBound; heapOrd++) {
+                        if (!leadingGraph.containsNode(heapOrd)) {
+                            continue;
+                        }
+                        midToHeapOrds[midOrd] = heapOrd;
+                        heapToGlobalRavvOrds[heapOrd] = graphNodeIdsToRavvOrds[midOrd];
+                        // the old ordinal space of the leading reader is not exactly the "mid" ordinal space
+                        // but by definition they match for the leading reader, so `.get(midOrd)` is valid
+                        if (liveGraphNodesPerReader[LEADING_READER_IDX].get(midOrd)) {
+                            finalOrdToDocId[finalOrd] = graphNodeIdToDocMap.getLuceneDocId(midOrd);
+                            finalOrd++;
+                        }
+                        midOrd++;
+                    }
+
+                    for (int heapOrd = leadingGraphIdUpperBound; heapOrd < heapOrdUpperBound; heapOrd++) {
+                        midToHeapOrds[midOrd] = heapOrd;
+                        heapToGlobalRavvOrds[heapOrd] = graphNodeIdsToRavvOrds[midOrd];
                         finalOrdToDocId[finalOrd] = graphNodeIdToDocMap.getLuceneDocId(midOrd);
                         finalOrd++;
+                        midOrd++;
                     }
-                    midOrd++;
-                }
 
-                for (int heapOrd = leadingGraphIdUpperBound; heapOrd < heapOrdUpperBound; heapOrd++) {
-                    midToHeapOrds[midOrd] = heapOrd;
-                    heapToGlobalRavvOrds[heapOrd] = graphNodeIdsToRavvOrds[midOrd];
-                    finalOrdToDocId[finalOrd] = graphNodeIdToDocMap.getLuceneDocId(midOrd);
-                    finalOrd++;
-                    midOrd++;
-                }
+                    if (midOrd != midToHeapOrds.length || finalOrd != finalOrdToDocId.length) {
+                        log.error(
+                            "Got midOrd_limit={} (wanted {}), finalOrd_limit={} (wanted {})",
+                            midOrd,
+                            midToHeapOrds.length,
+                            finalOrd,
+                            finalOrdToDocId.length
+                        );
+                        throw new IllegalStateException("failed to fill one of the maps, this is a bug");
+                    }
 
-                if (midOrd != midToHeapOrds.length || finalOrd != finalOrdToDocId.length) {
-                    log.error(
-                        "Got midOrd_limit={} (wanted {}), finalOrd_limit={} (wanted {})",
-                        midOrd,
-                        midToHeapOrds.length,
-                        finalOrd,
-                        finalOrdToDocId.length
-                    );
-                    throw new IllegalStateException("failed to fill one of the maps, this is a bug");
-                }
+                    var heapRavv = new RemappedRandomAccessVectorValues(this, heapToGlobalRavvOrds);
 
-                var heapRavv = new RemappedRandomAccessVectorValues(this, heapToGlobalRavvOrds);
+                    var leadingBsp = BuildScoreProvider.randomAccessScoreProvider(heapRavv, getVectorSimilarityFunction(fieldInfo));
 
-                var leadingBsp = BuildScoreProvider.randomAccessScoreProvider(heapRavv, getVectorSimilarityFunction(fieldInfo));
+                    // we left this uninitialized earlier, but we're ready to set it up now
+                    // just in time to mutate the graph
+                    diversityProvider.initialize(new VamanaDiversityProvider(leadingBsp, alpha));
 
-                // we left this uninitialized earlier, but we're ready to set it up now
-                // just in time to mutate the graph
-                diversityProvider.initialize(new VamanaDiversityProvider(leadingBsp, alpha));
+                    OnHeapGraphIndex graph;
+                    try (
+                        GraphIndexBuilder builder = new GraphIndexBuilder(
+                            leadingBsp,
+                            heapRavv.dimension(),
+                            leadingGraph,
+                            beamWidth,
+                            degreeOverflow,
+                            alpha,
+                            true,
+                            simdPoolMerge,
+                            parallelismPool
+                        )
+                    ) {
+                        var vv = heapRavv.threadLocalSupplier();
 
-                OnHeapGraphIndex graph;
-                try (
-                    GraphIndexBuilder builder = new GraphIndexBuilder(
-                        leadingBsp,
-                        heapRavv.dimension(),
-                        leadingGraph,
-                        beamWidth,
-                        degreeOverflow,
-                        alpha,
-                        true,
-                        simdPoolMerge,
-                        parallelismPool
-                    )
-                ) {
-                    var vv = heapRavv.threadLocalSupplier();
+                        // parallel graph construction from the merge documents Ids
+                        simdPoolMerge.submit(
+                            () -> IntStream.range(leadingGraph.getIdUpperBound(), heapRavv.size()).parallel().forEach(ord -> {
+                                assert heapToGlobalRavvOrds[ord] != GraphNodeIdToDocMap.NO_VECTOR_OR_DELETED_DOC
+                                    : "Should be a valid graph node / vector";
+                                builder.addGraphNode(ord, vv.get().getVector(ord));
+                            })
+                        ).join();
 
-                    // parallel graph construction from the merge documents Ids
-                    simdPoolMerge.submit(() -> IntStream.range(leadingGraph.getIdUpperBound(), heapRavv.size()).parallel().forEach(ord -> {
-                        assert heapToGlobalRavvOrds[ord] != GraphNodeIdToDocMap.NO_VECTOR_OR_DELETED_DOC
-                            : "Should be a valid graph node / vector";
-                        builder.addGraphNode(ord, vv.get().getVector(ord));
-                    })).join();
-
-                    // mark deleted nodes
-                    for (int i = 0; i < numBaseVectors; i++) {
-                        if (!liveGraphNodesPerReader[LEADING_READER_IDX].get(i)) {
-                            // we need to convert from the "mid" to the "heap" ordinal space to avoid errors
-                            builder.markNodeDeleted(midToHeapOrds[i]);
+                        // mark deleted nodes
+                        for (int i = 0; i < numBaseVectors; i++) {
+                            if (!liveGraphNodesPerReader[LEADING_READER_IDX].get(i)) {
+                                // we need to convert from the "mid" to the "heap" ordinal space to avoid errors
+                                builder.markNodeDeleted(midToHeapOrds[i]);
+                            }
                         }
+
+                        builder.cleanup();
+
+                        graph = (OnHeapGraphIndex) builder.getGraph();
                     }
 
-                    builder.cleanup();
-
-                    graph = (OnHeapGraphIndex) builder.getGraph();
+                    // Note that the ordinals for the OnDiskGraphIndex will automatically be compacted
+                    // But the OnHeapGraphIndex will not
+                    var finalOrdToDocMap = new GraphNodeIdToDocMap(finalOrdToDocId);
+                    writeField(fieldInfo, heapRavv, null, finalOrdToDocMap, graph);
+                    return true;
                 }
-
-                // Note that the ordinals for the OnDiskGraphIndex will automatically be compacted
-                // But the OnHeapGraphIndex will not
-                var finalOrdToDocMap = new GraphNodeIdToDocMap(finalOrdToDocId);
-                writeField(fieldInfo, heapRavv, null, finalOrdToDocMap, graph);
-                return true;
             }
         }
 
