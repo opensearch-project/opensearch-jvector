@@ -1,4 +1,3 @@
-org.opensearch.knn.index.codec.backward_codecs.KNN910Codec.KNN910Codec
 org.opensearch.knn.index.codec.backward_codecs.KNN920Codec.KNN920Codec
 org.opensearch.knn.index.codec.backward_codecs.KNN940Codec.KNN940Codec
 org.opensearch.knn.index.codec.backward_codecs.KNN950Codec.KNN950Codec
