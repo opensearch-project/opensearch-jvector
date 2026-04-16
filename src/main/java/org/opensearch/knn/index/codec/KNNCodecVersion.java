@@ -7,7 +7,6 @@ package org.opensearch.knn.index.codec;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
-import org.apache.lucene.backward_codecs.lucene94.Lucene94Codec;
 import org.apache.lucene.codecs.Codec;
 import org.apache.lucene.codecs.lucene104.Lucene104Codec;
 import org.apache.lucene.backward_codecs.lucene95.Lucene95Codec;
@@ -22,8 +21,6 @@ import org.opensearch.knn.index.codec.KNN1040Codec.KNN1040Codec;
 import org.opensearch.knn.index.codec.KNN80Codec.KNN80CompoundFormat;
 import org.opensearch.knn.index.codec.KNN80Codec.KNN80DocValuesFormat;
 import org.opensearch.knn.index.codec.KNN9120Codec.KNN9120PerFieldKnnVectorsFormat;
-import org.opensearch.knn.index.codec.backward_codecs.KNN940Codec.KNN940Codec;
-import org.opensearch.knn.index.codec.backward_codecs.KNN940Codec.KNN940PerFieldKnnVectorsFormat;
 import org.opensearch.knn.index.codec.backward_codecs.KNN950Codec.KNN950Codec;
 import org.opensearch.knn.index.codec.backward_codecs.KNN950Codec.KNN950PerFieldKnnVectorsFormat;
 import org.opensearch.knn.index.codec.backward_codecs.KNN990Codec.KNN990Codec;
@@ -41,21 +38,6 @@ import java.util.function.Supplier;
 @AllArgsConstructor
 @Getter
 public enum KNNCodecVersion {
-
-    V_9_4_0(
-        "KNN940Codec",
-        new Lucene94Codec(),
-        new KNN940PerFieldKnnVectorsFormat(Optional.empty()),
-        (delegate) -> new KNNFormatFacade(
-            new KNN80DocValuesFormat(delegate.docValuesFormat()),
-            new KNN80CompoundFormat(delegate.compoundFormat())
-        ),
-        (userCodec, mapperService) -> KNN940Codec.builder()
-            .delegate(userCodec)
-            .knnVectorsFormat(new KNN940PerFieldKnnVectorsFormat(Optional.ofNullable(mapperService)))
-            .build(),
-        KNN940Codec::new
-    ),
 
     V_9_5_0(
         "KNN950Codec",
