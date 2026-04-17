@@ -29,7 +29,6 @@ import org.opensearch.core.xcontent.XContentParser;
 import org.opensearch.index.query.MatchAllQueryBuilder;
 import org.opensearch.knn.common.KNNConstants;
 import org.opensearch.knn.index.VectorDataType;
-import org.opensearch.knn.index.codec.backward_codecs.KNN9120Codec.ParentChildHelper;
 import org.opensearch.knn.index.query.KNNQueryBuilder;
 import org.opensearch.knn.index.KNNSettings;
 import org.opensearch.knn.index.SpaceType;
@@ -800,7 +799,7 @@ public class KNNRestTestCase extends ODFERestTestCase {
     protected void updateKnnDoc(String index, String docId, String fieldName, Object[] vector) throws IOException {
         Request request = new Request("POST", "/" + index + "/_doc/" + docId + "?refresh=true");
         XContentBuilder builder = XContentFactory.jsonBuilder().startObject();
-        String parent = ParentChildHelper.getParentField(fieldName);
+        String parent = TestUtils.ParentChildHelper.getParentField(fieldName);
         if (parent != null) {
             builder.startObject(parent).field(fieldName, vector).endObject();
         } else {
@@ -1443,7 +1442,7 @@ public class KNNRestTestCase extends ODFERestTestCase {
                 Map<String, Object> source = new HashMap<>();
                 for (int j = 0; j < includeVectorFields.size(); j++) {
                     if (includeVectorFields.get(j)) {
-                        String[] fields = ParentChildHelper.splitPath(vectorFields.get(j));
+                        String[] fields = TestUtils.ParentChildHelper.splitPath(vectorFields.get(j));
                         Map<String, Object> currentMap = source;
                         for (int k = 0; k < fields.length - 1; k++) {
                             String field = fields[k];
@@ -1455,7 +1454,7 @@ public class KNNRestTestCase extends ODFERestTestCase {
                 }
                 for (int j = 0; j < includeTextFields.size(); j++) {
                     if (includeTextFields.get(j)) {
-                        String[] fields = ParentChildHelper.splitPath(textFields.get(j));
+                        String[] fields = TestUtils.ParentChildHelper.splitPath(textFields.get(j));
                         Map<String, Object> currentMap = source;
                         for (int k = 0; k < fields.length - 1; k++) {
                             String field = fields[k];
@@ -1522,13 +1521,13 @@ public class KNNRestTestCase extends ODFERestTestCase {
             int nestedDocs = random.nextInt(maxDoc) + 1;
             XContentBuilder builder = XContentFactory.jsonBuilder()
                 .startObject()
-                .startArray(ParentChildHelper.getParentField(nestedFieldName));
+                .startArray(TestUtils.ParentChildHelper.getParentField(nestedFieldName));
             for (int j = 0; j < nestedDocs; j++) {
                 builder.startObject();
                 if (random.nextFloat() > skipProb) {
-                    builder.field(ParentChildHelper.getChildField(nestedFieldName), vectors[i + j]);
+                    builder.field(TestUtils.ParentChildHelper.getChildField(nestedFieldName), vectors[i + j]);
                 } else {
-                    builder.field(ParentChildHelper.getChildField(nestedNumericPath), 1);
+                    builder.field(TestUtils.ParentChildHelper.getChildField(nestedNumericPath), 1);
                 }
                 builder.endObject();
             }
