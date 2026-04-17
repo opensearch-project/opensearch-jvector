@@ -22,7 +22,7 @@ public class KNNVectorValuesTests extends KNNTestCase {
         final List<float[]> floatArray = List.of(new float[] { 1, 2 }, new float[] { 2, 3 });
         final int dimension = floatArray.get(0).length;
         final TestVectorValues.PreDefinedFloatVectorValues randomVectorValues = new TestVectorValues.PreDefinedFloatVectorValues(
-                floatArray
+            floatArray
         );
         final KNNVectorValues<float[]> knnVectorValues = KNNVectorValuesFactory.getVectorValues(VectorDataType.FLOAT, randomVectorValues);
         new CompareVectorValues<float[]>().validateVectorValues(knnVectorValues, floatArray, 8, dimension, true);
@@ -31,16 +31,16 @@ public class KNNVectorValuesTests extends KNNTestCase {
 
         final Map<Integer, float[]> vectorsMap = Map.of(0, floatArray.get(0), 1, floatArray.get(1));
         final KNNVectorValues<float[]> knnVectorValuesForFieldWriter = KNNVectorValuesFactory.getVectorValues(
-                VectorDataType.FLOAT,
-                docsWithFieldSet,
-                vectorsMap
+            VectorDataType.FLOAT,
+            docsWithFieldSet,
+            vectorsMap
         );
         new CompareVectorValues<float[]>().validateVectorValues(knnVectorValuesForFieldWriter, floatArray, 8, dimension, false);
         final TestVectorValues.PredefinedFloatVectorBinaryDocValues preDefinedFloatVectorValues =
-                new TestVectorValues.PredefinedFloatVectorBinaryDocValues(floatArray);
+            new TestVectorValues.PredefinedFloatVectorBinaryDocValues(floatArray);
         final KNNVectorValues<float[]> knnFloatVectorValuesBinaryDocValues = KNNVectorValuesFactory.getVectorValues(
-                VectorDataType.FLOAT,
-                preDefinedFloatVectorValues
+            VectorDataType.FLOAT,
+            preDefinedFloatVectorValues
         );
         new CompareVectorValues<float[]>().validateVectorValues(knnFloatVectorValuesBinaryDocValues, floatArray, 8, dimension, false);
     }
@@ -56,17 +56,17 @@ public class KNNVectorValuesTests extends KNNTestCase {
         final DocsWithFieldSet docsWithFieldSet = getDocIdSetIterator(byteArray.size());
         final Map<Integer, byte[]> vectorsMap = Map.of(0, byteArray.get(0), 1, byteArray.get(1));
         final KNNVectorValues<byte[]> knnVectorValuesForFieldWriter = KNNVectorValuesFactory.getVectorValues(
-                VectorDataType.BYTE,
-                docsWithFieldSet,
-                vectorsMap
+            VectorDataType.BYTE,
+            docsWithFieldSet,
+            vectorsMap
         );
         new CompareVectorValues<byte[]>().validateVectorValues(knnVectorValuesForFieldWriter, byteArray, 2, dimension, false);
 
         final TestVectorValues.PredefinedByteVectorBinaryDocValues preDefinedByteVectorValues =
-                new TestVectorValues.PredefinedByteVectorBinaryDocValues(byteArray);
+            new TestVectorValues.PredefinedByteVectorBinaryDocValues(byteArray);
         final KNNVectorValues<byte[]> knnBinaryVectorValuesBinaryDocValues = KNNVectorValuesFactory.getVectorValues(
-                VectorDataType.BYTE,
-                preDefinedByteVectorValues
+            VectorDataType.BYTE,
+            preDefinedByteVectorValues
         );
         new CompareVectorValues<byte[]>().validateVectorValues(knnBinaryVectorValuesBinaryDocValues, byteArray, 2, dimension, false);
     }
@@ -76,7 +76,7 @@ public class KNNVectorValuesTests extends KNNTestCase {
         final List<byte[]> byteArray = List.of(new byte[] { 1, 5, 8 }, new byte[] { 6, 7, 9 });
         int dimension = byteArray.get(0).length * 8;
         final TestVectorValues.PreDefinedBinaryVectorValues randomVectorValues = new TestVectorValues.PreDefinedBinaryVectorValues(
-                byteArray
+            byteArray
         );
         final KNNVectorValues<byte[]> knnVectorValues = KNNVectorValuesFactory.getVectorValues(VectorDataType.BINARY, randomVectorValues);
         new CompareVectorValues<byte[]>().validateVectorValues(knnVectorValues, byteArray, 3, dimension, true);
@@ -84,17 +84,17 @@ public class KNNVectorValuesTests extends KNNTestCase {
         final DocsWithFieldSet docsWithFieldSet = getDocIdSetIterator(byteArray.size());
         final Map<Integer, byte[]> vectorsMap = Map.of(0, byteArray.get(0), 1, byteArray.get(1));
         final KNNBinaryVectorValues knnVectorValuesForFieldWriter = (KNNBinaryVectorValues) KNNVectorValuesFactory.getVectorValues(
-                VectorDataType.BINARY,
-                docsWithFieldSet,
-                vectorsMap
+            VectorDataType.BINARY,
+            docsWithFieldSet,
+            vectorsMap
         );
         new CompareVectorValues<byte[]>().validateVectorValues(knnVectorValuesForFieldWriter, byteArray, 3, dimension, false);
 
         final TestVectorValues.PredefinedByteVectorBinaryDocValues preDefinedByteVectorValues =
-                new TestVectorValues.PredefinedByteVectorBinaryDocValues(byteArray);
+            new TestVectorValues.PredefinedByteVectorBinaryDocValues(byteArray);
         final KNNVectorValues<byte[]> knnBinaryVectorValuesBinaryDocValues = KNNVectorValuesFactory.getVectorValues(
-                VectorDataType.BINARY,
-                preDefinedByteVectorValues
+            VectorDataType.BINARY,
+            preDefinedByteVectorValues
         );
         new CompareVectorValues<byte[]>().validateVectorValues(knnBinaryVectorValuesBinaryDocValues, byteArray, 3, dimension, false);
     }
@@ -109,11 +109,11 @@ public class KNNVectorValuesTests extends KNNTestCase {
 
     private class CompareVectorValues<T> {
         void validateVectorValues(
-                KNNVectorValues<T> vectorValues,
-                List<T> vectors,
-                int bytesPerVector,
-                int dimension,
-                boolean validateAddress
+            KNNVectorValues<T> vectorValues,
+            List<T> vectors,
+            int bytesPerVector,
+            int dimension,
+            boolean validateAddress
         ) throws IOException {
             assertEquals(vectorValues.totalLiveDocs(), vectors.size());
             int docId, i = 0;
