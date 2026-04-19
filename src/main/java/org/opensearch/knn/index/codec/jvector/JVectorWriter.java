@@ -915,6 +915,13 @@ public class JVectorWriter extends KnnVectorsWriter {
             PerFieldKnnVectorsFormat.FieldsReader fieldsReader = (PerFieldKnnVectorsFormat.FieldsReader) readers[LEADING_READER_IDX];
             JVectorReader leadingReader = (JVectorReader) fieldsReader.getFieldReader(fieldName);
             final RemappedRandomAccessVectorValues compactRavv = new RemappedRandomAccessVectorValues(this, compactOrdsToRavvOrds);
+
+            // The merged segments ends up with no vectors (empty graph), nothing to merge there
+            if (compactRavv.size() == 0) {
+                log.info("No vectors for field {} in segment {}", fieldName, mergeState.segmentInfo.name);
+                return;
+            }
+
             // Check if the leading reader has pre-existing PQ codebooks and if so, refine them with the remaining vectors
             if (leadingReader.getProductQuantizationForField(fieldInfo.name).isEmpty()) {
                 // No pre-existing codebooks, check if we have enough vectors to trigger quantization
