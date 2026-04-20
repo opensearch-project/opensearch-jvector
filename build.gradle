@@ -455,10 +455,10 @@ testClusters.integTest { cluster ->
                         File getAsFile() {
                             return it
                         }
+                    }
                 }
-            }
-          }))
-      }
+            }))
+        }
     }
 
     plugin(project.tasks.bundlePlugin.archiveFile)
