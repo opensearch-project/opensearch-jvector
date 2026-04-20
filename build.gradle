@@ -309,6 +309,7 @@ task release(type: Copy, group: 'build') {
 //****************************************************************************/
 // Dependencies
 //****************************************************************************/
+
 dependencies {
     api "org.opensearch:opensearch:${opensearch_version}"
     compileOnly "org.opensearch.plugin:opensearch-scripting-painless-spi:${versions.opensearch}"
@@ -454,10 +455,10 @@ testClusters.integTest { cluster ->
                         File getAsFile() {
                             return it
                         }
+                    }
                 }
-            }
-          }))
-      }
+            }))
+        }
     }
 
     plugin(project.tasks.bundlePlugin.archiveFile)
