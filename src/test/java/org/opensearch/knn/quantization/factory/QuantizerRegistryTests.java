@@ -19,16 +19,16 @@ public class QuantizerRegistryTests extends KNNTestCase {
     public static void setup() {
         try {
             QuantizerRegistry.register(
-                    ScalarQuantizationParams.generateTypeIdentifier(ScalarQuantizationType.ONE_BIT),
-                    new OneBitScalarQuantizer()
+                ScalarQuantizationParams.generateTypeIdentifier(ScalarQuantizationType.ONE_BIT),
+                new OneBitScalarQuantizer()
             );
             QuantizerRegistry.register(
-                    ScalarQuantizationParams.generateTypeIdentifier(ScalarQuantizationType.TWO_BIT),
-                    new MultiBitScalarQuantizer(2)
+                ScalarQuantizationParams.generateTypeIdentifier(ScalarQuantizationType.TWO_BIT),
+                new MultiBitScalarQuantizer(2)
             );
             QuantizerRegistry.register(
-                    ScalarQuantizationParams.generateTypeIdentifier(ScalarQuantizationType.FOUR_BIT),
-                    new MultiBitScalarQuantizer(4)
+                ScalarQuantizationParams.generateTypeIdentifier(ScalarQuantizationType.FOUR_BIT),
+                new MultiBitScalarQuantizer(4)
             );
         } catch (Exception e) {
             assertTrue(e.getMessage().contains("already registered"));
@@ -74,9 +74,12 @@ public class QuantizerRegistryTests extends KNNTestCase {
 
     public void testRegisterQuantizerThrowsExceptionWhenAlreadyRegistered() {
         // Attempt to register the same quantizer again should throw an exception
-        assertThrows(IllegalArgumentException.class, () -> QuantizerRegistry.register(
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> QuantizerRegistry.register(
                 ScalarQuantizationParams.generateTypeIdentifier(ScalarQuantizationType.ONE_BIT),
                 new OneBitScalarQuantizer()
-        ));
+            )
+        );
     }
 }

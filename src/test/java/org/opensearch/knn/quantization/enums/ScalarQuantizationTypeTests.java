@@ -13,9 +13,9 @@ import java.util.Set;
 public class ScalarQuantizationTypeTests extends KNNTestCase {
     public void testSQTypesValues() {
         ScalarQuantizationType[] expectedValues = {
-                ScalarQuantizationType.ONE_BIT,
-                ScalarQuantizationType.TWO_BIT,
-                ScalarQuantizationType.FOUR_BIT };
+            ScalarQuantizationType.ONE_BIT,
+            ScalarQuantizationType.TWO_BIT,
+            ScalarQuantizationType.FOUR_BIT };
         assertArrayEquals(expectedValues, ScalarQuantizationType.values());
     }
 

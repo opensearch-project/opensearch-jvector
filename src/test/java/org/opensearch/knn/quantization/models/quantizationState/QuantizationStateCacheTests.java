@@ -50,20 +50,20 @@ public class QuantizationStateCacheTests extends KNNTestCase {
     public void testSingleThreadedAddAndRetrieve() {
         String fieldName = "singleThreadField";
         QuantizationState state = new OneBitScalarQuantizationState(
-                new ScalarQuantizationParams(ONE_BIT),
-                new float[] { 1.2f, 2.3f, 3.4f }
+            new ScalarQuantizationParams(ONE_BIT),
+            new float[] { 1.2f, 2.3f, 3.4f }
         );
 
         String cacheSize = "10%";
         TimeValue expiry = TimeValue.timeValueMinutes(30);
 
         Settings settings = Settings.builder()
-                .put(QUANTIZATION_STATE_CACHE_SIZE_LIMIT_SETTING.getKey(), cacheSize)
-                .put(QUANTIZATION_STATE_CACHE_EXPIRY_TIME_MINUTES_SETTING.getKey(), expiry)
-                .build();
+            .put(QUANTIZATION_STATE_CACHE_SIZE_LIMIT_SETTING.getKey(), cacheSize)
+            .put(QUANTIZATION_STATE_CACHE_EXPIRY_TIME_MINUTES_SETTING.getKey(), expiry)
+            .build();
         ClusterSettings clusterSettings = new ClusterSettings(
-                settings,
-                ImmutableSet.of(QUANTIZATION_STATE_CACHE_SIZE_LIMIT_SETTING, QUANTIZATION_STATE_CACHE_EXPIRY_TIME_MINUTES_SETTING)
+            settings,
+            ImmutableSet.of(QUANTIZATION_STATE_CACHE_SIZE_LIMIT_SETTING, QUANTIZATION_STATE_CACHE_EXPIRY_TIME_MINUTES_SETTING)
         );
         ClusterService clusterService = mock(ClusterService.class);
         when(clusterService.getClusterSettings()).thenReturn(clusterSettings);
@@ -87,19 +87,19 @@ public class QuantizationStateCacheTests extends KNNTestCase {
         CountDownLatch latch = new CountDownLatch(threadCount);
         String fieldName = "multiThreadField";
         QuantizationState state = new OneBitScalarQuantizationState(
-                new ScalarQuantizationParams(ONE_BIT),
-                new float[] { 1.2f, 2.3f, 3.4f }
+            new ScalarQuantizationParams(ONE_BIT),
+            new float[] { 1.2f, 2.3f, 3.4f }
         );
         String cacheSize = "10%";
         TimeValue expiry = TimeValue.timeValueMinutes(30);
 
         Settings settings = Settings.builder()
-                .put(QUANTIZATION_STATE_CACHE_SIZE_LIMIT_SETTING.getKey(), cacheSize)
-                .put(QUANTIZATION_STATE_CACHE_EXPIRY_TIME_MINUTES_SETTING.getKey(), expiry)
-                .build();
+            .put(QUANTIZATION_STATE_CACHE_SIZE_LIMIT_SETTING.getKey(), cacheSize)
+            .put(QUANTIZATION_STATE_CACHE_EXPIRY_TIME_MINUTES_SETTING.getKey(), expiry)
+            .build();
         ClusterSettings clusterSettings = new ClusterSettings(
-                settings,
-                ImmutableSet.of(QUANTIZATION_STATE_CACHE_SIZE_LIMIT_SETTING, QUANTIZATION_STATE_CACHE_EXPIRY_TIME_MINUTES_SETTING)
+            settings,
+            ImmutableSet.of(QUANTIZATION_STATE_CACHE_SIZE_LIMIT_SETTING, QUANTIZATION_STATE_CACHE_EXPIRY_TIME_MINUTES_SETTING)
         );
         ClusterService clusterService = mock(ClusterService.class);
         when(clusterService.getClusterSettings()).thenReturn(clusterSettings);
@@ -135,19 +135,19 @@ public class QuantizationStateCacheTests extends KNNTestCase {
         CountDownLatch latch = new CountDownLatch(threadCount);
         String fieldName = "multiThreadEvictField";
         QuantizationState state = new OneBitScalarQuantizationState(
-                new ScalarQuantizationParams(ONE_BIT),
-                new float[] { 1.2f, 2.3f, 3.4f }
+            new ScalarQuantizationParams(ONE_BIT),
+            new float[] { 1.2f, 2.3f, 3.4f }
         );
         String cacheSize = "10%";
         TimeValue expiry = TimeValue.timeValueMinutes(30);
 
         Settings settings = Settings.builder()
-                .put(QUANTIZATION_STATE_CACHE_SIZE_LIMIT_SETTING.getKey(), cacheSize)
-                .put(QUANTIZATION_STATE_CACHE_EXPIRY_TIME_MINUTES_SETTING.getKey(), expiry)
-                .build();
+            .put(QUANTIZATION_STATE_CACHE_SIZE_LIMIT_SETTING.getKey(), cacheSize)
+            .put(QUANTIZATION_STATE_CACHE_EXPIRY_TIME_MINUTES_SETTING.getKey(), expiry)
+            .build();
         ClusterSettings clusterSettings = new ClusterSettings(
-                settings,
-                ImmutableSet.of(QUANTIZATION_STATE_CACHE_SIZE_LIMIT_SETTING, QUANTIZATION_STATE_CACHE_EXPIRY_TIME_MINUTES_SETTING)
+            settings,
+            ImmutableSet.of(QUANTIZATION_STATE_CACHE_SIZE_LIMIT_SETTING, QUANTIZATION_STATE_CACHE_EXPIRY_TIME_MINUTES_SETTING)
         );
         ClusterService clusterService = mock(ClusterService.class);
         when(clusterService.getClusterSettings()).thenReturn(clusterSettings);
@@ -185,19 +185,19 @@ public class QuantizationStateCacheTests extends KNNTestCase {
         CountDownLatch latch = new CountDownLatch(threadCount);
         String fieldName = "concurrentAddEvictField";
         QuantizationState state = new OneBitScalarQuantizationState(
-                new ScalarQuantizationParams(ONE_BIT),
-                new float[] { 1.2f, 2.3f, 3.4f }
+            new ScalarQuantizationParams(ONE_BIT),
+            new float[] { 1.2f, 2.3f, 3.4f }
         );
         String cacheSize = "10%";
         TimeValue expiry = TimeValue.timeValueMinutes(30);
 
         Settings settings = Settings.builder()
-                .put(QUANTIZATION_STATE_CACHE_SIZE_LIMIT_SETTING.getKey(), cacheSize)
-                .put(QUANTIZATION_STATE_CACHE_EXPIRY_TIME_MINUTES_SETTING.getKey(), expiry)
-                .build();
+            .put(QUANTIZATION_STATE_CACHE_SIZE_LIMIT_SETTING.getKey(), cacheSize)
+            .put(QUANTIZATION_STATE_CACHE_EXPIRY_TIME_MINUTES_SETTING.getKey(), expiry)
+            .build();
         ClusterSettings clusterSettings = new ClusterSettings(
-                settings,
-                ImmutableSet.of(QUANTIZATION_STATE_CACHE_SIZE_LIMIT_SETTING, QUANTIZATION_STATE_CACHE_EXPIRY_TIME_MINUTES_SETTING)
+            settings,
+            ImmutableSet.of(QUANTIZATION_STATE_CACHE_SIZE_LIMIT_SETTING, QUANTIZATION_STATE_CACHE_EXPIRY_TIME_MINUTES_SETTING)
         );
         ClusterService clusterService = mock(ClusterService.class);
         when(clusterService.getClusterSettings()).thenReturn(clusterSettings);
@@ -244,19 +244,19 @@ public class QuantizationStateCacheTests extends KNNTestCase {
         CountDownLatch latch = new CountDownLatch(threadCount);
         String fieldName = "multiThreadField";
         QuantizationState state = new OneBitScalarQuantizationState(
-                new ScalarQuantizationParams(ONE_BIT),
-                new float[] { 1.2f, 2.3f, 3.4f }
+            new ScalarQuantizationParams(ONE_BIT),
+            new float[] { 1.2f, 2.3f, 3.4f }
         );
         String cacheSize = "10%";
         TimeValue expiry = TimeValue.timeValueMinutes(30);
 
         Settings settings = Settings.builder()
-                .put(QUANTIZATION_STATE_CACHE_SIZE_LIMIT_SETTING.getKey(), cacheSize)
-                .put(QUANTIZATION_STATE_CACHE_EXPIRY_TIME_MINUTES_SETTING.getKey(), expiry)
-                .build();
+            .put(QUANTIZATION_STATE_CACHE_SIZE_LIMIT_SETTING.getKey(), cacheSize)
+            .put(QUANTIZATION_STATE_CACHE_EXPIRY_TIME_MINUTES_SETTING.getKey(), expiry)
+            .build();
         ClusterSettings clusterSettings = new ClusterSettings(
-                settings,
-                ImmutableSet.of(QUANTIZATION_STATE_CACHE_SIZE_LIMIT_SETTING, QUANTIZATION_STATE_CACHE_EXPIRY_TIME_MINUTES_SETTING)
+            settings,
+            ImmutableSet.of(QUANTIZATION_STATE_CACHE_SIZE_LIMIT_SETTING, QUANTIZATION_STATE_CACHE_EXPIRY_TIME_MINUTES_SETTING)
         );
         ClusterService clusterService = mock(ClusterService.class);
         when(clusterService.getClusterSettings()).thenReturn(clusterSettings);
@@ -292,19 +292,19 @@ public class QuantizationStateCacheTests extends KNNTestCase {
         CountDownLatch latch = new CountDownLatch(threadCount);
         String fieldName = "rebuildField";
         QuantizationState state = new OneBitScalarQuantizationState(
-                new ScalarQuantizationParams(ONE_BIT),
-                new float[] { 1.2f, 2.3f, 3.4f }
+            new ScalarQuantizationParams(ONE_BIT),
+            new float[] { 1.2f, 2.3f, 3.4f }
         );
         String cacheSize = "10%";
         TimeValue expiry = TimeValue.timeValueMinutes(30);
 
         Settings settings = Settings.builder()
-                .put(QUANTIZATION_STATE_CACHE_SIZE_LIMIT_SETTING.getKey(), cacheSize)
-                .put(QUANTIZATION_STATE_CACHE_EXPIRY_TIME_MINUTES_SETTING.getKey(), expiry)
-                .build();
+            .put(QUANTIZATION_STATE_CACHE_SIZE_LIMIT_SETTING.getKey(), cacheSize)
+            .put(QUANTIZATION_STATE_CACHE_EXPIRY_TIME_MINUTES_SETTING.getKey(), expiry)
+            .build();
         ClusterSettings clusterSettings = new ClusterSettings(
-                settings,
-                ImmutableSet.of(QUANTIZATION_STATE_CACHE_SIZE_LIMIT_SETTING, QUANTIZATION_STATE_CACHE_EXPIRY_TIME_MINUTES_SETTING)
+            settings,
+            ImmutableSet.of(QUANTIZATION_STATE_CACHE_SIZE_LIMIT_SETTING, QUANTIZATION_STATE_CACHE_EXPIRY_TIME_MINUTES_SETTING)
         );
         ClusterService clusterService = mock(ClusterService.class);
         when(clusterService.getClusterSettings()).thenReturn(clusterSettings);
@@ -339,14 +339,14 @@ public class QuantizationStateCacheTests extends KNNTestCase {
         CountDownLatch latch = new CountDownLatch(threadCount);
         String fieldName = "rebuildField";
         QuantizationState state = new OneBitScalarQuantizationState(
-                new ScalarQuantizationParams(ONE_BIT),
-                new float[] { 1.2f, 2.3f, 3.4f }
+            new ScalarQuantizationParams(ONE_BIT),
+            new float[] { 1.2f, 2.3f, 3.4f }
         );
 
         Settings settings = Settings.builder().build();
         ClusterSettings clusterSettings = new ClusterSettings(
-                settings,
-                ImmutableSet.of(QUANTIZATION_STATE_CACHE_SIZE_LIMIT_SETTING, QUANTIZATION_STATE_CACHE_EXPIRY_TIME_MINUTES_SETTING)
+            settings,
+            ImmutableSet.of(QUANTIZATION_STATE_CACHE_SIZE_LIMIT_SETTING, QUANTIZATION_STATE_CACHE_EXPIRY_TIME_MINUTES_SETTING)
         );
         ClusterService clusterService = mock(ClusterService.class);
         when(clusterService.getClusterSettings()).thenReturn(clusterSettings);
@@ -392,14 +392,14 @@ public class QuantizationStateCacheTests extends KNNTestCase {
         CountDownLatch latch = new CountDownLatch(threadCount);
         String fieldName = "rebuildField";
         QuantizationState state = new OneBitScalarQuantizationState(
-                new ScalarQuantizationParams(ONE_BIT),
-                new float[] { 1.2f, 2.3f, 3.4f }
+            new ScalarQuantizationParams(ONE_BIT),
+            new float[] { 1.2f, 2.3f, 3.4f }
         );
 
         Settings settings = Settings.builder().build();
         ClusterSettings clusterSettings = new ClusterSettings(
-                settings,
-                ImmutableSet.of(QUANTIZATION_STATE_CACHE_SIZE_LIMIT_SETTING, QUANTIZATION_STATE_CACHE_EXPIRY_TIME_MINUTES_SETTING)
+            settings,
+            ImmutableSet.of(QUANTIZATION_STATE_CACHE_SIZE_LIMIT_SETTING, QUANTIZATION_STATE_CACHE_EXPIRY_TIME_MINUTES_SETTING)
         );
         ClusterService clusterService = mock(ClusterService.class);
         when(clusterService.getClusterSettings()).thenReturn(clusterSettings);
@@ -450,8 +450,8 @@ public class QuantizationStateCacheTests extends KNNTestCase {
         long cacheSize = 1;
         Settings settings = Settings.builder().build();
         ClusterSettings clusterSettings = new ClusterSettings(
-                settings,
-                ImmutableSet.of(QUANTIZATION_STATE_CACHE_SIZE_LIMIT_SETTING, QUANTIZATION_STATE_CACHE_EXPIRY_TIME_MINUTES_SETTING)
+            settings,
+            ImmutableSet.of(QUANTIZATION_STATE_CACHE_SIZE_LIMIT_SETTING, QUANTIZATION_STATE_CACHE_EXPIRY_TIME_MINUTES_SETTING)
         );
         ClusterService clusterService = mock(ClusterService.class);
         when(clusterService.getClusterSettings()).thenReturn(clusterSettings);

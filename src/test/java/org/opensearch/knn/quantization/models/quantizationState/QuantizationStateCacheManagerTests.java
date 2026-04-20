@@ -38,7 +38,7 @@ public class QuantizationStateCacheManagerTests extends KNNTestCase {
             Mockito.doNothing().when(quantizationStateCache).addQuantizationState(cacheKey, quantizationState);
             try (MockedStatic<KNN990QuantizationStateReader> mockedStaticReader = Mockito.mockStatic(KNN990QuantizationStateReader.class)) {
                 mockedStaticReader.when(() -> KNN990QuantizationStateReader.read(quantizationStateReadConfig))
-                        .thenReturn(quantizationState);
+                    .thenReturn(quantizationState);
                 QuantizationStateCacheManager.getInstance().getQuantizationState(quantizationStateReadConfig);
                 Mockito.verify(quantizationStateCache, times(1)).addQuantizationState(cacheKey, quantizationState);
             }
