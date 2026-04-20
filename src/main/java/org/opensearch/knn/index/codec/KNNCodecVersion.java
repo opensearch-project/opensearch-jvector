@@ -7,13 +7,8 @@ package org.opensearch.knn.index.codec;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
-import org.apache.lucene.backward_codecs.lucene91.Lucene91Codec;
-import org.apache.lucene.backward_codecs.lucene92.Lucene92Codec;
-import org.apache.lucene.backward_codecs.lucene94.Lucene94Codec;
 import org.apache.lucene.codecs.Codec;
 import org.apache.lucene.codecs.lucene104.Lucene104Codec;
-import org.apache.lucene.backward_codecs.lucene95.Lucene95Codec;
-import org.apache.lucene.backward_codecs.lucene99.Lucene99Codec;
 import org.apache.lucene.backward_codecs.lucene101.Lucene101Codec;
 import org.apache.lucene.backward_codecs.lucene103.Lucene103Codec;
 import org.apache.lucene.codecs.perfield.PerFieldKnnVectorsFormat;
@@ -23,16 +18,7 @@ import org.opensearch.knn.index.codec.backward_codecs.KNN1030Codec.KNN1030Codec;
 import org.opensearch.knn.index.codec.KNN1040Codec.KNN1040Codec;
 import org.opensearch.knn.index.codec.KNN80Codec.KNN80CompoundFormat;
 import org.opensearch.knn.index.codec.KNN80Codec.KNN80DocValuesFormat;
-import org.opensearch.knn.index.codec.backward_codecs.KNN910Codec.KNN910Codec;
 import org.opensearch.knn.index.codec.KNN9120Codec.KNN9120PerFieldKnnVectorsFormat;
-import org.opensearch.knn.index.codec.backward_codecs.KNN920Codec.KNN920Codec;
-import org.opensearch.knn.index.codec.backward_codecs.KNN920Codec.KNN920PerFieldKnnVectorsFormat;
-import org.opensearch.knn.index.codec.backward_codecs.KNN940Codec.KNN940Codec;
-import org.opensearch.knn.index.codec.backward_codecs.KNN940Codec.KNN940PerFieldKnnVectorsFormat;
-import org.opensearch.knn.index.codec.backward_codecs.KNN950Codec.KNN950Codec;
-import org.opensearch.knn.index.codec.backward_codecs.KNN950Codec.KNN950PerFieldKnnVectorsFormat;
-import org.opensearch.knn.index.codec.backward_codecs.KNN990Codec.KNN990Codec;
-import org.opensearch.knn.index.codec.backward_codecs.KNN990Codec.KNN990PerFieldKnnVectorsFormat;
 
 import java.util.Optional;
 import java.util.function.BiFunction;
@@ -47,77 +33,6 @@ import java.util.function.Supplier;
 @Getter
 public enum KNNCodecVersion {
 
-    V_9_1_0(
-        "KNN910Codec",
-        new Lucene91Codec(),
-        null,
-        (delegate) -> new KNNFormatFacade(
-            new KNN80DocValuesFormat(delegate.docValuesFormat()),
-            new KNN80CompoundFormat(delegate.compoundFormat())
-        ),
-        (userCodec, mapperService) -> new KNN910Codec(userCodec),
-        KNN910Codec::new
-    ),
-
-    V_9_2_0(
-        "KNN920Codec",
-        new Lucene92Codec(),
-        new KNN920PerFieldKnnVectorsFormat(Optional.empty()),
-        (delegate) -> new KNNFormatFacade(
-            new KNN80DocValuesFormat(delegate.docValuesFormat()),
-            new KNN80CompoundFormat(delegate.compoundFormat())
-        ),
-        (userCodec, mapperService) -> KNN920Codec.builder()
-            .delegate(userCodec)
-            .knnVectorsFormat(new KNN920PerFieldKnnVectorsFormat(Optional.ofNullable(mapperService)))
-            .build(),
-        KNN920Codec::new
-    ),
-
-    V_9_4_0(
-        "KNN940Codec",
-        new Lucene94Codec(),
-        new KNN940PerFieldKnnVectorsFormat(Optional.empty()),
-        (delegate) -> new KNNFormatFacade(
-            new KNN80DocValuesFormat(delegate.docValuesFormat()),
-            new KNN80CompoundFormat(delegate.compoundFormat())
-        ),
-        (userCodec, mapperService) -> KNN940Codec.builder()
-            .delegate(userCodec)
-            .knnVectorsFormat(new KNN940PerFieldKnnVectorsFormat(Optional.ofNullable(mapperService)))
-            .build(),
-        KNN940Codec::new
-    ),
-
-    V_9_5_0(
-        "KNN950Codec",
-        new Lucene95Codec(),
-        new KNN950PerFieldKnnVectorsFormat(Optional.empty()),
-        (delegate) -> new KNNFormatFacade(
-            new KNN80DocValuesFormat(delegate.docValuesFormat()),
-            new KNN80CompoundFormat(delegate.compoundFormat())
-        ),
-        (userCodec, mapperService) -> KNN950Codec.builder()
-            .delegate(userCodec)
-            .knnVectorsFormat(new KNN950PerFieldKnnVectorsFormat(Optional.ofNullable(mapperService)))
-            .build(),
-        KNN950Codec::new
-    ),
-
-    V_9_9_0(
-        "KNN990Codec",
-        new Lucene99Codec(),
-        new KNN990PerFieldKnnVectorsFormat(Optional.empty()),
-        (delegate) -> new KNNFormatFacade(
-            new KNN80DocValuesFormat(delegate.docValuesFormat()),
-            new KNN80CompoundFormat(delegate.compoundFormat())
-        ),
-        (userCodec, mapperService) -> KNN990Codec.builder()
-            .delegate(userCodec)
-            .knnVectorsFormat(new KNN990PerFieldKnnVectorsFormat(Optional.ofNullable(mapperService)))
-            .build(),
-        KNN990Codec::new
-    ),
     V_10_01_0(
         "KNN10010Codec",
         new Lucene101Codec(),

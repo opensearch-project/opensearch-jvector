@@ -22,7 +22,6 @@ import org.opensearch.core.xcontent.MediaType;
 import org.opensearch.core.xcontent.MediaTypeRegistry;
 import org.opensearch.core.xcontent.XContentBuilder;
 import org.opensearch.index.mapper.SourceFieldMapper;
-import org.opensearch.knn.index.codec.backward_codecs.KNN9120Codec.KNN9120DerivedSourceStoredFieldsReader;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -92,13 +91,6 @@ public class KNN10010DerivedSourceStoredFieldsWriter extends StoredFieldsWriter 
 
     @Override
     public int merge(MergeState mergeState) throws IOException {
-        // In case of backwards compatibility, with old segments, we need to perform a non-optimal merge. Basically, it
-        // will repopulate each source and then inject the vector and then remove it. This allows us to migrate
-        // segments from filter approach to mask approach
-        if (KNN9120DerivedSourceStoredFieldsReader.doesMergeContainLegacySegments(mergeState)) {
-            return super.merge(mergeState);
-        }
-
         // We wrap the segments to avoid injecting back vectors and then removing. If this is not done, then we will
         // inject and then just write to disk potentially.
         for (int i = 0; i < mergeState.storedFieldsReaders.length; i++) {
