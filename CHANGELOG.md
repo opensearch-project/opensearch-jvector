@@ -8,8 +8,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Features
 ### Enhancements
 ### Bug Fixes
-* Fix Hash map memory leak in JVectorRandomAccessReader.java (https://github.com/opensearch-project/opensearch-jvector/pull/401)
-* Fix NullPointerException/IllegalStateException if merge ends up with no vectors for a field (empty graph) [417] (https://github.com/opensearch-project/opensearch-jvector/pull/417)
 ### Infrastructure
 ### Documentation
 ### Maintenance
