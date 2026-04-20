@@ -87,14 +87,14 @@ public class QuantizationStateTests extends KNNTestCase {
 
         // 3. RAM Usage from RamUsageEstimator
         long expectedRamBytesUsed = RamUsageEstimator.shallowSizeOfInstance(OneBitScalarQuantizationState.class) + RamUsageEstimator
-                .shallowSizeOf(params) + RamUsageEstimator.sizeOf(mean);
+            .shallowSizeOf(params) + RamUsageEstimator.sizeOf(mean);
 
         long actualRamBytesUsed = state.ramBytesUsed();
 
         // Allow a difference between manual estimation, serialization size, and actual RAM usage
         assertTrue(
-                "The difference between manual and actual RAM usage exceeds 8 bytes",
-                Math.abs(manualEstimatedRamBytesUsed - actualRamBytesUsed) <= 8
+            "The difference between manual and actual RAM usage exceeds 8 bytes",
+            Math.abs(manualEstimatedRamBytesUsed - actualRamBytesUsed) <= 8
         );
 
         assertEquals(expectedRamBytesUsed, actualRamBytesUsed);
@@ -117,10 +117,10 @@ public class QuantizationStateTests extends KNNTestCase {
 
         // Case 3: 4 thresholds, each with 7 dimensions (28 bits, should align to 32)
         float[][] thresholds3 = {
-                { 0.5f, 1.5f, 2.5f, 3.5f, 4.5f, 5.5f, 6.5f },
-                { 1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f },
-                { 1.5f, 2.5f, 3.5f, 4.5f, 5.5f, 6.5f, 7.5f },
-                { 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f } };
+            { 0.5f, 1.5f, 2.5f, 3.5f, 4.5f, 5.5f, 6.5f },
+            { 1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f },
+            { 1.5f, 2.5f, 3.5f, 4.5f, 5.5f, 6.5f, 7.5f },
+            { 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f } };
         MultiBitScalarQuantizationState state3 = new MultiBitScalarQuantizationState(params, thresholds3);
         int expectedDimensions3 = 32; // The next multiple of 8 considering all bits
         assertEquals(expectedDimensions3, state3.getDimensions());
@@ -195,7 +195,7 @@ public class QuantizationStateTests extends KNNTestCase {
         }
 
         long ramEstimatorRamBytesUsed = RamUsageEstimator.shallowSizeOfInstance(MultiBitScalarQuantizationState.class) + RamUsageEstimator
-                .shallowSizeOf(params) + RamUsageEstimator.shallowSizeOf(thresholds);
+            .shallowSizeOf(params) + RamUsageEstimator.shallowSizeOf(thresholds);
 
         for (float[] row : thresholds) {
             ramEstimatorRamBytesUsed += RamUsageEstimator.sizeOf(row);
