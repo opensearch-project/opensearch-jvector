@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package org.opensearch.knn.index.codec.backward_codecs.KNN9120Codec;
+package org.opensearch.knn;
 
 /**
  * Helper class for working with nested fields.
