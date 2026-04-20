@@ -15,8 +15,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * Remove usage of the commons-lang 2.6 [317] (https://github.com/opensearch-project/opensearch-jvector/pull/317)
 * Fixing guava dependency scope, since the dependency is provided by transport-grpc plugin [344] (https://github.com/opensearch-project/opensearch-jvector/pull/344)
 * Remove manual ref counting and simplify DeriveSourceReaders [397] (https://github.com/opensearch-project/opensearch-jvector/pull/397)
-* Fix Hash map memory leak in JVectorRandomAccessReader [401] (https://github.com/opensearch-project/opensearch-jvector/pull/401)
-* Fix NullPointerException/IllegalStateException if merge ends up with no vectors for a field (empty graph) [417] (https://github.com/opensearch-project/opensearch-jvector/pull/417)
 ### Infrastructure
 * Upgrade Lucene to 10.4.0 [292] (https://github.com/opensearch-project/opensearch-jvector/pull/292)
 * Upgrade jvector from 4.0.0-rc.6 to 4.0.0-rc.8 [370](https://github.com/opensearch-project/opensearch-jvector/pull/370)
