@@ -47,7 +47,6 @@ OpenSearch JVector Plugin is a pure Java implementation of vector similarity sea
 4. **Product Quantization (PQ)**: Compress vectors to significantly reduce memory usage with quantization refinement during merge
 5. **SIMD Support**: Hardware-accelerated vector operations
 6. **Fused ADC**: Advanced distance computation optimizations
-7. **Cassandra Compatibility**: Easy data transfer between Cassandra and OpenSearch
 
 ---
 
@@ -96,9 +95,16 @@ docker run -d -p 9200:9200 -p 9600:9600 \
 **Verify OpenSearch is Running:**
 
 ```bash
-curl http://localhost:9200
-# Should return cluster information
+curl https://localhost:9200 -u admin:YourStrongPassword123!
 ```
+
+**Important Security Notes:**
+- OpenSearch 3.x comes with security enabled by default (HTTPS + authentication required)
+- Default username is `admin`, password is set via `OPENSEARCH_INITIAL_ADMIN_PASSWORD` (Docker) or during first startup
+- If using self-signed certificates (development), add `--insecure` or `-k` flag to curl commands
+- For production, configure proper SSL certificates to avoid using `--insecure`
+
+**For Simplicity:** The examples below omit the authentication flags (`-u admin:YourStrongPassword123!`). Remember to add them to your actual commands, or configure your environment to handle authentication automatically.
 
 #### Installing JVector Plugin
 
@@ -155,13 +161,7 @@ docker run -p 9200:9200 -p 9600:9600 \
 Check that the plugin is installed:
 
 ```bash
-# For local development (with security disabled)
-curl -X GET "http://localhost:9200/_cat/plugins?v"
-
-# For production (with security enabled - default)
-curl -X GET "https://localhost:9200/_cat/plugins?v" \
-  -u admin:admin \
-  --insecure
+curl -X GET "https://localhost:9200/_cat/plugins?v" -u admin:YourStrongPassword123!
 ```
 
 Expected output should include:
@@ -171,7 +171,7 @@ name       component           version
 node-1     opensearch-jvector  3.3.2.0
 ```
 
-**Note:** Replace `admin:admin` with your actual credentials. Use `--insecure` only for development with self-signed certificates.
+**Note:** Replace `admin:YourStrongPassword123!` with your actual credentials. Use `--insecure` only for development with self-signed certificates.
 
 ### Your First Index and Search
 
@@ -180,7 +180,7 @@ node-1     opensearch-jvector  3.3.2.0
 Create an index with a 128-dimensional vector field:
 
 ```bash
-curl -X PUT "localhost:9200/my-vector-index" -H 'Content-Type: application/json' -d'
+curl -X PUT "https://localhost:9200/my-vector-index" -H 'Content-Type: application/json' -d'
 {
   "settings": {
     "index": {
@@ -217,7 +217,7 @@ curl -X PUT "localhost:9200/my-vector-index" -H 'Content-Type: application/json'
 
 ```bash
 # Index document 1
-curl -X POST "localhost:9200/my-vector-index/_doc/1" -H 'Content-Type: application/json' -d'
+curl -X POST "https://localhost:9200/my-vector-index/_doc/1" -H 'Content-Type: application/json' -d'
 {
   "my_vector": [0.1, 0.2, 0.3, ..., 0.128],
   "title": "First document"
@@ -225,7 +225,7 @@ curl -X POST "localhost:9200/my-vector-index/_doc/1" -H 'Content-Type: applicati
 '
 
 # Index document 2
-curl -X POST "localhost:9200/my-vector-index/_doc/2" -H 'Content-Type: application/json' -d'
+curl -X POST "https://localhost:9200/my-vector-index/_doc/2" -H 'Content-Type: application/json' -d'
 {
   "my_vector": [0.2, 0.3, 0.4, ..., 0.129],
   "title": "Second document"
@@ -233,13 +233,13 @@ curl -X POST "localhost:9200/my-vector-index/_doc/2" -H 'Content-Type: applicati
 '
 
 # Refresh the index
-curl -X POST "localhost:9200/my-vector-index/_refresh"
+curl -X POST "https://localhost:9200/my-vector-index/_refresh"
 ```
 
 #### Step 3: Search for Similar Vectors
 
 ```bash
-curl -X POST "localhost:9200/my-vector-index/_search" -H 'Content-Type: application/json' -d'
+curl -X POST "https://localhost:9200/my-vector-index/_search" -H 'Content-Type: application/json' -d'
 {
   "size": 5,
   "query": {
@@ -267,7 +267,7 @@ curl -X POST "localhost:9200/my-vector-index/_search" -H 'Content-Type: applicat
 The simplest way to create a JVector index:
 
 ```bash
-curl -X PUT "localhost:9200/basic-index" -H 'Content-Type: application/json' -d'
+curl -X PUT "https://localhost:9200/basic-index" -H 'Content-Type: application/json' -d'
 {
   "settings": {
     "index.knn": true
@@ -294,7 +294,7 @@ curl -X PUT "localhost:9200/basic-index" -H 'Content-Type: application/json' -d'
 You can have multiple vector fields in a single index:
 
 ```bash
-curl -X PUT "localhost:9200/multi-vector-index" -H 'Content-Type: application/json' -d'
+curl -X PUT "https://localhost:9200/multi-vector-index" -H 'Content-Type: application/json' -d'
 {
   "settings": {
     "index.knn": true
@@ -343,7 +343,7 @@ The `disk_ann` method supports several parameters:
 **Example with custom parameters:**
 
 ```bash
-curl -X PUT "localhost:9200/optimized-index" -H 'Content-Type: application/json' -d'
+curl -X PUT "https://localhost:9200/optimized-index" -H 'Content-Type: application/json' -d'
 {
   "settings": {
     "index.knn": true
@@ -383,7 +383,7 @@ JVector supports the following distance metrics:
 **Example with cosine similarity:**
 
 ```bash
-curl -X PUT "localhost:9200/text-embeddings" -H 'Content-Type: application/json' -d'
+curl -X PUT "https://localhost:9200/text-embeddings" -H 'Content-Type: application/json' -d'
 {
   "settings": {
     "index.knn": true
@@ -416,7 +416,7 @@ JVector supports Product Quantization (PQ) for memory efficiency:
 **Product Quantization (PQ):**
 
 ```bash
-curl -X PUT "localhost:9200/pq-index" -H 'Content-Type: application/json' -d'
+curl -X PUT "https://localhost:9200/pq-index" -H 'Content-Type: application/json' -d'
 {
   "settings": {
     "index.knn": true
@@ -454,7 +454,7 @@ curl -X PUT "localhost:9200/pq-index" -H 'Content-Type: application/json' -d'
 Index one document at a time:
 
 ```bash
-curl -X POST "localhost:9200/my-index/_doc/1" -H 'Content-Type: application/json' -d'
+curl -X POST "https://localhost:9200/my-index/_doc/1" -H 'Content-Type: application/json' -d'
 {
   "vector_field": [0.1, 0.2, 0.3, ..., 0.768],
   "title": "Document title",
@@ -468,7 +468,7 @@ curl -X POST "localhost:9200/my-index/_doc/1" -H 'Content-Type: application/json
 For large datasets, use the bulk API for better performance:
 
 ```bash
-curl -X POST "localhost:9200/_bulk" -H 'Content-Type: application/x-ndjson' -d'
+curl -X POST "https://localhost:9200/_bulk" -H 'Content-Type: application/x-ndjson' -d'
 {"index": {"_index": "my-index", "_id": "1"}}
 {"vector_field": [0.1, 0.2, ..., 0.768], "title": "Doc 1"}
 {"index": {"_index": "my-index", "_id": "2"}}
@@ -483,83 +483,7 @@ curl -X POST "localhost:9200/_bulk" -H 'Content-Type: application/x-ndjson' -d'
 - **Medium vectors (256-768 dims)**: 500-1000 documents per batch
 - **Large vectors (> 768 dims)**: 100-500 documents per batch
 
-**Java Example for Bulk Indexing:**
-
-```java
-import org.opensearch.client.opensearch.OpenSearchClient;
-import org.opensearch.client.opensearch.core.BulkRequest;
-import org.opensearch.client.opensearch.core.BulkResponse;
-import org.opensearch.client.opensearch.core.bulk.BulkOperation;
-import org.opensearch.client.json.jackson.JacksonJsonpMapper;
-import org.opensearch.client.transport.OpenSearchTransport;
-import org.opensearch.client.transport.rest_client.RestClientTransport;
-import org.apache.http.HttpHost;
-import org.opensearch.client.RestClient;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Random;
-
-public class BulkIndexExample {
-    public static void main(String[] args) throws Exception {
-        // Create OpenSearch client
-        RestClient restClient = RestClient.builder(
-            new HttpHost("localhost", 9200, "http")
-        ).build();
-        
-        OpenSearchTransport transport = new RestClientTransport(
-            restClient, new JacksonJsonpMapper()
-        );
-        OpenSearchClient client = new OpenSearchClient(transport);
-        
-        // Bulk index documents
-        int batchSize = 1000;
-        int totalDocs = 10000;
-        int dimension = 768;
-        Random random = new Random();
-        
-        for (int batch = 0; batch < totalDocs / batchSize; batch++) {
-            List<BulkOperation> operations = new ArrayList<>();
-            
-            for (int i = 0; i < batchSize; i++) {
-                int docId = batch * batchSize + i;
-                float[] vector = new float[dimension];
-                for (int j = 0; j < dimension; j++) {
-                    vector[j] = random.nextFloat();
-                }
-                
-                operations.add(BulkOperation.of(op -> op
-                    .index(idx -> idx
-                        .index("my-index")
-                        .id(String.valueOf(docId))
-                        .document(new Document(vector, "Document " + docId))
-                    )
-                ));
-            }
-            
-            BulkResponse response = client.bulk(BulkRequest.of(b -> b
-                .operations(operations)
-            ));
-            
-            System.out.println("Batch " + batch + ": " +
-                (batchSize - response.errors()) + " succeeded, " +
-                response.errors() + " failed");
-        }
-        
-        transport.close();
-    }
-    
-    static class Document {
-        public float[] vector_field;
-        public String title;
-        
-        public Document(float[] vector, String title) {
-            this.vector_field = vector;
-            this.title = title;
-        }
-    }
-}
-```
+**For Java applications**, refer to the [OpenSearch Java Client Bulk Indexing Guide](https://github.com/opensearch-project/opensearch-java/blob/main/guides/bulk.md) for detailed examples and best practices.
 
 #### Incremental Updates
 
@@ -567,7 +491,7 @@ JVector's unique advantage is efficient incremental updates:
 
 ```bash
 # Add new documents to existing index
-curl -X POST "localhost:9200/my-index/_doc/10001" -H 'Content-Type: application/json' -d'
+curl -X POST "https://localhost:9200/my-index/_doc/10001" -H 'Content-Type: application/json' -d'
 {
   "vector_field": [0.5, 0.6, ..., 0.771],
   "title": "New document"
@@ -575,7 +499,7 @@ curl -X POST "localhost:9200/my-index/_doc/10001" -H 'Content-Type: application/
 '
 
 # Update existing document
-curl -X POST "localhost:9200/my-index/_update/1" -H 'Content-Type: application/json' -d'
+curl -X POST "https://localhost:9200/my-index/_update/1" -H 'Content-Type: application/json' -d'
 {
   "doc": {
     "vector_field": [0.15, 0.25, ..., 0.768],
@@ -605,7 +529,7 @@ Force merge consolidates index segments and optimizes the vector graph:
 
 ```bash
 # Force merge to 1 segment (optimal for search performance)
-curl -X POST "localhost:9200/my-index/_forcemerge?max_num_segments=1"
+curl -X POST "https://localhost:9200/my-index/_forcemerge?max_num_segments=1"
 ```
 
 #### Monitoring Merge Performance
@@ -613,13 +537,13 @@ curl -X POST "localhost:9200/my-index/_forcemerge?max_num_segments=1"
 Check merge statistics:
 
 ```bash
-curl -X GET "localhost:9200/my-index/_stats/merge?pretty"
+curl -X GET "https://localhost:9200/my-index/_stats/merge?pretty"
 ```
 
 Get JVector-specific statistics:
 
 ```bash
-curl -X GET "localhost:9200/_nodes/stats/indices/knn?pretty"
+curl -X GET "https://localhost:9200/_nodes/stats/indices/knn?pretty"
 ```
 
 **Key Metrics:**
@@ -649,7 +573,7 @@ See [benchmarks](../README.md#incremental-merges) for detailed performance compa
 Find the k most similar vectors:
 
 ```bash
-curl -X POST "localhost:9200/my-index/_search" -H 'Content-Type: application/json' -d'
+curl -X POST "https://localhost:9200/my-index/_search" -H 'Content-Type: application/json' -d'
 {
   "size": 10,
   "query": {
@@ -691,7 +615,7 @@ curl -X POST "localhost:9200/my-index/_search" -H 'Content-Type: application/jso
 #### Returning Specific Fields
 
 ```bash
-curl -X POST "localhost:9200/my-index/_search" -H 'Content-Type: application/json' -d'
+curl -X POST "https://localhost:9200/my-index/_search" -H 'Content-Type: application/json' -d'
 {
   "size": 10,
   "_source": ["title", "description"],
@@ -714,7 +638,7 @@ curl -X POST "localhost:9200/my-index/_search" -H 'Content-Type: application/jso
 Override the default `ef_search` parameter at query time:
 
 ```bash
-curl -X POST "localhost:9200/my-index/_search" -H 'Content-Type: application/json' -d'
+curl -X POST "https://localhost:9200/my-index/_search" -H 'Content-Type: application/json' -d'
 {
   "size": 10,
   "query": {
@@ -740,7 +664,7 @@ curl -X POST "localhost:9200/my-index/_search" -H 'Content-Type: application/jso
 **Pre-filtering (recommended):**
 
 ```bash
-curl -X POST "localhost:9200/my-index/_search" -H 'Content-Type: application/json' -d'
+curl -X POST "https://localhost:9200/my-index/_search" -H 'Content-Type: application/json' -d'
 {
   "size": 10,
   "query": {
@@ -779,7 +703,7 @@ curl -X POST "localhost:9200/my-index/_search" -H 'Content-Type: application/jso
 **Post-filtering:**
 
 ```bash
-curl -X POST "localhost:9200/my-index/_search" -H 'Content-Type: application/json' -d'
+curl -X POST "https://localhost:9200/my-index/_search" -H 'Content-Type: application/json' -d'
 {
   "size": 10,
   "query": {
@@ -818,7 +742,7 @@ Search vectors in nested documents:
 
 ```bash
 # Index mapping with nested field
-curl -X PUT "localhost:9200/nested-index" -H 'Content-Type: application/json' -d'
+curl -X PUT "https://localhost:9200/nested-index" -H 'Content-Type: application/json' -d'
 {
   "mappings": {
     "properties": {
@@ -843,7 +767,7 @@ curl -X PUT "localhost:9200/nested-index" -H 'Content-Type: application/json' -d
 '
 
 # Search nested vectors
-curl -X POST "localhost:9200/nested-index/_search" -H 'Content-Type: application/json' -d'
+curl -X POST "https://localhost:9200/nested-index/_search" -H 'Content-Type: application/json' -d'
 {
   "query": {
     "nested": {
@@ -869,7 +793,7 @@ curl -X POST "localhost:9200/nested-index/_search" -H 'Content-Type: application
 Get detailed JVector statistics:
 
 ```bash
-curl -X GET "localhost:9200/_nodes/stats/indices/knn?pretty"
+curl -X GET "https://localhost:9200/_nodes/stats/indices/knn?pretty"
 ```
 
 **Key Statistics:**
@@ -886,7 +810,7 @@ OpenSearch provides built-in query profiling capabilities. For detailed informat
 **Example:**
 
 ```bash
-curl -X POST "localhost:9200/my-index/_search" -H 'Content-Type: application/json' -d'
+curl -X POST "https://localhost:9200/my-index/_search" -H 'Content-Type: application/json' -d'
 {
   "profile": true,
   "query": {
@@ -952,7 +876,7 @@ The `ef_construction` parameter affects index quality:
 Control how often segments are merged:
 
 ```bash
-curl -X PUT "localhost:9200/my-index/_settings" -H 'Content-Type: application/json' -d'
+curl -X PUT "https://localhost:9200/my-index/_settings" -H 'Content-Type: application/json' -d'
 {
   "index": {
     "merge.policy.max_merged_segment": "5gb",
@@ -975,7 +899,7 @@ Tune `ef_search` based on your recall requirements by testing different values:
 
 ```bash
 # Test with ef_search=50
-curl -X POST "localhost:9200/my-index/_search" -H 'Content-Type: application/json' -d'
+curl -X POST "https://localhost:9200/my-index/_search" -H 'Content-Type: application/json' -d'
 {
   "size": 10,
   "query": {
@@ -1005,7 +929,7 @@ curl -X POST "localhost:9200/my-index/_search" -H 'Content-Type: application/jso
 Enable query result caching:
 
 ```bash
-curl -X PUT "localhost:9200/my-index/_settings" -H 'Content-Type: application/json' -d'
+curl -X PUT "https://localhost:9200/my-index/_settings" -H 'Content-Type: application/json' -d'
 {
   "index.queries.cache.enabled": true
 }
@@ -1105,7 +1029,7 @@ Compare JVector with Lucene HNSW:
 
 ```bash
 # Create JVector index
-curl -X PUT "localhost:9200/jvector-index" -H 'Content-Type: application/json' -d'
+curl -X PUT "https://localhost:9200/jvector-index" -H 'Content-Type: application/json' -d'
 {
   "mappings": {
     "properties": {
@@ -1120,7 +1044,7 @@ curl -X PUT "localhost:9200/jvector-index" -H 'Content-Type: application/json' -
 '
 
 # Create Lucene index
-curl -X PUT "localhost:9200/lucene-index" -H 'Content-Type: application/json' -d'
+curl -X PUT "https://localhost:9200/lucene-index" -H 'Content-Type: application/json' -d'
 {
   "mappings": {
     "properties": {
@@ -1139,7 +1063,7 @@ curl -X PUT "localhost:9200/lucene-index" -H 'Content-Type: application/json' -d
 ```
 
 **Expected Results:**
-- JVector provides faster search for large datasets
+- JVector provides faster search for datasets that exceeds available memory
 - JVector provides significantly faster merges with incremental updates
 - JVector performs well in RAM-constrained environments
 
