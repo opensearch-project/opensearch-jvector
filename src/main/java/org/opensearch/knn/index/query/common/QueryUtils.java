@@ -37,6 +37,11 @@ import java.util.concurrent.Callable;
 public class QueryUtils {
     public static QueryUtils INSTANCE = new QueryUtils();
 
+    // Public method to get the singleton instance
+    public static QueryUtils getInstance() {
+        return INSTANCE;
+    }
+
     /**
      * Returns a query that represents the specified TopDocs
      * This is copied from org.apache.lucene.search.AbstractKnnVectorQuery#createRewrittenQuery
