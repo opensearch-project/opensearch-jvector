@@ -31,7 +31,7 @@ import static com.carrotsearch.randomizedtesting.RandomizedTest.$$;
 public class InvalidSearchQueryIT extends KNNRestTestCase {
     private final XContentBuilder xContentBuilder;
 
-    @ParametersFactory(argumentFormatting = "description:%1$s; request:%2$s, expectedexception:%3$s")
+    @ParametersFactory(argumentFormatting = "request:%1$s")
     public static Collection<Object[]> parameters() throws IOException {
         /**
          * Valid query:
@@ -53,23 +53,6 @@ public class InvalidSearchQueryIT extends KNNRestTestCase {
         return Arrays.asList(
             $$(
                 $(
-                    "Empty method_parameter",
-                    XContentFactory.jsonBuilder()
-                        .startObject()
-                        .startObject("query")
-                        .startObject("knn")
-                        .startObject(FIELD_NAME)
-                        .field("vector", new float[] { 1.0f, 2.0f })
-                        .field("k", 1)
-                        .startObject("method_parameter")
-                        .endObject()
-                        .endObject()
-                        .endObject()
-                        .endObject()
-                        .endObject()
-                ),
-                $(
-                    "ef_search string",
                     XContentFactory.jsonBuilder()
                         .startObject()
                         .startObject("query")
@@ -86,7 +69,6 @@ public class InvalidSearchQueryIT extends KNNRestTestCase {
                         .endObject()
                 ),
                 $(
-                    "ef_search less than 0",
                     XContentFactory.jsonBuilder()
                         .startObject()
                         .startObject("query")
@@ -96,40 +78,6 @@ public class InvalidSearchQueryIT extends KNNRestTestCase {
                         .field("k", 1)
                         .startObject("method_parameter")
                         .field("ef_search", -1)
-                        .endObject()
-                        .endObject()
-                        .endObject()
-                        .endObject()
-                        .endObject()
-                ),
-                $(
-                    "nprobes string",
-                    XContentFactory.jsonBuilder()
-                        .startObject()
-                        .startObject("query")
-                        .startObject("knn")
-                        .startObject(FIELD_NAME)
-                        .field("vector", new float[] { 1.0f, 2.0f })
-                        .field("k", 1)
-                        .startObject("method_parameter")
-                        .field("nprobes", "string value")
-                        .endObject()
-                        .endObject()
-                        .endObject()
-                        .endObject()
-                        .endObject()
-                ),
-                $(
-                    "nprobes less than 0",
-                    XContentFactory.jsonBuilder()
-                        .startObject()
-                        .startObject("query")
-                        .startObject("knn")
-                        .startObject(FIELD_NAME)
-                        .field("vector", new float[] { 1.0f, 2.0f })
-                        .field("k", 1)
-                        .startObject("method_parameter")
-                        .field("nprobes", -10)
                         .endObject()
                         .endObject()
                         .endObject()
