@@ -6,8 +6,8 @@
 package org.opensearch.knn.integ;
 
 import lombok.SneakyThrows;
+
 import org.junit.Before;
-import org.junit.Ignore;
 import org.opensearch.client.ResponseException;
 import org.opensearch.common.collect.Tuple;
 import org.opensearch.common.settings.Settings;
@@ -21,7 +21,9 @@ import org.opensearch.knn.index.VectorDataType;
 import java.io.IOException;
 import java.util.*;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.opensearch.knn.DerivedSourceUtils.*;
+import static org.opensearch.knn.index.KNNSettings.KNN_DERIVED_SOURCE_ENABLED;
 
 /**
  * Integration tests for derived source feature for vector fields. Currently, with derived source, there are
@@ -91,10 +93,17 @@ public class DerivedSourceIT extends DerivedSourceTestCase {
     }
 
     @SneakyThrows
-    @Ignore
     public void testNestedField() {
-        List<DerivedSourceUtils.IndexConfigContext> indexConfigContexts = getNestedIndexContexts("derivedit", true);
-        testDerivedSourceE2E(indexConfigContexts);
+        try {
+            List<DerivedSourceUtils.IndexConfigContext> indexConfigContexts = getNestedIndexContexts("derivedit", true);
+            testDerivedSourceE2E(indexConfigContexts);
+        } catch (Exception excp) {
+            // TODO: Remove this check when nested fields are supported with derived sources.
+            assertTrue(excp.getMessage().contains("validation_exception"));
+            assertTrue(
+                excp.getMessage().contains(String.format("Nested fields are not supported when [%s] is true.", KNN_DERIVED_SOURCE_ENABLED))
+            );
+        }
     }
 
     @SneakyThrows
@@ -373,13 +382,14 @@ public class DerivedSourceIT extends DerivedSourceTestCase {
             new String[] { VECTOR_FIELD_1 }
         );
 
-        // Test 4: Both includes and excludes - excludes override includes
-        assertSourceFiltering(
-            indexName,
-            new String[] { VECTOR_FIELD_1, VECTOR_FIELD_2, TEXT_FIELD },
-            new String[] { VECTOR_FIELD_2 },
-            new String[] { VECTOR_FIELD_1, TEXT_FIELD },
-            new String[] { VECTOR_FIELD_2, VECTOR_FIELD_3 }
+        // Test 4: Both includes and excludes - throws IllegalArgumentException because vector field cannot be in both includes and excludes
+        ResponseException ex = expectThrows(
+            ResponseException.class,
+            () -> sourceFiltering(indexName, new String[] { VECTOR_FIELD_1, VECTOR_FIELD_2, TEXT_FIELD }, new String[] { VECTOR_FIELD_2 })
+        );
+        assertThat(
+            ex.getMessage(),
+            containsString("The same entry [" + VECTOR_FIELD_2 + "] cannot be both included and excluded in _source.")
         );
 
         // Test 5: Wildcard includes - only matching fields returned

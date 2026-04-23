@@ -7,6 +7,7 @@ package org.opensearch.knn.index.codec.derivedsource;
 
 import lombok.extern.log4j.Log4j2;
 import org.apache.lucene.index.SegmentReadState;
+import org.opensearch.common.ValidationException;
 import org.opensearch.common.collect.Tuple;
 import org.opensearch.common.io.stream.BytesStreamOutput;
 import org.opensearch.common.xcontent.XContentHelper;
@@ -19,12 +20,10 @@ import org.opensearch.common.regex.Regex;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.function.Function;
-import java.util.HashSet;
-import java.util.Set;
+
+import static org.opensearch.knn.index.KNNSettings.KNN_DERIVED_SOURCE_ENABLED;
 
 @Log4j2
 public class DerivedSourceVectorTransformer {
@@ -148,10 +147,17 @@ public class DerivedSourceVectorTransformer {
         // Have to create a copy of the map here to ensure that is mutable
         Map<String, Object> sourceAsMap = mapTuple.v2();
 
-        // We only need the offset for the nested fields. If there arent any, we can skip
+        // We only need the offset for the nested fields. If there aren't any, we can skip
         int offset = 0;
         if (isNested) {
-            offset = derivedSourceLuceneHelper.getFirstChild(docId);
+            ValidationException validationException = new ValidationException();
+            validationException.addValidationError(
+                String.format("Nested fields are not supported when [%s] is true.", KNN_DERIVED_SOURCE_ENABLED)
+            );
+            throw validationException;
+
+            // TODO: Uncomment this when derived source nested field is fixed.
+            // offset = derivedSourceLuceneHelper.getFirstChild(docId);
         }
 
         // For each vector field, add in the source. The per field injectors are responsible for skipping if
