@@ -23,7 +23,6 @@
   - [Index-time Optimization](#index-time-optimization)
   - [Query-time Optimization](#query-time-optimization)
   - [Memory Management](#memory-management)
-  - [Benchmarking](#benchmarking)
 
 ---
 
@@ -31,7 +30,7 @@
 
 ### What is JVector?
 
-OpenSearch JVector Plugin is a pure Java implementation of vector similarity search that enables you to perform approximate nearest neighbor (ANN) search on billions of documents. It leverages the [JVector library](https://github.com/jbellis/jvector) (as referenced in the [source code](../src/main/java/org/opensearch/knn/index/codec/jvector/JVector.java#L21)) to provide high-performance vector search capabilities directly within OpenSearch.
+OpenSearch JVector Plugin is a pure Java implementation of vector similarity search of vector similarity search that enables you to perform approximate nearest neighbor (ANN) search on billions of documents. It leverages the [JVector library](https://github.com/jbellis/jvector) as one of its engines (as referenced in the [source code](../src/main/java/org/opensearch/knn/index/codec/jvector/JVector.java#L21)) to provide high-performance vector search capabilities directly within OpenSearch.
 
 ### Why Use JVector?
 
@@ -46,7 +45,6 @@ OpenSearch JVector Plugin is a pure Java implementation of vector similarity sea
 3. **Incremental Merges**: Update large graphs without full rebuilds for faster updates
 4. **Product Quantization (PQ)**: Compress vectors to significantly reduce memory usage with quantization refinement during merge
 5. **SIMD Support**: Hardware-accelerated vector operations
-6. **Fused ADC**: Advanced distance computation optimizations
 
 ---
 
@@ -56,7 +54,7 @@ OpenSearch JVector Plugin is a pure Java implementation of vector similarity sea
 
 - **Java**: JDK 21 or later (required by OpenSearch 3.x)
 - **Memory**: Sufficient RAM for your vector dataset (see [Memory Management](#memory-management))
-- **Disk Space**: Adequate storage for indices and vector data
+- **Disk Space**: Adequate storage for indices and vector data with some buffer for merging segments
 
 ### Installation
 
@@ -66,17 +64,17 @@ If you don't have OpenSearch installed yet, choose one of these options:
 
 **Option A: Download and Install OpenSearch**
 
-Download OpenSearch 3.3.2 or later from the [OpenSearch downloads page](https://opensearch.org/downloads.html). Choose the distribution appropriate for your platform and OS.
+Download OpenSearch 3.5.0 or later from the [OpenSearch downloads page](https://opensearch.org/downloads.html). Choose the distribution appropriate for your platform and OS.
 
 Example for macOS:
 
 ```bash
-# Download OpenSearch 3.3.2 (example for macOS)
-curl -O https://artifacts.opensearch.org/releases/bundle/opensearch/3.3.2/opensearch-3.3.2-darwin-x64.tar.gz
+# Download OpenSearch 3.5.0 (example for macOS)
+curl -O https://artifacts.opensearch.org/releases/bundle/opensearch/3.5.0/opensearch-3.5.0-darwin-x64.tar.gz
 
 # Extract
-tar -xzf opensearch-3.3.2-darwin-x64.tar.gz
-cd opensearch-3.3.2
+tar -xzf opensearch-3.5.0-darwin-x64.tar.gz
+cd opensearch-3.5.0
 
 # Start OpenSearch
 ./bin/opensearch
@@ -85,11 +83,11 @@ cd opensearch-3.3.2
 **Option B: Use Docker**
 
 ```bash
-docker pull opensearchproject/opensearch:3.3.2
+docker pull opensearchproject/opensearch:3.5.0
 docker run -d -p 9200:9200 -p 9600:9600 \
   -e "discovery.type=single-node" \
   -e "OPENSEARCH_INITIAL_ADMIN_PASSWORD=YourStrongPassword123!" \
-  opensearchproject/opensearch:3.3.2
+  opensearchproject/opensearch:3.5.0
 ```
 
 **Verify OpenSearch is Running:**
@@ -123,7 +121,7 @@ bin/opensearch-plugin remove opensearch-neural-search
 bin/opensearch-plugin remove opensearch-knn
 
 # Download and install JVector plugin
-curl https://repo1.maven.org/maven2/org/opensearch/plugin/opensearch-jvector-plugin/3.3.2.0/opensearch-jvector-plugin-3.3.2.0.zip -o opensearch-jvector-plugin.zip
+curl https://repo1.maven.org/maven2/org/opensearch/plugin/opensearch-jvector-plugin/3.5.0.0/opensearch-jvector-plugin-3.5.0.0.zip -o opensearch-jvector-plugin.zip
 bin/opensearch-plugin install file://`pwd`/opensearch-jvector-plugin.zip
 
 # Start OpenSearch
@@ -135,14 +133,14 @@ bin/opensearch
 Create a `Dockerfile`:
 
 ```dockerfile
-FROM opensearchproject/opensearch:3.3.2
+FROM opensearchproject/opensearch:3.5.0
 
 # Remove default KNN plugin
 RUN /usr/share/opensearch/bin/opensearch-plugin remove opensearch-neural-search && \
     /usr/share/opensearch/bin/opensearch-plugin remove opensearch-knn
 
 # Install JVector plugin
-RUN curl https://repo1.maven.org/maven2/org/opensearch/plugin/opensearch-jvector-plugin/3.3.2.0/opensearch-jvector-plugin-3.3.2.0.zip -o opensearch-jvector-plugin.zip && \
+RUN curl https://repo1.maven.org/maven2/org/opensearch/plugin/opensearch-jvector-plugin/3.5.0.0/opensearch-jvector-plugin-3.5.0.0.zip -o opensearch-jvector-plugin.zip && \
     /usr/share/opensearch/bin/opensearch-plugin install --batch file://`pwd`/opensearch-jvector-plugin.zip
 ```
 
@@ -168,7 +166,7 @@ Expected output should include:
 
 ```
 name       component           version
-node-1     opensearch-jvector  3.3.2.0
+node-1     opensearch-jvector  3.5.0.0
 ```
 
 **Note:** Replace `admin:YourStrongPassword123!` with your actual credentials. Use `--insecure` only for development with self-signed certificates.
@@ -291,7 +289,7 @@ curl -X PUT "https://localhost:9200/basic-index" -H 'Content-Type: application/j
 
 #### Index with Multiple Vector Fields
 
-You can have multiple vector fields in a single index:
+You can have multiple vector fields in a single index along with non-vector fields:
 
 ```bash
 curl -X PUT "https://localhost:9200/multi-vector-index" -H 'Content-Type: application/json' -d'
@@ -332,15 +330,21 @@ curl -X PUT "https://localhost:9200/multi-vector-index" -H 'Content-Type: applic
 
 #### DiskANN Method Parameters
 
-The `disk_ann` method supports several parameters:
+**Index Build Time Parameters:**
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `m` | integer | 16 | Maximum number of connections per node in the graph. Higher values = better recall but more memory |
 | `ef_construction` | integer | 100 | Size of the dynamic candidate list during index construction. Higher values = better quality but slower indexing |
-| `ef_search` | integer | 100 | Size of the dynamic candidate list during search. Can be overridden at query time |
 
-**Example with custom parameters:**
+**Search Time Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `ef_search` | integer | 100 | Size of the dynamic candidate list during search. Can be overridden at query time |
+| `k` | integer | - | Number of nearest neighbors to return. Specified in the query |
+
+**Example with custom index build parameters:**
 
 ```bash
 curl -X PUT "https://localhost:9200/optimized-index" -H 'Content-Type: application/json' -d'
@@ -359,8 +363,7 @@ curl -X PUT "https://localhost:9200/optimized-index" -H 'Content-Type: applicati
           "space_type": "l2",
           "parameters": {
             "m": 32,
-            "ef_construction": 200,
-            "ef_search": 150
+            "ef_construction": 200
           }
         }
       }
@@ -369,6 +372,8 @@ curl -X PUT "https://localhost:9200/optimized-index" -H 'Content-Type: applicati
 }
 '
 ```
+
+**Note:** `ef_search` and `k` are specified at query time, not during index creation. See [Tuning ef_search](#tuning-ef_search) for examples.
 
 #### Space Types
 
@@ -433,11 +438,7 @@ curl -X PUT "https://localhost:9200/pq-index" -H 'Content-Type: application/json
           "parameters": {
             "m": 16,
             "ef_construction": 100,
-            "compression": {
-              "type": "product_quantization",
-              "subvectors": 96,
-              "bits_per_subvector": 8
-            }
+            "advanced.num_pq_subspaces": 96
           }
         }
       }
@@ -446,6 +447,7 @@ curl -X PUT "https://localhost:9200/pq-index" -H 'Content-Type: application/json
 }
 '
 ```
+
 
 ### Indexing Data
 
@@ -972,102 +974,6 @@ JVector leverages OS file system cache:
 - Monitor cache hit rates
 - Use SSDs for better performance
 - Consider memory-mapped files for large indices
-
-### Benchmarking
-
-#### Using Provided Scripts
-
-The plugin includes comprehensive benchmarking tools:
-
-```bash
-cd scripts/jvector_index_and_search
-
-# Install dependencies
-pip install -r ../requirements.txt
-
-# Run benchmark with recall measurement
-python create_and_test_large_index.py \
-  --num-vectors 100000 \
-  --dimension 768 \
-  --measure-recall \
-  --num-recall-queries 50 \
-  --csv-output results.csv \
-  --plot
-```
-
-#### Measuring Recall
-
-Recall measures search quality (% of true neighbors found):
-
-```python
-from jvector_utils.recall_measurement import GroundTruthTracker
-from jvector_utils.search_operations import test_search_with_stats
-
-# Create tracker
-tracker = GroundTruthTracker(
-    num_queries=50,
-    k=10,
-    dimension=768
-)
-
-# Track ground truth during indexing
-for vector in vectors:
-    tracker.update_ground_truth(vector)
-
-# Measure recall
-recall = tracker.compute_recall(search_results)
-print(f"Recall@10: {recall:.3f}")
-```
-
-#### Measuring Latency and Throughput
-
-For comprehensive performance measurements including latency, throughput, and recall, see the [Benchmarking](#benchmarking) section which provides detailed instructions on using the provided benchmarking tools.
-
-#### Performance Comparison
-
-Compare JVector with Lucene HNSW:
-
-```bash
-# Create JVector index
-curl -X PUT "https://localhost:9200/jvector-index" -H 'Content-Type: application/json' -d'
-{
-  "mappings": {
-    "properties": {
-      "vector": {
-        "type": "knn_vector",
-        "dimension": 768,
-        "method": {"name": "disk_ann", "engine": "jvector", "space_type": "l2"}
-      }
-    }
-  }
-}
-'
-
-# Create Lucene index
-curl -X PUT "https://localhost:9200/lucene-index" -H 'Content-Type: application/json' -d'
-{
-  "mappings": {
-    "properties": {
-      "vector": {
-        "type": "knn_vector",
-        "dimension": 768,
-        "method": {"name": "hnsw", "engine": "lucene", "space_type": "l2"}
-      }
-    }
-  }
-}
-'
-
-# Index same data to both
-# Run benchmarks and compare
-```
-
-**Expected Results:**
-- JVector provides faster search for datasets that exceeds available memory
-- JVector provides significantly faster merges with incremental updates
-- JVector performs well in RAM-constrained environments
-
-See [benchmarks](../README.md#incremental-merges) for detailed performance comparisons.
 
 ---
 
