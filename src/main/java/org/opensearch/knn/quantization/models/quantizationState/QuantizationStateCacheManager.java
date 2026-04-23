@@ -41,25 +41,12 @@ public final class QuantizationStateCacheManager implements Closeable {
      * @param quantizationStateReadConfig information required from reading from off-heap if necessary
      * @return The associated QuantizationState
      */
-    public QuantizationState getQuantizationState(QuantizationStateReadConfig quantizationStateReadConfig) throws IOException {
-        QuantizationState quantizationState = QuantizationStateCache.getInstance()
-            .getQuantizationState(quantizationStateReadConfig.getCacheKey());
-        if (quantizationState == null) {
-            quantizationState = KNN990QuantizationStateReader.read(quantizationStateReadConfig);
-            if (quantizationState != null) {
-                addQuantizationState(quantizationStateReadConfig.getCacheKey(), quantizationState);
-            }
-        }
-        return quantizationState;
-    }
-
-    /**
-     * Adds or updates a quantization state in the cache.
-     * @param fieldName The name of the field.
-     * @param quantizationState The quantization state to store.
-     */
-    public void addQuantizationState(String fieldName, QuantizationState quantizationState) {
-        QuantizationStateCache.getInstance().addQuantizationState(fieldName, quantizationState);
+    public QuantizationState getQuantizationState(QuantizationStateReadConfig quantizationStateReadConfig) {
+        return QuantizationStateCache.getInstance()
+            .getQuantizationState(
+                quantizationStateReadConfig.getCacheKey(),
+                () -> KNN990QuantizationStateReader.read(quantizationStateReadConfig)
+            );
     }
 
     /**
