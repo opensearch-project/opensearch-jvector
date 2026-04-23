@@ -20,6 +20,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * Upgrade jvector from 4.0.0-rc.6 to 4.0.0-rc.8 [370](https://github.com/opensearch-project/opensearch-jvector/pull/370)
 * Update Gradle to 9.4.1 [381](https://github.com/opensearch-project/opensearch-jvector/pull/381)
 ### Documentation
+* Update user guide covering index creation, search tuning, compression levels, and advanced topics; add demo script walking through cluster health check, bulk indexing, filtered/tuned KNN search, force merge, and node stats
 ### Maintenance
 * Update `com.google.guava:failureaccess` from 1.0.1 to 1.0.2
 * Update `com.google.guava:guava` from 32.1.3-jre to 33.2.1-jre
