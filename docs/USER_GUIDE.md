@@ -373,7 +373,7 @@ curl -X PUT "https://localhost:9200/optimized-index" -H 'Content-Type: applicati
 '
 ```
 
-**Note:** `ef_search` and `k` are specified at query time, not during index creation. See [Tuning ef_search](#tuning-ef_search) for examples.
+**Note:** `ef_search` and `k` are specified at query time. See [Tuning ef_search](#tuning-ef_search) for examples.
 
 #### Space Types
 
@@ -438,7 +438,7 @@ curl -X PUT "https://localhost:9200/pq-index" -H 'Content-Type: application/json
           "parameters": {
             "m": 16,
             "ef_construction": 100,
-            "advanced.num_pq_subspaces": 96
+            "advanced.num_pq_subspaces": 192
           }
         }
       }
@@ -447,6 +447,21 @@ curl -X PUT "https://localhost:9200/pq-index" -H 'Content-Type: application/json
 }
 '
 ```
+
+**About `advanced.num_pq_subspaces`:**
+
+This parameter controls Product Quantization compression. If omitted, JVector automatically selects an optimal default based on vector dimension. The value must be a divisor of the dimension.
+
+**Default Values by Dimension:**
+
+| Dimension | Default Subspaces |
+|-----------|-------------------|
+| 384 | 96 |
+| 768 | 192 |
+| 1536 | 192 |
+| 3072 | 384 |
+
+Lower values provide more compression but may reduce recall. The defaults are tuned for good recall/compression balance.
 
 
 ### Indexing Data
