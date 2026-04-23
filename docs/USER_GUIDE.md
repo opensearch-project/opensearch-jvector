@@ -754,6 +754,11 @@ The  [Hybrid Search](https://opensearch.org/docs/latest/search-plugins/hybrid-se
 - Configurable score combination strategies
 
 Please refer to the [OpenSearch Hybrid Search documentation](https://opensearch.org/docs/latest/search-plugins/hybrid-search/) for setup instructions and examples.
+- Proper score normalization across different query types
+- Combines semantic (vector) and lexical (keyword) search
+- Configurable score combination strategies
+
+Please refer to the [OpenSearch Hybrid Search documentation](https://opensearch.org/docs/latest/search-plugins/hybrid-search/) for setup instructions and examples.
 
 #### Nested Field Search
 
