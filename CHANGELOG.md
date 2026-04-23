@@ -15,7 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * Remove usage of the commons-lang 2.6 [317] (https://github.com/opensearch-project/opensearch-jvector/pull/317)
 * Fixing guava dependency scope, since the dependency is provided by transport-grpc plugin [344] (https://github.com/opensearch-project/opensearch-jvector/pull/344)
 * Remove manual ref counting and simplify DeriveSourceReaders [397] (https://github.com/opensearch-project/opensearch-jvector/pull/397)
-* Fix Hash map memory leak in JVectorRandomAccessReader.java (https://github.com/opensearch-project/opensearch-jvector/pull/401)
+* Fix CVE-2026-28684: Upgrade python-dotenv to 1.2.2 to address symbolic link following vulnerability [448] (https://github.com/opensearch-project/opensearch-jvector/issues/448)
 ### Infrastructure
 * Upgrade Lucene to 10.4.0 [292] (https://github.com/opensearch-project/opensearch-jvector/pull/292)
 * Upgrade jvector from 4.0.0-rc.6 to 4.0.0-rc.8 [370](https://github.com/opensearch-project/opensearch-jvector/pull/370)
@@ -25,4 +25,5 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * Update `com.google.guava:failureaccess` from 1.0.1 to 1.0.2
 * Update `com.google.guava:guava` from 32.1.3-jre to 33.2.1-jre
 * Move legacy codecs to backward_codecs [389](https://github.com/opensearch-project/opensearch-jvector/pull/389)
+* Remove 9.x codecs [411](https://github.com/opensearch-project/opensearch-jvector/pull/411)
 ### Refactoring
