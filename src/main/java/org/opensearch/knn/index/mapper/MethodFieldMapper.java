@@ -21,6 +21,7 @@ import org.opensearch.knn.index.engine.qframe.QuantizationConfig;
 import org.opensearch.knn.index.engine.qframe.QuantizationConfigParser;
 
 import java.io.IOException;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 
@@ -158,7 +159,7 @@ public class MethodFieldMapper extends KNNVectorFieldMapper {
                 XContentFactory.jsonBuilder().map(knnLibraryIndexingContext.getLibraryParameters()).toString()
             );
         } catch (IOException ioe) {
-            throw new RuntimeException(String.format("Unable to create KNNVectorFieldMapper: %s", ioe));
+            throw new RuntimeException(String.format(Locale.ROOT, "Unable to create KNNVectorFieldMapper: %s", ioe));
         }
 
         if (useLuceneBasedVectorField) {

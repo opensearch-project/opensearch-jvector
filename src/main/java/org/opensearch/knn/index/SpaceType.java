@@ -183,7 +183,9 @@ public enum SpaceType {
      * @return KNNVectorSimilarityFunction
      */
     public KNNVectorSimilarityFunction getKnnVectorSimilarityFunction() {
-        throw new UnsupportedOperationException(String.format("Space [%s] does not have a knn vector similarity function", getValue()));
+        throw new UnsupportedOperationException(
+            String.format(Locale.ROOT, "Space [%s] does not have a knn vector similarity function", getValue())
+        );
     }
 
     /**
@@ -253,6 +255,8 @@ public enum SpaceType {
      * @return translated distance
      */
     public float scoreToDistanceTranslation(float score) {
-        throw new UnsupportedOperationException(String.format("Space [%s] does not have a score to distance translation", getValue()));
+        throw new UnsupportedOperationException(
+            String.format(Locale.ROOT, "Space [%s] does not have a score to distance translation", getValue())
+        );
     }
 }
