@@ -21,6 +21,7 @@ import org.opensearch.knn.quantization.models.quantizationState.QuantizationStat
 import org.opensearch.knn.quantization.models.quantizationState.QuantizationStateReadConfig;
 
 import java.io.IOException;
+import java.util.Locale;
 
 /**
  * Reads quantization states
@@ -75,7 +76,7 @@ public final class KNN990QuantizationStateReader {
             }
 
             if (position == -1 || length == 0) {
-                throw new IllegalArgumentException(String.format("Field %s not found", field));
+                throw new IllegalArgumentException(String.format(Locale.ROOT, "Field %s not found", field));
             }
 
             byte[] stateBytes = readStateBytes(input, position, length);
@@ -89,7 +90,7 @@ public final class KNN990QuantizationStateReader {
                 case FOUR_BIT:
                     return MultiBitScalarQuantizationState.fromByteArray(stateBytes);
                 default:
-                    throw new IllegalArgumentException(String.format("Unexpected scalar quantization type: %s", scalarQuantizationType));
+                    throw new IllegalArgumentException(String.format(Locale.ROOT, "Unexpected scalar quantization type: %s", scalarQuantizationType));
             }
         }
     }

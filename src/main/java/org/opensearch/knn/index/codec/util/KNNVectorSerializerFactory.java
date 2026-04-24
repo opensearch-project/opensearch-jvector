@@ -9,6 +9,7 @@ import com.google.common.collect.ImmutableMap;
 import org.apache.lucene.util.BytesRef;
 
 import java.io.ObjectStreamConstants;
+import java.util.Locale;
 import java.util.Map;
 
 import static org.opensearch.knn.index.codec.util.SerializationMode.ARRAY;
@@ -75,7 +76,7 @@ public class KNNVectorSerializerFactory {
             return serializationMode;
         }
         throw new IllegalArgumentException(
-            String.format("Byte stream cannot be deserialized to array of floats due to invalid length %d", numberOfRemainingBytes)
+            String.format(Locale.ROOT, "Byte stream cannot be deserialized to array of floats due to invalid length %d", numberOfRemainingBytes)
         );
     }
 
