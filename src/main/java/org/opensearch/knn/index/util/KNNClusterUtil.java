@@ -64,11 +64,7 @@ public class KNNClusterUtil {
         try {
             return this.clusterService.state().getNodes().getMinNodeVersion();
         } catch (Exception exception) {
-            log.error(
-                "Failed to get cluster minimum node version, returning current node version {} instead.",
-                Version.CURRENT,
-                exception
-            );
+            log.error("Failed to get cluster minimum node version, returning current node version {} instead.", Version.CURRENT, exception);
             return Version.CURRENT;
         }
     }

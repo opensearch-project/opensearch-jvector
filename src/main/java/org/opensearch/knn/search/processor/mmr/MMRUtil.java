@@ -360,7 +360,13 @@ public class MMRUtil {
                         }
                     } catch (Exception e) {
                         throw new IllegalArgumentException(
-                            String.format(Locale.ROOT, "%s: unexpected value at the vector field [%s]. error: %s", baseError, fieldPath, e.getMessage()),
+                            String.format(
+                                Locale.ROOT,
+                                "%s: unexpected value at the vector field [%s]. error: %s",
+                                baseError,
+                                fieldPath,
+                                e.getMessage()
+                            ),
                             e
                         );
                     }
@@ -381,7 +387,9 @@ public class MMRUtil {
         }
 
         // Should never reach here
-        throw new IllegalStateException(String.format(Locale.ROOT, "%s: unexpected error resolving field path [%s].", baseError, fieldPath));
+        throw new IllegalStateException(
+            String.format(Locale.ROOT, "%s: unexpected error resolving field path [%s].", baseError, fieldPath)
+        );
     }
 
     /**
@@ -430,7 +438,12 @@ public class MMRUtil {
             String fieldType = (String) current.get(TYPE);
             if (ObjectMapper.NESTED_CONTENT_TYPE.equals(fieldType)) {
                 throw new IllegalArgumentException(
-                    String.format(Locale.ROOT, "MMR search extension cannot support the field %s because it is in the nested field %s.", fieldPath, part)
+                    String.format(
+                        Locale.ROOT,
+                        "MMR search extension cannot support the field %s because it is in the nested field %s.",
+                        fieldPath,
+                        part
+                    )
                 );
             }
         }

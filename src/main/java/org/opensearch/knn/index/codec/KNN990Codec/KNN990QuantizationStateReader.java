@@ -90,7 +90,9 @@ public final class KNN990QuantizationStateReader {
                 case FOUR_BIT:
                     return MultiBitScalarQuantizationState.fromByteArray(stateBytes);
                 default:
-                    throw new IllegalArgumentException(String.format(Locale.ROOT, "Unexpected scalar quantization type: %s", scalarQuantizationType));
+                    throw new IllegalArgumentException(
+                        String.format(Locale.ROOT, "Unexpected scalar quantization type: %s", scalarQuantizationType)
+                    );
             }
         }
     }

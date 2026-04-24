@@ -76,7 +76,11 @@ public class KNNVectorSerializerFactory {
             return serializationMode;
         }
         throw new IllegalArgumentException(
-            String.format(Locale.ROOT, "Byte stream cannot be deserialized to array of floats due to invalid length %d", numberOfRemainingBytes)
+            String.format(
+                Locale.ROOT,
+                "Byte stream cannot be deserialized to array of floats due to invalid length %d",
+                numberOfRemainingBytes
+            )
         );
     }
 

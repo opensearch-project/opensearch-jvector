@@ -49,7 +49,13 @@ public class KNNCodecUtil {
     }
 
     public static String buildEngineFileName(String segmentName, String latestBuildVersion, String fieldName, String extension) {
-        return String.format(Locale.ROOT, "%s%s%s", buildEngineFilePrefix(segmentName), latestBuildVersion, buildEngineFileSuffix(fieldName, extension));
+        return String.format(
+            Locale.ROOT,
+            "%s%s%s",
+            buildEngineFilePrefix(segmentName),
+            latestBuildVersion,
+            buildEngineFileSuffix(fieldName, extension)
+        );
     }
 
     public static String buildEngineFilePrefix(String segmentName) {

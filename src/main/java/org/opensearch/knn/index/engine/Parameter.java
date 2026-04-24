@@ -69,7 +69,9 @@ public abstract class Parameter<T> {
 
             if (!validator.apply((Boolean) value, knnMethodConfigContext)) {
                 validationException = new ValidationException();
-                validationException.addValidationError(String.format(Locale.ROOT, "parameter validation failed for Boolean parameter [%s].", getName()));
+                validationException.addValidationError(
+                    String.format(Locale.ROOT, "parameter validation failed for Boolean parameter [%s].", getName())
+                );
             }
             return validationException;
         }
@@ -96,7 +98,9 @@ public abstract class Parameter<T> {
 
             if (!validator.apply((Integer) value, knnMethodConfigContext)) {
                 validationException = new ValidationException();
-                validationException.addValidationError(String.format(Locale.ROOT, "parameter validation failed for Integer parameter [%s].", getName()));
+                validationException.addValidationError(
+                    String.format(Locale.ROOT, "parameter validation failed for Integer parameter [%s].", getName())
+                );
             }
 
             return validationException;
@@ -172,7 +176,9 @@ public abstract class Parameter<T> {
 
             if (!validator.apply((String) value, knnMethodConfigContext)) {
                 validationException = new ValidationException();
-                validationException.addValidationError(String.format(Locale.ROOT, "parameter validation failed for String parameter [%s].", getName()));
+                validationException.addValidationError(
+                    String.format(Locale.ROOT, "parameter validation failed for String parameter [%s].", getName())
+                );
             }
 
             return validationException;

@@ -143,7 +143,9 @@ public class IndexUtil {
         Object type = fieldMap.get("type");
 
         if (!(type instanceof String) || !KNNVectorFieldMapper.CONTENT_TYPE.equals(type)) {
-            exception.addValidationError(String.format(Locale.ROOT, "Field \"%s\" is not of type %s.", field, KNNVectorFieldMapper.CONTENT_TYPE));
+            exception.addValidationError(
+                String.format(Locale.ROOT, "Field \"%s\" is not of type %s.", field, KNNVectorFieldMapper.CONTENT_TYPE)
+            );
             return exception;
         }
 
