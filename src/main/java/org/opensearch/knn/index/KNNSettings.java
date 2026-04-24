@@ -6,8 +6,6 @@
 package org.opensearch.knn.index;
 
 import lombok.extern.log4j.Log4j2;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.opensearch.OpenSearchParseException;
 import org.opensearch.action.admin.cluster.settings.ClusterUpdateSettingsRequest;
 import org.opensearch.action.admin.cluster.settings.ClusterUpdateSettingsResponse;
@@ -52,7 +50,6 @@ import static org.opensearch.knn.common.featureflags.KNNFeatureFlags.getFeatureF
 @Log4j2
 public class KNNSettings {
 
-    private static final Logger logger = LogManager.getLogger(KNNSettings.class);
     private static KNNSettings INSTANCE;
     private static final OsProbe osProbe = OsProbe.getInstance();
 
@@ -666,7 +663,7 @@ public class KNNSettings {
         client.admin().cluster().updateSettings(clusterUpdateSettingsRequest, new ActionListener<ClusterUpdateSettingsResponse>() {
             @Override
             public void onResponse(ClusterUpdateSettingsResponse clusterUpdateSettingsResponse) {
-                logger.debug(
+                log.debug(
                     "Cluster setting {}, acknowledged: {} ",
                     clusterUpdateSettingsRequest.persistentSettings(),
                     clusterUpdateSettingsResponse.isAcknowledged()
@@ -675,7 +672,7 @@ public class KNNSettings {
 
             @Override
             public void onFailure(Exception e) {
-                logger.info(
+                log.info(
                     "Exception while updating circuit breaker setting {} to {}",
                     clusterUpdateSettingsRequest.persistentSettings(),
                     e.getMessage()
@@ -720,7 +717,7 @@ public class KNNSettings {
 
     public void onIndexModule(IndexModule module) {
         module.addSettingsUpdateConsumer(INDEX_KNN_ALGO_PARAM_EF_SEARCH_SETTING, newVal -> {
-            logger.debug("The value of [KNN] setting [{}] changed to [{}]", KNN_ALGO_PARAM_EF_SEARCH, newVal);
+            log.debug("The value of [KNN] setting [{}] changed to [{}]", KNN_ALGO_PARAM_EF_SEARCH, newVal);
         });
     }
 
