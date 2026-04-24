@@ -748,11 +748,6 @@ To combine vector similarity search with traditional text search, OpenSearch pro
 
 The  [Hybrid Search](https://opensearch.org/docs/latest/search-plugins/hybrid-search/) plugin has tight integration with the  [k-NN](https://docs.opensearch.org/latest/vector-search/api/knn/) plugin and does not support `opensearch-jvector` plugin at the moment. There are ongoing efforts to address this gap.
 
-**Key benefits of Hybrid Search:**
-- Proper score normalization across different query types
-- Combines semantic (vector) and lexical (keyword) search
-- Configurable score combination strategies
-
 Please refer to the [OpenSearch Hybrid Search documentation](https://opensearch.org/docs/latest/search-plugins/hybrid-search/) for setup instructions and examples.
 
 #### Nested Field Search
