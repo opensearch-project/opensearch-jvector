@@ -10,6 +10,7 @@ import org.opensearch.cluster.metadata.MappingMetadata;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.index.Index;
 import org.opensearch.knn.index.SpaceType;
+import org.opensearch.knn.index.ThreadLeakFiltersForTests;
 import org.opensearch.knn.index.mapper.KNNVectorFieldMapper;
 import org.opensearch.knn.index.query.KNNQueryBuilder;
 import org.opensearch.transport.client.Client;
@@ -17,10 +18,13 @@ import org.opensearch.transport.client.Client;
 import java.util.List;
 import java.util.Map;
 
+import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters;
+
 import static org.mockito.Mockito.*;
 import static org.opensearch.knn.common.KNNConstants.TOP_LEVEL_PARAMETER_SPACE_TYPE;
 import static org.opensearch.knn.common.KNNConstants.TYPE;
 
+@ThreadLeakFilters(defaultFilters = true, filters = { ThreadLeakFiltersForTests.class })
 public class MMRKnnQueryTransformerTests extends MMRTestCase {
     private Client client;
     private MMRKnnQueryTransformer transformer;
