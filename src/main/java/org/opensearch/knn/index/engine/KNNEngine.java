@@ -13,6 +13,7 @@ import org.opensearch.knn.index.codec.jvector.JVector;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -63,7 +64,7 @@ public enum KNNEngine implements KNNLibrary {
             return JVECTOR;
         }
 
-        throw new IllegalArgumentException(String.format("Invalid engine type: %s", name));
+        throw new IllegalArgumentException(String.format(Locale.ROOT, "Invalid engine type: %s", name));
     }
 
     /**

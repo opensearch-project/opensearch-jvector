@@ -14,4 +14,5 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * Update Gradle to 9.4.1 [381](https://github.com/opensearch-project/opensearch-jvector/pull/381)
 ### Documentation
 ### Maintenance
+* Fix String.format() uses the default system locale [465](https://github.com/opensearch-project/opensearch-jvector/pull/465)
 ### Refactoring
