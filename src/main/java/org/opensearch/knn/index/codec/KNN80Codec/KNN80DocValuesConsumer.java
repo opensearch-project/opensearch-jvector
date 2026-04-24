@@ -49,7 +49,7 @@ class KNN80DocValuesConsumer extends DocValuesConsumer {
             stopWatch.stop();
             long time_in_millis = stopWatch.totalTime().millis();
             KNNGraphValue.REFRESH_TOTAL_TIME_IN_MILLIS.set(KNNGraphValue.REFRESH_TOTAL_TIME_IN_MILLIS.getValue() + time_in_millis);
-            log.warn("Refresh operation complete in " + time_in_millis + " ms");
+            log.warn("Refresh operation complete in {} ms", time_in_millis);
         }
     }
 
@@ -85,7 +85,7 @@ class KNN80DocValuesConsumer extends DocValuesConsumer {
                     stopWatch.stop();
                     long time_in_millis = stopWatch.totalTime().millis();
                     KNNGraphValue.MERGE_TOTAL_TIME_IN_MILLIS.set(KNNGraphValue.MERGE_TOTAL_TIME_IN_MILLIS.getValue() + time_in_millis);
-                    log.warn("Merge operation complete in " + time_in_millis + " ms");
+                    log.warn("Merge operation complete in {} ms", time_in_millis);
                 }
             }
         } catch (Exception e) {
