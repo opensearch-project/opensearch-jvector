@@ -20,7 +20,12 @@ import org.opensearch.common.regex.Regex;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.*;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 
 import static org.opensearch.knn.index.KNNSettings.KNN_DERIVED_SOURCE_ENABLED;
@@ -152,7 +157,7 @@ public class DerivedSourceVectorTransformer {
         if (isNested) {
             ValidationException validationException = new ValidationException();
             validationException.addValidationError(
-                String.format("Nested fields are not supported when [%s] is true.", KNN_DERIVED_SOURCE_ENABLED)
+                String.format(Locale.ROOT, "Nested fields are not supported when [%s] is true.", KNN_DERIVED_SOURCE_ENABLED)
             );
             throw validationException;
 
