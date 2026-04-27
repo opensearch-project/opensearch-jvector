@@ -162,3 +162,11 @@ This project is licensed under the [Apache v2.0 License](LICENSE.txt).
 ## Copyright
 
 Copyright OpenSearch Contributors. See [NOTICE](NOTICE.txt) for details.
+
+## 💰 Bounty Contribution
+
+- **Task:** [BUG] Fix flaky org.opensearch.knn.index.codec.jvector.JVectorWriterMergeTests.t
+- **Reward:** $10
+- **Source:** GitHub-Paid
+- **Date:** 2026-04-28
+
