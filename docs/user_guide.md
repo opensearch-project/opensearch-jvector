@@ -77,7 +77,7 @@ This builds the plugin zip, installs it into a local OpenSearch distribution, an
 Open a second terminal and run:
 
 ```bash
-./scripts/demo.sh
+./scripts/demo_full.sh
 ```
 
 The script will:
@@ -105,13 +105,13 @@ The script will:
 
 ```bash
 # Default (localhost, no auth)
-./scripts/demo.sh
+./scripts/demo_full.sh
 
 # Remote cluster with auth over HTTPS
-./scripts/demo.sh -h my-cluster:9200 -u admin -p secret -s
+./scripts/demo_full.sh -h my-cluster:9200 -u admin -p secret -s
 
 # Keep the index so you can explore it afterwards
-./scripts/demo.sh -x
+./scripts/demo_full.sh -x
 ```
 
 ---
@@ -217,18 +217,6 @@ curl -X PUT "http://localhost:9200/my-vectors-disk" \
   }
 }'
 ```
-
-Compression levels and their trade-offs:
-
-| `compression_level` | Bits per float | RAM savings | Notes |
-|---|---|---|---|
-| `1x` | 32-bit | none | Full precision, in-memory |
-| `2x` | 16-bit | ~50% | |
-| `4x` | 8-bit | ~75% | |
-| `8x` | 4-bit | ~87% | Requires `mode: on_disk` |
-| `16x` | 2-bit | ~94% | |
-| `32x` | 1-bit | ~97% | |
-| `64x` | 1-bit (64-bit floats) | ~98% | |
 
 Higher compression levels require larger `advanced.num_pq_subspaces` to maintain recall quality.
 
