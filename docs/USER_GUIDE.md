@@ -742,6 +742,11 @@ curl -X POST "https://localhost:9200/my-index/_search" -H 'Content-Type: applica
 
 ### Advanced Search
 
+#### Hybrid Search (Vector + Text)
+
+To combine vector similarity search with traditional text search, OpenSearch provides a dedicated [Hybrid Search](https://opensearch.org/docs/latest/search-plugins/hybrid-search/) plugin. It exposes features to properly normalize and combine scores from different query types (vector and lexical) to produce meaningful scoring results.
+
+The  [Hybrid Search](https://opensearch.org/docs/latest/search-plugins/hybrid-search/) plugin has tight integration with the  [k-NN](https://docs.opensearch.org/latest/vector-search/api/knn/) plugin and does not support `opensearch-jvector` plugin at the moment. There are ongoing efforts to address this gap.
 #### Nested Field Search
 
 Search vectors in nested documents:
