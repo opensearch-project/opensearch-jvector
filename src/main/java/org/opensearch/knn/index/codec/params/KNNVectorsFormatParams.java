@@ -27,6 +27,8 @@ public class KNNVectorsFormatParams {
     private Function<Integer, Integer> numberOfSubspacesPerVectorSupplier;
     private final SpaceType spaceType;
     private boolean leadingSegmentMergeDisabled;
+    private String quantizationType;
+    private int numNvqSubvectors;
 
     public KNNVectorsFormatParams(final Map<String, Object> params, int defaultMaxConnections, int defaultBeamWidth) {
         this(
@@ -60,6 +62,8 @@ public class KNNVectorsFormatParams {
         initNumberOfSubspacesPerVectorSupplier(params);
         this.spaceType = spaceType;
         initLeadingSegmentMergeDisabled(params, KNNConstants.DEFAULT_LEADING_SEGMENT_MERGE_DISABLED);
+        initQuantizationType(params);
+        initNumNvqSubvectors(params);
     }
 
     public boolean validate(final Map<String, Object> params) {
@@ -129,5 +133,21 @@ public class KNNVectorsFormatParams {
             return;
         }
         this.leadingSegmentMergeDisabled = defaultLsmDisabled;
+    }
+
+    private void initQuantizationType(final Map<String, Object> params) {
+        if (params != null && params.containsKey(KNNConstants.METHOD_PARAMETER_QUANTIZATION_TYPE)) {
+            this.quantizationType = (String) params.get(KNNConstants.METHOD_PARAMETER_QUANTIZATION_TYPE);
+            return;
+        }
+        this.quantizationType = KNNConstants.DEFAULT_QUANTIZATION_TYPE;
+    }
+
+    private void initNumNvqSubvectors(final Map<String, Object> params) {
+        if (params != null && params.containsKey(KNNConstants.METHOD_PARAMETER_NUM_NVQ_SUBVECTORS)) {
+            this.numNvqSubvectors = (int) params.get(KNNConstants.METHOD_PARAMETER_NUM_NVQ_SUBVECTORS);
+            return;
+        }
+        this.numNvqSubvectors = KNNConstants.DEFAULT_NUM_NVQ_SUBVECTORS;
     }
 }
