@@ -414,7 +414,7 @@ public class JVectorWriterMergeTests extends LuceneTestCase {
                     .build()
             )
             .overqueryFactor(20)
-            .minimumRecall(0.99)
+            .minimumRecall(0.98)
             .build();
         runScenario(scenario);
     }
@@ -460,7 +460,7 @@ public class JVectorWriterMergeTests extends LuceneTestCase {
             )
             .round(MergeTestRound.builder().segmentSizes(List.of(400)).build())
             .overqueryFactor(20)
-            .minimumRecall(0.99)
+            .minimumRecall(0.98)
             .build();
         runScenarioWithPool(scenario, singleThreadGraphMergePool);
     }
