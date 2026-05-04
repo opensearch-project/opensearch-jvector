@@ -25,15 +25,17 @@ public class KNNFloatVectorValues extends KNNVectorValues<float[]> {
     @Override
     public float[] getVector() throws IOException {
         final float[] vector = VectorValueExtractorStrategy.extractFloatVector(vectorValuesIterator);
-        this.dimension = vector.length;
-        this.bytesPerVector = vector.length * 4;
+        if (vector != null) {
+            this.dimension = vector.length;
+            this.bytesPerVector = vector.length * 4;
+        }
         return vector;
     }
 
     @Override
     public float[] conditionalCloneVector() throws IOException {
         float[] vector = getVector();
-        if (vectorValuesIterator.getDocIdSetIterator() instanceof KnnVectorValues.DocIndexIterator) {
+        if (vector != null && vectorValuesIterator.getDocIdSetIterator() instanceof KnnVectorValues.DocIndexIterator) {
             return Arrays.copyOf(vector, vector.length);
         }
         return vector;

@@ -17,7 +17,8 @@ public class NestedPerFieldDerivedVectorTransformer extends AbstractPerFieldDeri
     private final FieldInfo childFieldInfo;
     private final DerivedSourceReaders derivedSourceReaders;
     private KNNVectorValues<?> vectorValues;
-    private int docId = -1;
+    private int parentDocId = -1;
+    private int currentVectorDocId = -1;
 
     /**
      *
@@ -31,16 +32,34 @@ public class NestedPerFieldDerivedVectorTransformer extends AbstractPerFieldDeri
 
     @Override
     public Object apply(Object object) {
-        if (object == null) {
-            return object;
-        } else if (docId == DocIdSetIterator.NO_MORE_DOCS) {
-            return null;
+        // This control is needed due to masking operation
+        if ((object instanceof Byte && ((Byte) object)
+                .byteValue() == org.opensearch.knn.index.codec.KNN10010Codec.KNN10010DerivedSourceStoredFieldsWriter.MASK)
+                || (object instanceof Integer && ((Integer) object)
+                        .intValue() == org.opensearch.knn.index.codec.KNN10010Codec.KNN10010DerivedSourceStoredFieldsWriter.MASK)) {
+            object = null;
         }
 
+        if (object != null) {
+            return object;
+        }
+
+        // When object is null or MASK, it means the field is not in the source, so we need to inject the vector
         try {
-            Object vector = formatVector(childFieldInfo, vectorValues::getVector, vectorValues::conditionalCloneVector);
-            vectorValues.nextDoc();
-            return vector;
+            // Iterate through children until we find one with a vector for this field
+            while (currentVectorDocId != DocIdSetIterator.NO_MORE_DOCS && currentVectorDocId < parentDocId) {
+                Object vector = formatVector(childFieldInfo, vectorValues::getVector, vectorValues::conditionalCloneVector);
+
+                // If vector is null, this child document doesn't have this field - skip to next
+                if (vector == null) {
+                    currentVectorDocId = vectorValues.nextDoc();
+                    continue;
+                }
+
+                currentVectorDocId = vectorValues.nextDoc();
+                return vector;
+            }
+            return null;
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -48,11 +67,12 @@ public class NestedPerFieldDerivedVectorTransformer extends AbstractPerFieldDeri
 
     @Override
     public void setCurrentDoc(int offset, int docId) throws IOException {
-        vectorValues = KNNVectorValuesFactory.getVectorValues(
+        this.vectorValues = KNNVectorValuesFactory.getVectorValues(
             childFieldInfo,
             derivedSourceReaders.getDocValuesProducer(),
             derivedSourceReaders.getKnnVectorsReader()
         );
-        this.docId = vectorValues.advance(offset);
+        this.parentDocId = docId;
+        this.currentVectorDocId = vectorValues.advance(offset);
     }
 }

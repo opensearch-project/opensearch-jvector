@@ -27,17 +27,18 @@ public class KNNByteVectorValues extends KNNVectorValues<byte[]> {
     @Override
     public byte[] getVector() throws IOException {
         final byte[] vector = VectorValueExtractorStrategy.extractByteVector(vectorValuesIterator);
-        this.dimension = vector.length;
-        this.bytesPerVector = vector.length;
+        if (vector != null) {
+            this.dimension = vector.length;
+            this.bytesPerVector = vector.length;
+        }
         return vector;
     }
 
     @Override
     public byte[] conditionalCloneVector() throws IOException {
         byte[] vector = getVector();
-        if (vectorValuesIterator.getDocIdSetIterator() instanceof KnnVectorValues.DocIndexIterator) {
+        if (vector != null && vectorValuesIterator.getDocIdSetIterator() instanceof KnnVectorValues.DocIndexIterator) {
             return Arrays.copyOf(vector, vector.length);
-
         }
         return vector;
     }
