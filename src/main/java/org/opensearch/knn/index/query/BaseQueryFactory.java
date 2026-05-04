@@ -75,11 +75,9 @@ public abstract class BaseQueryFactory {
         final QueryShardContext queryShardContext = createQueryRequest.getContext()
             .orElseThrow(() -> new RuntimeException("Shard context cannot be null"));
         log.debug(
-            String.format(
-                "Creating query with filter for index [%s], field [%s]",
-                createQueryRequest.getIndexName(),
-                createQueryRequest.getFieldName()
-            )
+            "Creating query with filter for index [{}], field [{}]",
+            createQueryRequest.getIndexName(),
+            createQueryRequest.getFieldName()
         );
         final Query filterQuery;
         try {

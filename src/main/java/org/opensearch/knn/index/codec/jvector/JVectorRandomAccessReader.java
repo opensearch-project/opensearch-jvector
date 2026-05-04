@@ -15,13 +15,10 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
 
 @Log4j2
 public class JVectorRandomAccessReader implements RandomAccessReader {
     private final byte[] internalBuffer = new byte[Long.BYTES];
-    private final byte[] internalFloatBuffer = new byte[Float.BYTES];
     private final IndexInput indexInputDelegate;
     private volatile boolean closed = false;
 
@@ -109,6 +106,10 @@ public class JVectorRandomAccessReader implements RandomAccessReader {
 
     @Override
     public void close() throws IOException {
+        if (this.closed == true) {
+            log.debug("JVectorRandomAccessReader already closed for file: {}", indexInputDelegate);
+            return;
+        }
         log.debug("Closing JVectorRandomAccessReader for file: {}", indexInputDelegate);
         this.closed = true;
         // no need to really close the index input delegate since it is a clone
@@ -128,11 +129,9 @@ public class JVectorRandomAccessReader implements RandomAccessReader {
      * The header offset, on the other hand, is flexible because we can provide it as a parameter to {@link io.github.jbellis.jvector.graph.disk.OnDiskGraphIndex#load(ReaderSupplier, long)}
      */
     public static class Supplier implements ReaderSupplier {
-        private final AtomicInteger readerCount = new AtomicInteger(0);
         private final IndexInput currentInput;
         private final long sliceStartOffset;
         private final long sliceLength;
-        private final ConcurrentHashMap<Integer, RandomAccessReader> readers = new ConcurrentHashMap<>();
 
         public Supplier(IndexInput indexInput) throws IOException {
             this(indexInput, indexInput.getFilePointer(), indexInput.length() - indexInput.getFilePointer());
@@ -149,26 +148,13 @@ public class JVectorRandomAccessReader implements RandomAccessReader {
             synchronized (this) {
                 final IndexInput input = currentInput.slice("Input Slice for the jVector graph or PQ", sliceStartOffset, sliceLength)
                     .clone();
-
-                var reader = new JVectorRandomAccessReader(input);
-                int readerId = readerCount.getAndIncrement();
-                readers.put(readerId, reader);
-                return reader;
+                return new JVectorRandomAccessReader(input);
             }
-
         }
 
         @Override
         public void close() throws IOException {
-            // Close source of all cloned inputs
             IOUtils.closeWhileHandlingException(currentInput);
-
-            // Close all readers
-            for (RandomAccessReader reader : readers.values()) {
-                IOUtils.closeWhileHandlingException(reader::close);
-            }
-            readers.clear();
-            readerCount.set(0);
         }
     }
 }

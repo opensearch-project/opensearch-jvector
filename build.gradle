@@ -201,6 +201,7 @@ allprojects {
 
 configurations {
     zipArchive
+    mockitoAgent
 }
 
 publishing {
@@ -308,6 +309,7 @@ task release(type: Copy, group: 'build') {
 //****************************************************************************/
 // Dependencies
 //****************************************************************************/
+
 dependencies {
     api "org.opensearch:opensearch:${opensearch_version}"
     compileOnly "org.opensearch.plugin:opensearch-scripting-painless-spi:${versions.opensearch}"
@@ -315,6 +317,7 @@ dependencies {
     compileOnly group: 'com.google.guava', name: 'guava', version: "${versions.guava}"
     api "org.apache.commons:commons-lang3:${versions.commonslang}"
     testFixturesImplementation "org.opensearch.test:framework:${opensearch_version}"
+    mockitoAgent("org.mockito:mockito-core:${versions.mockito}") { transitive = false }
     // Add the high-level client dependency
     testImplementation "org.opensearch.client:opensearch-rest-high-level-client:${opensearch_version}"
     // Add netty dependency so we can use it within internal test clusters (not just external ones)
@@ -361,7 +364,8 @@ test {
             '-Djdk.incubator.vector.VECTOR_ACCESS_OOB_CHECK=0',
             '--enable-native-access=ALL-UNNAMED',
             '-Dio.netty.tryReflectionSetAccessible=true',
-            '--enable-preview'
+            '--enable-preview',
+            "-javaagent:${configurations.mockitoAgent.asPath}"
     ]
 
 
@@ -451,10 +455,10 @@ testClusters.integTest { cluster ->
                         File getAsFile() {
                             return it
                         }
+                    }
                 }
-            }
-          }))
-      }
+            }))
+        }
     }
 
     plugin(project.tasks.bundlePlugin.archiveFile)

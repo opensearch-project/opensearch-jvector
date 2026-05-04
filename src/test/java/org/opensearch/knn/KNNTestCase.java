@@ -6,6 +6,7 @@
 package org.opensearch.knn;
 
 import lombok.SneakyThrows;
+
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.opensearch.cluster.service.ClusterService;
@@ -19,6 +20,7 @@ import org.opensearch.core.xcontent.XContentBuilder;
 import org.opensearch.knn.index.KNNSettings;
 import org.opensearch.knn.index.SpaceType;
 import org.opensearch.knn.index.VectorDataType;
+import org.opensearch.knn.index.codec.jvector.JVectorFormat;
 import org.opensearch.knn.index.engine.KNNEngine;
 import org.opensearch.knn.index.engine.KNNLibrarySearchContext;
 import org.opensearch.knn.index.engine.KNNMethodContext;
@@ -29,6 +31,8 @@ import org.opensearch.knn.quantization.models.quantizationState.QuantizationStat
 import org.opensearch.knn.quantization.models.quantizationState.QuantizationStateCacheManager;
 import org.opensearch.test.OpenSearchTestCase;
 import org.opensearch.threadpool.ThreadPool;
+
+import io.github.jbellis.jvector.util.PhysicalCoreExecutor;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
@@ -48,6 +52,17 @@ import static org.opensearch.knn.common.KNNConstants.METHOD_HNSW;
 public class KNNTestCase extends OpenSearchTestCase {
 
     protected static final KNNLibrarySearchContext EMPTY_ENGINE_SPECIFIC_CONTEXT = ctx -> Map.of();
+
+    static {
+        // shutdown hook so that when the test JVM exits, all ForkJoin pools shutdown too
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            JVectorFormat.SIMD_POOL_MERGE.shutdown();
+            JVectorFormat.SIMD_POOL_FLUSH.shutdown();
+            JVectorFormat.PARALLELISM_POOL.shutdown();
+            PhysicalCoreExecutor.instance.close();
+        }));
+
+    }
 
     @Mock
     protected ClusterService clusterService;

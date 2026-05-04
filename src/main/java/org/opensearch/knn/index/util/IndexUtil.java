@@ -119,7 +119,7 @@ public class IndexUtil {
 
         // Check field path is valid
         if (StringUtils.isEmpty(field)) {
-            exception.addValidationError(String.format(Locale.ROOT, "Field path is empty."));
+            exception.addValidationError("Field path is empty.");
             return exception;
         }
 
@@ -127,13 +127,13 @@ public class IndexUtil {
 
         // Check field existence
         if (fieldMapping == null) {
-            exception.addValidationError(String.format("Field \"%s\" does not exist.", field));
+            exception.addValidationError(String.format(Locale.ROOT, "Field \"%s\" does not exist.", field));
             return exception;
         }
 
         // Check if field is a map. If not, that is a problem
         if (!(fieldMapping instanceof Map)) {
-            exception.addValidationError(String.format("Field info for \"%s\" is not a map.", field));
+            exception.addValidationError(String.format(Locale.ROOT, "Field info for \"%s\" is not a map.", field));
             return exception;
         }
 
@@ -143,7 +143,9 @@ public class IndexUtil {
         Object type = fieldMap.get("type");
 
         if (!(type instanceof String) || !KNNVectorFieldMapper.CONTENT_TYPE.equals(type)) {
-            exception.addValidationError(String.format("Field \"%s\" is not of type %s.", field, KNNVectorFieldMapper.CONTENT_TYPE));
+            exception.addValidationError(
+                String.format(Locale.ROOT, "Field \"%s\" is not of type %s.", field, KNNVectorFieldMapper.CONTENT_TYPE)
+            );
             return exception;
         }
 
@@ -204,6 +206,7 @@ public class IndexUtil {
         if ((Integer) dimension != expectedDimension) {
             exception.addValidationError(
                 String.format(
+                    Locale.ROOT,
                     "Field \"%s\" has dimension %d, which is different from " + "dimension specified in the training request: %d",
                     field,
                     dimension,

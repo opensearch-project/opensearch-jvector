@@ -381,6 +381,70 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
 
     /**
      * Comprehensive test combining merges with documents that
+     * have no vector fields populated, multiple segments with deletes
+     * which lead to merges with no vectors (empty graph).
+     */
+    @Test
+    public void testMergesWithNoVectors() throws IOException {
+        final int dimension = 64;
+        final int k = 10;
+
+        IndexWriterConfig config = newIndexWriterConfig();
+        config.setUseCompoundFile(false);
+        config.setCodec(getCodec(random().nextBoolean() ? 1 : 10)); /* 1 to check empty PQ vectors, 10 to check empty graph */
+        config.setMergePolicy(new ForceMergesOnlyMergePolicy());
+        config.setMergeScheduler(new SerialMergeScheduler());
+
+        final Path indexPath = createTempDir();
+
+        try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter writer = new IndexWriter(dir, config)) {
+            int docId = 0;
+
+            // Segment 1: 2 documents with one document having no vector field populated
+            log.info("Creating segment 1: 2 docs");
+            for (int i = 0; i < 2; i++) {
+                Document doc = new Document();
+                if (i == 0) {
+                    float[] vector = new float[dimension];
+                    Arrays.fill(vector, docId * random().nextFloat(1.0f));
+                    doc.add(new KnnFloatVectorField(TEST_FIELD, vector, VectorSimilarityFunction.EUCLIDEAN));
+                }
+                doc.add(new StringField(TEST_ID_FIELD, String.valueOf(docId), Field.Store.YES));
+                writer.addDocument(doc);
+                docId++;
+            }
+            writer.commit();
+
+            // Segment 2: delete one document with vectors
+            writer.deleteDocuments(new Term(TEST_ID_FIELD, String.valueOf(0)));
+            writer.commit();
+
+            // Merge ends up with segment with no vector fields (empty graph)
+            log.info("Performing intermediate merge after segment 2");
+            writer.forceMerge(1);
+        }
+
+        // Verify the merged index
+        try (FSDirectory dir = FSDirectory.open(indexPath); IndexReader reader = DirectoryReader.open(dir)) {
+            Assert.assertEquals("Should have 1 segment after merge", 1, reader.getContext().leaves().size());
+            Assert.assertEquals("Should have correct number of live docs", 1, reader.numDocs());
+
+            // Verify search works correctly
+            final IndexSearcher searcher = newSearcher(reader);
+            TopDocs topDocs = searcher.search(new MatchAllDocsQuery(), k);
+            Assert.assertEquals("Should return k results", 1, topDocs.totalHits.value());
+
+            for (int i = 0; i < topDocs.scoreDocs.length; i++) {
+                Document doc = reader.storedFields().document(topDocs.scoreDocs[i].doc);
+                String id = doc.get(TEST_ID_FIELD);
+                log.info("Result {}: doc ID = {}", i, id);
+            }
+        }
+
+    }
+
+    /**
+     * Comprehensive test combining merges and deletes with documents that
      * have no vector fields populated.
      */
     @Test
@@ -396,7 +460,6 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
         config.setMergeScheduler(new SerialMergeScheduler());
 
         final Path indexPath = createTempDir();
-
         try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter writer = new IndexWriter(dir, config)) {
             int docId = 0;
 

@@ -149,11 +149,9 @@ public class KNNVectorFieldMapperUtil {
         if (spaceType == null) {
             spaceType = KNNSettings.INDEX_KNN_DEFAULT_SPACE_TYPE;
             log.info(
-                String.format(
-                    "[KNN] The setting \"%s\" was not set for the index. Likely caused by recent version upgrade. Setting the setting to the default value=%s",
-                    METHOD_PARAMETER_SPACE_TYPE,
-                    spaceType
-                )
+                "[KNN] The setting \"{}\" was not set for the index. Likely caused by recent version upgrade. Setting the setting to the default value={}",
+                METHOD_PARAMETER_SPACE_TYPE,
+                spaceType
             );
         }
         return SpaceType.getSpace(spaceType);
@@ -163,11 +161,9 @@ public class KNNVectorFieldMapperUtil {
         String m = indexSettings.get(KNNSettings.INDEX_KNN_ALGO_PARAM_M_SETTING.getKey());
         if (m == null) {
             log.info(
-                String.format(
-                    "[KNN] The setting \"%s\" was not set for the index. Likely caused by recent version upgrade. Setting the setting to the default value=%s",
-                    HNSW_ALGO_M,
-                    KNNSettings.INDEX_KNN_DEFAULT_ALGO_PARAM_M
-                )
+                "[KNN] The setting \"{}\" was not set for the index. Likely caused by recent version upgrade. Setting the setting to the default value={}",
+                HNSW_ALGO_M,
+                KNNSettings.INDEX_KNN_DEFAULT_ALGO_PARAM_M
             );
             return KNNSettings.INDEX_KNN_DEFAULT_ALGO_PARAM_M;
         }
@@ -179,12 +175,10 @@ public class KNNVectorFieldMapperUtil {
         if (efConstruction == null) {
             final int defaultEFConstructionValue = IndexHyperParametersUtil.getHNSWEFConstructionValue(indexVersion);
             log.info(
-                String.format(
-                    "[KNN] The setting \"%s\" was not set for the index. Likely caused by recent version upgrade. "
-                        + "Picking up default value for the index =%s",
-                    HNSW_ALGO_EF_CONSTRUCTION,
-                    defaultEFConstructionValue
-                )
+                "[KNN] The setting \"{}\" was not set for the index. Likely caused by recent version upgrade. "
+                    + "Picking up default value for the index ={}",
+                HNSW_ALGO_EF_CONSTRUCTION,
+                defaultEFConstructionValue
             );
             return defaultEFConstructionValue;
         }

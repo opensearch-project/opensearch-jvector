@@ -655,6 +655,41 @@ public class KNNJVectorTests extends LuceneTestCase {
                 Assert.assertEquals(1, reader.getContext().leaves().size());
                 Assert.assertEquals(totalNumberOfDocs, reader.numDocs());
 
+                for (LeafReaderContext context : reader.leaves()) {
+                    FloatVectorValues vectorValues = context.reader().getFloatVectorValues(TEST_FIELD);
+                    final var docIdSetIterator = vectorValues.iterator(); // iterator for all the vectors with values
+                    int docId = -1;
+                    while ((docId = docIdSetIterator.nextDoc()) != DocIdSetIterator.NO_MORE_DOCS) {
+                        final int luceneDocId = context.docBase + docId;
+                        float[] vectorValue = vectorValues.vectorValue(docIdSetIterator.index());
+                        float[] expectedVectorValue = source[docId];
+
+                        // if the vectors do not match, also look which source vector should be the right result
+                        if (!Arrays.equals(expectedVectorValue, vectorValue)) {
+                            for (int i = 0; i < source.length; i++) {
+                                if (Arrays.equals(source[i], vectorValue)) {
+                                    log.error(
+                                        "found vector with global id: {}, in docId: {}, however the actual position of the vector in source is: {}",
+                                        docId,
+                                        luceneDocId,
+                                        i
+                                    );
+                                }
+                            }
+                        }
+                        Assert.assertArrayEquals(
+                            "vector with global id "
+                                + docId
+                                + " in source doesn't match vector value in lucene docID "
+                                + luceneDocId
+                                + " on the index",
+                            expectedVectorValue,
+                            vectorValue,
+                            0.0f
+                        );
+                    }
+                }
+
                 final Query filterQuery = new MatchAllDocsQuery();
                 final IndexSearcher searcher = newSearcher(reader);
                 KnnFloatVectorQuery knnFloatVectorQuery = getJVectorKnnFloatVectorQuery(TEST_FIELD, target, k, filterQuery);
