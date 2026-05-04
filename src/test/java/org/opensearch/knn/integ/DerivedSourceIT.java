@@ -23,7 +23,6 @@ import java.util.*;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.opensearch.knn.DerivedSourceUtils.*;
-import static org.opensearch.knn.index.KNNSettings.KNN_DERIVED_SOURCE_ENABLED;
 
 /**
  * Integration tests for derived source feature for vector fields. Currently, with derived source, there are
@@ -94,16 +93,8 @@ public class DerivedSourceIT extends DerivedSourceTestCase {
 
     @SneakyThrows
     public void testNestedField() {
-        try {
-            List<DerivedSourceUtils.IndexConfigContext> indexConfigContexts = getNestedIndexContexts("derivedit", true);
-            testDerivedSourceE2E(indexConfigContexts);
-        } catch (Exception excp) {
-            // TODO: Remove this check when nested fields are supported with derived sources.
-            assertTrue(excp.getMessage().contains("validation_exception"));
-            assertTrue(
-                excp.getMessage().contains(String.format("Nested fields are not supported when [%s] is true.", KNN_DERIVED_SOURCE_ENABLED))
-            );
-        }
+        List<DerivedSourceUtils.IndexConfigContext> indexConfigContexts = getNestedIndexContexts("derivedit", true);
+        testDerivedSourceE2E(indexConfigContexts);
     }
 
     @SneakyThrows

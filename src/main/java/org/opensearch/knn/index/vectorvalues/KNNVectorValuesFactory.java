@@ -22,6 +22,7 @@ import org.apache.lucene.index.VectorEncoding;
 import org.apache.lucene.search.DocIdSetIterator;
 import org.opensearch.knn.common.FieldInfoExtractor;
 import org.opensearch.knn.index.VectorDataType;
+import org.opensearch.knn.index.codec.jvector.JVectorFloatVectorValues;
 
 import java.io.IOException;
 import java.util.Map;
@@ -151,7 +152,12 @@ public final class KNNVectorValuesFactory {
             } else {
                 throw new IllegalArgumentException("Invalid Vector encoding provided, hence cannot return VectorValues");
             }
-            return getVectorValues(vectorDataType, new KNNVectorValuesIterator.DocIdsIteratorValues(knnVectorValues));
+
+            if (knnVectorValues instanceof JVectorFloatVectorValues jfvv) {
+                return getVectorValues(vectorDataType, new KNNVectorValuesIterator.DocIdsIteratorValues(jfvv));
+            } else {
+                return getVectorValues(vectorDataType, new KNNVectorValuesIterator.DocIdsIteratorValues(knnVectorValues));
+            }
         } else if (docValuesProducer != null) {
             return getVectorValues(
                 FieldInfoExtractor.extractVectorDataType(fieldInfo),
