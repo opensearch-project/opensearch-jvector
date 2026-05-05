@@ -8,6 +8,7 @@ package org.opensearch.knn.index.vectorvalues;
 import lombok.SneakyThrows;
 import org.apache.lucene.index.DocsWithFieldSet;
 import org.apache.lucene.search.DocIdSetIterator;
+import org.junit.Assert;
 import org.opensearch.knn.KNNTestCase;
 import org.opensearch.knn.index.VectorDataType;
 
@@ -27,7 +28,7 @@ public class KNNVectorValuesTests extends KNNTestCase {
         final KNNVectorValues<float[]> knnVectorValues = KNNVectorValuesFactory.getVectorValues(VectorDataType.FLOAT, randomVectorValues);
         new CompareVectorValues<float[]>().validateVectorValues(knnVectorValues, floatArray, 8, dimension, true);
 
-        final DocsWithFieldSet docsWithFieldSet = getDocIdSetIterator(floatArray.size());
+        final DocsWithFieldSet docsWithFieldSet = TestVectorValues.getDocIdSetIterator(floatArray.size());
 
         final Map<Integer, float[]> vectorsMap = Map.of(0, floatArray.get(0), 1, floatArray.get(1));
         final KNNVectorValues<float[]> knnVectorValuesForFieldWriter = KNNVectorValuesFactory.getVectorValues(
@@ -53,7 +54,7 @@ public class KNNVectorValuesTests extends KNNTestCase {
         final KNNVectorValues<byte[]> knnVectorValues = KNNVectorValuesFactory.getVectorValues(VectorDataType.BYTE, randomVectorValues);
         new CompareVectorValues<byte[]>().validateVectorValues(knnVectorValues, byteArray, 2, dimension, true);
 
-        final DocsWithFieldSet docsWithFieldSet = getDocIdSetIterator(byteArray.size());
+        final DocsWithFieldSet docsWithFieldSet = TestVectorValues.getDocIdSetIterator(byteArray.size());
         final Map<Integer, byte[]> vectorsMap = Map.of(0, byteArray.get(0), 1, byteArray.get(1));
         final KNNVectorValues<byte[]> knnVectorValuesForFieldWriter = KNNVectorValuesFactory.getVectorValues(
             VectorDataType.BYTE,
@@ -81,7 +82,7 @@ public class KNNVectorValuesTests extends KNNTestCase {
         final KNNVectorValues<byte[]> knnVectorValues = KNNVectorValuesFactory.getVectorValues(VectorDataType.BINARY, randomVectorValues);
         new CompareVectorValues<byte[]>().validateVectorValues(knnVectorValues, byteArray, 3, dimension, true);
 
-        final DocsWithFieldSet docsWithFieldSet = getDocIdSetIterator(byteArray.size());
+        final DocsWithFieldSet docsWithFieldSet = TestVectorValues.getDocIdSetIterator(byteArray.size());
         final Map<Integer, byte[]> vectorsMap = Map.of(0, byteArray.get(0), 1, byteArray.get(1));
         final KNNBinaryVectorValues knnVectorValuesForFieldWriter = (KNNBinaryVectorValues) KNNVectorValuesFactory.getVectorValues(
             VectorDataType.BINARY,
@@ -97,14 +98,6 @@ public class KNNVectorValuesTests extends KNNTestCase {
             preDefinedByteVectorValues
         );
         new CompareVectorValues<byte[]>().validateVectorValues(knnBinaryVectorValuesBinaryDocValues, byteArray, 3, dimension, false);
-    }
-
-    private DocsWithFieldSet getDocIdSetIterator(int numberOfDocIds) {
-        final DocsWithFieldSet docsWithFieldSet = new DocsWithFieldSet();
-        for (int i = 0; i < numberOfDocIds; i++) {
-            docsWithFieldSet.add(i);
-        }
-        return docsWithFieldSet;
     }
 
     private class CompareVectorValues<T> {
@@ -124,8 +117,12 @@ public class KNNVectorValuesTests extends KNNTestCase {
                 T actual = vectorValues.getVector();
                 T clone = vectorValues.conditionalCloneVector();
                 T expected = vectors.get(i);
+                
                 assertNotEquals(oldDocId, docId);
+                assertEquals(docId, vectorValues.docId());
                 assertEquals(dimension, vectorValues.dimension());
+                assertEquals(bytesPerVector, vectorValues.bytesPerVector());
+                
                 // this will check if reference is correct for the vectors. This is mainly required because for
                 // VectorValues of Lucene when reading vectors put the vector at same reference
                 if (oldActual != null && validateAddress) {
@@ -134,13 +131,49 @@ public class KNNVectorValuesTests extends KNNTestCase {
                 }
 
                 oldActual = actual;
+                oldDocId = docId;
+                
                 // this will do the deep equals
                 assertArrayEquals(new Object[] { actual }, new Object[] { expected });
                 assertArrayEquals(new Object[] { clone }, new Object[] { expected });
                 i++;
             }
-            assertEquals(bytesPerVector, vectorValues.bytesPerVector);
         }
     }
 
+    @SneakyThrows
+    public void testAdvance_whenAdvanceToEnd_thenNoMoreDocs() {
+        final List<float[]> floatArray = List.of(new float[] { 1.0f, 2.0f }, new float[] { 3.0f, 4.0f });
+        final TestVectorValues.PreDefinedFloatVectorValues vectorValues = new TestVectorValues.PreDefinedFloatVectorValues(floatArray);
+        final KNNVectorValues<float[]> knnVectorValues = KNNVectorValuesFactory.getVectorValues(VectorDataType.FLOAT, vectorValues);
+        
+        // Test advance() beyond available docs
+        int docId = knnVectorValues.advance(10);
+        assertEquals(DocIdSetIterator.NO_MORE_DOCS, docId);
+    }
+
+    @SneakyThrows
+    public void testAdvance_whenSequentialAdvance_thenSuccess() {
+        final List<byte[]> byteArray = List.of(
+            new byte[] { 1, 2 },
+            new byte[] { 3, 4 },
+            new byte[] { 5, 6 },
+            new byte[] { 7, 8 },
+            new byte[] { 9, 10 }
+        );
+        final TestVectorValues.PreDefinedByteVectorValues vectorValues = new TestVectorValues.PreDefinedByteVectorValues(byteArray);
+        final KNNVectorValues<byte[]> knnVectorValues = KNNVectorValuesFactory.getVectorValues(VectorDataType.BYTE, vectorValues);
+        
+        // Test sequential advance() calls
+        assertEquals(1, knnVectorValues.advance(1));
+        assertArrayEquals(byteArray.get(1), knnVectorValues.getVector());
+        assertEquals(2, knnVectorValues.dimension());
+        assertEquals(2, knnVectorValues.bytesPerVector());
+        
+        assertEquals(3, knnVectorValues.advance(3));
+        assertArrayEquals(byteArray.get(3), knnVectorValues.getVector());
+        
+        assertEquals(4, knnVectorValues.advance(4));
+        assertArrayEquals(byteArray.get(4), knnVectorValues.getVector());
+    }
 }
