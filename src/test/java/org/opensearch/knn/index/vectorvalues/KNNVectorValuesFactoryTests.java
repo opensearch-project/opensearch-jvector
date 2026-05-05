@@ -81,7 +81,7 @@ public class KNNVectorValuesFactoryTests extends KNNTestCase {
 
         Assert.assertThrows(
             IllegalArgumentException.class,
-            () -> KNNVectorValuesFactory.getVectorValues(fieldInfo, docValuesProducer, reader)
+            () -> KNNVectorValuesFactory.getDerivedVectorValues(fieldInfo, docValuesProducer, reader)
         );
     }
 
@@ -98,7 +98,11 @@ public class KNNVectorValuesFactoryTests extends KNNTestCase {
         // Checking for byte vectors
         Mockito.when(fieldInfo.getVectorEncoding()).thenReturn(VectorEncoding.BYTE);
         Mockito.when(reader.getByteVectorValues("test_field")).thenReturn(new TestVectorValues.PreDefinedByteVectorValues(byteArrayList));
-        final KNNVectorValues<byte[]> byteVectorValues = KNNVectorValuesFactory.getVectorValues(fieldInfo, docValuesProducer, reader);
+        final KNNVectorValues<byte[]> byteVectorValues = KNNVectorValuesFactory.getDerivedVectorValues(
+            fieldInfo,
+            docValuesProducer,
+            reader
+        );
         byteVectorValues.nextDoc();
         Assert.assertArrayEquals(byteArrayList.getFirst(), byteVectorValues.getVector());
 
@@ -106,7 +110,11 @@ public class KNNVectorValuesFactoryTests extends KNNTestCase {
         Mockito.when(fieldInfo.getVectorEncoding()).thenReturn(VectorEncoding.FLOAT32);
         Mockito.when(reader.getFloatVectorValues("test_field"))
             .thenReturn(new TestVectorValues.PreDefinedFloatVectorValues(floatArrayList));
-        final KNNVectorValues<float[]> floatVectorValues = KNNVectorValuesFactory.getVectorValues(fieldInfo, docValuesProducer, reader);
+        final KNNVectorValues<float[]> floatVectorValues = KNNVectorValuesFactory.getDerivedVectorValues(
+            fieldInfo,
+            docValuesProducer,
+            reader
+        );
         floatVectorValues.nextDoc();
         Assert.assertArrayEquals(floatArrayList.getFirst(), floatVectorValues.getVector(), 0.0f);
 
@@ -115,7 +123,11 @@ public class KNNVectorValuesFactoryTests extends KNNTestCase {
         Mockito.when(fieldInfo.hasVectorValues()).thenReturn(false);
         Mockito.when(reader.getByteVectorValues("test_field")).thenReturn(new TestVectorValues.PreDefinedByteVectorValues(byteArrayList));
         Mockito.when(docValuesProducer.getBinary(fieldInfo)).thenReturn(new TestVectorValues.ConstantVectorBinaryDocValues(1, 1, 2));
-        final KNNVectorValues<float[]> binaryVectorValues = KNNVectorValuesFactory.getVectorValues(fieldInfo, docValuesProducer, reader);
+        final KNNVectorValues<float[]> binaryVectorValues = KNNVectorValuesFactory.getDerivedVectorValues(
+            fieldInfo,
+            docValuesProducer,
+            reader
+        );
         byteVectorValues.nextDoc();
         Assert.assertArrayEquals(new float[] { 2 }, binaryVectorValues.getVector(), 0);
     }
@@ -123,10 +135,10 @@ public class KNNVectorValuesFactoryTests extends KNNTestCase {
     public void testGetVectorValuesUsingDocValuesProducer_whenInvalidInput_thenException() {
         final FieldInfo fieldInfo = Mockito.mock(FieldInfo.class);
         Mockito.when(fieldInfo.hasVectorValues()).thenReturn(false);
-        Assert.assertThrows(IllegalArgumentException.class, () -> KNNVectorValuesFactory.getVectorValues(fieldInfo, null, null));
+        Assert.assertThrows(IllegalArgumentException.class, () -> KNNVectorValuesFactory.getDerivedVectorValues(fieldInfo, null, null));
 
         Mockito.when(fieldInfo.hasVectorValues()).thenReturn(true);
-        Assert.assertThrows(IllegalArgumentException.class, () -> KNNVectorValuesFactory.getVectorValues(fieldInfo, null, null));
+        Assert.assertThrows(IllegalArgumentException.class, () -> KNNVectorValuesFactory.getDerivedVectorValues(fieldInfo, null, null));
     }
 
     @SneakyThrows

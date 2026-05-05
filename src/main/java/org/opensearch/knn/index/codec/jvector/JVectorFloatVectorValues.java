@@ -96,6 +96,10 @@ public class JVectorFloatVectorValues extends FloatVectorValues {
         };
     }
 
+    /**
+     * Constructs an iterator that iterates over vectors that have corresponding nodes in the graph (skipping the gaps with non-live / NO_VECTORS nodes).
+     * @return an iterator that iterates over vectors that have corresponding nodes in the graph (skipping the gaps with non-live / NO_VECTORS nodes)
+     */
     public DocIndexIterator vectorIterator() {
         return new DocIndexIterator() {
             private int docId = -1;
