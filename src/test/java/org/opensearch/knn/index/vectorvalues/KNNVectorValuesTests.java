@@ -8,7 +8,6 @@ package org.opensearch.knn.index.vectorvalues;
 import lombok.SneakyThrows;
 import org.apache.lucene.index.DocsWithFieldSet;
 import org.apache.lucene.search.DocIdSetIterator;
-import org.junit.Assert;
 import org.opensearch.knn.KNNTestCase;
 import org.opensearch.knn.index.VectorDataType;
 
@@ -117,12 +116,12 @@ public class KNNVectorValuesTests extends KNNTestCase {
                 T actual = vectorValues.getVector();
                 T clone = vectorValues.conditionalCloneVector();
                 T expected = vectors.get(i);
-                
+
                 assertNotEquals(oldDocId, docId);
                 assertEquals(docId, vectorValues.docId());
                 assertEquals(dimension, vectorValues.dimension());
                 assertEquals(bytesPerVector, vectorValues.bytesPerVector());
-                
+
                 // this will check if reference is correct for the vectors. This is mainly required because for
                 // VectorValues of Lucene when reading vectors put the vector at same reference
                 if (oldActual != null && validateAddress) {
@@ -132,7 +131,7 @@ public class KNNVectorValuesTests extends KNNTestCase {
 
                 oldActual = actual;
                 oldDocId = docId;
-                
+
                 // this will do the deep equals
                 assertArrayEquals(new Object[] { actual }, new Object[] { expected });
                 assertArrayEquals(new Object[] { clone }, new Object[] { expected });
@@ -146,7 +145,7 @@ public class KNNVectorValuesTests extends KNNTestCase {
         final List<float[]> floatArray = List.of(new float[] { 1.0f, 2.0f }, new float[] { 3.0f, 4.0f });
         final TestVectorValues.PreDefinedFloatVectorValues vectorValues = new TestVectorValues.PreDefinedFloatVectorValues(floatArray);
         final KNNVectorValues<float[]> knnVectorValues = KNNVectorValuesFactory.getVectorValues(VectorDataType.FLOAT, vectorValues);
-        
+
         // Test advance() beyond available docs
         int docId = knnVectorValues.advance(10);
         assertEquals(DocIdSetIterator.NO_MORE_DOCS, docId);
@@ -163,16 +162,16 @@ public class KNNVectorValuesTests extends KNNTestCase {
         );
         final TestVectorValues.PreDefinedByteVectorValues vectorValues = new TestVectorValues.PreDefinedByteVectorValues(byteArray);
         final KNNVectorValues<byte[]> knnVectorValues = KNNVectorValuesFactory.getVectorValues(VectorDataType.BYTE, vectorValues);
-        
+
         // Test sequential advance() calls
         assertEquals(1, knnVectorValues.advance(1));
         assertArrayEquals(byteArray.get(1), knnVectorValues.getVector());
         assertEquals(2, knnVectorValues.dimension());
         assertEquals(2, knnVectorValues.bytesPerVector());
-        
+
         assertEquals(3, knnVectorValues.advance(3));
         assertArrayEquals(byteArray.get(3), knnVectorValues.getVector());
-        
+
         assertEquals(4, knnVectorValues.advance(4));
         assertArrayEquals(byteArray.get(4), knnVectorValues.getVector());
     }

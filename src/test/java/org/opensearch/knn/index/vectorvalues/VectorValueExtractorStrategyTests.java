@@ -20,9 +20,9 @@ import java.util.Map;
  * {@link KNNVectorValuesTests}
  */
 public class VectorValueExtractorStrategyTests extends KNNTestCase {
-    final private List<float[]> floatArrayList = List.of(new float[] {1.3f, 2.2f, 3.2f}, new float[] {1.4f, 1.1f, 2.7f});
-    final private List<byte[]> byteArrayList = List.of(new byte[] {1, 2, 3}, new byte[] {2, 3, 4});
-    final List<byte[]> binaryArrayList = List.of(new byte[] {3, 2, 3}, new byte[] {1, 3, 2});
+    final private List<float[]> floatArrayList = List.of(new float[] { 1.3f, 2.2f, 3.2f }, new float[] { 1.4f, 1.1f, 2.7f });
+    final private List<byte[]> byteArrayList = List.of(new byte[] { 1, 2, 3 }, new byte[] { 2, 3, 4 });
+    final List<byte[]> binaryArrayList = List.of(new byte[] { 3, 2, 3 }, new byte[] { 1, 3, 2 });
 
     @SneakyThrows
     public void testExtractWithDISI_whenInvalidIterator_thenException() {
@@ -36,7 +36,9 @@ public class VectorValueExtractorStrategyTests extends KNNTestCase {
 
     @SneakyThrows
     public void testExtractWithDISI_whenInvalidVectorDataType_thenException() {
-        final TestVectorValues.PredefinedFloatVectorBinaryDocValues docValues = new TestVectorValues.PredefinedFloatVectorBinaryDocValues(floatArrayList);
+        final TestVectorValues.PredefinedFloatVectorBinaryDocValues docValues = new TestVectorValues.PredefinedFloatVectorBinaryDocValues(
+            floatArrayList
+        );
         docValues.nextDoc();
         final VectorValueExtractorStrategy disiStrategy = new VectorValueExtractorStrategy.DISIVectorExtractor();
         final KNNVectorValuesIterator vectorValuesIterator = Mockito.mock(KNNVectorValuesIterator.DocIdsIteratorValues.class);
@@ -46,23 +48,33 @@ public class VectorValueExtractorStrategyTests extends KNNTestCase {
 
     @SneakyThrows
     public void testExtractWithDISI_extractFloatDocValues() {
-        TestVectorValues.PredefinedFloatVectorBinaryDocValues vectorValues = new TestVectorValues.PredefinedFloatVectorBinaryDocValues(floatArrayList);
+        TestVectorValues.PredefinedFloatVectorBinaryDocValues vectorValues = new TestVectorValues.PredefinedFloatVectorBinaryDocValues(
+            floatArrayList
+        );
         KNNVectorValues<float[]> knnVectorValues = TestVectorValues.createKNNFloatVectorValues(vectorValues);
         new TestVectorValueExtractor<float[]>().testVectorValueExtractorDISIStrategy(VectorDataType.FLOAT, floatArrayList, knnVectorValues);
     }
 
     @SneakyThrows
     public void testExtractWithDISI_extractByteDocValues() {
-        TestVectorValues.PredefinedByteVectorBinaryDocValues vectorValues = new TestVectorValues.PredefinedByteVectorBinaryDocValues(byteArrayList);
+        TestVectorValues.PredefinedByteVectorBinaryDocValues vectorValues = new TestVectorValues.PredefinedByteVectorBinaryDocValues(
+            byteArrayList
+        );
         KNNVectorValues<byte[]> knnVectorValues = TestVectorValues.createKNNBinaryVectorValues(vectorValues);
         new TestVectorValueExtractor<byte[]>().testVectorValueExtractorDISIStrategy(VectorDataType.BYTE, byteArrayList, knnVectorValues);
     }
 
     @SneakyThrows
     public void testExtractWithDISI_extractBinaryDocValues() {
-        TestVectorValues.PredefinedByteVectorBinaryDocValues vectorValues = new TestVectorValues.PredefinedByteVectorBinaryDocValues(binaryArrayList);
+        TestVectorValues.PredefinedByteVectorBinaryDocValues vectorValues = new TestVectorValues.PredefinedByteVectorBinaryDocValues(
+            binaryArrayList
+        );
         KNNVectorValues<byte[]> knnVectorValues = TestVectorValues.createKNNBinaryVectorValues(vectorValues);
-        new TestVectorValueExtractor<byte[]>().testVectorValueExtractorDISIStrategy(VectorDataType.BINARY, binaryArrayList, knnVectorValues);
+        new TestVectorValueExtractor<byte[]>().testVectorValueExtractorDISIStrategy(
+            VectorDataType.BINARY,
+            binaryArrayList,
+            knnVectorValues
+        );
     }
 
     @SneakyThrows
@@ -77,7 +89,7 @@ public class VectorValueExtractorStrategyTests extends KNNTestCase {
     public void testExtractWithDISI_docIndexIterator_whenNoVectorOrDeletedDoc_thenReturnNull() {
         final VectorValueExtractorStrategy disiStrategy = new VectorValueExtractorStrategy.DISIVectorExtractor();
         final KNNVectorValuesIterator vectorValuesIterator = Mockito.mock(KNNVectorValuesIterator.DocIdsIteratorValues.class);
-        Mockito.when(vectorValuesIterator.getDocIdSetIterator()).thenReturn( new TestVectorValues.NotExistingDocIndexIterator());
+        Mockito.when(vectorValuesIterator.getDocIdSetIterator()).thenReturn(new TestVectorValues.NotExistingDocIndexIterator());
         byte[] result = disiStrategy.extract(VectorDataType.BYTE, vectorValuesIterator);
         Assert.assertNull(result);
     }
@@ -117,7 +129,11 @@ public class VectorValueExtractorStrategyTests extends KNNTestCase {
 
     private static class TestVectorValueExtractor<T> {
         @SneakyThrows
-        private void testVectorValueExtractorDISIStrategy(VectorDataType vectorDataType, List<T> vectorValuesSourceList, KNNVectorValues<T> vectorValues) {
+        private void testVectorValueExtractorDISIStrategy(
+            VectorDataType vectorDataType,
+            List<T> vectorValuesSourceList,
+            KNNVectorValues<T> vectorValues
+        ) {
             final VectorValueExtractorStrategy disiStrategy = new VectorValueExtractorStrategy.DISIVectorExtractor();
             extractAndVerify(vectorDataType, vectorValuesSourceList, vectorValues, disiStrategy);
         }
@@ -128,15 +144,20 @@ public class VectorValueExtractorStrategyTests extends KNNTestCase {
             final DocsWithFieldSet docsWithFieldSet = TestVectorValues.getDocIdSetIterator(vectorValuesSourceList.size());
             final Map<Integer, T> vectorsMap = Map.of(0, vectorValuesSourceList.get(0), 1, vectorValuesSourceList.get(1));
             final KNNVectorValues<T> knnVectorValuesForFieldWriter = KNNVectorValuesFactory.getVectorValues(
-                    vectorDataType,
-                    docsWithFieldSet,
-                    vectorsMap
+                vectorDataType,
+                docsWithFieldSet,
+                vectorsMap
             );
             extractAndVerify(vectorDataType, vectorValuesSourceList, knnVectorValuesForFieldWriter, fieldWriterStrategy);
         }
 
         @SneakyThrows
-        private void extractAndVerify(VectorDataType vectorDataType, List<T> vectorValuesSourceList, KNNVectorValues<T> vectorValues, VectorValueExtractorStrategy extractorStrategy) {
+        private void extractAndVerify(
+            VectorDataType vectorDataType,
+            List<T> vectorValuesSourceList,
+            KNNVectorValues<T> vectorValues,
+            VectorValueExtractorStrategy extractorStrategy
+        ) {
             vectorValues.vectorValuesIterator.nextDoc();
             T result = extractorStrategy.extract(vectorDataType, vectorValues.vectorValuesIterator);
             T expected = vectorValuesSourceList.getFirst();

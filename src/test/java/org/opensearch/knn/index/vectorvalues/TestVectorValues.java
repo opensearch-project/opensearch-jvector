@@ -87,7 +87,9 @@ public class TestVectorValues {
         }
 
         @Override
-        public BinaryDocValues getBinary(FieldInfo field) throws IOException { return null; }
+        public BinaryDocValues getBinary(FieldInfo field) throws IOException {
+            return null;
+        }
 
         @Override
         public SortedDocValues getSorted(FieldInfo field) {
@@ -513,15 +515,11 @@ public class TestVectorValues {
     }
 
     public static KNNVectorValues<float[]> createKNNFloatVectorValues(final BinaryDocValues binaryDocValues) {
-        return new KNNFloatVectorValues(
-                new KNNVectorValuesIterator.DocIdsIteratorValues(binaryDocValues)
-        );
+        return new KNNFloatVectorValues(new KNNVectorValuesIterator.DocIdsIteratorValues(binaryDocValues));
     }
 
     public static KNNVectorValues<float[]> createKNNFloatVectorValues(final List<float[]> vectors) {
-        return new KNNFloatVectorValues(
-            new KNNVectorValuesIterator.DocIdsIteratorValues(new PreDefinedFloatVectorValues(vectors))
-        );
+        return new KNNFloatVectorValues(new KNNVectorValuesIterator.DocIdsIteratorValues(new PreDefinedFloatVectorValues(vectors)));
     }
 
     public static DocsWithFieldSet getDocIdSetIterator(int numberOfDocIds) {

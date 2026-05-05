@@ -70,16 +70,19 @@ public class KNNVectorValuesFactoryTests extends KNNTestCase {
     public void testGetVectorValuesUsingDocValuesProducer_whenInvalidVectorEncoding_thenException() {
         final FieldInfo fieldInfo = Mockito.mock(FieldInfo.class);
         final KnnVectorsReader reader = Mockito.mock(KnnVectorsReader.class);
-        final TestVectorValues.ConstantVectorDocValuesProducer docValuesProducer = new TestVectorValues.ConstantVectorDocValuesProducer(3, 2, 3.2f);
+        final TestVectorValues.ConstantVectorDocValuesProducer docValuesProducer = new TestVectorValues.ConstantVectorDocValuesProducer(
+            3,
+            2,
+            3.2f
+        );
         Mockito.when(fieldInfo.hasVectorValues()).thenReturn(true);
         Mockito.when(fieldInfo.getName()).thenReturn("test_field");
         Mockito.when(fieldInfo.getVectorEncoding()).thenReturn(null);
 
-        Assert.assertThrows(IllegalArgumentException.class, () -> KNNVectorValuesFactory.getVectorValues(
-                fieldInfo,
-                docValuesProducer,
-                reader
-        ));
+        Assert.assertThrows(
+            IllegalArgumentException.class,
+            () -> KNNVectorValuesFactory.getVectorValues(fieldInfo, docValuesProducer, reader)
+        );
     }
 
     @SneakyThrows
@@ -95,22 +98,15 @@ public class KNNVectorValuesFactoryTests extends KNNTestCase {
         // Checking for byte vectors
         Mockito.when(fieldInfo.getVectorEncoding()).thenReturn(VectorEncoding.BYTE);
         Mockito.when(reader.getByteVectorValues("test_field")).thenReturn(new TestVectorValues.PreDefinedByteVectorValues(byteArrayList));
-        final KNNVectorValues<byte[]> byteVectorValues = KNNVectorValuesFactory.getVectorValues(
-                fieldInfo,
-                docValuesProducer,
-                reader
-        );
+        final KNNVectorValues<byte[]> byteVectorValues = KNNVectorValuesFactory.getVectorValues(fieldInfo, docValuesProducer, reader);
         byteVectorValues.nextDoc();
         Assert.assertArrayEquals(byteArrayList.getFirst(), byteVectorValues.getVector());
 
         // Checking for float vectors
         Mockito.when(fieldInfo.getVectorEncoding()).thenReturn(VectorEncoding.FLOAT32);
-        Mockito.when(reader.getFloatVectorValues("test_field")).thenReturn(new TestVectorValues.PreDefinedFloatVectorValues(floatArrayList));
-        final KNNVectorValues<float[]> floatVectorValues = KNNVectorValuesFactory.getVectorValues(
-                fieldInfo,
-                docValuesProducer,
-                reader
-        );
+        Mockito.when(reader.getFloatVectorValues("test_field"))
+            .thenReturn(new TestVectorValues.PreDefinedFloatVectorValues(floatArrayList));
+        final KNNVectorValues<float[]> floatVectorValues = KNNVectorValuesFactory.getVectorValues(fieldInfo, docValuesProducer, reader);
         floatVectorValues.nextDoc();
         Assert.assertArrayEquals(floatArrayList.getFirst(), floatVectorValues.getVector(), 0.0f);
 
@@ -119,11 +115,7 @@ public class KNNVectorValuesFactoryTests extends KNNTestCase {
         Mockito.when(fieldInfo.hasVectorValues()).thenReturn(false);
         Mockito.when(reader.getByteVectorValues("test_field")).thenReturn(new TestVectorValues.PreDefinedByteVectorValues(byteArrayList));
         Mockito.when(docValuesProducer.getBinary(fieldInfo)).thenReturn(new TestVectorValues.ConstantVectorBinaryDocValues(1, 1, 2));
-        final KNNVectorValues<float[]> binaryVectorValues = KNNVectorValuesFactory.getVectorValues(
-                fieldInfo,
-                docValuesProducer,
-                reader
-        );
+        final KNNVectorValues<float[]> binaryVectorValues = KNNVectorValuesFactory.getVectorValues(fieldInfo, docValuesProducer, reader);
         byteVectorValues.nextDoc();
         Assert.assertArrayEquals(new float[] { 2 }, binaryVectorValues.getVector(), 0);
     }
@@ -131,18 +123,10 @@ public class KNNVectorValuesFactoryTests extends KNNTestCase {
     public void testGetVectorValuesUsingDocValuesProducer_whenInvalidInput_thenException() {
         final FieldInfo fieldInfo = Mockito.mock(FieldInfo.class);
         Mockito.when(fieldInfo.hasVectorValues()).thenReturn(false);
-        Assert.assertThrows(IllegalArgumentException.class, () -> KNNVectorValuesFactory.getVectorValues(
-                fieldInfo,
-                null,
-                null
-        ));
+        Assert.assertThrows(IllegalArgumentException.class, () -> KNNVectorValuesFactory.getVectorValues(fieldInfo, null, null));
 
         Mockito.when(fieldInfo.hasVectorValues()).thenReturn(true);
-        Assert.assertThrows(IllegalArgumentException.class, () -> KNNVectorValuesFactory.getVectorValues(
-                fieldInfo,
-                null,
-                null
-        ));
+        Assert.assertThrows(IllegalArgumentException.class, () -> KNNVectorValuesFactory.getVectorValues(fieldInfo, null, null));
     }
 
     @SneakyThrows
@@ -242,11 +226,13 @@ public class KNNVectorValuesFactoryTests extends KNNTestCase {
     @SneakyThrows
     public void testGetVectorValuesSupplierFromDISI_whenValidInput_thenSuccess() {
         final List<float[]> floatArray = List.of(new float[] { 1, 2 }, new float[] { 2, 3 });
-        final TestVectorValues.PreDefinedFloatVectorValues preDefinedFloatVectorValues = new TestVectorValues.PreDefinedFloatVectorValues(floatArray);
+        final TestVectorValues.PreDefinedFloatVectorValues preDefinedFloatVectorValues = new TestVectorValues.PreDefinedFloatVectorValues(
+            floatArray
+        );
 
         Supplier<KNNVectorValues<?>> supplier = KNNVectorValuesFactory.getVectorValuesSupplier(
-                VectorDataType.FLOAT,
-                preDefinedFloatVectorValues
+            VectorDataType.FLOAT,
+            preDefinedFloatVectorValues
         );
 
         final KNNVectorValues<?> knnVectorValues = supplier.get();
@@ -265,9 +251,9 @@ public class KNNVectorValuesFactoryTests extends KNNTestCase {
         docsWithFieldSet.add(1);
 
         Supplier<KNNVectorValues<?>> supplier = KNNVectorValuesFactory.getVectorValuesSupplier(
-                VectorDataType.FLOAT,
-                docsWithFieldSet,
-                floatVectorMap
+            VectorDataType.FLOAT,
+            docsWithFieldSet,
+            floatVectorMap
         );
 
         final KNNVectorValues<?> knnVectorValues = supplier.get();
@@ -281,8 +267,9 @@ public class KNNVectorValuesFactoryTests extends KNNTestCase {
     @SneakyThrows
     public void testGetKNNVectorValuesSupplierForMerge_whenFloatVectors_thenSuccess() {
         final List<float[]> floatArray = List.of(new float[] { 1.0f, 2.0f }, new float[] { 3.0f, 4.0f });
-        final TestVectorValues.PreDefinedFloatVectorValues preDefinedFloatVectorValues =
-            new TestVectorValues.PreDefinedFloatVectorValues(floatArray);
+        final TestVectorValues.PreDefinedFloatVectorValues preDefinedFloatVectorValues = new TestVectorValues.PreDefinedFloatVectorValues(
+            floatArray
+        );
 
         final FieldInfo fieldInfo = Mockito.mock(FieldInfo.class);
         final MergeState mergeState = Mockito.mock(MergeState.class);
@@ -290,8 +277,9 @@ public class KNNVectorValuesFactoryTests extends KNNTestCase {
         Mockito.when(fieldInfo.getName()).thenReturn("test_field");
         Mockito.when(fieldInfo.getVectorEncoding()).thenReturn(VectorEncoding.FLOAT32);
 
-        try (MockedStatic<KnnVectorsWriter.MergedVectorValues> mockedStatic =
-                Mockito.mockStatic(KnnVectorsWriter.MergedVectorValues.class)) {
+        try (
+            MockedStatic<KnnVectorsWriter.MergedVectorValues> mockedStatic = Mockito.mockStatic(KnnVectorsWriter.MergedVectorValues.class)
+        ) {
             mockedStatic.when(() -> KnnVectorsWriter.MergedVectorValues.mergeFloatVectorValues(fieldInfo, mergeState))
                 .thenReturn(preDefinedFloatVectorValues);
 
@@ -311,8 +299,9 @@ public class KNNVectorValuesFactoryTests extends KNNTestCase {
     @SneakyThrows
     public void testGetKNNVectorValuesSupplierForMerge_whenByteVectors_thenSuccess() {
         final List<byte[]> byteArray = List.of(new byte[] { 1, 2 }, new byte[] { 3, 4 });
-        final TestVectorValues.PreDefinedByteVectorValues preDefinedByteVectorValues =
-            new TestVectorValues.PreDefinedByteVectorValues(byteArray);
+        final TestVectorValues.PreDefinedByteVectorValues preDefinedByteVectorValues = new TestVectorValues.PreDefinedByteVectorValues(
+            byteArray
+        );
 
         final FieldInfo fieldInfo = Mockito.mock(FieldInfo.class);
         final MergeState mergeState = Mockito.mock(MergeState.class);
@@ -320,8 +309,9 @@ public class KNNVectorValuesFactoryTests extends KNNTestCase {
         Mockito.when(fieldInfo.getName()).thenReturn("test_field");
         Mockito.when(fieldInfo.getVectorEncoding()).thenReturn(VectorEncoding.BYTE);
 
-        try (MockedStatic<KnnVectorsWriter.MergedVectorValues> mockedStatic =
-                Mockito.mockStatic(KnnVectorsWriter.MergedVectorValues.class)) {
+        try (
+            MockedStatic<KnnVectorsWriter.MergedVectorValues> mockedStatic = Mockito.mockStatic(KnnVectorsWriter.MergedVectorValues.class)
+        ) {
             mockedStatic.when(() -> KnnVectorsWriter.MergedVectorValues.mergeByteVectorValues(fieldInfo, mergeState))
                 .thenReturn(preDefinedByteVectorValues);
 
@@ -346,8 +336,9 @@ public class KNNVectorValuesFactoryTests extends KNNTestCase {
         Mockito.when(fieldInfo.getName()).thenReturn("test_field");
         Mockito.when(fieldInfo.getVectorEncoding()).thenReturn(VectorEncoding.FLOAT32);
 
-        try (MockedStatic<KnnVectorsWriter.MergedVectorValues> mockedStatic =
-                Mockito.mockStatic(KnnVectorsWriter.MergedVectorValues.class)) {
+        try (
+            MockedStatic<KnnVectorsWriter.MergedVectorValues> mockedStatic = Mockito.mockStatic(KnnVectorsWriter.MergedVectorValues.class)
+        ) {
             mockedStatic.when(() -> KnnVectorsWriter.MergedVectorValues.mergeFloatVectorValues(fieldInfo, mergeState))
                 .thenThrow(new IOException("Test IO error"));
 
