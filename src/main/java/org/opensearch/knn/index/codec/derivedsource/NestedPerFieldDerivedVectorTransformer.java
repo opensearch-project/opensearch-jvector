@@ -48,7 +48,7 @@ public class NestedPerFieldDerivedVectorTransformer extends AbstractPerFieldDeri
 
     @Override
     public void setCurrentDoc(int offset, int docId) throws IOException {
-        vectorValues = KNNVectorValuesFactory.getDerivedVectorValues(
+        vectorValues = KNNVectorValuesFactory.getDerivedSourcesVectorValues(
             childFieldInfo,
             derivedSourceReaders.getDocValuesProducer(),
             derivedSourceReaders.getKnnVectorsReader()

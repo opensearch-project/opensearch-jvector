@@ -126,15 +126,14 @@ public final class KNNVectorValuesFactory {
     }
 
     /**
-     * Returns a {@link KNNVectorValues} for the given {@link FieldInfo} and {@link KnnVectorsReader} that support derived
-     * vector values.
+     * Returns a {@link KNNVectorValues} for the given {@link FieldInfo} and {@link LeafReader} that support derived sources
      *
      * @param fieldInfo {@link FieldInfo}
      * @param docValuesProducer {@link DocValuesProducer}
      * @param knnVectorsReader {@link KnnVectorsReader}
      * @return {@link KNNVectorValues}
      */
-    public static <T> KNNVectorValues<T> getDerivedVectorValues(
+    public static <T> KNNVectorValues<T> getDerivedSourcesVectorValues(
         final FieldInfo fieldInfo,
         final DocValuesProducer docValuesProducer,
         final KnnVectorsReader knnVectorsReader
