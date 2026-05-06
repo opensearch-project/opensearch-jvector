@@ -14,6 +14,7 @@ import org.apache.lucene.index.DocsWithFieldSet;
 import org.apache.lucene.index.FloatVectorValues;
 import org.apache.lucene.search.DocIdSetIterator;
 import org.apache.lucene.index.KnnVectorValues;
+import org.opensearch.knn.index.codec.jvector.JVectorFloatVectorValues;
 import org.opensearch.knn.index.codec.util.KNNCodecUtil;
 
 import java.io.IOException;
@@ -79,6 +80,11 @@ public interface KNNVectorValuesIterator {
         @Getter
         @Setter
         private Object lastAccessedVector = null;
+
+        DocIdsIteratorValues(@NonNull final JVectorFloatVectorValues knnVectorValues) {
+            this.docIdSetIterator = knnVectorValues.vectorIterator();
+            this.knnVectorValues = knnVectorValues;
+        }
 
         DocIdsIteratorValues(@NonNull final KnnVectorValues knnVectorValues) {
             this.docIdSetIterator = knnVectorValues.iterator();

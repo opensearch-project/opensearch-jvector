@@ -667,6 +667,21 @@ public class KNNRestTestCase extends ODFERestTestCase {
         assertEquals(request.getEndpoint() + ": failed", RestStatus.CREATED, RestStatus.fromCode(response.getStatusLine().getStatusCode()));
     }
 
+    /**
+     * Updates a doc where document is represented as a string.
+     */
+    protected void updateKnnDoc(final String index, final String docId, final String document, final String routingValue)
+        throws IOException {
+        String endpoint = String.join("/", index, "_doc", docId);
+        if (!StringUtils.isEmpty(routingValue)) {
+            endpoint = endpoint + "?" + "routing=" + routingValue;
+        }
+        Request request = new Request("PUT", endpoint);
+        request.setJsonEntity(document);
+        Response response = client().performRequest(request);
+        assertEquals(request.getEndpoint() + ": failed", RestStatus.OK, RestStatus.fromCode(response.getStatusLine().getStatusCode()));
+    }
+
     protected <T> void addNonKNNDoc(String index, String docId, String fieldName, String text) throws IOException {
         Request request = new Request("POST", "/" + index + "/_doc/" + docId + "?refresh=true");
 
