@@ -33,9 +33,8 @@ public class DerivedSourceUtils {
     public static final int TEST_DIMENSION = 16;
     protected static final int DOCS = 500;
 
-    // TODO: set null_prob to 0.03f and skip_prob to 0.1f once the merge issues are fixed.
-    public static final float DEFAULT_NULL_PROB = 0.00f;
-    public static final float DEFAULT_SKIP_PROB = 0.00f;
+    public static final float DEFAULT_NULL_PROB = 0.03f;
+    public static final float DEFAULT_SKIP_PROB = 0.1f;
 
     protected static final Settings DERIVED_ENABLED_SETTINGS = Settings.builder()
         .put(

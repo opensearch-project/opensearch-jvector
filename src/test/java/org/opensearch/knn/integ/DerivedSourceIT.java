@@ -23,7 +23,6 @@ import java.util.*;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.opensearch.knn.DerivedSourceUtils.*;
-import static org.opensearch.knn.index.KNNSettings.KNN_DERIVED_SOURCE_ENABLED;
 
 /**
  * Integration tests for derived source feature for vector fields. Currently, with derived source, there are
@@ -94,16 +93,88 @@ public class DerivedSourceIT extends DerivedSourceTestCase {
 
     @SneakyThrows
     public void testNestedField() {
-        try {
-            List<DerivedSourceUtils.IndexConfigContext> indexConfigContexts = getNestedIndexContexts("derivedit", true);
-            testDerivedSourceE2E(indexConfigContexts);
-        } catch (Exception excp) {
-            // TODO: Remove this check when nested fields are supported with derived sources.
-            assertTrue(excp.getMessage().contains("validation_exception"));
-            assertTrue(
-                excp.getMessage().contains(String.format("Nested fields are not supported when [%s] is true.", KNN_DERIVED_SOURCE_ENABLED))
+        List<DerivedSourceUtils.IndexConfigContext> indexConfigContexts = getNestedIndexContexts("derivedit", true, true);
+        testDerivedSourceE2E(indexConfigContexts);
+    }
+
+    @SneakyThrows
+    public void testNestedFieldWithNullables() {
+        List<DerivedSourceUtils.IndexConfigContext> indexConfigContexts = getNestedIndexContexts("derivedit", true, true);
+        assertEquals(6, indexConfigContexts.size());
+
+        assertTrue(1 < indexConfigContexts.size());
+        DerivedSourceUtils.IndexConfigContext derivedSourceEnabledContext = indexConfigContexts.get(0);
+        DerivedSourceUtils.IndexConfigContext derivedSourceDisabledContext = indexConfigContexts.get(1);
+
+        createKnnIndex(
+            derivedSourceEnabledContext.indexName,
+            derivedSourceEnabledContext.getSettings(),
+            derivedSourceEnabledContext.getMapping()
+        );
+        createKnnIndex(
+            derivedSourceDisabledContext.indexName,
+            derivedSourceDisabledContext.getSettings(),
+            derivedSourceDisabledContext.getMapping()
+        );
+        // make sure that both index has same routing settings
+        assertEquals(derivedSourceEnabledContext.isRoutingEnabled, derivedSourceDisabledContext.isRoutingEnabled);
+
+        // Build all docs with null fields
+        for (int i = 0; i < derivedSourceDisabledContext.docCount; i++) {
+            String doc1 = "{}";
+            String doc2 = "{}";
+
+            // using doc id as routing value, which is default
+            addKnnDoc(
+                derivedSourceEnabledContext.getIndexName(),
+                String.valueOf(i + 1),
+                doc1,
+                derivedSourceEnabledContext.isRoutingEnabled ? String.valueOf(i + 1) : null
+            );
+            addKnnDoc(
+                derivedSourceDisabledContext.getIndexName(),
+                String.valueOf(i + 1),
+                doc2,
+                derivedSourceDisabledContext.isRoutingEnabled ? String.valueOf(i + 1) : null
             );
         }
+        refreshAllIndices();
+
+        assertDocsMatch(
+            derivedSourceDisabledContext.docCount,
+            derivedSourceDisabledContext.indexName,
+            derivedSourceEnabledContext.indexName,
+            derivedSourceEnabledContext.isRoutingEnabled
+        );
+
+        // Update all docs with random field vectors
+        for (int i = 0; i < derivedSourceDisabledContext.docCount; i++) {
+            String doc1 = derivedSourceEnabledContext.buildDoc();
+            String doc2 = derivedSourceDisabledContext.buildDoc();
+
+            assertEquals(doc1, doc2);
+            // using doc id as routing value, which is default
+            updateKnnDoc(
+                derivedSourceEnabledContext.getIndexName(),
+                String.valueOf(i + 1),
+                doc1,
+                derivedSourceEnabledContext.isRoutingEnabled ? String.valueOf(i + 1) : null
+            );
+            updateKnnDoc(
+                derivedSourceDisabledContext.getIndexName(),
+                String.valueOf(i + 1),
+                doc2,
+                derivedSourceDisabledContext.isRoutingEnabled ? String.valueOf(i + 1) : null
+            );
+        }
+        refreshAllIndices();
+
+        assertDocsMatch(
+            derivedSourceDisabledContext.docCount,
+            derivedSourceDisabledContext.indexName,
+            derivedSourceEnabledContext.indexName,
+            derivedSourceEnabledContext.isRoutingEnabled
+        );
     }
 
     @SneakyThrows

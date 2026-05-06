@@ -524,7 +524,7 @@ public class JVectorWriter extends KnnVectorsWriter {
 
         @Override
         public void addValue(int docID, T vectorValue) throws IOException {
-            log.trace("Adding value {} to field {} in segment {}", vectorValue, fieldInfo.name, segmentName);
+            log.trace("Adding value {} to field {} in segment {} for document {}", vectorValue, fieldInfo.name, segmentName, docID);
             if (docID == lastDocID) {
                 throw new IllegalArgumentException(
                     "VectorValuesField \""
