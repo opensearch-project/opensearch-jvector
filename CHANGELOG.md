@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Features
 ### Enhancements
 ### Bug Fixes
+- Fix derived nested fields processing [484] (https://github.com/opensearch-project/opensearch-jvector/pull/484)
 ### Infrastructure
 ### Documentation
 ### Maintenance

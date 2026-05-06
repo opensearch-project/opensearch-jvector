@@ -96,6 +96,53 @@ public class JVectorFloatVectorValues extends FloatVectorValues {
         };
     }
 
+    /**
+     * Constructs an iterator that iterates over vectors that have corresponding nodes in the graph (skipping the gaps with non-live / NO_VECTORS nodes).
+     * @return an iterator that iterates over vectors that have corresponding nodes in the graph (skipping the gaps with non-live / NO_VECTORS nodes)
+     */
+    public DocIndexIterator vectorIterator() {
+        return new DocIndexIterator() {
+            private int docId = -1;
+            private final Bits liveNodes = view.liveNodes();
+
+            @Override
+            public long cost() {
+                return size();
+            }
+
+            @Override
+            public int index() {
+                return graphNodeIdToDocMap.getJVectorNodeId(docId);
+            }
+
+            @Override
+            public int docID() {
+                return docId;
+            }
+
+            @Override
+            public int nextDoc() throws IOException {
+                // Advance to the next node docId starts from -1 which is why we need to increment docId by 1
+                // until maxDoc is reached. If the document has vector field but no value (== null), the NO_MORE_DOCS
+                // is going to be returned by this method.
+                while (docId < graphNodeIdToDocMap.getMaxDoc() - 1) {
+                    docId++;
+                    if (liveNodes.get(docId) && index() != NO_VECTOR) {
+                        return docId;
+                    }
+                }
+                docId = NO_MORE_DOCS;
+
+                return docId;
+            }
+
+            @Override
+            public int advance(int target) throws IOException {
+                return slowAdvance(target);
+            }
+        };
+    }
+
     @Override
     public float[] vectorValue(int i) throws IOException {
         try {
