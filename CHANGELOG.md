@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased 3.6](https://github.com/opensearch-project/opensearch-jvector/compare/3.5...HEAD)
 ### Features
+* Support derived source for knn with other fields [474] (https://github.com/opensearch-project/opensearch-jvector/pull/488)
 ### Enhancements
 ### Bug Fixes
 - Fix derived nested fields processing [484] (https://github.com/opensearch-project/opensearch-jvector/pull/484)
