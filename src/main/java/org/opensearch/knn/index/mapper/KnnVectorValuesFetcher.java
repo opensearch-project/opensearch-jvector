@@ -38,7 +38,7 @@ public class KnnVectorValuesFetcher extends FieldValueFetcher {
         try {
             FieldInfo fieldInfo = reader.getFieldInfos().fieldInfo(mappedFieldType.name());
             KNNVectorValues<?> vectorValues = fieldInfo != null
-                ? KNNVectorValuesFactory.getVectorValues(fieldInfo, Lucene.segmentReader(reader))
+                ? KNNVectorValuesFactory.getDerivedSourcesVectorValues(fieldInfo, Lucene.segmentReader(reader))
                 : null;
             if (vectorValues == null) {
                 return values;
