@@ -60,30 +60,36 @@ public class DerivedSourceIT extends DerivedSourceTestCase {
     }
 
     @SneakyThrows
-    public void testMetaFields() {
-        List<DerivedSourceUtils.IndexConfigContext> indexConfigContexts = getIndexContextsWithMetaFields("derivedit", true, true);
-        List<String> metaFields = List.of(ROUTING_FIELD, "_id", "_score");
+    public void testFlatFieldsWithCore() {
+        try {
+            List<DerivedSourceUtils.IndexConfigContext> indexConfigContexts = getFlatIndexContexts("derivedit", true, false, true);
+            testDerivedSourceE2E(indexConfigContexts);
+        } catch (Exception excp) {
+            // TODO: Byte vectors is not supported. Remove the catch checks once BQ (Binary quantization) support is added to Jvector
+            // plugin.
+            assertTrue(excp.getMessage().contains("validation_exception"));
+            assertTrue(excp.getMessage().contains("\\\"disk_ann\\\" is not supported for vector data type \\\"BYTE\\\""));
 
-        assertEquals("Expected 6 index contexts for meta fields test", 6, indexConfigContexts.size());
-        prepareOriginalIndices(indexConfigContexts);
-
-        List<Object> searchResults = testSearch(indexConfigContexts);
-        assertFalse("Search results should not be empty", searchResults.isEmpty());
-
-        for (int i = 0; i < searchResults.size(); i++) {
-            Object searchResult = searchResults.get(i);
-            assertNotNull("Search result at index " + i + " should not be null", searchResult);
-
-            Map<String, Object> hits = (Map<String, Object>) searchResult;
-            for (String metaField : metaFields) {
-                assertTrue(String.format("Missing meta field '%s' in search result %d", metaField, i), hits.containsKey(metaField));
-                assertNotNull(
-                    String.format("Meta field '%s' value should not be null in search result %d", metaField, i),
-                    hits.get(metaField)
-                );
-            }
+            // test should do this, but calling it defensively to avoid leaving indices behind on failures.
+            super.tearDown();
         }
     }
+
+    public void testMetaFieldsWithKnn() {
+        List<DerivedSourceUtils.IndexConfigContext> indexConfigContexts = getIndexContextsWithMetaFields("derivedit", true, true);
+        testMetaFields(indexConfigContexts);
+    }
+
+    public void testMetaFieldsWithCore() {
+        /** TODO it fails with java.lang.NullPointerException: Cannot read the array length because "vector" is null
+            at org.opensearch.knn.index.vectorvalues.KNNFloatVectorValues.getVector(KNNFloatVectorValues.java:28)
+            at org.opensearch.knn.index.vectorvalues.KNNFloatVectorValues.getVector(KNNFloatVectorValues.java:20)
+            at org.opensearch.knn.index.mapper.KnnVectorValuesFetcher.fetch(KnnVectorValuesFetcher.java:47)
+        */
+        List<DerivedSourceUtils.IndexConfigContext> indexConfigContexts = getIndexContextsWithMetaFields("derivedit", true, false, true);
+        testMetaFields(indexConfigContexts);
+    }
+
 
     @SneakyThrows
     public void testObjectField() {
@@ -95,6 +101,19 @@ public class DerivedSourceIT extends DerivedSourceTestCase {
     public void testNestedField() {
         List<DerivedSourceUtils.IndexConfigContext> indexConfigContexts = getNestedIndexContexts("derivedit", true, true);
         testDerivedSourceE2E(indexConfigContexts);
+    }
+
+    @SneakyThrows
+    public void testNestedFieldWithCore() {
+        List<DerivedSourceUtils.IndexConfigContext> indexConfigContexts = getNestedIndexContexts("derivedit", true, false, true);
+        expectThrows(
+            ResponseException.class,
+            () -> createKnnIndex(
+                indexConfigContexts.get(0).indexName,
+                indexConfigContexts.get(0).getSettings(),
+                indexConfigContexts.get(0).getMapping()
+            )
+        );
     }
 
     @SneakyThrows
@@ -290,6 +309,30 @@ public class DerivedSourceIT extends DerivedSourceTestCase {
                 dsDisabledException = true;
             }
             assertEquals(dsEnabledException, dsDisabledException);
+        }
+    }
+
+    private void testMetaFields(List<DerivedSourceUtils.IndexConfigContext> indexConfigContexts) {
+        List<String> metaFields = List.of(ROUTING_FIELD, "_id", "_score");
+
+        assertEquals("Expected 6 index contexts for meta fields test", 6, indexConfigContexts.size());
+        prepareOriginalIndices(indexConfigContexts);
+
+        List<Object> searchResults = testSearch(indexConfigContexts);
+        assertFalse("Search results should not be empty", searchResults.isEmpty());
+
+        for (int i = 0; i < searchResults.size(); i++) {
+            Object searchResult = searchResults.get(i);
+            assertNotNull("Search result at index " + i + " should not be null", searchResult);
+
+            Map<String, Object> hits = (Map<String, Object>) searchResult;
+            for (String metaField : metaFields) {
+                assertTrue(String.format("Missing meta field '%s' in search result %d", metaField, i), hits.containsKey(metaField));
+                assertNotNull(
+                    String.format("Meta field '%s' value should not be null in search result %d", metaField, i),
+                    hits.get(metaField)
+                );
+            }
         }
     }
 

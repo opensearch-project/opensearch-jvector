@@ -391,7 +391,8 @@ public class IndexUtil {
         }
 
         // Core derived source takes precedence over KNN derived source
-        if (mapperService.getIndexSettings().isDerivedSourceEnabled()) {
+        if (mapperService.getIndexSettings().getIndexVersionCreated().onOrAfter(Version.V_3_7_0)
+            && mapperService.getIndexSettings().isDerivedSourceEnabled()) {
             return false;
         }
 
