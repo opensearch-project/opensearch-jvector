@@ -533,8 +533,9 @@ public class DerivedSourceTestCase extends KNNRestTestCase {
             } else {
                 builder.derivedEnabled(index.v2());
             }
-            DerivedSourceUtils.IndexConfigContext indexConfigContext = builder
-                .indexName(getIndexName(testSuitePrefix, index.v1(), addRandom))
+            DerivedSourceUtils.IndexConfigContext indexConfigContext = builder.indexName(
+                getIndexName(testSuitePrefix, index.v1(), addRandom)
+            )
                 .docCount(randomDocCountSupplier.get())
                 .random(new Random(consistentRandomSeed))
                 .fields(
@@ -659,7 +660,11 @@ public class DerivedSourceTestCase extends KNNRestTestCase {
         return indexConfigContexts;
     }
 
-    protected List<DerivedSourceUtils.IndexConfigContext> getNestedIndexContexts(String testSuitePrefix, boolean addRandom, boolean addNull) {
+    protected List<DerivedSourceUtils.IndexConfigContext> getNestedIndexContexts(
+        String testSuitePrefix,
+        boolean addRandom,
+        boolean addNull
+    ) {
         return getNestedIndexContexts(testSuitePrefix, addRandom, addNull, false);
     }
 
@@ -707,8 +712,9 @@ public class DerivedSourceTestCase extends KNNRestTestCase {
             } else {
                 builder.derivedEnabled(index.v2());
             }
-            DerivedSourceUtils.IndexConfigContext indexConfigContext = builder
-                .indexName(getIndexName(testSuitePrefix, index.v1(), addRandom))
+            DerivedSourceUtils.IndexConfigContext indexConfigContext = builder.indexName(
+                getIndexName(testSuitePrefix, index.v1(), addRandom)
+            )
                 .docCount(randomDocCountSupplier.get())
                 .random(new Random(consistentRandomSeed))
                 .fields(

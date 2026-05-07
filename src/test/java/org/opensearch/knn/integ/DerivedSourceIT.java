@@ -90,7 +90,6 @@ public class DerivedSourceIT extends DerivedSourceTestCase {
         testMetaFields(indexConfigContexts);
     }
 
-
     @SneakyThrows
     public void testObjectField() {
         List<DerivedSourceUtils.IndexConfigContext> indexConfigContexts = getObjectIndexContexts("derivedit", true);
