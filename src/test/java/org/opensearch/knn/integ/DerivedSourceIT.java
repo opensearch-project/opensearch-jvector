@@ -81,11 +81,6 @@ public class DerivedSourceIT extends DerivedSourceTestCase {
     }
 
     public void testMetaFieldsWithCore() {
-        /** TODO it fails with java.lang.NullPointerException: Cannot read the array length because "vector" is null
-            at org.opensearch.knn.index.vectorvalues.KNNFloatVectorValues.getVector(KNNFloatVectorValues.java:28)
-            at org.opensearch.knn.index.vectorvalues.KNNFloatVectorValues.getVector(KNNFloatVectorValues.java:20)
-            at org.opensearch.knn.index.mapper.KnnVectorValuesFetcher.fetch(KnnVectorValuesFetcher.java:47)
-        */
         List<DerivedSourceUtils.IndexConfigContext> indexConfigContexts = getIndexContextsWithMetaFields("derivedit", true, false, true);
         testMetaFields(indexConfigContexts);
     }
