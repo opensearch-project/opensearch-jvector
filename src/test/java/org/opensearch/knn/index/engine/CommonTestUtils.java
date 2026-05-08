@@ -177,6 +177,64 @@ public class CommonTestUtils {
         }
     }
 
+    public static Codec getCodecWithNVQ(int minBatchSizeForQuantization, boolean leadingSegmentMergeDisabled) {
+        return getCodecWithNVQ(minBatchSizeForQuantization, leadingSegmentMergeDisabled, null);
+    }
+
+    public static Codec getCodecWithNVQ(int minBatchSizeForQuantization, boolean leadingSegmentMergeDisabled, ForkJoinPool graphMergePool) {
+        if (graphMergePool == null) {
+            return new FilterCodec(KNNCodecVersion.V_10_04_0.getCodecName(), new Lucene104Codec()) {
+                @Override
+                public KnnVectorsFormat knnVectorsFormat() {
+                    return new PerFieldKnnVectorsFormat() {
+                        @Override
+                        public KnnVectorsFormat getKnnVectorsFormatForField(String field) {
+                            return new JVectorFormat(
+                                JVectorFormat.DEFAULT_MAX_CONN,
+                                JVectorFormat.DEFAULT_BEAM_WIDTH,
+                                KNNConstants.DEFAULT_NEIGHBOR_OVERFLOW_VALUE.floatValue(),
+                                KNNConstants.DEFAULT_ALPHA_VALUE.floatValue(),
+                                JVectorFormat::getDefaultNumberOfSubspacesPerVector,
+                                minBatchSizeForQuantization,
+                                KNNConstants.DEFAULT_HIERARCHY_ENABLED,
+                                leadingSegmentMergeDisabled,
+                                KNNConstants.QUANTIZATION_TYPE_NVQ,
+                                KNNConstants.DEFAULT_NUM_NVQ_SUBVECTORS
+                            );
+                        }
+                    };
+                }
+            };
+        } else {
+            return new FilterCodec(KNNCodecVersion.V_10_04_0.getCodecName(), new Lucene104Codec()) {
+                @Override
+                public KnnVectorsFormat knnVectorsFormat() {
+                    return new PerFieldKnnVectorsFormat() {
+                        @Override
+                        public KnnVectorsFormat getKnnVectorsFormatForField(String field) {
+                            return new JVectorFormat(
+                                JVectorFormat.NAME,
+                                JVectorFormat.DEFAULT_MAX_CONN,
+                                JVectorFormat.DEFAULT_BEAM_WIDTH,
+                                KNNConstants.DEFAULT_NEIGHBOR_OVERFLOW_VALUE.floatValue(),
+                                KNNConstants.DEFAULT_ALPHA_VALUE.floatValue(),
+                                JVectorFormat::getDefaultNumberOfSubspacesPerVector,
+                                minBatchSizeForQuantization,
+                                KNNConstants.DEFAULT_HIERARCHY_ENABLED,
+                                leadingSegmentMergeDisabled,
+                                KNNConstants.QUANTIZATION_TYPE_NVQ,
+                                KNNConstants.DEFAULT_NUM_NVQ_SUBVECTORS,
+                                graphMergePool,
+                                graphMergePool,
+                                graphMergePool
+                            );
+                        }
+                    };
+                }
+            };
+        }
+    }
+
     /**
      * Get Stats from KNN Plugin
      */
