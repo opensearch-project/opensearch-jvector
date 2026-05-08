@@ -24,6 +24,7 @@ public class ThreadLeakFiltersForTests implements ThreadFilter {
                 || threadGroup.getName().startsWith("TGRP-JVectorWriterMergeTests")
                 || threadGroup.getName().startsWith("TGRP-MemoryUsageAnalysisTests")
                 || threadGroup.getName().startsWith("TGRP-KNN1030CodecTests")
-                || threadGroup.getName().startsWith("TGRP-KNN1040CodecTests"));
+                || threadGroup.getName().startsWith("TGRP-KNN1040CodecTests")
+                || threadGroup.getName().startsWith("TGRP-JVectorNVQTests"));
     }
 }
