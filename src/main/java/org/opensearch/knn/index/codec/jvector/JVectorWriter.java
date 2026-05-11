@@ -565,7 +565,7 @@ public class JVectorWriter extends KnnVectorsWriter {
         return switch (fieldInfo.getVectorSimilarityFunction()) {
             case EUCLIDEAN -> io.github.jbellis.jvector.vector.VectorSimilarityFunction.EUCLIDEAN;
             case COSINE -> io.github.jbellis.jvector.vector.VectorSimilarityFunction.COSINE;
-            case DOT_PRODUCT -> io.github.jbellis.jvector.vector.VectorSimilarityFunction.DOT_PRODUCT;
+            case DOT_PRODUCT, MAXIMUM_INNER_PRODUCT -> io.github.jbellis.jvector.vector.VectorSimilarityFunction.DOT_PRODUCT;
             default -> throw new IllegalArgumentException("Unsupported similarity function: " + fieldInfo.getVectorSimilarityFunction());
         };
     }

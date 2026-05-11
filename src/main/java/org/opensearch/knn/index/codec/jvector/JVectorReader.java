@@ -15,9 +15,16 @@ import io.github.jbellis.jvector.graph.similarity.ScoreFunction;
 import io.github.jbellis.jvector.graph.similarity.SearchScoreProvider;
 import io.github.jbellis.jvector.quantization.PQVectors;
 import io.github.jbellis.jvector.quantization.ProductQuantization;
+import io.github.jbellis.jvector.vector.VectorSimilarityFunction;
 import io.github.jbellis.jvector.vector.VectorizationProvider;
 import io.github.jbellis.jvector.vector.types.VectorFloat;
 import io.github.jbellis.jvector.vector.types.VectorTypeSupport;
+import java.io.Closeable;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import lombok.extern.log4j.Log4j2;
 import org.apache.lucene.codecs.CodecUtil;
 import org.apache.lucene.codecs.KnnVectorsReader;
@@ -27,17 +34,8 @@ import org.apache.lucene.search.KnnCollector;
 import org.apache.lucene.store.*;
 import org.apache.lucene.util.Bits;
 import org.apache.lucene.util.IOUtils;
-import io.github.jbellis.jvector.vector.VectorSimilarityFunction;
 import org.opensearch.knn.common.KNNConstants;
 import org.opensearch.knn.plugin.stats.KNNCounter;
-
-import java.io.Closeable;
-import java.io.IOException;
-
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 
 @Log4j2
 public class JVectorReader extends KnnVectorsReader {
@@ -99,7 +97,12 @@ public class JVectorReader extends KnnVectorsReader {
     @Override
     public FloatVectorValues getFloatVectorValues(String field) throws IOException {
         final FieldEntry fieldEntry = fieldEntryMap.get(field);
-        return new JVectorFloatVectorValues(fieldEntry.index, fieldEntry.similarityFunction, fieldEntry.graphNodeIdToDocMap);
+        return new JVectorFloatVectorValues(
+            fieldEntry.index,
+            fieldEntry.similarityFunction,
+            fieldEntry.fieldInfo.getVectorSimilarityFunction(),
+            fieldEntry.graphNodeIdToDocMap
+        );
     }
 
     @Override
@@ -186,8 +189,22 @@ public class JVectorReader extends KnnVectorsReader {
                     jvectorKnnCollector.getRerankFloor(),
                     compatibleBits
                 );
+
+                // Get the Lucene similarity function to check if we need to transform scores
+                final FieldEntry fieldEntry = fieldEntryMap.get(field);
+                final org.apache.lucene.index.VectorSimilarityFunction luceneSimilarityFunction = fieldEntry.fieldInfo
+                    .getVectorSimilarityFunction();
+
                 for (SearchResult.NodeScore ns : searchResults.getNodes()) {
-                    jvectorKnnCollector.collect(jvectorLuceneDocMap.getLuceneDocId(ns.node), ns.score);
+                    float score = ns.score;
+                    // Lucene's MAXIMUM_INNER_PRODUCT formula is: 1 + dotProduct
+                    // jVector's DOT_PRODUCT returns: (1 + dotProduct) / 2
+                    // To convert: score * 2 = (1 + dotProduct) / 2 * 2 = 1 + dotProduct
+                    if (luceneSimilarityFunction == org.apache.lucene.index.VectorSimilarityFunction.MAXIMUM_INNER_PRODUCT
+                        && fieldEntry.similarityFunction == VectorSimilarityFunction.DOT_PRODUCT) {
+                        score = score * 2.0f;
+                    }
+                    jvectorKnnCollector.collect(jvectorLuceneDocMap.getLuceneDocId(ns.node), score);
                 }
                 final long graphSearchEnd = System.currentTimeMillis();
                 final long searchTime = graphSearchEnd - graphSearchStart;
@@ -353,7 +370,8 @@ public class JVectorReader extends KnnVectorsReader {
         public static final List<VectorSimilarityFunction> JVECTOR_SUPPORTED_SIMILARITY_FUNCTIONS = List.of(
             VectorSimilarityFunction.EUCLIDEAN,
             VectorSimilarityFunction.DOT_PRODUCT,
-            VectorSimilarityFunction.COSINE
+            VectorSimilarityFunction.COSINE,
+            VectorSimilarityFunction.DOT_PRODUCT
         );
 
         public static final Map<org.apache.lucene.index.VectorSimilarityFunction, VectorSimilarityFunction> LUCENE_TO_JVECTOR_MAP = Map.of(
@@ -362,7 +380,9 @@ public class JVectorReader extends KnnVectorsReader {
             org.apache.lucene.index.VectorSimilarityFunction.DOT_PRODUCT,
             VectorSimilarityFunction.DOT_PRODUCT,
             org.apache.lucene.index.VectorSimilarityFunction.COSINE,
-            VectorSimilarityFunction.COSINE
+            VectorSimilarityFunction.COSINE,
+            org.apache.lucene.index.VectorSimilarityFunction.MAXIMUM_INNER_PRODUCT,
+            VectorSimilarityFunction.DOT_PRODUCT
         );
 
         public static int distFuncToOrd(org.apache.lucene.index.VectorSimilarityFunction func) {

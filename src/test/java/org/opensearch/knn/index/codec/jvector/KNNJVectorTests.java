@@ -132,8 +132,76 @@ public class KNNJVectorTests extends LuceneTestCase {
     }
 
     /**
+     * Test to verify that the JVector codec is able to successfully search for the nearest neighbours
+     * using Maximum Inner Product (DOT_PRODUCT) similarity function.
+     * Single field is used to store the vectors.
+     * All the documents are stored in a single segment.
+     * Single commit without refreshing the index.
+     * No merge.
+     */
+    @Test
+    public void testJVectorKnnIndex_simpleCase_maxInnerProduct() throws IOException {
+        int k = 3; // The number of nearest neighbors to gather
+        int totalNumberOfDocs = 10;
+        IndexWriterConfig indexWriterConfig = LuceneTestCase.newIndexWriterConfig();
+        indexWriterConfig.setUseCompoundFile(false);
+        indexWriterConfig.setCodec(getCodec());
+        indexWriterConfig.setMergePolicy(new ForceMergesOnlyMergePolicy());
+        final Path indexPath = createTempDir();
+        log.info("Index path: {}", indexPath);
+        try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter w = new IndexWriter(dir, indexWriterConfig)) {
+            final float[] target = new float[] { 1.0f, 0.0f };
+            for (int i = 1; i < totalNumberOfDocs + 1; i++) {
+                final float[] source = new float[] { 1.0f / i, 0.0f };
+                final Document doc = new Document();
+                doc.add(new KnnFloatVectorField("test_field", source, VectorSimilarityFunction.MAXIMUM_INNER_PRODUCT));
+                w.addDocument(doc);
+            }
+            log.info("Flushing docs to make them discoverable on the file system");
+            w.commit();
+
+            try (IndexReader reader = DirectoryReader.open(w)) {
+                log.info("We should now have a single segment with 10 documents");
+                Assert.assertEquals(1, reader.getContext().leaves().size());
+                Assert.assertEquals(totalNumberOfDocs, reader.numDocs());
+
+                final Query filterQuery = new MatchAllDocsQuery();
+                final IndexSearcher searcher = newSearcher(reader);
+                KnnFloatVectorQuery knnFloatVectorQuery = getJVectorKnnFloatVectorQuery("test_field", target, k, filterQuery);
+                TopDocs topDocs = searcher.search(knnFloatVectorQuery, k);
+                assertEquals(k, topDocs.totalHits.value());
+                // With MAXIMUM_INNER_PRODUCT, higher dot product means more similar
+                // target = [1.0, 0.0], source = [1.0/i, 0.0]
+                // dot product = 1.0 * (1.0/i) + 0.0 * 0.0 = 1.0/i
+                // So doc 0 (i=1) has highest score (1.0), doc 1 (i=2) has 0.5, doc 2 (i=3) has 0.333...
+                assertEquals(0, topDocs.scoreDocs[0].doc);
+                Assert.assertEquals(
+                    VectorSimilarityFunction.MAXIMUM_INNER_PRODUCT.compare(target, new float[] { 1.0f, 0.0f }),
+                    topDocs.scoreDocs[0].score,
+                    0.001f
+                );
+                assertEquals(1, topDocs.scoreDocs[1].doc);
+                Assert.assertEquals(
+                    VectorSimilarityFunction.MAXIMUM_INNER_PRODUCT.compare(target, new float[] { 1.0f / 2.0f, 0.0f }),
+                    topDocs.scoreDocs[1].score,
+                    0.001f
+                );
+                assertEquals(2, topDocs.scoreDocs[2].doc);
+                Assert.assertEquals(
+                    VectorSimilarityFunction.MAXIMUM_INNER_PRODUCT.compare(target, new float[] { 1.0f / 3.0f, 0.0f }),
+                    topDocs.scoreDocs[2].score,
+                    0.001f
+                );
+                log.info("successfully completed search tests with MAXIMUM_INNER_PRODUCT");
+            }
+        }
+        log.info("successfully closed directory");
+    }
+
+    /**
      * Test the scenario when not all documents are populated with the vector field
      */
+    @Test
     public void testMissing_fields() throws IOException {
         final int k = 3; // The number of nearest neighbors to gather
         final int totalNumberOfDocs = 10;
