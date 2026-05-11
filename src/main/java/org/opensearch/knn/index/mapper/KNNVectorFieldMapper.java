@@ -783,7 +783,8 @@ public abstract class KNNVectorFieldMapper extends ParametrizedFieldMapper {
 
     @Override
     protected void canDeriveSourceInternal() {
-        // skipping any checks here
+        // core implementation traverses all the field mappers and checks if derived source is supported for that specific field
+        // skipping any checks here is sufficient, default FieldMapper::canDeriveSourceInternal just throws UnsupportedOperationException
     }
 
     /**
