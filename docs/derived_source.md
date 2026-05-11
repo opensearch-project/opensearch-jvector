@@ -2,7 +2,7 @@
 
 ## Overview
 
-jVector supports derived source for KNN vector fields through the plugin setting `index.knn.derived_source.enabled`.
+`opensearch-jvector` supports derived source for KNN vector fields through the plugin setting `index.knn.derived_source.enabled`.
 
 Starting from OpenSearch 3.7, you can also use the OpenSearch core derived source setting `index.derived_source.enabled`. This adds support for derived source across all supported fields, including `knn_vector` fields when used with jVector.
 
@@ -12,12 +12,12 @@ Derived source reduces stored `_source` overhead by reconstructing fields when d
 
 ## Configuration Options
 
-There are two derived source mechanisms relevant to jVector indexes:
+There are two derived source mechanisms relevant to k-NN indexes:
 
 - OpenSearch core derived source via `index.derived_source.enabled`
 - jVector plugin derived source via `index.knn.derived_source.enabled`
 
-### jVector plugin derived source
+### `opensearch-jvector` plugin derived source
 
 This mechanism is available independently of OpenSearch 3.7 and is controlled by the plugin setting:
 
@@ -30,7 +30,7 @@ This mechanism is available independently of OpenSearch 3.7 and is controlled by
 }
 ```
 
-This option is specific to jVector/KNN behavior and applies only when KNN is enabled on the index.
+This option is specific to `opensearch-jvector` behavior and applies only when KNN index setting is enabled on the index.
 
 ### OpenSearch core derived source
 
@@ -45,7 +45,7 @@ Starting from OpenSearch 3.7, you can use the core setting:
 }
 ```
 
-When `index.derived_source.enabled` is enabled, the core implementation takes precedence over the jVector-specific implementation, including for KNN fields.
+When `index.derived_source.enabled` is enabled, the core implementation takes precedence over the `opensearch-jvector`-specific implementation, including for KNN fields.
 
 ---
 
@@ -79,15 +79,15 @@ General rules:
 - Indexes created with `index.knn.derived_source.enabled` continue to work after upgrade
 - The only supported migration path between implementations is to reindex data
 - If both settings are present on OpenSearch 3.7+, core derived source takes precedence
-- If the core setting is not enabled, jVector can continue handling derived source for vector fields
+- If the core setting is not enabled, `opensearch-jvector` can continue handling derived source for vector fields
 
-This preserves compatibility for existing jVector indexes while allowing newer clusters to adopt the core OpenSearch implementation.
+This preserves compatibility for existing `opensearch-jvector` indexes while allowing newer clusters to adopt the core OpenSearch implementation.
 
 ---
 
 ## Requirements and Limitations
 
-jVector plugin implementation
+`opensearch-jvector` plugin implementation
 
 Requirements:
 
@@ -102,7 +102,7 @@ Supported Features:
 
 Limitations:
 - copy_to not supported
-- jVector-derived source is disabled when segment replication with local node-to-node replication is enabled
+- `opensearch-jvector`-derived source is disabled when segment replication with local node-to-node replication is enabled
 
 
 OpenSearch Core Approach
@@ -113,7 +113,7 @@ Requirements:
 
 Supported Features:
 
-- Eliminate redundant storage of the entire _source field by reconstructing it from indexed data structures (doc values/stored fields)
+- Eliminate redundant storage of the entire `_source` field by reconstructing it from indexed data structures (doc values/stored fields)
 - Unified approach for all field types
 - Translog-based real-time reads with consistent formatting
 - Index-level enablement
@@ -131,7 +131,7 @@ https://docs.opensearch.org/latest/mappings/metadata-fields/source/#limitations
 
 ## Example Index Creation
 
-### Using jVector plugin derived source
+### Using `opensearch-jvector` plugin derived source
 
 ```bash
 curl -X PUT "http://localhost:9200/my-derived-source-index" \
@@ -191,4 +191,4 @@ curl -X PUT "http://localhost:9200/my-derived-source-index" \
 
 ## Summary
 
-Use `index.knn.derived_source.enabled` for the jVector plugin implementation. Starting from OpenSearch 3.7, you can also use `index.derived_source.enabled` for the core implementation, which takes precedence when both settings are present.
+Use `index.knn.derived_source.enabled` for the `opensearch-jvector` plugin implementation or when support for nested fields is required. Starting from OpenSearch 3.7, you can also use `index.derived_source.enabled` for the core implementation, which takes precedence when both settings are present.
