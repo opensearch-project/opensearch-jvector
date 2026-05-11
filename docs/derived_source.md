@@ -4,7 +4,7 @@
 
 `opensearch-jvector` supports derived source for KNN vector fields through the plugin setting `index.knn.derived_source.enabled`.
 
-Starting from OpenSearch 3.7, you can also use the OpenSearch core derived source setting `index.derived_source.enabled`. This adds support for derived source across all supported fields, including `knn_vector` fields when used with jVector.
+Starting from OpenSearch 3.7, you can also use the OpenSearch core derived source setting `index.derived_source.enabled`. This adds support for derived source across all supported fields, including `knn_vector` fields when used with `opensearch-jvector`.
 
 Derived source reduces stored `_source` overhead by reconstructing fields when documents are read back. This is useful when you want to reduce storage overhead while still retrieving documents that include vectors and regular fields from the same index.
 
