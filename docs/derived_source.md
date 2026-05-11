@@ -15,7 +15,7 @@ Derived source reduces stored `_source` overhead by reconstructing fields when d
 There are two derived source mechanisms relevant to k-NN indexes:
 
 - OpenSearch core derived source via `index.derived_source.enabled`
-- jVector plugin derived source via `index.knn.derived_source.enabled`
+- `opensearch-jvector` plugin derived source via `index.knn.derived_source.enabled`
 
 ### `opensearch-jvector` plugin derived source
 
@@ -53,7 +53,7 @@ When `index.derived_source.enabled` is enabled, the core implementation takes pr
 
 ### Before OpenSearch 3.7
 
-Use the jVector plugin setting:
+Use the `opensearch-jvector` plugin setting:
 
 - `index.knn.derived_source.enabled`
 
