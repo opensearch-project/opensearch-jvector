@@ -19,7 +19,7 @@ There are two derived source mechanisms relevant to k-NN indexes:
 
 ### `opensearch-jvector` plugin derived source
 
-This mechanism is available independently of OpenSearch 3.7 and is controlled by the plugin setting:
+This mechanism is similar to k-nn plugin, and is controlled by the plugin setting:
 
 ```json
 {
@@ -57,7 +57,7 @@ Use the `opensearch-jvector` plugin setting:
 
 - `index.knn.derived_source.enabled`
 
-The core setting `index.derived_source.enabled` does not apply to this jVector use case before OpenSearch 3.7.
+The core setting `index.derived_source.enabled` does not apply to this `opensearch-jvector` plugin use case before OpenSearch 3.7.
 
 ### OpenSearch 3.7 and later
 
@@ -79,9 +79,9 @@ General rules:
 - Indexes created with `index.knn.derived_source.enabled` continue to work after upgrade
 - The only supported migration path between implementations is to reindex data
 - If both settings are present on OpenSearch 3.7+, core derived source takes precedence
-- If the core setting is not enabled, `opensearch-jvector` can continue handling derived source for vector fields
+- If the core setting is not enabled (default), `opensearch-jvector` can continue handling derived source for vector fields
 
-This preserves compatibility for existing `opensearch-jvector` indexes while allowing newer clusters to adopt the core OpenSearch implementation.
+This preserves compatibility for existing `opensearch-jvector` indexes while allowing newer clusters to adopt the core OpenSearch implementation. By default `index.derived_source.enabled` is disabled.
 
 ---
 
@@ -98,7 +98,6 @@ Supported Features:
 
 - Nested vector fields
 - Works independently of other field types
-- Field-level enablement
 
 Limitations:
 - copy_to not supported
