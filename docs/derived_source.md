@@ -92,7 +92,7 @@ This preserves compatibility for existing `opensearch-jvector` indexes while all
 Requirements:
 
 - `index.knn.derived_source.enabled` requires `index.knn: true`
-- `_source` must remain enabled for the jVector plugin implementation
+- `_source` must remain enabled for the `opensearch-jvector` plugin implementation
 
 Supported Features:
 
@@ -108,7 +108,7 @@ OpenSearch Core Approach
 
 Requirements:
 
-- `_source` must remain enabled for the jVector plugin implementation
+- `_source` must remain enabled for the `opensearch-jvector` plugin implementation
 
 Supported Features:
 
