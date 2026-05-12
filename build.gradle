@@ -313,6 +313,11 @@ task release(type: Copy, group: 'build') {
 dependencies {
     api "org.opensearch:opensearch:${opensearch_version}"
     compileOnly "org.opensearch.plugin:opensearch-scripting-painless-spi:${versions.opensearch}"
+    
+    // gRPC support dependencies (provided at runtime by OpenSearch)
+    compileOnly "org.opensearch.plugin:transport-grpc-spi:${opensearch_version}"
+    compileOnly "org.opensearch:protobufs:${versions.opensearchprotobufs}"
+    
     // Declare guava as compile time since guava will come from OpenSearch transport-grpc module.
     compileOnly group: 'com.google.guava', name: 'guava', version: "${versions.guava}"
     api "org.apache.commons:commons-lang3:${versions.commonslang}"
