@@ -5,9 +5,11 @@
 package org.opensearch.knn.index.engine;
 
 import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters;
+import org.apache.hc.client5.http.config.RequestConfig;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.junit.Test;
 import org.opensearch.client.Request;
+import org.opensearch.client.RequestOptions;
 import org.opensearch.client.Response;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.common.xcontent.XContentFactory;
@@ -45,7 +47,6 @@ import static org.opensearch.knn.index.engine.CommonTestUtils.DIMENSION;
 @OpenSearchIntegTestCase.ClusterScope(scope = OpenSearchIntegTestCase.Scope.TEST, numDataNodes = 1)
 @ThreadLeakFilters(defaultFilters = true, filters = { ThreadLeakFiltersForTests.class })
 public class JVectorConcurrentQueryTests extends OpenSearchIntegTestCase {
-
     private static final int NUM_VECTORS = 100;
     private static final int NUM_QUERIES = 10;
     private static final int NUM_CONCURRENT_QUERIES = 10; // Will be equivalent to the number of threads
@@ -251,6 +252,9 @@ public class JVectorConcurrentQueryTests extends OpenSearchIntegTestCase {
     protected Response searchKNNIndex(String index, String query, int resultSize) throws IOException {
         Request request = new Request("POST", "/" + index + "/_search");
         request.setJsonEntity(query);
+        request.setOptions(
+            RequestOptions.DEFAULT.toBuilder().setRequestConfig(RequestConfig.custom().setResponseTimeout(60, TimeUnit.SECONDS).build())
+        );
 
         request.addParameter("size", Integer.toString(resultSize));
         request.addParameter("search_type", "query_then_fetch");
