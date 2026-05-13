@@ -7,6 +7,7 @@ package org.opensearch.knn.index.codec.jvector;
 
 import io.github.jbellis.jvector.disk.RandomAccessReader;
 import io.github.jbellis.jvector.disk.ReaderSupplier;
+import io.github.jbellis.jvector.vector.VectorizationProvider;
 import lombok.extern.log4j.Log4j2;
 import org.apache.lucene.store.IndexInput;
 import org.apache.lucene.util.IOUtils;
@@ -14,6 +15,7 @@ import org.apache.lucene.util.IOUtils;
 import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
 
 @Log4j2
@@ -24,6 +26,28 @@ public class JVectorRandomAccessReader implements RandomAccessReader {
 
     public JVectorRandomAccessReader(IndexInput indexInputDelegate) {
         this.indexInputDelegate = indexInputDelegate;
+    }
+
+    private static final ByteOrder BYTE_ORDER = determineByteOrder();
+
+    private static ByteOrder determineByteOrder() {
+        try {
+            VectorizationProvider provider = VectorizationProvider.getInstance();
+            String providerClassName = provider.getClass().getName();
+
+            // Check if it's the native provider (uses LITTLE_ENDIAN)
+            if (providerClassName.contains("Native")) {
+                log.info("Using LITTLE_ENDIAN byte order for native JVector vectorization");
+                return ByteOrder.LITTLE_ENDIAN;
+            }
+
+            // Panama and default providers use BIG_ENDIAN
+            log.info("Using BIG_ENDIAN byte order for JVector (provider: {})", providerClassName);
+            return ByteOrder.BIG_ENDIAN;
+        } catch (Exception e) {
+            log.warn("Failed to determine vectorization provider, defaulting to BIG_ENDIAN", e);
+            return ByteOrder.BIG_ENDIAN;
+        }
     }
 
     @Override
@@ -99,6 +123,7 @@ public class JVectorRandomAccessReader implements RandomAccessReader {
     @Override
     public void read(float[] floats, int offset, int count) throws IOException {
         final ByteBuffer byteBuffer = ByteBuffer.allocate(Float.BYTES * count);
+        byteBuffer.order(BYTE_ORDER);
         indexInputDelegate.readBytes(byteBuffer.array(), offset, Float.BYTES * count);
         FloatBuffer buffer = byteBuffer.asFloatBuffer();
         buffer.get(floats, offset, count);
@@ -106,7 +131,7 @@ public class JVectorRandomAccessReader implements RandomAccessReader {
 
     @Override
     public void close() throws IOException {
-        if (this.closed == true) {
+        if (this.closed) {
             log.debug("JVectorRandomAccessReader already closed for file: {}", indexInputDelegate);
             return;
         }
