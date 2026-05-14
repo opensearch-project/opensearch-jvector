@@ -193,7 +193,11 @@ public class MMRKnnQueryTransformerTests extends MMRTestCase {
 
         transformer.transform(queryBuilder, listener, transformContext);
 
-        verifyException(listener, IllegalArgumentException.class, "Failed to transform the knn query for MMR. Field name of the knn query should not be null.");
+        verifyException(
+            listener,
+            IllegalArgumentException.class,
+            "Failed to transform the knn query for MMR. Field name of the knn query should not be null."
+        );
     }
 
     public void testTransform_ThrowsExceptionWhenFieldNameIsEmpty() {
@@ -326,7 +330,17 @@ public class MMRKnnQueryTransformerTests extends MMRTestCase {
         when(queryBuilder.getMaxDistance()).thenReturn(null);
         when(queryBuilder.getMinScore()).thenReturn(null);
         when(queryBuilder.fieldName()).thenReturn("vector_field");
-        transformContext = new MMRTransformContext(Integer.MAX_VALUE, processingContext, List.of(), List.of(), null, "vector_field", null, client, true);
+        transformContext = new MMRTransformContext(
+            Integer.MAX_VALUE,
+            processingContext,
+            List.of(),
+            List.of(),
+            null,
+            "vector_field",
+            null,
+            client,
+            true
+        );
 
         transformer.transform(queryBuilder, listener, transformContext);
 
