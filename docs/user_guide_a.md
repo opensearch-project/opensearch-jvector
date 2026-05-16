@@ -20,6 +20,7 @@
   - [Product Quantization (PQ)](#product-quantization-pq)
   - [DiskANN Mode](#diskann-mode)
   - [MMR Search](#mmr-search)
+  - [Derived Source](#derived-source)
 - [Index Settings Reference](#index-settings-reference)
 - [Mapping Parameters Reference](#mapping-parameters-reference)
 
@@ -420,6 +421,10 @@ During search, jVector uses the compressed vectors for graph traversal and re-ra
 ### MMR Search
 
 For diverse result sets, see [docs/mmr_search.md](mmr_search.md).
+
+### Derived Source
+
+For derived source configuration and version-specific behavior, see [docs/derived_source.md](derived_source.md).
 
 ---
 
