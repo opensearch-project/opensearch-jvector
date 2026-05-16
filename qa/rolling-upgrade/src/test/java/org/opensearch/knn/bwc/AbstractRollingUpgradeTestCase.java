@@ -81,6 +81,7 @@ public abstract class AbstractRollingUpgradeTestCase extends KNNRestTestCase {
         return Boolean.parseBoolean(System.getProperty(ROLLING_UPGRADE_FIRST_ROUND, "false"));
     }
 
+    @Override
     protected final Optional<String> getBWCVersion() {
         return Optional.ofNullable(System.getProperty(BWC_VERSION, null));
     }

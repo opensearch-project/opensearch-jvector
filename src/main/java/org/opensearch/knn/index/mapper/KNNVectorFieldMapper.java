@@ -30,7 +30,9 @@ import org.opensearch.core.common.Strings;
 import org.opensearch.core.xcontent.ToXContent;
 import org.opensearch.core.xcontent.XContentBuilder;
 import org.opensearch.core.xcontent.XContentParser;
+import org.opensearch.index.mapper.DerivedFieldGenerator;
 import org.opensearch.index.mapper.FieldMapper;
+import org.opensearch.index.mapper.FieldValueType;
 import org.opensearch.index.mapper.Mapper;
 import org.opensearch.index.mapper.MapperParsingException;
 import org.opensearch.index.mapper.ParametrizedFieldMapper;
@@ -777,6 +779,30 @@ public abstract class KNNVectorFieldMapper extends ParametrizedFieldMapper {
         if (includeDefaults || ignoreMalformed.explicit()) {
             builder.field(Names.IGNORE_MALFORMED, ignoreMalformed.value());
         }
+    }
+
+    @Override
+    protected void canDeriveSourceInternal() {
+        // core implementation traverses all the field mappers and checks if derived source is supported for that specific field
+        // skipping any checks here is sufficient, default FieldMapper::canDeriveSourceInternal just throws UnsupportedOperationException
+    }
+
+    /**
+     * Derive source using stored field, which would always be present for derived source enabled index field
+     */
+    @Override
+    protected DerivedFieldGenerator derivedFieldGenerator() {
+        // using knn vector fetcher to fetch the vector and passing it as a doc values fetcher
+        return new DerivedFieldGenerator(
+            mappedFieldType,
+            new KnnVectorValuesFetcher((KNNVectorFieldType) mappedFieldType, simpleName()),
+            null
+        ) {
+            @Override
+            public FieldValueType getDerivedFieldPreference() {
+                return FieldValueType.DOC_VALUES;
+            }
+        };
     }
 
     /**
