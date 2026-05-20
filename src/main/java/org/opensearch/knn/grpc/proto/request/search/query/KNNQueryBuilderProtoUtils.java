@@ -162,7 +162,8 @@ public class KNNQueryBuilderProtoUtils {
      * Handles all supported protobuf value types.
      *
      * @param value The Protocol Buffer Value to convert
-     * @return The converted Java Object, or null if unsupported type
+     * @return The converted Java Object
+     * @throws UnsupportedOperationException if the value type is not supported
      */
     static Object convertObjectMapValue(org.opensearch.protobufs.ObjectMap.Value value) {
         switch (value.getValueCase()) {
@@ -179,8 +180,9 @@ public class KNNQueryBuilderProtoUtils {
             case BOOL:
                 return value.getBool();
             default:
-                // Skip unsupported types
-                return null;
+                throw new UnsupportedOperationException(
+                    "Unsupported ObjectMap.Value type: " + value.getValueCase()
+                );
         }
     }
 
