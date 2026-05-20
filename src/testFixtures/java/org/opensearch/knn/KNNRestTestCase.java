@@ -201,6 +201,13 @@ public class KNNRestTestCase extends ODFERestTestCase {
     }
 
     /**
+     * Gets the current BWC version. This method is used to control determine or not we should update settings in the base test class as new settings are not BWC.
+     */
+    protected Optional<String> getBWCVersion() {
+        return Optional.of(Version.CURRENT.toString());
+    }
+
+    /**
      * Deprecated
      * To better simulate user request, use {@link #searchKNNIndex(String, XContentBuilder, int)} instead
      */

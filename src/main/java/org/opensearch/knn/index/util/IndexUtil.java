@@ -14,6 +14,7 @@ import org.opensearch.cluster.metadata.MappingMetadata;
 import org.opensearch.common.ValidationException;
 import org.opensearch.index.mapper.FieldMapper;
 import org.opensearch.index.mapper.MapperService;
+import org.opensearch.index.mapper.SourceFieldMapper;
 import org.opensearch.knn.common.KNNConstants;
 import org.opensearch.knn.index.engine.KNNMethodContext;
 import org.opensearch.knn.index.KNNSettings;
@@ -26,12 +27,14 @@ import org.opensearch.knn.index.query.request.MethodParameter;
 import org.opensearch.knn.index.engine.KNNEngine;
 
 import java.io.File;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
+import static org.opensearch.common.regex.Regex.simpleMatch;
 import static org.opensearch.knn.common.KNNConstants.BYTES_PER_KILOBYTES;
 import static org.opensearch.knn.common.KNNConstants.ENCODER_FLAT;
 import static org.opensearch.knn.common.KNNConstants.EXPAND_NESTED;
@@ -369,12 +372,27 @@ public class IndexUtil {
             .equals(VectorDataType.BYTE.getValue());
     }
 
+    /**
+    * Checks whether the k-NN plugin's derived source feature is enabled for the given index.
+    * Returns {@code false} when core's {@code index.derived_source.enabled} is on (core takes precedence),
+    * when source is disabled, when the k-NN derived source setting is off, or when segment
+    * replication with local node-to-node replication is enabled.
+    *
+    * @param mapperService the mapper service for the index, or {@code null}
+    * @return {@code true} if the k-NN plugin should handle derived source for this index
+    */
     public static boolean isDerivedEnabledForIndex(MapperService mapperService) {
         if (mapperService == null) {
             return false;
         }
 
         if (!mapperService.documentMapper().sourceMapper().enabled()) {
+            return false;
+        }
+
+        // Core derived source takes precedence over KNN derived source
+        if (mapperService.getIndexSettings().getIndexVersionCreated().onOrAfter(Version.V_3_7_0)
+            && mapperService.getIndexSettings().isDerivedSourceEnabled()) {
             return false;
         }
 
@@ -391,10 +409,49 @@ public class IndexUtil {
     }
 
     public static boolean isDerivedEnabledForField(KNNVectorFieldType knnVectorFieldType, MapperService mapperService) {
+        if (knnVectorFieldType == null) {
+            return false;
+        }
+
+        if (isFieldExcludedFromSource(knnVectorFieldType.name(), mapperService)) {
+            return false;
+        }
+
         // Skip copy to fields
         if (mapperService.documentMapper().mappers().getMapper(knnVectorFieldType.name()) instanceof FieldMapper mapper) {
             return mapper.copyTo() == null || mapper.copyTo().copyToFields() == null || mapper.copyTo().copyToFields().isEmpty();
         }
         return true;
+    }
+
+    private static boolean isFieldExcludedFromSource(String fieldName, MapperService mapperService) {
+        SourceFieldMapper sourceMapper = mapperService.documentMapper().metadataMapper(SourceFieldMapper.class);
+        if (sourceMapper == null) {
+            return false;
+        }
+        Collection<String> includes = sourceMapper.getIncludes();
+        Collection<String> excludes = sourceMapper.getExcludes();
+        // If includes are specified, field must match at least one include pattern
+        if (includes != null && !includes.isEmpty()) {
+            boolean matchedInclude = false;
+            for (String include : includes) {
+                if (simpleMatch(include, fieldName)) {
+                    matchedInclude = true;
+                    break;
+                }
+            }
+            if (!matchedInclude) {
+                return true;
+            }
+        }
+        // Excludes override includes
+        if (excludes != null && !excludes.isEmpty()) {
+            for (String exclude : excludes) {
+                if (simpleMatch(exclude, fieldName)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 }
