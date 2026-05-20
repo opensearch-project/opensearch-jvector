@@ -29,11 +29,9 @@ public class KNNQueryBuilderProtoConverter implements QueryBuilderProtoConverter
         return QueryContainer.QueryContainerCase.KNN;
     }
 
-
     @Override
     public QueryBuilder fromProto(QueryContainer queryContainer) {
-        if (queryContainer == null ||
-            queryContainer.getQueryContainerCase() != QueryContainer.QueryContainerCase.KNN) {
+        if (queryContainer == null || queryContainer.getQueryContainerCase() != QueryContainer.QueryContainerCase.KNN) {
             throw new IllegalArgumentException("QueryContainer does not contain a KNN query");
         }
 

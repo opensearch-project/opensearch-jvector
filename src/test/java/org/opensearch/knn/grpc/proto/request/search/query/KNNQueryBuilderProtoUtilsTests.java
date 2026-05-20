@@ -40,13 +40,7 @@ public class KNNQueryBuilderProtoUtilsTests extends OpenSearchTestCase {
      * Test basic conversion with field, vector, and k.
      */
     public void testFromProto_BasicQuery() {
-        KnnQuery knnQuery = KnnQuery.newBuilder()
-            .setField("test_field")
-            .addVector(1.0f)
-            .addVector(2.0f)
-            .addVector(3.0f)
-            .setK(5)
-            .build();
+        KnnQuery knnQuery = KnnQuery.newBuilder().setField("test_field").addVector(1.0f).addVector(2.0f).addVector(3.0f).setK(5).build();
 
         QueryBuilder result = KNNQueryBuilderProtoUtils.fromProto(knnQuery, mockRegistry);
 
@@ -100,12 +94,7 @@ public class KNNQueryBuilderProtoUtilsTests extends OpenSearchTestCase {
      * Test conversion with maxDistance.
      */
     public void testFromProto_WithMaxDistance() {
-        KnnQuery knnQuery = KnnQuery.newBuilder()
-            .setField("test_field")
-            .addVector(1.0f)
-            .addVector(2.0f)
-            .setMaxDistance(0.5f)
-            .build();
+        KnnQuery knnQuery = KnnQuery.newBuilder().setField("test_field").addVector(1.0f).addVector(2.0f).setMaxDistance(0.5f).build();
 
         QueryBuilder result = KNNQueryBuilderProtoUtils.fromProto(knnQuery, mockRegistry);
 
@@ -118,12 +107,7 @@ public class KNNQueryBuilderProtoUtilsTests extends OpenSearchTestCase {
      * Test conversion with minScore.
      */
     public void testFromProto_WithMinScore() {
-        KnnQuery knnQuery = KnnQuery.newBuilder()
-            .setField("test_field")
-            .addVector(1.0f)
-            .addVector(2.0f)
-            .setMinScore(0.8f)
-            .build();
+        KnnQuery knnQuery = KnnQuery.newBuilder().setField("test_field").addVector(1.0f).addVector(2.0f).setMinScore(0.8f).build();
 
         QueryBuilder result = KNNQueryBuilderProtoUtils.fromProto(knnQuery, mockRegistry);
 
@@ -139,10 +123,7 @@ public class KNNQueryBuilderProtoUtilsTests extends OpenSearchTestCase {
         ObjectMap.Value efSearchValue = ObjectMap.Value.newBuilder().setInt32(100).build();
         ObjectMap.Value nprobesValue = ObjectMap.Value.newBuilder().setInt32(50).build();
 
-        ObjectMap methodParams = ObjectMap.newBuilder()
-            .putFields("ef_search", efSearchValue)
-            .putFields("nprobes", nprobesValue)
-            .build();
+        ObjectMap methodParams = ObjectMap.newBuilder().putFields("ef_search", efSearchValue).putFields("nprobes", nprobesValue).build();
 
         KnnQuery knnQuery = KnnQuery.newBuilder()
             .setField("test_field")
@@ -306,15 +287,9 @@ public class KNNQueryBuilderProtoUtilsTests extends OpenSearchTestCase {
      * Test error handling for missing field.
      */
     public void testFromProto_MissingField_ThrowsException() {
-        KnnQuery knnQuery = KnnQuery.newBuilder()
-            .addVector(1.0f)
-            .addVector(2.0f)
-            .setK(5)
-            .build();
+        KnnQuery knnQuery = KnnQuery.newBuilder().addVector(1.0f).addVector(2.0f).setK(5).build();
 
-        expectThrows(IllegalArgumentException.class, () -> {
-            KNNQueryBuilderProtoUtils.fromProto(knnQuery, mockRegistry);
-        });
+        expectThrows(IllegalArgumentException.class, () -> { KNNQueryBuilderProtoUtils.fromProto(knnQuery, mockRegistry); });
     }
 
     /**
@@ -323,8 +298,6 @@ public class KNNQueryBuilderProtoUtilsTests extends OpenSearchTestCase {
     public void testFromProto_EmptyVector_ThrowsException() {
         KnnQuery knnQuery = KnnQuery.newBuilder().setField("test_field").setK(5).build();
 
-        expectThrows(IllegalArgumentException.class, () -> {
-            KNNQueryBuilderProtoUtils.fromProto(knnQuery, mockRegistry);
-        });
+        expectThrows(IllegalArgumentException.class, () -> { KNNQueryBuilderProtoUtils.fromProto(knnQuery, mockRegistry); });
     }
 }

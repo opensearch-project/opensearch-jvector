@@ -114,7 +114,7 @@ public class KNNQueryBuilderProtoUtils {
     /**
      * Converts Protocol Buffer method parameters following the exact same pattern as
      * MethodParametersParser.fromXContent() to ensure consistency.
-     * 
+     *
      * This uses a two-phase conversion:
      * 1. Convert Protocol Buffer ObjectMap to raw Java Map
      * 2. Process through MethodParameter.parse() for type conversion
@@ -150,9 +150,7 @@ public class KNNQueryBuilderProtoUtils {
                 Object parsedValue = parameter.parse(value);
                 processedMethodParameters.put(name, parsedValue);
             } catch (Exception exception) {
-                throw new IllegalArgumentException(
-                    "Error parsing method parameter [" + name + "]: " + exception.getMessage()
-                );
+                throw new IllegalArgumentException("Error parsing method parameter [" + name + "]: " + exception.getMessage());
             }
         }
 
@@ -196,9 +194,7 @@ public class KNNQueryBuilderProtoUtils {
     private RescoreContext convertRescoreContext(KnnQueryRescore rescoreProto) {
         switch (rescoreProto.getKnnQueryRescoreCase()) {
             case ENABLE:
-                return rescoreProto.getEnable() 
-                    ? RescoreContext.getDefault() 
-                    : RescoreContext.EXPLICITLY_DISABLED_RESCORE_CONTEXT;
+                return rescoreProto.getEnable() ? RescoreContext.getDefault() : RescoreContext.EXPLICITLY_DISABLED_RESCORE_CONTEXT;
 
             case CONTEXT:
                 org.opensearch.protobufs.RescoreContext contextProto = rescoreProto.getContext();

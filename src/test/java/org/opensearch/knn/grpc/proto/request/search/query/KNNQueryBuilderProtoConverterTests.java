@@ -51,13 +51,7 @@ public class KNNQueryBuilderProtoConverterTests extends OpenSearchTestCase {
     public void testFromProto_DelegatesToUtils() {
         converter.setRegistry(mockRegistry);
 
-        KnnQuery knnQuery = KnnQuery.newBuilder()
-            .setField("test_field")
-            .addVector(1.0f)
-            .addVector(2.0f)
-            .addVector(3.0f)
-            .setK(5)
-            .build();
+        KnnQuery knnQuery = KnnQuery.newBuilder().setField("test_field").addVector(1.0f).addVector(2.0f).addVector(3.0f).setK(5).build();
 
         QueryContainer queryContainer = QueryContainer.newBuilder().setKnn(knnQuery).build();
 
@@ -105,17 +99,11 @@ public class KNNQueryBuilderProtoConverterTests extends OpenSearchTestCase {
      */
     public void testFromProto_WithoutRegistry_ThrowsException() {
         // Don't set registry
-        KnnQuery knnQuery = KnnQuery.newBuilder()
-            .setField("test_field")
-            .addVector(1.0f)
-            .setK(5)
-            .build();
+        KnnQuery knnQuery = KnnQuery.newBuilder().setField("test_field").addVector(1.0f).setK(5).build();
 
         QueryContainer queryContainer = QueryContainer.newBuilder().setKnn(knnQuery).build();
 
-        expectThrows(IllegalStateException.class, () -> {
-            converter.fromProto(queryContainer);
-        });
+        expectThrows(IllegalStateException.class, () -> { converter.fromProto(queryContainer); });
     }
 
     /**
@@ -127,9 +115,7 @@ public class KNNQueryBuilderProtoConverterTests extends OpenSearchTestCase {
         // Create QueryContainer with Term query instead of KNN
         QueryContainer queryContainer = QueryContainer.newBuilder().build();
 
-        expectThrows(IllegalArgumentException.class, () -> {
-            converter.fromProto(queryContainer);
-        });
+        expectThrows(IllegalArgumentException.class, () -> { converter.fromProto(queryContainer); });
     }
 
     /**
@@ -138,16 +124,11 @@ public class KNNQueryBuilderProtoConverterTests extends OpenSearchTestCase {
     public void testFromProto_InvalidQuery_ThrowsException() {
         converter.setRegistry(mockRegistry);
 
-        KnnQuery knnQuery = KnnQuery.newBuilder()
-            .addVector(1.0f)
-            .setK(5)
-            .build(); // Missing field name
+        KnnQuery knnQuery = KnnQuery.newBuilder().addVector(1.0f).setK(5).build(); // Missing field name
 
         QueryContainer queryContainer = QueryContainer.newBuilder().setKnn(knnQuery).build();
 
-        expectThrows(IllegalArgumentException.class, () -> {
-            converter.fromProto(queryContainer);
-        });
+        expectThrows(IllegalArgumentException.class, () -> { converter.fromProto(queryContainer); });
     }
 
     /**
