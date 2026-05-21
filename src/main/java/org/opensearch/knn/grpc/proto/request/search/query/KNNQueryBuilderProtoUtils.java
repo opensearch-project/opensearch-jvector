@@ -180,9 +180,7 @@ public class KNNQueryBuilderProtoUtils {
             case BOOL:
                 return value.getBool();
             default:
-                throw new UnsupportedOperationException(
-                    "Unsupported ObjectMap.Value type: " + value.getValueCase()
-                );
+                throw new UnsupportedOperationException("Unsupported ObjectMap.Value type: " + value.getValueCase());
         }
     }
 
