@@ -44,7 +44,7 @@ jobs:
 
     steps:
       - name: Checkout k-NN
-        uses: actions/checkout@50fbc622fc4ef5163becd7fab6573eac35f8462e # v1
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
 
       # Setup git user so that patches for native libraries can be applied and committed
       - name: Setup git user
@@ -130,7 +130,7 @@ jobs:
 
     steps:
       - name: Checkout k-NN
-        uses: actions/checkout@50fbc622fc4ef5163becd7fab6573eac35f8462e # v1
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
 
       # Setup git user so that patches for native libraries can be applied and committed
       - name: Setup git user
