@@ -63,7 +63,7 @@ public class JVectorReader extends KnnVectorsReader {
         this.directory = state.directory;
         boolean success = false;
         try (ChecksumIndexInput meta = state.directory.openChecksumInput(metaFileName)) {
-            CodecUtil.checkIndexHeader(
+            int version = CodecUtil.checkIndexHeader(
                 meta,
                 JVectorFormat.META_CODEC_NAME,
                 JVectorFormat.VERSION_START,
@@ -71,7 +71,7 @@ public class JVectorReader extends KnnVectorsReader {
                 state.segmentInfo.getId(),
                 state.segmentSuffix
             );
-            readFields(meta);
+            readFields(meta, version);
             CodecUtil.checkFooter(meta);
 
             success = true;
@@ -238,10 +238,10 @@ public class JVectorReader extends KnnVectorsReader {
         fieldEntryMap.clear();
     }
 
-    private void readFields(ChecksumIndexInput meta) throws IOException {
+    private void readFields(ChecksumIndexInput meta, int version) throws IOException {
         for (int fieldNumber = meta.readInt(); fieldNumber != -1; fieldNumber = meta.readInt()) {
             final FieldInfo fieldInfo = fieldInfos.fieldInfo(fieldNumber); // read field number
-            JVectorWriter.VectorIndexFieldMetadata vectorIndexFieldMetadata = new JVectorWriter.VectorIndexFieldMetadata(meta);
+            JVectorWriter.VectorIndexFieldMetadata vectorIndexFieldMetadata = new JVectorWriter.VectorIndexFieldMetadata(meta, version);
             assert fieldInfo.number == vectorIndexFieldMetadata.getFieldNumber();
             fieldEntryMap.put(fieldInfo.name, new FieldEntry(fieldInfo, vectorIndexFieldMetadata));
         }

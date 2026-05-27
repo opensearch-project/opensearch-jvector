@@ -445,7 +445,7 @@ public class JVectorWriter extends KnnVectorsWriter {
             out.writeInt(JVectorReader.VectorizationProviderMapper.providerToOrd());
         }
 
-        public VectorIndexFieldMetadata(IndexInput in) throws IOException {
+        public VectorIndexFieldMetadata(IndexInput in, int version) throws IOException {
             this.fieldNumber = in.readInt();
             this.vectorEncoding = readVectorEncoding(in);
             this.vectorSimilarityFunction = JVectorReader.VectorSimilarityMapper.ordToLuceneDistFunc(in.readInt());
@@ -457,14 +457,11 @@ public class JVectorWriter extends KnnVectorsWriter {
             this.degreeOverflow = Float.intBitsToFloat(in.readInt());
             this.graphNodeIdToDocMap = new GraphNodeIdToDocMap(in);
 
-            JVectorReader.VectorizationProviderMapper.VectorizationProvider provider;
-            try {
-                provider = JVectorReader.VectorizationProviderMapper.ordToProvider(in.readInt());
-            } catch (Exception e) {
-                // Fallback, old fields were always NON_NATIVE
-                provider = JVectorReader.VectorizationProviderMapper.VectorizationProvider.NON_NATIVE;
+            if (version >= JVectorFormat.VERSION_WITH_VECTORIZATION_PROVIDER) {
+                this.vectorizationProvider = JVectorReader.VectorizationProviderMapper.ordToProvider(in.readInt());
+            } else {
+                this.vectorizationProvider =  JVectorReader.VectorizationProviderMapper.VectorizationProvider.NON_NATIVE;
             }
-            this.vectorizationProvider = provider;
         }
 
     }
