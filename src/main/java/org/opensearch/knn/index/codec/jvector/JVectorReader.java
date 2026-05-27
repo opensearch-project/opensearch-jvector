@@ -278,7 +278,7 @@ public class JVectorReader extends KnnVectorsReader {
             this.dimension = vectorIndexFieldMetadata.getVectorDimension();
             this.graphNodeIdToDocMap = vectorIndexFieldMetadata.getGraphNodeIdToDocMap();
             VectorizationProviderMapper.VectorizationProvider provider = vectorIndexFieldMetadata.getVectorizationProvider();
-            ByteOrder byteOrder = provider.equals(VectorizationProviderMapper.VectorizationProvider.NATIVE)
+            var byteOrder = provider.equals(VectorizationProviderMapper.VectorizationProvider.NATIVE)
                 ? ByteOrder.LITTLE_ENDIAN
                 : ByteOrder.BIG_ENDIAN;
 
@@ -332,9 +332,7 @@ public class JVectorReader extends KnnVectorsReader {
             final IndexInput indexInput = directory.openInput(neighborsScoreCacheIndexFieldFileName, state.context);
             CodecUtil.readIndexHeader(indexInput);
 
-            this.neighborsScoreCacheIndexReaderSupplier = new JVectorRandomAccessReader.Supplier(indexInput); // TODO: investigate if it
-                                                                                                              // requires to provide it here
-                                                                                                              // as well
+            this.neighborsScoreCacheIndexReaderSupplier = new JVectorRandomAccessReader.Supplier(indexInput, byteOrder);
         }
 
         @Override
@@ -401,13 +399,20 @@ public class JVectorReader extends KnnVectorsReader {
         }
     }
 
-    // TODO: docs
     public static class VectorizationProviderMapper {
         public enum VectorizationProvider {
             NON_NATIVE,
             NATIVE,
         }
 
+        /**
+         Simplified list of vector vectorization providers supported by <a href="https://github.com/jbellis/jvector">jVector library</a>
+         The providers orders matter in this list because it is later used to resolve the similarity function by ordinal.
+         - VectorizationProvider.NON_NATIVE - refers to all providers (DefaultVectorizationProvider, PanamaVectorizationProvider)
+         - VectorizationProvider.NATIVE - refers to NativeVectorizationProvider
+
+         Use case to distinguish vectorization provider was introduced due to difference in ByteOrder for native provider.
+         */
         public static final List<VectorizationProvider> JVECTOR_SUPPORTED_PROVIDERS = List.of(
             VectorizationProvider.NON_NATIVE,
             VectorizationProvider.NATIVE
@@ -415,8 +420,7 @@ public class JVectorReader extends KnnVectorsReader {
 
         public static int providerToOrd() {
             try {
-                io.github.jbellis.jvector.vector.VectorizationProvider provider = io.github.jbellis.jvector.vector.VectorizationProvider
-                    .getInstance();
+                var provider = io.github.jbellis.jvector.vector.VectorizationProvider.getInstance();
                 String providerClassName = provider.getClass().getName();
 
                 if (providerClassName.contains("Native")) {

@@ -26,7 +26,7 @@ public class JVectorRandomAccessReader implements RandomAccessReader {
 
     public JVectorRandomAccessReader(IndexInput indexInputDelegate) {
         this.indexInputDelegate = indexInputDelegate;
-        this.byteOrder = ByteOrder.BIG_ENDIAN; // TODO: defualt, make more docs about it
+        this.byteOrder = ByteOrder.BIG_ENDIAN;
     }
 
     public JVectorRandomAccessReader(IndexInput indexInputDelegate, ByteOrder byteOrder) {
@@ -146,11 +146,15 @@ public class JVectorRandomAccessReader implements RandomAccessReader {
             this(indexInput, indexInput.getFilePointer(), indexInput.length() - indexInput.getFilePointer());
         }
 
+        public Supplier(IndexInput indexInput, ByteOrder byteOrder) throws IOException {
+            this(indexInput, indexInput.getFilePointer(), indexInput.length() - indexInput.getFilePointer(), byteOrder);
+        }
+
         public Supplier(IndexInput indexInput, long sliceStartOffset, long sliceLength) throws IOException {
             this.currentInput = indexInput;
             this.sliceStartOffset = sliceStartOffset;
             this.sliceLength = sliceLength;
-            this.byteOrder = null;
+            this.byteOrder = ByteOrder.BIG_ENDIAN;
         }
 
         public Supplier(IndexInput indexInput, long sliceStartOffset, long sliceLength, ByteOrder byteOrder) throws IOException {

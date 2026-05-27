@@ -31,7 +31,6 @@ public class JVectorFormat extends KnnVectorsFormat {
 
     public static final int VERSION_START = 0;
     public static final int VERSION_CURRENT = 1;
-
     public static final int VERSION_WITH_VECTORIZATION_PROVIDER = 1;
     public static final int DEFAULT_MAX_CONN = 32;
     public static final int DEFAULT_BEAM_WIDTH = 100;

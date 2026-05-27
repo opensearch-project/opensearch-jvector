@@ -460,7 +460,7 @@ public class JVectorWriter extends KnnVectorsWriter {
             if (version >= JVectorFormat.VERSION_WITH_VECTORIZATION_PROVIDER) {
                 this.vectorizationProvider = JVectorReader.VectorizationProviderMapper.ordToProvider(in.readInt());
             } else {
-                this.vectorizationProvider =  JVectorReader.VectorizationProviderMapper.VectorizationProvider.NON_NATIVE;
+                this.vectorizationProvider = JVectorReader.VectorizationProviderMapper.VectorizationProvider.NON_NATIVE;
             }
         }
 
