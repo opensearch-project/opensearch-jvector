@@ -76,6 +76,7 @@ public class KNNQueryGrpcIT extends KNNRestTestCase {
 
             // Create index with KNN vector field using JVector engine
             String indexMapping = String.format(
+                java.util.Locale.ROOT,
                 "{\n"
                     + "  \"settings\": {\n"
                     + "    \"index\": {\n"
@@ -88,7 +89,12 @@ public class KNNQueryGrpcIT extends KNNRestTestCase {
                     + "    \"properties\": {\n"
                     + "      \"%s\": {\n"
                     + "        \"type\": \"knn_vector\",\n"
-                    + "        \"dimension\": %d\n"
+                    + "        \"dimension\": %d,\n"
+                    + "        \"method\": {\n"
+                    + "          \"name\": \"disk_ann\",\n"
+                    + "          \"engine\": \"jvector\",\n"
+                    + "          \"space_type\": \"l2\"\n"
+                    + "        }\n"
                     + "      }\n"
                     + "    }\n"
                     + "  }\n"
