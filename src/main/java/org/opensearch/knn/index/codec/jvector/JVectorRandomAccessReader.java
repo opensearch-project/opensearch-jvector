@@ -7,7 +7,6 @@ package org.opensearch.knn.index.codec.jvector;
 
 import io.github.jbellis.jvector.disk.RandomAccessReader;
 import io.github.jbellis.jvector.disk.ReaderSupplier;
-import io.github.jbellis.jvector.vector.VectorizationProvider;
 import lombok.extern.log4j.Log4j2;
 import org.apache.lucene.store.IndexInput;
 import org.apache.lucene.util.IOUtils;
@@ -23,31 +22,16 @@ public class JVectorRandomAccessReader implements RandomAccessReader {
     private final byte[] internalBuffer = new byte[Long.BYTES];
     private final IndexInput indexInputDelegate;
     private volatile boolean closed = false;
+    private final ByteOrder byteOrder;
 
     public JVectorRandomAccessReader(IndexInput indexInputDelegate) {
         this.indexInputDelegate = indexInputDelegate;
+        this.byteOrder = ByteOrder.BIG_ENDIAN; // TODO: defualt, make more docs about it
     }
 
-    private static final ByteOrder BYTE_ORDER = determineByteOrder();
-
-    private static ByteOrder determineByteOrder() {
-        try {
-            VectorizationProvider provider = VectorizationProvider.getInstance();
-            String providerClassName = provider.getClass().getName();
-
-            // Check if it's the native provider (uses LITTLE_ENDIAN)
-            if (providerClassName.contains("Native")) {
-                log.info("Using LITTLE_ENDIAN byte order for native JVector vectorization");
-                return ByteOrder.LITTLE_ENDIAN;
-            }
-
-            // Panama and default providers use BIG_ENDIAN
-            log.info("Using BIG_ENDIAN byte order for JVector (provider: {})", providerClassName);
-            return ByteOrder.BIG_ENDIAN;
-        } catch (Exception e) {
-            log.warn("Failed to determine vectorization provider, defaulting to BIG_ENDIAN", e);
-            return ByteOrder.BIG_ENDIAN;
-        }
+    public JVectorRandomAccessReader(IndexInput indexInputDelegate, ByteOrder byteOrder) {
+        this.indexInputDelegate = indexInputDelegate;
+        this.byteOrder = byteOrder;
     }
 
     @Override
@@ -65,7 +49,6 @@ public class JVectorRandomAccessReader implements RandomAccessReader {
         return indexInputDelegate.readInt();
     }
 
-    @Override
     public float readFloat() throws IOException {
         return Float.intBitsToFloat(indexInputDelegate.readInt());
     }
@@ -123,7 +106,7 @@ public class JVectorRandomAccessReader implements RandomAccessReader {
     @Override
     public void read(float[] floats, int offset, int count) throws IOException {
         final ByteBuffer byteBuffer = ByteBuffer.allocate(Float.BYTES * count);
-        byteBuffer.order(BYTE_ORDER);
+        byteBuffer.order(byteOrder);
         indexInputDelegate.readBytes(byteBuffer.array(), offset, Float.BYTES * count);
         FloatBuffer buffer = byteBuffer.asFloatBuffer();
         buffer.get(floats, offset, count);
@@ -157,6 +140,7 @@ public class JVectorRandomAccessReader implements RandomAccessReader {
         private final IndexInput currentInput;
         private final long sliceStartOffset;
         private final long sliceLength;
+        private final ByteOrder byteOrder;
 
         public Supplier(IndexInput indexInput) throws IOException {
             this(indexInput, indexInput.getFilePointer(), indexInput.length() - indexInput.getFilePointer());
@@ -166,6 +150,14 @@ public class JVectorRandomAccessReader implements RandomAccessReader {
             this.currentInput = indexInput;
             this.sliceStartOffset = sliceStartOffset;
             this.sliceLength = sliceLength;
+            this.byteOrder = null;
+        }
+
+        public Supplier(IndexInput indexInput, long sliceStartOffset, long sliceLength, ByteOrder byteOrder) throws IOException {
+            this.currentInput = indexInput;
+            this.sliceStartOffset = sliceStartOffset;
+            this.sliceLength = sliceLength;
+            this.byteOrder = byteOrder;
         }
 
         @Override
@@ -173,7 +165,7 @@ public class JVectorRandomAccessReader implements RandomAccessReader {
             synchronized (this) {
                 final IndexInput input = currentInput.slice("Input Slice for the jVector graph or PQ", sliceStartOffset, sliceLength)
                     .clone();
-                return new JVectorRandomAccessReader(input);
+                return new JVectorRandomAccessReader(input, byteOrder);
             }
         }
 

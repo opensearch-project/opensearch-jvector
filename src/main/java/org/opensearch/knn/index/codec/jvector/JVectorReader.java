@@ -34,6 +34,7 @@ import org.opensearch.knn.plugin.stats.KNNCounter;
 import java.io.Closeable;
 import java.io.IOException;
 
+import java.nio.ByteOrder;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -276,6 +277,10 @@ public class JVectorReader extends KnnVectorsReader {
             this.pqCodebooksAndVectorsOffset = vectorIndexFieldMetadata.getPqCodebooksAndVectorsOffset();
             this.dimension = vectorIndexFieldMetadata.getVectorDimension();
             this.graphNodeIdToDocMap = vectorIndexFieldMetadata.getGraphNodeIdToDocMap();
+            VectorizationProviderMapper.VectorizationProvider provider = vectorIndexFieldMetadata.getVectorizationProvider();
+            ByteOrder byteOrder = provider.equals(VectorizationProviderMapper.VectorizationProvider.NATIVE)
+                ? ByteOrder.LITTLE_ENDIAN
+                : ByteOrder.BIG_ENDIAN;
 
             this.vectorIndexFieldDataFileName = baseDataFileName + "_" + fieldInfo.name + "." + JVectorFormat.VECTOR_INDEX_EXTENSION;
             this.neighborsScoreCacheIndexFieldFileName = baseDataFileName
@@ -294,7 +299,8 @@ public class JVectorReader extends KnnVectorsReader {
             this.indexReaderSupplier = new JVectorRandomAccessReader.Supplier(
                 directory.openInput(vectorIndexFieldDataFileName, state.context),
                 0,
-                sliceLength
+                sliceLength,
+                byteOrder
             );
             this.index = OnDiskGraphIndex.load(indexReaderSupplier, vectorIndexOffset);
 
@@ -307,7 +313,8 @@ public class JVectorReader extends KnnVectorsReader {
                 this.pqCodebooksReaderSupplier = new JVectorRandomAccessReader.Supplier(
                     directory.openInput(vectorIndexFieldDataFileName, IOContext.READONCE),
                     pqCodebooksAndVectorsOffset,
-                    pqCodebooksAndVectorsLength
+                    pqCodebooksAndVectorsLength,
+                    byteOrder // TODO: verify if needed.
                 );
                 log.debug(
                     "Loading PQ codebooks and vectors for field {}, with numbers of vectors: {}",
@@ -325,7 +332,9 @@ public class JVectorReader extends KnnVectorsReader {
             final IndexInput indexInput = directory.openInput(neighborsScoreCacheIndexFieldFileName, state.context);
             CodecUtil.readIndexHeader(indexInput);
 
-            this.neighborsScoreCacheIndexReaderSupplier = new JVectorRandomAccessReader.Supplier(indexInput);
+            this.neighborsScoreCacheIndexReaderSupplier = new JVectorRandomAccessReader.Supplier(indexInput); // TODO: investigate if it
+                                                                                                              // requires to provide it here
+                                                                                                              // as well
         }
 
         @Override
@@ -389,6 +398,42 @@ public class JVectorReader extends KnnVectorsReader {
                 }
             }
             throw new IllegalStateException("No matching Lucene VectorSimilarityFunction found for ordinal: " + ord);
+        }
+    }
+
+    // TODO: docs
+    public static class VectorizationProviderMapper {
+        public enum VectorizationProvider {
+            NON_NATIVE,
+            NATIVE,
+        }
+
+        public static final List<VectorizationProvider> JVECTOR_SUPPORTED_PROVIDERS = List.of(
+            VectorizationProvider.NON_NATIVE,
+            VectorizationProvider.NATIVE
+        );
+
+        public static int providerToOrd() {
+            try {
+                io.github.jbellis.jvector.vector.VectorizationProvider provider = io.github.jbellis.jvector.vector.VectorizationProvider
+                    .getInstance();
+                String providerClassName = provider.getClass().getName();
+
+                if (providerClassName.contains("Native")) {
+                    return JVECTOR_SUPPORTED_PROVIDERS.indexOf(VectorizationProvider.NATIVE);
+                }
+
+                return JVECTOR_SUPPORTED_PROVIDERS.indexOf(VectorizationProvider.NON_NATIVE);
+            } catch (Exception e) {
+                return JVECTOR_SUPPORTED_PROVIDERS.indexOf(VectorizationProvider.NON_NATIVE);
+            }
+        }
+
+        public static VectorizationProvider ordToProvider(int ord) {
+            if (ord < 0 || ord >= JVECTOR_SUPPORTED_PROVIDERS.size()) {
+                throw new IllegalArgumentException("Invalid ordinal: " + ord);
+            }
+            return JVECTOR_SUPPORTED_PROVIDERS.get(ord);
         }
     }
 }
