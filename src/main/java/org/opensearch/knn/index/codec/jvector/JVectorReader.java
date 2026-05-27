@@ -153,6 +153,12 @@ public class JVectorReader extends KnnVectorsReader {
         VectorFloat<?> q = VECTOR_TYPE_SUPPORT.createFloatVector(target);
         final SearchScoreProvider ssp;
 
+        // Get the Lucene similarity function to check if we need to transform scores
+        final FieldEntry fieldEntry = fieldEntryMap.get(field);
+        final org.apache.lucene.index.VectorSimilarityFunction luceneSimilarityFunction = fieldEntry.fieldInfo
+            .getVectorSimilarityFunction();
+        final VectorSimilarityFunction vectorSimilarityFunction = fieldEntry.similarityFunction;
+
         try (var view = index.getView()) {
             final long graphSearchStart = System.currentTimeMillis();
             if (fieldEntryMap.get(field).pqVectors != null) { // Quantized, use the precomputed score function
@@ -161,12 +167,17 @@ public class JVectorReader extends KnnVectorsReader {
                 // then reranks with the exact vectors that are stored on disk in the index
                 ScoreFunction.ApproximateScoreFunction asf = pqVectors.precomputedScoreFunctionFor(
                     q,
-                    fieldEntryMap.get(field).similarityFunction
+                    vectorSimilarityFunction
                 );
-                ScoreFunction.ExactScoreFunction reranker = view.rerankerFor(q, fieldEntryMap.get(field).similarityFunction);
+                ScoreFunction.ExactScoreFunction reranker = wrapExactScoreFunction(
+                    view.rerankerFor(q, vectorSimilarityFunction),
+                    luceneSimilarityFunction,
+                    vectorSimilarityFunction
+                );
                 ssp = new DefaultSearchScoreProvider(asf, reranker);
             } else { // Not quantized, used typical searcher
-                ssp = DefaultSearchScoreProvider.exact(q, fieldEntryMap.get(field).similarityFunction, view);
+                ScoreFunction.ExactScoreFunction esf = DefaultSearchScoreProvider.exact(q, vectorSimilarityFunction, view).exactScoreFunction();
+                ssp = new DefaultSearchScoreProvider(wrapExactScoreFunction(esf, luceneSimilarityFunction, vectorSimilarityFunction));
             }
             final GraphNodeIdToDocMap jvectorLuceneDocMap = fieldEntryMap.get(field).graphNodeIdToDocMap;
             // Convert the acceptDocs bitmap from Lucene to jVector ordinal bitmap filter
@@ -190,21 +201,8 @@ public class JVectorReader extends KnnVectorsReader {
                     compatibleBits
                 );
 
-                // Get the Lucene similarity function to check if we need to transform scores
-                final FieldEntry fieldEntry = fieldEntryMap.get(field);
-                final org.apache.lucene.index.VectorSimilarityFunction luceneSimilarityFunction = fieldEntry.fieldInfo
-                    .getVectorSimilarityFunction();
-
                 for (SearchResult.NodeScore ns : searchResults.getNodes()) {
-                    float score = ns.score;
-                    // Lucene's MAXIMUM_INNER_PRODUCT formula is: 1 + dotProduct
-                    // jVector's DOT_PRODUCT returns: (1 + dotProduct) / 2
-                    // To convert: score * 2 = (1 + dotProduct) / 2 * 2 = 1 + dotProduct
-                    if (luceneSimilarityFunction == org.apache.lucene.index.VectorSimilarityFunction.MAXIMUM_INNER_PRODUCT
-                        && fieldEntry.similarityFunction == VectorSimilarityFunction.DOT_PRODUCT) {
-                        score = score * 2.0f;
-                    }
-                    jvectorKnnCollector.collect(jvectorLuceneDocMap.getLuceneDocId(ns.node), score);
+                    jvectorKnnCollector.collect(jvectorLuceneDocMap.getLuceneDocId(ns.node), ns.score);
                 }
                 final long graphSearchEnd = System.currentTimeMillis();
                 final long searchTime = graphSearchEnd - graphSearchStart;
@@ -237,6 +235,35 @@ public class JVectorReader extends KnnVectorsReader {
                     jvectorKnnCollector.incVisitedCount(visitedCount);
                 }
             }
+        }
+    }
+
+    /**
+     * Wraps an ExactScoreFunction to handle score transformation between jVector and Lucene similarity functions for innerproduct.
+     *
+     * @param delegate the base ExactScoreFunction to wrap
+     * @param luceneSimilarityFunction the Lucene similarity function
+     * @param jvectorSimilarityFunction the jVector similarity function
+     * @return a wrapped ExactScoreFunction that applies score transformation if needed
+     */
+    private static ScoreFunction.ExactScoreFunction wrapExactScoreFunction(
+        ScoreFunction.ExactScoreFunction delegate,
+        org.apache.lucene.index.VectorSimilarityFunction luceneSimilarityFunction,
+        VectorSimilarityFunction jvectorSimilarityFunction
+    ) {
+        // Lucene's MAXIMUM_INNER_PRODUCT formula is: 1 + dotProduct
+        // jVector's DOT_PRODUCT returns: (1 + dotProduct) / 2
+        // To convert: score * 2 = (1 + dotProduct) / 2 * 2 = 1 + dotProduct
+        if (luceneSimilarityFunction == org.apache.lucene.index.VectorSimilarityFunction.MAXIMUM_INNER_PRODUCT
+            && jvectorSimilarityFunction == VectorSimilarityFunction.DOT_PRODUCT) {
+            return new ScoreFunction.ExactScoreFunction() {
+                @Override
+                public float similarityTo(int node2) {
+                    return delegate.similarityTo(node2) * 2.0f;
+                }
+            };
+        } else {
+            return delegate;
         }
     }
 
