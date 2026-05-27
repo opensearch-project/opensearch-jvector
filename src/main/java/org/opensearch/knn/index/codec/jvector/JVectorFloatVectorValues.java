@@ -15,8 +15,6 @@ import org.apache.lucene.index.FloatVectorValues;
 import org.apache.lucene.search.VectorScorer;
 
 import java.io.IOException;
-import java.lang.foreign.MemorySegment;
-import java.lang.foreign.ValueLayout;
 
 public class JVectorFloatVectorValues extends FloatVectorValues {
     public static final int NO_VECTOR = -1;
@@ -154,9 +152,10 @@ public class JVectorFloatVectorValues extends FloatVectorValues {
                 return array;
             }
 
-            if (backing instanceof MemorySegment segment) {
-                return segment.toArray(ValueLayout.JAVA_FLOAT);
-            }
+            // TODO: Use with Java 22+
+            // if (backing instanceof MemorySegment segment) {
+            // return segment.toArray(ValueLayout.JAVA_FLOAT);
+            // }
 
             float[] result = new float[vector.length()];
             for (int j = 0; j < vector.length(); j++) {
