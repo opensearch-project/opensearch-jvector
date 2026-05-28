@@ -93,6 +93,22 @@ public class JVectorDiskANNMethod extends AbstractKNNMethod {
                     (v, context) -> true
                 )
             )
+            .addParameter(
+                METHOD_PARAMETER_QUANTIZATION_TYPE,
+                new Parameter.StringParameter(
+                    METHOD_PARAMETER_QUANTIZATION_TYPE,
+                    KNNConstants.DEFAULT_QUANTIZATION_TYPE,
+                    (v, context) -> QUANTIZATION_TYPE_PQ.equals(v) || QUANTIZATION_TYPE_NVQ.equals(v)
+                )
+            )
+            .addParameter(
+                METHOD_PARAMETER_NVQ_VECTORS_INLINE,
+                new Parameter.BooleanParameter(
+                    METHOD_PARAMETER_NVQ_VECTORS_INLINE,
+                    KNNConstants.DEFAULT_NVQ_VECTORS_INLINE,
+                    (v, context) -> true
+                )
+            )
             .build();
     }
 
