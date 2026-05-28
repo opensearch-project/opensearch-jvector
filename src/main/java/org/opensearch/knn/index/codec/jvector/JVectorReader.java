@@ -10,6 +10,8 @@ import io.github.jbellis.jvector.disk.ReaderSupplier;
 import io.github.jbellis.jvector.graph.GraphSearcher;
 import io.github.jbellis.jvector.graph.SearchResult;
 import io.github.jbellis.jvector.graph.disk.OnDiskGraphIndex;
+import io.github.jbellis.jvector.graph.disk.feature.FeatureId;
+import io.github.jbellis.jvector.graph.disk.feature.NVQ;
 import io.github.jbellis.jvector.graph.similarity.DefaultSearchScoreProvider;
 import io.github.jbellis.jvector.graph.similarity.ScoreFunction;
 import io.github.jbellis.jvector.graph.similarity.SearchScoreProvider;
@@ -35,6 +37,7 @@ import org.opensearch.knn.plugin.stats.KNNCounter;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.lang.reflect.Field;
 
 import java.util.HashMap;
 import java.util.List;
@@ -101,7 +104,12 @@ public class JVectorReader extends KnnVectorsReader {
     @Override
     public FloatVectorValues getFloatVectorValues(String field) throws IOException {
         final FieldEntry fieldEntry = fieldEntryMap.get(field);
-        return new JVectorFloatVectorValues(fieldEntry.index, fieldEntry.similarityFunction, fieldEntry.graphNodeIdToDocMap);
+        return new JVectorFloatVectorValues(
+            fieldEntry.index,
+            fieldEntry.similarityFunction,
+            fieldEntry.graphNodeIdToDocMap,
+            fieldEntry.nvqInlineQuantization
+        );
     }
 
     @Override
@@ -174,6 +182,9 @@ public class JVectorReader extends KnnVectorsReader {
                 );
                 ScoreFunction.ExactScoreFunction reranker = view.rerankerFor(q, fe.similarityFunction);
                 ssp = new DefaultSearchScoreProvider(asf, reranker);
+            } else if (fe.nvqVectorsInline) { // NVQ stored inline in graph nodes — use reranker backed by NVQ inline
+                ScoreFunction.ExactScoreFunction nvqReranker = view.rerankerFor(q, fe.similarityFunction);
+                ssp = new DefaultSearchScoreProvider(nvqReranker);
             } else { // Not quantized, used typical searcher
                 ssp = DefaultSearchScoreProvider.exact(q, fe.similarityFunction, view);
             }
@@ -275,7 +286,10 @@ public class JVectorReader extends KnnVectorsReader {
         private final ReaderSupplier neighborsScoreCacheIndexReaderSupplier;
         private final OnDiskGraphIndex index;
         private final PQVectors pqVectors; // non-null when quantizationType == PQ
-        private final NVQVectors nvqVectors; // non-null when quantizationType == NVQ
+        private final NVQVectors nvqVectors; // non-null when quantizationType == NVQ (separate blob)
+        private final boolean nvqVectorsInline; // true when NVQ vectors are stored inline in the graph
+        // NVQuantization extracted from the graph's NVQ feature; non-null only when nvqVectorsInline == true
+        final NVQuantization nvqInlineQuantization;
 
         public FieldEntry(FieldInfo fieldInfo, JVectorWriter.VectorIndexFieldMetadata vectorIndexFieldMetadata) throws IOException {
             this.fieldInfo = fieldInfo;
@@ -312,6 +326,7 @@ public class JVectorReader extends KnnVectorsReader {
             this.index = OnDiskGraphIndex.load(indexReaderSupplier, vectorIndexOffset);
 
             // Load compressed vectors if present
+            final byte qType = vectorIndexFieldMetadata.getQuantizationType();
             if (compressedVectorsLength > 0) {
                 assert compressedVectorsOffset > 0;
                 if (compressedVectorsOffset < vectorIndexOffset) {
@@ -322,7 +337,6 @@ public class JVectorReader extends KnnVectorsReader {
                     compressedVectorsOffset,
                     compressedVectorsLength
                 );
-                final byte qType = vectorIndexFieldMetadata.getQuantizationType();
                 if (qType == JVectorWriter.QUANTIZATION_TYPE_NVQ) {
                     log.debug("Loading NVQ vectors for field {}", fieldInfo.name);
                     try (final var randomAccessReader = compressedVectorsReaderSupplier.get()) {
@@ -336,16 +350,47 @@ public class JVectorReader extends KnnVectorsReader {
                     }
                     this.nvqVectors = null;
                 }
+                this.nvqVectorsInline = false;
+                this.nvqInlineQuantization = null;
             } else {
                 this.compressedVectorsReaderSupplier = null;
                 this.pqVectors = null;
                 this.nvqVectors = null;
+                this.nvqVectorsInline = (qType == JVectorWriter.QUANTIZATION_TYPE_NVQ_INLINE);
+                if (this.nvqVectorsInline) {
+                    log.debug("NVQ vectors stored inline in graph for field {}", fieldInfo.name);
+                    this.nvqInlineQuantization = extractNVQuantizationFromGraph(this.index);
+                } else {
+                    this.nvqInlineQuantization = null;
+                }
             }
 
             final IndexInput indexInput = directory.openInput(neighborsScoreCacheIndexFieldFileName, state.context);
             CodecUtil.readIndexHeader(indexInput);
 
             this.neighborsScoreCacheIndexReaderSupplier = new JVectorRandomAccessReader.Supplier(indexInput);
+        }
+
+        /**
+         * Extracts the {@link NVQuantization} object from the private {@code nvq} field of
+         * the {@link NVQ} feature stored in the given graph index.  This is needed so that
+         * the merge path can dequantize NVQ-inline vectors back to float.
+         *
+         * The jVector {@link NVQ} class does not expose a public getter for its internal
+         * {@link NVQuantization}; reflection is the only alternative to modifying the library.
+         */
+        private static NVQuantization extractNVQuantizationFromGraph(OnDiskGraphIndex index) throws IOException {
+            NVQ nvqFeature = (NVQ) index.getFeatures().get(FeatureId.NVQ_VECTORS);
+            if (nvqFeature == null) {
+                return null;
+            }
+            try {
+                Field nvqField = NVQ.class.getDeclaredField("nvq");
+                nvqField.setAccessible(true);
+                return (NVQuantization) nvqField.get(nvqFeature);
+            } catch (NoSuchFieldException | IllegalAccessException e) {
+                throw new IOException("Unable to extract NVQuantization from NVQ feature via reflection", e);
+            }
         }
 
         @Override
