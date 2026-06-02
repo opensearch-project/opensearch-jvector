@@ -105,7 +105,7 @@ public class JVectorRandomAccessReader implements RandomAccessReader {
 
     @Override
     public void read(float[] floats, int offset, int count) throws IOException {
-        final ByteBuffer byteBuffer = ByteBuffer.allocate(Float.BYTES * count);
+        final ByteBuffer byteBuffer = ByteBuffer.allocate(Float.BYTES * count).order(byteOrder);
         byteBuffer.order(byteOrder);
         indexInputDelegate.readBytes(byteBuffer.array(), offset, Float.BYTES * count);
         FloatBuffer buffer = byteBuffer.asFloatBuffer();
@@ -114,7 +114,7 @@ public class JVectorRandomAccessReader implements RandomAccessReader {
 
     @Override
     public void close() throws IOException {
-        if (this.closed) {
+        if (this.closed == true) {
             log.debug("JVectorRandomAccessReader already closed for file: {}", indexInputDelegate);
             return;
         }
