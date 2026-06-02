@@ -100,7 +100,6 @@ public class JVectorWriter extends KnnVectorsWriter {
     private final boolean leadingSegmentMergeDisabled;
     private final String quantizationType;
     private final int numNvqSubvectors;
-    private final boolean nvqVectorsInline;
 
     private final ForkJoinPool simdPoolMerge;
     private final ForkJoinPool simdPoolFlush;
@@ -120,7 +119,6 @@ public class JVectorWriter extends KnnVectorsWriter {
         boolean leadingSegmentMergeDisabled,
         String quantizationType,
         int numNvqSubvectors,
-        boolean nvqVectorsInline,
         final ForkJoinPool simdPoolMerge,
         final ForkJoinPool simdPoolFlush,
         final ForkJoinPool parallelismPool
@@ -136,7 +134,6 @@ public class JVectorWriter extends KnnVectorsWriter {
         this.leadingSegmentMergeDisabled = leadingSegmentMergeDisabled;
         this.quantizationType = quantizationType;
         this.numNvqSubvectors = numNvqSubvectors;
-        this.nvqVectorsInline = nvqVectorsInline;
         this.simdPoolMerge = simdPoolMerge;
         this.simdPoolFlush = simdPoolFlush;
         this.parallelismPool = parallelismPool;
@@ -236,12 +233,8 @@ public class JVectorWriter extends KnnVectorsWriter {
                 log.info("Calculating codebooks and compressed vectors for field {} using {}", fieldInfo.name, quantizationType);
                 if (isNVQ()) {
                     nvqVectors = getNVQVectors(randomAccessVectorValues, fieldInfo);
-                    pqVectors = null;
-                    // NVQ has no pqBuildScoreProvider equivalent; use full-precision for graph building
-                    buildScoreProvider = BuildScoreProvider.randomAccessScoreProvider(
-                        randomAccessVectorValues,
-                        getVectorSimilarityFunction(fieldInfo)
-                    );
+                    pqVectors = getPQVectors(randomAccessVectorValues, fieldInfo);
+                    buildScoreProvider = BuildScoreProvider.pqBuildScoreProvider(getVectorSimilarityFunction(fieldInfo), pqVectors);
                 } else {
                     pqVectors = getPQVectors(randomAccessVectorValues, fieldInfo);
                     nvqVectors = null;
@@ -283,7 +276,8 @@ public class JVectorWriter extends KnnVectorsWriter {
                 simdPoolFlush
             );
             final CompressedVectors compressedVectors = nvqVectors != null ? nvqVectors : pqVectors;
-            writeField(field.fieldInfo, randomAccessVectorValues, compressedVectors, graphNodeIdToDocMap, graph);
+            final PQVectors auxiliaryPqVectors = nvqVectors != null ? pqVectors : null;
+            writeField(field.fieldInfo, randomAccessVectorValues, compressedVectors, auxiliaryPqVectors, graphNodeIdToDocMap, graph);
 
         }
     }
@@ -292,6 +286,7 @@ public class JVectorWriter extends KnnVectorsWriter {
         FieldInfo fieldInfo,
         RandomAccessVectorValues randomAccessVectorValues,
         CompressedVectors compressedVectors,
+        PQVectors auxiliaryPqVectors,
         GraphNodeIdToDocMap graphNodeIdToDocMap,
         OnHeapGraphIndex graph
     ) throws IOException {
@@ -301,7 +296,7 @@ public class JVectorWriter extends KnnVectorsWriter {
             randomAccessVectorValues.size(),
             segmentWriteState.segmentInfo.name
         );
-        final var vectorIndexFieldMetadata = writeGraph(graph, randomAccessVectorValues, fieldInfo, compressedVectors, graphNodeIdToDocMap);
+        final var vectorIndexFieldMetadata = writeGraph(graph, randomAccessVectorValues, fieldInfo, compressedVectors, auxiliaryPqVectors, graphNodeIdToDocMap);
         meta.writeInt(fieldInfo.number);
         vectorIndexFieldMetadata.toOutput(meta);
 
@@ -345,6 +340,7 @@ public class JVectorWriter extends KnnVectorsWriter {
         RandomAccessVectorValues randomAccessVectorValues,
         FieldInfo fieldInfo,
         CompressedVectors compressedVectors,
+        PQVectors auxiliaryPqVectors,
         GraphNodeIdToDocMap graphNodeIdToDocMap
     ) throws IOException {
         // field data file, which contains the graph
@@ -372,14 +368,10 @@ public class JVectorWriter extends KnnVectorsWriter {
                 .vectorDimension(randomAccessVectorValues.dimension())
                 .graphNodeIdToDocMap(graphNodeIdToDocMap);
 
-            final boolean useNvqInline = compressedVectors instanceof NVQVectors;
-            if (useNvqInline) {
+            if (compressedVectors instanceof NVQVectors) {
                 final NVQVectors nvqVectors = (NVQVectors) compressedVectors;
                 final NVQuantization nvQuantization = nvqVectors.getNVQuantization();
-                log.info(
-                    "Writing NVQ vectors inline with graph nodes for field {} (nvq_vectors_inline=true)",
-                    fieldInfo.name
-                );
+                log.info("Writing NVQ vectors inline with graph nodes for field {}", fieldInfo.name);
                 try (
                     var writer = new OnDiskSequentialGraphIndexWriter.Builder(graph, jVectorIndexWriter).with(
                         new NVQ(nvQuantization)
@@ -393,8 +385,15 @@ public class JVectorWriter extends KnnVectorsWriter {
                     long endGraphOffset = jVectorIndexWriter.position();
                     resultBuilder.vectorIndexOffset(startOffset);
                     resultBuilder.vectorIndexLength(endGraphOffset - startOffset);
-                    resultBuilder.compressedVectorsOffset(0);
-                    resultBuilder.compressedVectorsLength(0);
+                    if (auxiliaryPqVectors != null) {
+                        log.info("Writing auxiliary PQ blob for NVQ field {} for approximate search traversal", fieldInfo.name);
+                        resultBuilder.compressedVectorsOffset(endGraphOffset);
+                        auxiliaryPqVectors.write(jVectorIndexWriter);
+                        resultBuilder.compressedVectorsLength(jVectorIndexWriter.position() - endGraphOffset);
+                    } else {
+                        resultBuilder.compressedVectorsOffset(0);
+                        resultBuilder.compressedVectorsLength(0);
+                    }
                     resultBuilder.quantizationType(QUANTIZATION_TYPE_NVQ_INLINE);
                     CodecUtil.writeFooter(indexOutput);
                 }
@@ -412,30 +411,17 @@ public class JVectorWriter extends KnnVectorsWriter {
                     long endGraphOffset = jVectorIndexWriter.position();
                     resultBuilder.vectorIndexOffset(startOffset);
                     resultBuilder.vectorIndexLength(endGraphOffset - startOffset);
-
                     if (compressedVectors != null) {
-                        final byte qType;
-                        if (compressedVectors instanceof NVQVectors) {
-                            qType = QUANTIZATION_TYPE_NVQ;
-                            log.info(
-                                "Writing NVQ compressed vectors for field {} since the size is {} >= {}",
-                                fieldInfo.name,
-                                randomAccessVectorValues.size(),
-                                minimumBatchSizeForQuantization
-                            );
-                        } else {
-                            qType = QUANTIZATION_TYPE_PQ;
-                            log.info(
-                                "Writing PQ codebooks and vectors for field {} since the size is {} >= {}",
-                                fieldInfo.name,
-                                randomAccessVectorValues.size(),
-                                minimumBatchSizeForQuantization
-                            );
-                        }
+                        log.info(
+                            "Writing PQ codebooks and vectors for field {} since the size is {} >= {}",
+                            fieldInfo.name,
+                            randomAccessVectorValues.size(),
+                            minimumBatchSizeForQuantization
+                        );
                         resultBuilder.compressedVectorsOffset(endGraphOffset);
                         compressedVectors.write(jVectorIndexWriter);
                         resultBuilder.compressedVectorsLength(jVectorIndexWriter.position() - endGraphOffset);
-                        resultBuilder.quantizationType(qType);
+                        resultBuilder.quantizationType(QUANTIZATION_TYPE_PQ);
                     } else {
                         resultBuilder.compressedVectorsOffset(0);
                         resultBuilder.compressedVectorsLength(0);
@@ -486,9 +472,7 @@ public class JVectorWriter extends KnnVectorsWriter {
     // quantizationType byte values stored in VectorIndexFieldMetadata
     static final byte QUANTIZATION_TYPE_NONE = 0;
     static final byte QUANTIZATION_TYPE_PQ = 1;
-    static final byte QUANTIZATION_TYPE_NVQ = 2;
-    // NVQ encoded inline with each graph node (no separate compressed-vector blob)
-    static final byte QUANTIZATION_TYPE_NVQ_INLINE = 3;
+    static final byte QUANTIZATION_TYPE_NVQ_INLINE = 2;
 
     private boolean isNVQ() {
         return org.opensearch.knn.common.KNNConstants.QUANTIZATION_TYPE_NVQ.equals(quantizationType);
@@ -1027,6 +1011,7 @@ public class JVectorWriter extends KnnVectorsWriter {
             // NVQ merge: always recompute from scratch (no refine() equivalent)
             if (isNVQ()) {
                 final NVQVectors compactNvqVectors;
+                final PQVectors compactNvqAuxPqVectors;
                 if (totalLiveVectorsCount >= minimumBatchSizeForQuantization) {
                     log.info(
                         "Calculating NVQ compressed vectors for field: {}, with totalVectorCount: {}",
@@ -1034,6 +1019,7 @@ public class JVectorWriter extends KnnVectorsWriter {
                         totalLiveVectorsCount
                     );
                     compactNvqVectors = getNVQVectors(compactRavvEarly, fieldInfo);
+                    compactNvqAuxPqVectors = getPQVectors(compactRavvEarly, fieldInfo);
                 } else {
                     log.info(
                         "Not enough vectors for NVQ for field: {}, totalVectorCount: {} < minimumBatchSizeForQuantization: {}",
@@ -1042,10 +1028,17 @@ public class JVectorWriter extends KnnVectorsWriter {
                         minimumBatchSizeForQuantization
                     );
                     compactNvqVectors = null;
+                    compactNvqAuxPqVectors = null;
                 }
-                var bsp = BuildScoreProvider.randomAccessScoreProvider(compactRavvEarly, getVectorSimilarityFunction(fieldInfo));
+                final BuildScoreProvider bsp;
+                if (compactNvqAuxPqVectors != null) {
+                    bsp = BuildScoreProvider.pqBuildScoreProvider(getVectorSimilarityFunction(fieldInfo), compactNvqAuxPqVectors);
+                    bsp.diversityProviderFor(0);
+                } else {
+                    bsp = BuildScoreProvider.randomAccessScoreProvider(compactRavvEarly, getVectorSimilarityFunction(fieldInfo));
+                }
                 var graph = getGraph(bsp, compactRavvEarly, fieldInfo, segmentWriteState.segmentInfo.name, simdPoolMerge);
-                writeField(fieldInfo, compactRavvEarly, compactNvqVectors, compactOrdToDocMap, graph);
+                writeField(fieldInfo, compactRavvEarly, compactNvqVectors, compactNvqAuxPqVectors, compactOrdToDocMap, graph);
                 return;
             }
 
@@ -1120,7 +1113,7 @@ public class JVectorWriter extends KnnVectorsWriter {
                     );
                     var bsp = BuildScoreProvider.randomAccessScoreProvider(compactRavv, getVectorSimilarityFunction(fieldInfo));
                     var graph = getGraph(bsp, compactRavv, fieldInfo, segmentWriteState.segmentInfo.name, simdPoolMerge);
-                    writeField(fieldInfo, compactRavv, (CompressedVectors) null, compactOrdToDocMap, graph);
+                    writeField(fieldInfo, compactRavv, (CompressedVectors) null, null, compactOrdToDocMap, graph);
                 }
             } else {
                 log.info("PQ codebooks found, building graph from scratch with PQ vectors");
@@ -1129,7 +1122,7 @@ public class JVectorWriter extends KnnVectorsWriter {
                 // Pre-init the diversity provider here to avoid doing it lazily (as it could block the SIMD threads)
                 buildScoreProvider.diversityProviderFor(0);
                 var graph = getGraph(buildScoreProvider, compactRavv, fieldInfo, segmentWriteState.segmentInfo.name, simdPoolMerge);
-                writeField(fieldInfo, compactRavv, compactPqVectors, compactOrdToDocMap, graph);
+                writeField(fieldInfo, compactRavv, compactPqVectors, null, compactOrdToDocMap, graph);
             }
         }
 
@@ -1316,7 +1309,7 @@ public class JVectorWriter extends KnnVectorsWriter {
                     // Note that the ordinals for the OnDiskGraphIndex will automatically be compacted
                     // But the OnHeapGraphIndex will not
                     var finalOrdToDocMap = new GraphNodeIdToDocMap(finalOrdToDocId);
-                    writeField(fieldInfo, heapRavv, (CompressedVectors) null, finalOrdToDocMap, graph);
+                    writeField(fieldInfo, heapRavv, (CompressedVectors) null, null, finalOrdToDocMap, graph);
                     return true;
                 }
             }

@@ -10,11 +10,9 @@ import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.junit.After;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.common.xcontent.XContentFactory;
-import org.opensearch.core.xcontent.XContentBuilder;
 import org.opensearch.knn.KNNRestTestCase;
 import org.opensearch.knn.KNNResult;
 import org.opensearch.knn.TestUtils;
-import org.opensearch.knn.common.KNNConstants;
 import org.opensearch.knn.index.KNNSettings;
 import org.opensearch.knn.index.SpaceType;
 import org.opensearch.knn.index.query.KNNQueryBuilder;
@@ -43,7 +41,7 @@ import static org.opensearch.knn.index.engine.CommonTestUtils.*;
 public class JVectorNVQIT extends KNNRestTestCase {
 
     private static final int SMALL_DIM = 3;
-    private static final int NVQ_DIM = 16;
+    private static final int NVQ_DIM = 128;
     private static final int SHARD_COUNT = 1;
     private static final int REPLICA_COUNT = 0;
 
@@ -56,7 +54,7 @@ public class JVectorNVQIT extends KNNRestTestCase {
 
     @After
     public final void cleanUp() throws IOException {
-        //deleteKNNIndex(INDEX_NAME);
+        deleteKNNIndex(INDEX_NAME);
     }
 
     // -------------------------------------------------------------------------
@@ -73,11 +71,6 @@ public class JVectorNVQIT extends KNNRestTestCase {
      *                                    to disable training in smoke tests
      */
     private String nvqMapping(int dim, SpaceType spaceType, int minBatchSizeForQuantization) throws IOException {
-        return nvqMapping(dim, spaceType, minBatchSizeForQuantization, true);
-    }
-
-    private String nvqMapping(int dim, SpaceType spaceType, int minBatchSizeForQuantization, boolean nvqVectorsInline)
-        throws IOException {
         return XContentFactory.jsonBuilder()
             .startObject()
             .startObject(PROPERTIES_FIELD_NAME)
@@ -91,7 +84,6 @@ public class JVectorNVQIT extends KNNRestTestCase {
             .startObject(PARAMETERS)
             .field(METHOD_PARAMETER_QUANTIZATION_TYPE, QUANTIZATION_TYPE_NVQ)
             .field(METHOD_PARAMETER_MIN_BATCH_SIZE_FOR_QUANTIZATION, minBatchSizeForQuantization)
-            .field(METHOD_PARAMETER_NVQ_VECTORS_INLINE, nvqVectorsInline)
             .endObject()
             .endObject()
             .endObject()
@@ -238,38 +230,16 @@ public class JVectorNVQIT extends KNNRestTestCase {
     // NVQ inline tests (FeatureId.NVQ_VECTORS stored inline with graph nodes)
     // -------------------------------------------------------------------------
 
-    /**
-     * Index 1 000 L2 vectors with {@code nvq_vectors_inline=true}, force a merge,
-     * then assert recall ≥ 0.75. When inline, no separate NVQ blob is written;
-     * the NVQ-encoded vectors are stored directly in each graph node.
-     */
-    @SneakyThrows
-    public void testNVQInlineRecall_l2() {
-        runRecallTest(SpaceType.L2, true);
-    }
-
-    /**
-     * Same as {@link #testNVQInlineRecall_l2} but with cosine similarity.
-     */
-    @SneakyThrows
-    public void testNVQInlineRecall_cosine() {
-        runRecallTest(SpaceType.COSINESIMIL, true);
-    }
-
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
 
     private void runRecallTest(SpaceType spaceType) throws Exception {
-        runRecallTest(spaceType, false);
-    }
-
-    private void runRecallTest(SpaceType spaceType, boolean nvqVectorsInline) throws Exception {
         float[][] indexVectors = TestUtils.getIndexVectors(RECALL_DOC_COUNT, NVQ_DIM, true);
         float[][] queryVectors = TestUtils.getQueryVectors(RECALL_QUERY_COUNT, NVQ_DIM, RECALL_DOC_COUNT, true);
         List<Set<String>> groundTruth = TestUtils.computeGroundTruthValues(indexVectors, queryVectors, spaceType, RECALL_K);
 
-        createKnnIndex(INDEX_NAME, nvqSettings(), nvqMapping(NVQ_DIM, spaceType, 1, nvqVectorsInline));
+        createKnnIndex(INDEX_NAME, nvqSettings(), nvqMapping(NVQ_DIM, spaceType, 1));
 
         for (int offset = 0; offset < RECALL_DOC_COUNT; offset += RECALL_BATCH_SIZE) {
             int batchSize = Math.min(RECALL_BATCH_SIZE, RECALL_DOC_COUNT - offset);

@@ -6,7 +6,6 @@
 package org.opensearch.knn.index.codec.jvector;
 
 import static org.opensearch.knn.index.engine.CommonTestUtils.getCodecWithNVQ;
-import static org.opensearch.knn.index.engine.CommonTestUtils.getCodecWithNVQInline;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -130,19 +129,7 @@ public class JVectorNVQTests extends LuceneTestCase {
         runScenarioWithPool(scenario, null);
     }
 
-    void runScenarioInline(MergeTestScenario scenario) throws IOException {
-        runScenarioInlineWithPool(scenario, null);
-    }
-
-    void runScenarioInlineWithPool(MergeTestScenario scenario, ForkJoinPool mergePool) throws IOException {
-        runScenarioCore(scenario, mergePool, true);
-    }
-
     void runScenarioWithPool(MergeTestScenario scenario, ForkJoinPool mergePool) throws IOException {
-        runScenarioCore(scenario, mergePool, false);
-    }
-
-    void runScenarioCore(MergeTestScenario scenario, ForkJoinPool mergePool, boolean nvqVectorsInline) throws IOException {
         int nBase = scenario.rounds.stream().mapToInt(r -> r.segmentSizes.stream().mapToInt(x -> x).sum()).sum();
         var baseVecs = TestUtils.randomlyGenerateStandardVectors(nBase, scenario.dimension, RANDOM_SEED);
         var queryVecs = TestUtils.randomlyGenerateStandardVectors(scenario.nQueries, scenario.dimension, RANDOM_SEED + 1);
@@ -152,11 +139,7 @@ public class JVectorNVQTests extends LuceneTestCase {
 
         IndexWriterConfig iwc = LuceneTestCase.newIndexWriterConfig();
         iwc.setUseCompoundFile(false);
-        iwc.setCodec(
-            nvqVectorsInline
-                ? getCodecWithNVQInline(scenario.minNvqThreshold, scenario.leadingSegmentMergeDisabled, mergePool)
-                : getCodecWithNVQ(scenario.minNvqThreshold, scenario.leadingSegmentMergeDisabled, mergePool)
-        );
+        iwc.setCodec(getCodecWithNVQ(scenario.minNvqThreshold, scenario.leadingSegmentMergeDisabled, mergePool));
         iwc.setMergePolicy(new ForceMergesOnlyMergePolicy(false));
         iwc.setMaxBufferedDocs(-1);
 
@@ -363,53 +346,4 @@ public class JVectorNVQTests extends LuceneTestCase {
         runScenarioWithPool(scenario, singleThreadGraphMergePool);
     }
 
-    // -------------------------------------------------------------------------
-    // NVQ inline tests (FeatureId.NVQ_VECTORS stored inline with graph nodes)
-    // -------------------------------------------------------------------------
-
-    /**
-     * Single segment, NVQ inline active. Verifies the flush → inline-encode → search path
-     * when {@code nvq_vectors_inline=true}. No separate blob is written; NVQ vectors are
-     * stored directly in the graph nodes.
-     */
-    @Test
-    public void testNVQInlineFlushRecall() throws IOException {
-        var scenario = MergeTestScenario.builder()
-            .minNvqThreshold(1)
-            .round(MergeTestRound.builder().segmentSizes(List.of(500)).build())
-            .minimumRecall(0.80)
-            .overqueryFactor(15)
-            .build();
-        runScenarioInline(scenario);
-    }
-
-    /**
-     * Two segments merged under NVQ inline. Verifies the merge path correctly encodes
-     * NVQ vectors inline with graph nodes after merge.
-     */
-    @Test
-    public void testNVQInlineSimpleMerge() throws IOException {
-        var scenario = MergeTestScenario.builder()
-            .minNvqThreshold(1)
-            .round(MergeTestRound.builder().segmentSizes(List.of(250, 250)).build())
-            .minimumRecall(0.80)
-            .overqueryFactor(15)
-            .build();
-        runScenarioInlineWithPool(scenario, singleThreadGraphMergePool);
-    }
-
-    /**
-     * NVQ inline with minThreshold=MAX_VALUE falls back to raw float32 inline vectors
-     * (no NVQ training triggered). Recall must be perfect since full-precision is used.
-     */
-    @Test
-    public void testNVQInlineBelowThresholdFallbackToFullPrecision() throws IOException {
-        var scenario = MergeTestScenario.builder()
-            .minNvqThreshold(Integer.MAX_VALUE)
-            .round(MergeTestRound.builder().segmentSizes(List.of(200)).build())
-            .minimumRecall(1.0)
-            .overqueryFactor(KNNConstants.DEFAULT_OVER_QUERY_FACTOR)
-            .build();
-        runScenarioInline(scenario);
-    }
 }
