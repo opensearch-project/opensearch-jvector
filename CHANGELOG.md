@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Features
 * Add gRPC Protocol Buffer support for KNN queries [391](https://github.com/opensearch-project/opensearch-jvector/issues/391)
 * Support derived source for knn with other fields [474] (https://github.com/opensearch-project/opensearch-jvector/pull/488)
+* Support for experimental native jvector  [478](https://github.com/opensearch-project/opensearch-jvector/issues/478)
 ### Enhancements
 ### Bug Fixes
 - Fix derived nested fields processing [484] (https://github.com/opensearch-project/opensearch-jvector/pull/484)
