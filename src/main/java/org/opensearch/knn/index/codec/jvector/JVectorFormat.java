@@ -49,7 +49,6 @@ public class JVectorFormat extends KnnVectorsFormat {
     private final boolean leadingSegmentMergeDisabled;
     private final String quantizationType;
     private final int numNvqSubvectors;
-    private final boolean nvqVectorsInline;
     private final ForkJoinPool simdPoolMerge;
     private final ForkJoinPool simdPoolFlush;
     private final ForkJoinPool parallelismPool;
@@ -162,34 +161,6 @@ public class JVectorFormat extends KnnVectorsFormat {
         int numNvqSubvectors
     ) {
         this(
-            maxConn,
-            beamWidth,
-            neighborOverflow,
-            alpha,
-            numberOfSubspacesPerVectorSupplier,
-            minBatchSizeForQuantization,
-            hierarchyEnabled,
-            leadingSegmentMergeDisabled,
-            quantizationType,
-            numNvqSubvectors,
-            KNNConstants.DEFAULT_NVQ_VECTORS_INLINE
-        );
-    }
-
-    public JVectorFormat(
-        int maxConn,
-        int beamWidth,
-        float neighborOverflow,
-        float alpha,
-        Function<Integer, Integer> numberOfSubspacesPerVectorSupplier,
-        int minBatchSizeForQuantization,
-        boolean hierarchyEnabled,
-        boolean leadingSegmentMergeDisabled,
-        String quantizationType,
-        int numNvqSubvectors,
-        boolean nvqVectorsInline
-    ) {
-        this(
             NAME,
             maxConn,
             beamWidth,
@@ -201,7 +172,6 @@ public class JVectorFormat extends KnnVectorsFormat {
             leadingSegmentMergeDisabled,
             quantizationType,
             numNvqSubvectors,
-            nvqVectorsInline,
             SIMD_POOL_MERGE,
             SIMD_POOL_FLUSH,
             PARALLELISM_POOL
@@ -224,42 +194,6 @@ public class JVectorFormat extends KnnVectorsFormat {
         final ForkJoinPool simdPoolFlush,
         final ForkJoinPool parallelismPool
     ) {
-        this(
-            name,
-            maxConn,
-            beamWidth,
-            neighborOverflow,
-            alpha,
-            numberOfSubspacesPerVectorSupplier,
-            minBatchSizeForQuantization,
-            hierarchyEnabled,
-            leadingSegmentMergeDisabled,
-            quantizationType,
-            numNvqSubvectors,
-            KNNConstants.DEFAULT_NVQ_VECTORS_INLINE,
-            simdPoolMerge,
-            simdPoolFlush,
-            parallelismPool
-        );
-    }
-
-    public JVectorFormat(
-        String name,
-        int maxConn,
-        int beamWidth,
-        float neighborOverflow,
-        float alpha,
-        Function<Integer, Integer> numberOfSubspacesPerVectorSupplier,
-        int minBatchSizeForQuantization,
-        boolean hierarchyEnabled,
-        boolean leadingSegmentMergeDisabled,
-        String quantizationType,
-        int numNvqSubvectors,
-        boolean nvqVectorsInline,
-        final ForkJoinPool simdPoolMerge,
-        final ForkJoinPool simdPoolFlush,
-        final ForkJoinPool parallelismPool
-    ) {
         super(name);
         this.maxConn = maxConn;
         this.beamWidth = beamWidth;
@@ -271,7 +205,6 @@ public class JVectorFormat extends KnnVectorsFormat {
         this.leadingSegmentMergeDisabled = leadingSegmentMergeDisabled;
         this.quantizationType = quantizationType;
         this.numNvqSubvectors = numNvqSubvectors;
-        this.nvqVectorsInline = nvqVectorsInline;
         this.simdPoolMerge = simdPoolMerge;
         this.simdPoolFlush = simdPoolFlush;
         this.parallelismPool = parallelismPool;
@@ -291,7 +224,6 @@ public class JVectorFormat extends KnnVectorsFormat {
             leadingSegmentMergeDisabled,
             quantizationType,
             numNvqSubvectors,
-            nvqVectorsInline,
             simdPoolMerge,
             simdPoolFlush,
             parallelismPool
