@@ -38,7 +38,18 @@ public class JVectorVectorScorer implements VectorScorer {
         if (index == GraphNodeIdToDocMap.NO_VECTOR_OR_DELETED_DOC) {
             return 0.0f;
         }
-        return similarityFunction.compare(target, floatVectorValues.vectorFloatValue(index));
+        float score = similarityFunction.compare(target, floatVectorValues.vectorFloatValue(index));
+
+        // Apply score transformation for MAXIMUM_INNER_PRODUCT
+        // Lucene's MAXIMUM_INNER_PRODUCT formula is: 1 + dotProduct
+        // jVector's DOT_PRODUCT returns: (1 + dotProduct) / 2
+        // To convert: score * 2 = (1 + dotProduct) / 2 * 2 = 1 + dotProduct
+        if (luceneSimilarityFunction == org.apache.lucene.index.VectorSimilarityFunction.MAXIMUM_INNER_PRODUCT
+            && similarityFunction == VectorSimilarityFunction.DOT_PRODUCT) {
+            return score * 2.0f;
+        }
+
+        return score;
     }
 
     @Override

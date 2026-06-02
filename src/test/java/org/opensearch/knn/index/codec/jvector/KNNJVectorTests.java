@@ -6,6 +6,12 @@
 package org.opensearch.knn.index.codec.jvector;
 
 import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.*;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import lombok.extern.log4j.Log4j2;
 import org.apache.lucene.document.*;
 import org.apache.lucene.index.*;
@@ -20,19 +26,11 @@ import org.junit.Before;
 import org.junit.Test;
 import org.opensearch.knn.TestUtils;
 import org.opensearch.knn.common.KNNConstants;
-import org.opensearch.knn.index.ThreadLeakFiltersForTests;
-import org.opensearch.knn.plugin.stats.KNNCounter;
-
-import java.io.IOException;
-import java.nio.file.Path;
-import java.util.*;
-import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
-
 import static org.opensearch.knn.common.KNNConstants.DEFAULT_LEADING_SEGMENT_MERGE_DISABLED;
 import static org.opensearch.knn.common.KNNConstants.DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION;
+import org.opensearch.knn.index.ThreadLeakFiltersForTests;
 import static org.opensearch.knn.index.engine.CommonTestUtils.getCodec;
+import org.opensearch.knn.plugin.stats.KNNCounter;
 
 /**
  * Test used specifically for JVector
@@ -189,6 +187,76 @@ public class KNNJVectorTests extends LuceneTestCase {
                 assertEquals(2, topDocs.scoreDocs[2].doc);
                 Assert.assertEquals(
                     VectorSimilarityFunction.MAXIMUM_INNER_PRODUCT.compare(target, new float[] { 1.0f / 3.0f, 0.0f }),
+                    topDocs.scoreDocs[2].score,
+                    0.001f
+                );
+                log.info("successfully completed search tests with MAXIMUM_INNER_PRODUCT");
+            }
+        }
+        log.info("successfully closed directory");
+    }
+
+    /**
+     * Test to verify that the JVector codec is able to successfully search for the nearest neighbours
+     * using Maximum Inner Product (DOT_PRODUCT) similarity function and filtering.
+     * Single field is used to store the vectors.
+     * All the documents are stored in a single segment.
+     * Single commit without refreshing the index.
+     * No merge.
+     */
+    @Test
+    public void testJVectorKnnIndex_filter_maxInnerProduct() throws IOException {
+        int k = 3; // The number of nearest neighbors to gather
+        int totalNumberOfDocs = 10;
+        IndexWriterConfig indexWriterConfig = LuceneTestCase.newIndexWriterConfig();
+        indexWriterConfig.setUseCompoundFile(false);
+        indexWriterConfig.setCodec(getCodec());
+        indexWriterConfig.setMergePolicy(new ForceMergesOnlyMergePolicy());
+        final Path indexPath = createTempDir();
+        log.info("Index path: {}", indexPath);
+        try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter w = new IndexWriter(dir, indexWriterConfig)) {
+            final float[] target = new float[] { 1.0f, 0.0f };
+            for (int i = 1; i < totalNumberOfDocs + 1; i++) {
+                final float[] source = new float[] { 1.0f / i, 0.0f };
+                final Document doc = new Document();
+                doc.add(new StringField("filter_field", i % 2 == 0 ? "even" : "odd", Field.Store.YES));
+                doc.add(new KnnFloatVectorField("test_field", source, VectorSimilarityFunction.MAXIMUM_INNER_PRODUCT));
+                w.addDocument(doc);
+            }
+            log.info("Flushing docs to make them discoverable on the file system");
+            w.commit();
+
+            try (IndexReader reader = DirectoryReader.open(w)) {
+                log.info("We should now have a single segment with 10 documents");
+                Assert.assertEquals(1, reader.getContext().leaves().size());
+                Assert.assertEquals(totalNumberOfDocs, reader.numDocs());
+
+                final Query filterQuery = new TermQuery(new Term("filter_field", "even"));
+                final IndexSearcher searcher = newSearcher(reader);
+                KnnFloatVectorQuery knnFloatVectorQuery = getJVectorKnnFloatVectorQuery("test_field", target, k, filterQuery);
+                TopDocs topDocs = searcher.search(knnFloatVectorQuery, k);
+                assertEquals(k, topDocs.totalHits.value());
+                // With MAXIMUM_INNER_PRODUCT, higher dot product means more similar
+                // target = [1.0, 0.0], source = [1.0/i, 0.0]
+                // dot product = 1.0 * (1.0/i) + 0.0 * 0.0 = 1.0/i
+                // So doc 0 (i=1) has highest score (1.0), doc 1 (i=2) has 0.5, doc 2 (i=3) has 0.333...
+                // However, in this case we are filtering out odd docs, so we expect doc 1 (i=2) to have the
+                // highest score, followed by doc 3 (i=4), etc.
+                assertEquals(1, topDocs.scoreDocs[0].doc);
+                Assert.assertEquals(
+                    VectorSimilarityFunction.MAXIMUM_INNER_PRODUCT.compare(target, new float[] { 1.0f / 2.0f, 0.0f }),
+                    topDocs.scoreDocs[0].score,
+                    0.001f
+                );
+                assertEquals(3, topDocs.scoreDocs[1].doc);
+                Assert.assertEquals(
+                    VectorSimilarityFunction.MAXIMUM_INNER_PRODUCT.compare(target, new float[] { 1.0f / 4.0f, 0.0f }),
+                    topDocs.scoreDocs[1].score,
+                    0.001f
+                );
+                assertEquals(5, topDocs.scoreDocs[2].doc);
+                Assert.assertEquals(
+                    VectorSimilarityFunction.MAXIMUM_INNER_PRODUCT.compare(target, new float[] { 1.0f / 6.0f, 0.0f }),
                     topDocs.scoreDocs[2].score,
                     0.001f
                 );

@@ -165,10 +165,7 @@ public class JVectorReader extends KnnVectorsReader {
                 final PQVectors pqVectors = fieldEntryMap.get(field).pqVectors;
                 // SearchScoreProvider that does a first pass with the loaded-in-memory PQVectors,
                 // then reranks with the exact vectors that are stored on disk in the index
-                ScoreFunction.ApproximateScoreFunction asf = pqVectors.precomputedScoreFunctionFor(
-                    q,
-                    vectorSimilarityFunction
-                );
+                ScoreFunction.ApproximateScoreFunction asf = pqVectors.precomputedScoreFunctionFor(q, vectorSimilarityFunction);
                 ScoreFunction.ExactScoreFunction reranker = wrapExactScoreFunction(
                     view.rerankerFor(q, vectorSimilarityFunction),
                     luceneSimilarityFunction,
@@ -176,7 +173,8 @@ public class JVectorReader extends KnnVectorsReader {
                 );
                 ssp = new DefaultSearchScoreProvider(asf, reranker);
             } else { // Not quantized, used typical searcher
-                ScoreFunction.ExactScoreFunction esf = DefaultSearchScoreProvider.exact(q, vectorSimilarityFunction, view).exactScoreFunction();
+                ScoreFunction.ExactScoreFunction esf = DefaultSearchScoreProvider.exact(q, vectorSimilarityFunction, view)
+                    .exactScoreFunction();
                 ssp = new DefaultSearchScoreProvider(wrapExactScoreFunction(esf, luceneSimilarityFunction, vectorSimilarityFunction));
             }
             final GraphNodeIdToDocMap jvectorLuceneDocMap = fieldEntryMap.get(field).graphNodeIdToDocMap;
