@@ -182,23 +182,6 @@ public class CommonTestUtils {
     }
 
     public static Codec getCodecWithNVQ(int minBatchSizeForQuantization, boolean leadingSegmentMergeDisabled, ForkJoinPool graphMergePool) {
-        return getCodecWithNVQ(minBatchSizeForQuantization, leadingSegmentMergeDisabled, false, graphMergePool);
-    }
-
-    public static Codec getCodecWithNVQInline(int minBatchSizeForQuantization, boolean leadingSegmentMergeDisabled) {
-        return getCodecWithNVQ(minBatchSizeForQuantization, leadingSegmentMergeDisabled, true, null);
-    }
-
-    public static Codec getCodecWithNVQInline(int minBatchSizeForQuantization, boolean leadingSegmentMergeDisabled, ForkJoinPool graphMergePool) {
-        return getCodecWithNVQ(minBatchSizeForQuantization, leadingSegmentMergeDisabled, true, graphMergePool);
-    }
-
-    private static Codec getCodecWithNVQ(
-        int minBatchSizeForQuantization,
-        boolean leadingSegmentMergeDisabled,
-        boolean nvqVectorsInline,
-        ForkJoinPool graphMergePool
-    ) {
         if (graphMergePool == null) {
             return new FilterCodec(KNNCodecVersion.V_10_04_0.getCodecName(), new Lucene104Codec()) {
                 @Override
@@ -216,8 +199,7 @@ public class CommonTestUtils {
                                 KNNConstants.DEFAULT_HIERARCHY_ENABLED,
                                 leadingSegmentMergeDisabled,
                                 KNNConstants.QUANTIZATION_TYPE_NVQ,
-                                KNNConstants.DEFAULT_NUM_NVQ_SUBVECTORS,
-                                nvqVectorsInline
+                                KNNConstants.DEFAULT_NUM_NVQ_SUBVECTORS
                             );
                         }
                     };
@@ -242,7 +224,6 @@ public class CommonTestUtils {
                                 leadingSegmentMergeDisabled,
                                 KNNConstants.QUANTIZATION_TYPE_NVQ,
                                 KNNConstants.DEFAULT_NUM_NVQ_SUBVECTORS,
-                                nvqVectorsInline,
                                 graphMergePool,
                                 graphMergePool,
                                 graphMergePool

@@ -29,7 +29,6 @@ public class KNNVectorsFormatParams {
     private boolean leadingSegmentMergeDisabled;
     private String quantizationType;
     private int numNvqSubvectors;
-    private boolean nvqVectorsInline;
 
     public KNNVectorsFormatParams(final Map<String, Object> params, int defaultMaxConnections, int defaultBeamWidth) {
         this(
@@ -65,7 +64,6 @@ public class KNNVectorsFormatParams {
         initLeadingSegmentMergeDisabled(params, KNNConstants.DEFAULT_LEADING_SEGMENT_MERGE_DISABLED);
         initQuantizationType(params);
         initNumNvqSubvectors(params);
-        initNvqVectorsInline(params);
     }
 
     public boolean validate(final Map<String, Object> params) {
@@ -153,11 +151,4 @@ public class KNNVectorsFormatParams {
         this.numNvqSubvectors = KNNConstants.DEFAULT_NUM_NVQ_SUBVECTORS;
     }
 
-    private void initNvqVectorsInline(final Map<String, Object> params) {
-        if (params != null && params.containsKey(KNNConstants.METHOD_PARAMETER_NVQ_VECTORS_INLINE)) {
-            this.nvqVectorsInline = (boolean) params.get(KNNConstants.METHOD_PARAMETER_NVQ_VECTORS_INLINE);
-            return;
-        }
-        this.nvqVectorsInline = KNNConstants.DEFAULT_NVQ_VECTORS_INLINE;
-    }
 }

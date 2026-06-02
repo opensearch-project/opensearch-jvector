@@ -73,8 +73,7 @@ public class KNN9120PerFieldKnnVectorsFormat extends BasePerFieldKnnVectorsForma
                             knnVectorsFormatParams.isHierarchyEnabled(),
                             knnVectorsFormatParams.isLeadingSegmentMergeDisabled(),
                             knnVectorsFormatParams.getQuantizationType(),
-                            knnVectorsFormatParams.getNumNvqSubvectors(),
-                            knnVectorsFormatParams.isNvqVectorsInline()
+                            knnVectorsFormatParams.getNumNvqSubvectors()
                         );
                     default:
                         throw new IllegalArgumentException("Unsupported java engine: " + knnEngine);
