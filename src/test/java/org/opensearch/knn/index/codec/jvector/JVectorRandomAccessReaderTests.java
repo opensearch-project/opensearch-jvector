@@ -163,11 +163,11 @@ public class JVectorRandomAccessReaderTests {
             0x3F,
             (byte) 0x80,
             0x00,
-            0x00,  // 1.0f
+            0x00, // 1.0f
             0x40,
             0x00,
             0x00,
-            0x00         // 2.0f
+            0x00  // 2.0f
         };
 
         JVectorRandomAccessReader reader = new JVectorRandomAccessReader(new ByteArrayIndexInput(src), ByteOrder.BIG_ENDIAN);
@@ -186,11 +186,11 @@ public class JVectorRandomAccessReaderTests {
             0x00,
             0x00,
             (byte) 0x80,
-            0x3F,  // 1.0f
+            0x3F, // 1.0f
             0x00,
             0x00,
             0x00,
-            0x40         // 2.0f
+            0x40  // 2.0f
         };
 
         JVectorRandomAccessReader reader = new JVectorRandomAccessReader(new ByteArrayIndexInput(src), ByteOrder.LITTLE_ENDIAN);
