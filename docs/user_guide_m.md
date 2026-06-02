@@ -383,6 +383,7 @@ JVector supports the following distance metrics:
 |------------|-------------|----------|
 | `l2` | Euclidean distance (L2 norm) | General purpose, geometric similarity |
 | `cosinesimil` | Cosine similarity | Text embeddings, normalized vectors |
+| `innerproduct` | Dot product (inner product) | Embeddings where magnitude carries meaning (e.g., biencoder models) |
 
 
 **Example with cosine similarity:**
@@ -413,6 +414,37 @@ curl -X PUT "https://localhost:9200/text-embeddings" -H 'Content-Type: applicati
 }
 '
 ```
+
+**Example with inner product:**
+
+```bash
+curl -X PUT "https://localhost:9200/biencoder-embeddings" -H 'Content-Type: application/json' -d'
+{
+  "settings": {
+    "index.knn": true
+  },
+  "mappings": {
+    "properties": {
+      "embedding": {
+        "type": "knn_vector",
+        "dimension": 768,
+        "method": {
+          "name": "disk_ann",
+          "engine": "jvector",
+          "space_type": "innerproduct",
+          "parameters": {
+            "m": 16,
+            "ef_construction": 100
+          }
+        }
+      }
+    }
+  }
+}
+'
+```
+
+Inner product (dot product) is useful for embeddings where the magnitude carries semantic meaning, such as those from biencoder models. Unlike cosine similarity which normalizes vectors, inner product preserves magnitude information, making it suitable for scenarios where vector length is meaningful.
 
 #### Quantization Options
 

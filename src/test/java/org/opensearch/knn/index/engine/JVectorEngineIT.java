@@ -5,35 +5,32 @@
 
 package org.opensearch.knn.index.engine;
 
-import org.opensearch.client.*;
-
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import java.io.IOException;
+import java.util.*;
+import java.util.stream.Collectors;
 import lombok.SneakyThrows;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hc.core5.http.ParseException;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.junit.After;
+import org.opensearch.client.*;
 import org.opensearch.common.settings.Settings;
+import static org.opensearch.common.xcontent.XContentFactory.jsonBuilder;
 import org.opensearch.core.xcontent.XContentBuilder;
+import static org.opensearch.index.engine.EngineConfig.INDEX_USE_COMPOUND_FILE;
 import org.opensearch.index.query.QueryBuilder;
 import org.opensearch.index.query.QueryBuilders;
 import org.opensearch.knn.KNNRestTestCase;
 import org.opensearch.knn.KNNResult;
 import org.opensearch.knn.TestUtils;
 import org.opensearch.knn.common.KNNConstants;
+import static org.opensearch.knn.common.KNNConstants.*;
 import org.opensearch.knn.index.SpaceType;
 import org.opensearch.knn.index.VectorDataType;
-import org.opensearch.knn.index.query.KNNQueryBuilder;
-
-import java.io.IOException;
-import java.util.*;
-import java.util.stream.Collectors;
-
-import static org.opensearch.common.xcontent.XContentFactory.jsonBuilder;
-import static org.opensearch.index.engine.EngineConfig.INDEX_USE_COMPOUND_FILE;
-import static org.opensearch.knn.common.KNNConstants.*;
 import static org.opensearch.knn.index.engine.CommonTestUtils.*;
+import org.opensearch.knn.index.query.KNNQueryBuilder;
 
 public class JVectorEngineIT extends KNNRestTestCase {
 
@@ -48,6 +45,10 @@ public class JVectorEngineIT extends KNNRestTestCase {
 
     public void testQuery_cosine() throws Exception {
         baseQueryTest(SpaceType.COSINESIMIL);
+    }
+
+    public void testQuery_innerProduct() throws Exception {
+        baseQueryTest(SpaceType.INNER_PRODUCT);
     }
 
     public void testQuery_invalidVectorDimensionInQuery() throws Exception {
