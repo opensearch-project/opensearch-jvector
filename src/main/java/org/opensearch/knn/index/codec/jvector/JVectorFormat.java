@@ -30,8 +30,8 @@ public class JVectorFormat extends KnnVectorsFormat {
     public static final String NEIGHBORS_SCORE_CACHE_EXTENSION = "neighbors-score-cache-" + JVECTOR_FILES_SUFFIX;
 
     public static final int VERSION_START = 0;
-    public static final int VERSION_CURRENT = 1;
     public static final int VERSION_WITH_VECTORIZATION_PROVIDER = 1;
+    public static final int VERSION_CURRENT = VERSION_WITH_VECTORIZATION_PROVIDER;
     public static final int DEFAULT_MAX_CONN = 32;
     public static final int DEFAULT_BEAM_WIDTH = 100;
     // Unfortunately, this can't be managed yet by the OpenSearch ThreadPool because it's not supporting {@link ForkJoinPool} types

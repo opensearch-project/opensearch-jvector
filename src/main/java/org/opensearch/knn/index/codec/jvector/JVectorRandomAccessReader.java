@@ -49,6 +49,7 @@ public class JVectorRandomAccessReader implements RandomAccessReader {
         return indexInputDelegate.readInt();
     }
 
+    @Override
     public float readFloat() throws IOException {
         return Float.intBitsToFloat(indexInputDelegate.readInt());
     }
