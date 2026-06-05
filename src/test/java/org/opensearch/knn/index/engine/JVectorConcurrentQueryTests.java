@@ -193,7 +193,6 @@ public class JVectorConcurrentQueryTests extends OpenSearchIntegTestCase {
             client().prepareIndex(INDEX_NAME).setId("doc_" + i).setSource(FIELD_NAME, TEST_VECTORS[i]).get();
         }
         refresh(INDEX_NAME);
-        ensureGreen(INDEX_NAME);
     }
 
     private void createKnnIndexMappingWithJVectorEngine(int dimension, SpaceType spaceType, VectorDataType vectorDataType)
