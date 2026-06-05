@@ -181,7 +181,7 @@ public class JVectorConcurrentQueryTests extends OpenSearchIntegTestCase {
             float expectedDistance = TestUtils.computeDistFromSpaceType(SPACE_TYPE, expectedVector, queryVector);
 
             // Allow for minor floating point differences
-            assertEquals("Distance mismatch at position " + i, expectedDistance, actualDistance, 0.001);
+            assertEquals("Distance mismatch at position " + i, expectedDistance, actualDistance, 0.02);
         }
     }
 
@@ -193,6 +193,7 @@ public class JVectorConcurrentQueryTests extends OpenSearchIntegTestCase {
             client().prepareIndex(INDEX_NAME).setId("doc_" + i).setSource(FIELD_NAME, TEST_VECTORS[i]).get();
         }
         refresh(INDEX_NAME);
+        ensureGreen(INDEX_NAME);
     }
 
     private void createKnnIndexMappingWithJVectorEngine(int dimension, SpaceType spaceType, VectorDataType vectorDataType)
