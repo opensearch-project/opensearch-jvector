@@ -11,10 +11,9 @@ import io.github.jbellis.jvector.vector.VectorSimilarityFunction;
 import io.github.jbellis.jvector.vector.VectorizationProvider;
 import io.github.jbellis.jvector.vector.types.VectorFloat;
 import io.github.jbellis.jvector.vector.types.VectorTypeSupport;
+import java.io.IOException;
 import org.apache.lucene.index.FloatVectorValues;
 import org.apache.lucene.search.VectorScorer;
-
-import java.io.IOException;
 
 public class JVectorFloatVectorValues extends FloatVectorValues {
     public static final int NO_VECTOR = -1;
@@ -22,6 +21,7 @@ public class JVectorFloatVectorValues extends FloatVectorValues {
 
     private final OnDiskGraphIndex.View view;
     private final VectorSimilarityFunction similarityFunction;
+    private final org.apache.lucene.index.VectorSimilarityFunction luceneSimilarityFunction;
     private final int dimension;
     private final int size;
     private final GraphNodeIdToDocMap graphNodeIdToDocMap;
@@ -29,12 +29,14 @@ public class JVectorFloatVectorValues extends FloatVectorValues {
     public JVectorFloatVectorValues(
         OnDiskGraphIndex onDiskGraphIndex,
         VectorSimilarityFunction similarityFunction,
+        org.apache.lucene.index.VectorSimilarityFunction luceneSimilarityFunction,
         GraphNodeIdToDocMap graphNodeIdToDocMap
     ) throws IOException {
         this.view = onDiskGraphIndex.getView();
         this.dimension = view.dimension();
         this.size = view.size();
         this.similarityFunction = similarityFunction;
+        this.luceneSimilarityFunction = luceneSimilarityFunction;
         this.graphNodeIdToDocMap = graphNodeIdToDocMap;
     }
 
@@ -178,7 +180,7 @@ public class JVectorFloatVectorValues extends FloatVectorValues {
 
     @Override
     public VectorScorer scorer(float[] query) throws IOException {
-        return new JVectorVectorScorer(this, VECTOR_TYPE_SUPPORT.createFloatVector(query), similarityFunction);
+        return new JVectorVectorScorer(this, VECTOR_TYPE_SUPPORT.createFloatVector(query), similarityFunction, luceneSimilarityFunction);
     }
 
 }
