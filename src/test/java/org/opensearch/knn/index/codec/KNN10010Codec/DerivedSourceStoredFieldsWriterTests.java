@@ -90,10 +90,10 @@ public class DerivedSourceStoredFieldsWriterTests extends KNNTestCase {
         assertTrue(IndexUtil.isDerivedEnabledForField(vectorFieldType, mapperService));
 
         KNN10010DerivedSourceStoredFieldsWriter derivedSourceStoredFieldsWriter = new KNN10010DerivedSourceStoredFieldsWriter(
-                "mock-codec",
-                delegate,
-                segmentInfo,
-                mapperService
+            "mock-codec",
+            delegate,
+            segmentInfo,
+            mapperService
         );
 
         derivedSourceStoredFieldsWriter.finish(1);
