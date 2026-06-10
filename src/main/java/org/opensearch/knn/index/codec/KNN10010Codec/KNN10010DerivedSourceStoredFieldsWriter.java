@@ -168,10 +168,6 @@ public class KNN10010DerivedSourceStoredFieldsWriter extends StoredFieldsWriter 
      */
     @Override
     public int merge(MergeState mergeState) throws IOException {
-        // if (KNN9120DerivedSourceStoredFieldsReader.doesMergeContainLegacySegments(mergeState)) {
-        // return super.merge(mergeState);
-        // }
-
         Set<String> vectorFields = new HashSet<>();
         Set<String> nestedVectorFields = new HashSet<>();
 
