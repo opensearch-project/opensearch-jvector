@@ -14,6 +14,7 @@ import org.apache.lucene.index.MergeState;
 import org.apache.lucene.index.SegmentInfo;
 import org.apache.lucene.index.StoredFieldDataInput;
 import org.apache.lucene.util.BytesRef;
+import org.opensearch.OpenSearchParseException;
 import org.opensearch.common.collect.Tuple;
 import org.opensearch.common.io.stream.BytesStreamOutput;
 import org.opensearch.common.xcontent.XContentHelper;
@@ -140,7 +141,7 @@ public class KNN10010DerivedSourceStoredFieldsWriter extends StoredFieldsWriter 
             if (fieldType instanceof KNNVectorFieldType knnVectorFieldType) {
                 if (IndexUtil.isDerivedEnabledForField(knnVectorFieldType, mapperService)) {
                     String fieldName = fieldType.name();
-                    boolean isNested = mapperService.documentMapper().mappers().getNestedScope(fieldType.name()) != null;
+                    boolean isNested = mapperService.documentMapper().mappers().getNestedScope(fieldName) != null;
 
                     if (isNested) {
                         knownNestedVectorFields.add(fieldName);
@@ -242,6 +243,14 @@ public class KNN10010DerivedSourceStoredFieldsWriter extends StoredFieldsWriter 
             log.warn(
                 "Encountered NotXContent while deserializing _source field. Instead found String: [{}]",
                 new String(bytesRef.bytes, 0, Math.min(bytesRef.bytes.length, 512)),
+                e
+            );
+            return;
+        } catch (OpenSearchParseException e) {
+            // Catch any other parsing exceptions (e.g., OpenSearchParseException for invalid JSON)
+            log.warn(
+                "Failed to parse _source field as XContent. Instead found bytes: [{}]",
+                new String(bytesRef.bytes, bytesRef.offset, Math.min(bytesRef.length, 512)),
                 e
             );
             return;
