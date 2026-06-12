@@ -160,6 +160,32 @@ public class KNNRestTestCase extends ODFERestTestCase {
     }
 
     /**
+    * Add a single KNN Doc with a numeric field to an index
+    */
+    protected <T> void addKnnDocWithNumericField(
+        String index,
+        String docId,
+        String vectorFieldName,
+        T vector,
+        String numericFieldName,
+        long val
+    ) throws IOException {
+        Request request = new Request("POST", "/" + index + "/_doc/" + docId + "?refresh=true");
+
+        XContentBuilder builder = XContentFactory.jsonBuilder()
+            .startObject()
+            .field(vectorFieldName, vector)
+            .field(numericFieldName, val)
+            .endObject();
+        request.setJsonEntity(builder.toString());
+        client().performRequest(request);
+
+        request = new Request("POST", "/" + index + "/_refresh");
+        Response response = client().performRequest(request);
+        assertEquals(request.getEndpoint() + ": failed", RestStatus.OK, RestStatus.fromCode(response.getStatusLine().getStatusCode()));
+    }
+
+    /**
      * Gives the ability for certain, more exhaustive checks, to be disabled by default
      *
      * @return If the test is running in exhaustive mode

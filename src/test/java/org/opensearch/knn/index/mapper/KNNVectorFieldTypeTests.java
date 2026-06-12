@@ -5,6 +5,7 @@
 
 package org.opensearch.knn.index.mapper;
 
+import java.time.ZoneId;
 import java.util.Collections;
 import java.util.Optional;
 
@@ -22,6 +23,7 @@ import org.opensearch.knn.index.KNNVectorIndexFieldData;
 import org.opensearch.knn.index.VectorDataType;
 import org.opensearch.knn.index.engine.KNNMethodContext;
 import org.opensearch.knn.index.query.rescore.RescoreContext;
+import org.opensearch.search.DocValueFormat;
 import org.opensearch.search.lookup.SearchLookup;
 
 public class KNNVectorFieldTypeTests extends KNNTestCase {
@@ -214,5 +216,43 @@ public class KNNVectorFieldTypeTests extends KNNTestCase {
         );
         float[] queryVector = new float[] { 1.0f, 2.0f, 3.0f };
         expectThrows(IllegalStateException.class, () -> knnVectorFieldType.transformQueryVector(queryVector));
+    }
+
+        public void testDocValueFormat_nullFormatAndTimezone_returnsRaw() {
+        KNNMethodContext knnMethodContext = getDefaultKNNMethodContext();
+        KNNVectorFieldType fieldType = new KNNVectorFieldType(
+            FIELD_NAME,
+            Collections.emptyMap(),
+            VectorDataType.FLOAT,
+            getMappingConfigForMethodMapping(knnMethodContext, 3)
+        );
+        DocValueFormat format = fieldType.docValueFormat(null, null);
+        assertSame(DocValueFormat.RAW, format);
+    }
+
+    public void testDocValueFormat_nonNullFormat_throwsIllegalArgument() {
+        KNNMethodContext knnMethodContext = getDefaultKNNMethodContext();
+        KNNVectorFieldType fieldType = new KNNVectorFieldType(
+            FIELD_NAME,
+            Collections.emptyMap(),
+            VectorDataType.FLOAT,
+            getMappingConfigForMethodMapping(knnMethodContext, 3)
+        );
+        IllegalArgumentException ex = expectThrows(IllegalArgumentException.class, () -> fieldType.docValueFormat("epoch_millis", null));
+        assertTrue(ex.getMessage().contains(FIELD_NAME));
+        assertTrue(ex.getMessage().contains("does not support custom formats"));
+    }
+
+    public void testDocValueFormat_nonNullTimezone_throwsIllegalArgument() {
+        KNNMethodContext knnMethodContext = getDefaultKNNMethodContext();
+        KNNVectorFieldType fieldType = new KNNVectorFieldType(
+            FIELD_NAME,
+            Collections.emptyMap(),
+            VectorDataType.FLOAT,
+            getMappingConfigForMethodMapping(knnMethodContext, 3)
+        );
+        IllegalArgumentException ex = expectThrows(IllegalArgumentException.class, () -> fieldType.docValueFormat(null, ZoneId.of("UTC")));
+        assertTrue(ex.getMessage().contains(FIELD_NAME));
+        assertTrue(ex.getMessage().contains("does not support custom time zones"));
     }
 }
