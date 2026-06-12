@@ -428,6 +428,7 @@ public class JVectorWriter extends KnnVectorsWriter {
         long pqCodebooksAndVectorsOffset;
         long pqCodebooksAndVectorsLength;
         float degreeOverflow; // important when leveraging cache
+        JVectorReader.VectorizationProviderMapper.VectorizationProvider vectorizationProvider;
         GraphNodeIdToDocMap graphNodeIdToDocMap;
 
         public void toOutput(IndexOutput out) throws IOException {
@@ -441,9 +442,10 @@ public class JVectorWriter extends KnnVectorsWriter {
             out.writeVLong(pqCodebooksAndVectorsLength);
             out.writeInt(Float.floatToIntBits(degreeOverflow));
             graphNodeIdToDocMap.toOutput(out);
+            out.writeInt(JVectorReader.VectorizationProviderMapper.providerToOrd());
         }
 
-        public VectorIndexFieldMetadata(IndexInput in) throws IOException {
+        public VectorIndexFieldMetadata(IndexInput in, int version) throws IOException {
             this.fieldNumber = in.readInt();
             this.vectorEncoding = readVectorEncoding(in);
             this.vectorSimilarityFunction = JVectorReader.VectorSimilarityMapper.ordToLuceneDistFunc(in.readInt());
@@ -454,6 +456,12 @@ public class JVectorWriter extends KnnVectorsWriter {
             this.pqCodebooksAndVectorsLength = in.readVLong();
             this.degreeOverflow = Float.intBitsToFloat(in.readInt());
             this.graphNodeIdToDocMap = new GraphNodeIdToDocMap(in);
+
+            if (version >= JVectorFormat.VERSION_WITH_VECTORIZATION_PROVIDER) {
+                this.vectorizationProvider = JVectorReader.VectorizationProviderMapper.ordToProvider(in.readInt());
+            } else {
+                this.vectorizationProvider = JVectorReader.VectorizationProviderMapper.VectorizationProvider.NON_NATIVE;
+            }
         }
 
     }

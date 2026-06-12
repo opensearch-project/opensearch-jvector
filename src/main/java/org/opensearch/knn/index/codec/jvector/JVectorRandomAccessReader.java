@@ -14,6 +14,7 @@ import org.apache.lucene.util.IOUtils;
 import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
 
 @Log4j2
@@ -21,9 +22,16 @@ public class JVectorRandomAccessReader implements RandomAccessReader {
     private final byte[] internalBuffer = new byte[Long.BYTES];
     private final IndexInput indexInputDelegate;
     private volatile boolean closed = false;
+    private final ByteOrder byteOrder;
 
     public JVectorRandomAccessReader(IndexInput indexInputDelegate) {
         this.indexInputDelegate = indexInputDelegate;
+        this.byteOrder = ByteOrder.BIG_ENDIAN;
+    }
+
+    public JVectorRandomAccessReader(IndexInput indexInputDelegate, ByteOrder byteOrder) {
+        this.indexInputDelegate = indexInputDelegate;
+        this.byteOrder = byteOrder;
     }
 
     @Override
@@ -98,7 +106,8 @@ public class JVectorRandomAccessReader implements RandomAccessReader {
 
     @Override
     public void read(float[] floats, int offset, int count) throws IOException {
-        final ByteBuffer byteBuffer = ByteBuffer.allocate(Float.BYTES * count);
+        final ByteBuffer byteBuffer = ByteBuffer.allocate(Float.BYTES * count).order(byteOrder);
+        byteBuffer.order(byteOrder);
         indexInputDelegate.readBytes(byteBuffer.array(), offset, Float.BYTES * count);
         FloatBuffer buffer = byteBuffer.asFloatBuffer();
         buffer.get(floats, offset, count);
@@ -132,15 +141,28 @@ public class JVectorRandomAccessReader implements RandomAccessReader {
         private final IndexInput currentInput;
         private final long sliceStartOffset;
         private final long sliceLength;
+        private final ByteOrder byteOrder;
 
         public Supplier(IndexInput indexInput) throws IOException {
             this(indexInput, indexInput.getFilePointer(), indexInput.length() - indexInput.getFilePointer());
+        }
+
+        public Supplier(IndexInput indexInput, ByteOrder byteOrder) throws IOException {
+            this(indexInput, indexInput.getFilePointer(), indexInput.length() - indexInput.getFilePointer(), byteOrder);
         }
 
         public Supplier(IndexInput indexInput, long sliceStartOffset, long sliceLength) throws IOException {
             this.currentInput = indexInput;
             this.sliceStartOffset = sliceStartOffset;
             this.sliceLength = sliceLength;
+            this.byteOrder = ByteOrder.BIG_ENDIAN;
+        }
+
+        public Supplier(IndexInput indexInput, long sliceStartOffset, long sliceLength, ByteOrder byteOrder) throws IOException {
+            this.currentInput = indexInput;
+            this.sliceStartOffset = sliceStartOffset;
+            this.sliceLength = sliceLength;
+            this.byteOrder = byteOrder;
         }
 
         @Override
@@ -148,7 +170,7 @@ public class JVectorRandomAccessReader implements RandomAccessReader {
             synchronized (this) {
                 final IndexInput input = currentInput.slice("Input Slice for the jVector graph or PQ", sliceStartOffset, sliceLength)
                     .clone();
-                return new JVectorRandomAccessReader(input);
+                return new JVectorRandomAccessReader(input, byteOrder);
             }
         }
 

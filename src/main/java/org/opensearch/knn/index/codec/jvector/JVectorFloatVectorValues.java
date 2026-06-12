@@ -149,7 +149,21 @@ public class JVectorFloatVectorValues extends FloatVectorValues {
     public float[] vectorValue(int i) throws IOException {
         try {
             final VectorFloat<?> vector = vectorFloatValue(i);
-            return (float[]) vector.get();
+            Object backing = vector.get();
+            if (backing instanceof float[] array) {
+                return array;
+            }
+
+            // TODO: Use with Java 22+
+            // if (backing instanceof MemorySegment segment) {
+            // return segment.toArray(ValueLayout.JAVA_FLOAT);
+            // }
+
+            float[] result = new float[vector.length()];
+            for (int j = 0; j < vector.length(); j++) {
+                result[j] = vector.get(j);
+            }
+            return result;
         } catch (Throwable e) {
             throw new RuntimeException(e);
         }
