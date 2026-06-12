@@ -39,7 +39,7 @@ dependencies {
 
     // Add other dependencies from main project that are needed for benchmarks
     implementation "io.github.jbellis:jvector:${jvector_version}"
-    implementation 'org.agrona:agrona:1.20.0'
+    implementation 'org.agrona:agrona:1.23.1'
 
     //testImplementation "org.opensearch.test:framework:${opensearch_version}"
 
