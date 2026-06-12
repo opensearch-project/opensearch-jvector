@@ -65,7 +65,7 @@ dependencies {
      * while this is not ideal, the benefits of downloading the required datasets on-demand is better than bloating this repo by including the datasets
      */
     /**** Transitive dependencies of awssdk ****/
-    api("software.amazon.awssdk.crt:aws-crt:0.27.7")
+    api("software.amazon.awssdk.crt:aws-crt:0.47.0")
     api("software.amazon.awssdk:auth:${awssdk_version}")
     api("software.amazon.awssdk:annotations:${awssdk_version}")
     api("software.amazon.awssdk:apache-client:${awssdk_version}")
