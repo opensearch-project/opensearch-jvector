@@ -17,7 +17,7 @@ test.enabled = false
 assemble.enabled = false
 dependenciesInfo.enabled = false
 
-def awssdk_version="2.21.10"
+def awssdk_version="2.46.9"
 configurations.all {
     resolutionStrategy {
         force 'org.apache.commons:commons-math3:3.6.1'  // Force the newer version
