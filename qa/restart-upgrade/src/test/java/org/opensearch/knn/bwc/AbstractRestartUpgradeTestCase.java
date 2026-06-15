@@ -58,6 +58,7 @@ public abstract class AbstractRestartUpgradeTestCase extends KNNRestTestCase {
         return Boolean.parseBoolean(System.getProperty(RESTART_UPGRADE_OLD_CLUSTER));
     }
 
+    @Override
     protected final Optional<String> getBWCVersion() {
         return Optional.ofNullable(System.getProperty(BWC_VERSION, null));
     }

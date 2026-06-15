@@ -28,7 +28,7 @@ public class RootPerFieldDerivedVectorTransformer extends AbstractPerFieldDerive
      */
     public RootPerFieldDerivedVectorTransformer(FieldInfo fieldInfo, DerivedSourceReaders derivedSourceReaders) {
         this.fieldInfo = fieldInfo;
-        this.vectorValuesSupplier = () -> KNNVectorValuesFactory.getVectorValues(
+        this.vectorValuesSupplier = () -> KNNVectorValuesFactory.getDerivedSourcesVectorValues(
             fieldInfo,
             derivedSourceReaders.getDocValuesProducer(),
             derivedSourceReaders.getKnnVectorsReader()

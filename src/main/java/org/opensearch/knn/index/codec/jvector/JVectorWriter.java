@@ -618,7 +618,7 @@ public class JVectorWriter extends KnnVectorsWriter {
 
         @Override
         public void addValue(int docID, T vectorValue) throws IOException {
-            log.trace("Adding value {} to field {} in segment {}", vectorValue, fieldInfo.name, segmentName);
+            log.trace("Adding value {} to field {} in segment {} for document {}", vectorValue, fieldInfo.name, segmentName, docID);
             if (docID == lastDocID) {
                 throw new IllegalArgumentException(
                     "VectorValuesField \""
@@ -659,7 +659,7 @@ public class JVectorWriter extends KnnVectorsWriter {
         return switch (fieldInfo.getVectorSimilarityFunction()) {
             case EUCLIDEAN -> io.github.jbellis.jvector.vector.VectorSimilarityFunction.EUCLIDEAN;
             case COSINE -> io.github.jbellis.jvector.vector.VectorSimilarityFunction.COSINE;
-            case DOT_PRODUCT -> io.github.jbellis.jvector.vector.VectorSimilarityFunction.DOT_PRODUCT;
+            case DOT_PRODUCT, MAXIMUM_INNER_PRODUCT -> io.github.jbellis.jvector.vector.VectorSimilarityFunction.DOT_PRODUCT;
             default -> throw new IllegalArgumentException("Unsupported similarity function: " + fieldInfo.getVectorSimilarityFunction());
         };
     }

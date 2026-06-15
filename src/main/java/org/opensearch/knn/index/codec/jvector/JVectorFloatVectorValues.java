@@ -13,10 +13,9 @@ import io.github.jbellis.jvector.vector.VectorSimilarityFunction;
 import io.github.jbellis.jvector.vector.VectorizationProvider;
 import io.github.jbellis.jvector.vector.types.VectorFloat;
 import io.github.jbellis.jvector.vector.types.VectorTypeSupport;
+import java.io.IOException;
 import org.apache.lucene.index.FloatVectorValues;
 import org.apache.lucene.search.VectorScorer;
-
-import java.io.IOException;
 
 public class JVectorFloatVectorValues extends FloatVectorValues {
     public static final int NO_VECTOR = -1;
@@ -24,6 +23,7 @@ public class JVectorFloatVectorValues extends FloatVectorValues {
 
     private final OnDiskGraphIndex.View view;
     private final VectorSimilarityFunction similarityFunction;
+    private final org.apache.lucene.index.VectorSimilarityFunction luceneSimilarityFunction;
     private final int dimension;
     private final int size;
     private final GraphNodeIdToDocMap graphNodeIdToDocMap;
@@ -35,6 +35,7 @@ public class JVectorFloatVectorValues extends FloatVectorValues {
     public JVectorFloatVectorValues(
         OnDiskGraphIndex onDiskGraphIndex,
         VectorSimilarityFunction similarityFunction,
+        org.apache.lucene.index.VectorSimilarityFunction luceneSimilarityFunction,
         GraphNodeIdToDocMap graphNodeIdToDocMap
     ) throws IOException {
         this(onDiskGraphIndex, similarityFunction, graphNodeIdToDocMap, null);
@@ -50,6 +51,7 @@ public class JVectorFloatVectorValues extends FloatVectorValues {
         this.dimension = view.dimension();
         this.size = view.size();
         this.similarityFunction = similarityFunction;
+        this.luceneSimilarityFunction = luceneSimilarityFunction;
         this.graphNodeIdToDocMap = graphNodeIdToDocMap;
         this.nvqInline = nvqInline;
         this.nvqScratch = nvqInline != null
@@ -195,6 +197,53 @@ public class JVectorFloatVectorValues extends FloatVectorValues {
         };
     }
 
+    /**
+     * Constructs an iterator that iterates over vectors that have corresponding nodes in the graph (skipping the gaps with non-live / NO_VECTORS nodes).
+     * @return an iterator that iterates over vectors that have corresponding nodes in the graph (skipping the gaps with non-live / NO_VECTORS nodes)
+     */
+    public DocIndexIterator vectorIterator() {
+        return new DocIndexIterator() {
+            private int docId = -1;
+            private final Bits liveNodes = view.liveNodes();
+
+            @Override
+            public long cost() {
+                return size();
+            }
+
+            @Override
+            public int index() {
+                return graphNodeIdToDocMap.getJVectorNodeId(docId);
+            }
+
+            @Override
+            public int docID() {
+                return docId;
+            }
+
+            @Override
+            public int nextDoc() throws IOException {
+                // Advance to the next node docId starts from -1 which is why we need to increment docId by 1
+                // until maxDoc is reached. If the document has vector field but no value (== null), the NO_MORE_DOCS
+                // is going to be returned by this method.
+                while (docId < graphNodeIdToDocMap.getMaxDoc() - 1) {
+                    docId++;
+                    if (liveNodes.get(docId) && index() != NO_VECTOR) {
+                        return docId;
+                    }
+                }
+                docId = NO_MORE_DOCS;
+
+                return docId;
+            }
+
+            @Override
+            public int advance(int target) throws IOException {
+                return slowAdvance(target);
+            }
+        };
+    }
+
     @Override
     public float[] vectorValue(int i) throws IOException {
         try {
@@ -216,7 +265,7 @@ public class JVectorFloatVectorValues extends FloatVectorValues {
 
     @Override
     public VectorScorer scorer(float[] query) throws IOException {
-        return new JVectorVectorScorer(this, VECTOR_TYPE_SUPPORT.createFloatVector(query), similarityFunction);
+        return new JVectorVectorScorer(this, VECTOR_TYPE_SUPPORT.createFloatVector(query), similarityFunction, luceneSimilarityFunction);
     }
 
 }

@@ -47,6 +47,7 @@ public class DerivedSourceTestCase extends KNNRestTestCase {
      *  index without derived source enabled (baseline).
      *  {
      *     "settings": {
+     *         "index.derived_source.enabled": true/false,
      *         "index.knn" true,
      *         "index.knn.derived_source.enabled": true/false
      *     },
@@ -57,12 +58,12 @@ public class DerivedSourceTestCase extends KNNRestTestCase {
      *                 "dimension": 16,
      *                 "data_type": float
      *             },
-     *  			"test_float_vector": {
+     *             "test_float_vector": {
      *                 "type": "knn_vector",
      *                 "dimension": 16,
      *                 "data_type": float
      *             },
-     * 			"test_float_vector": {
+     *             "test_float_vector": {
      *                 "type": "knn_vector",
      *                 "dimension": 16,
      *                 "data_type": float
@@ -83,26 +84,37 @@ public class DerivedSourceTestCase extends KNNRestTestCase {
      *                 "data_type": float
      *             },
      *             "test-text" {
-     *             	"type": "text"
+     *                 "type": "text"
      *             },
      *             "test-int" {
-     *             	"type": "text"
+     *                 "type": "text"
      *             },
      *         }
      *     }
      * }
      */
-    protected List<DerivedSourceUtils.IndexConfigContext> getFlatIndexContexts(String testSuitePrefix, boolean addRandom, boolean addNull) {
+    protected List<DerivedSourceUtils.IndexConfigContext> getFlatIndexContexts(
+        String testSuitePrefix,
+        boolean addRandom,
+        boolean addNull,
+        boolean coreEnabled
+    ) {
         List<DerivedSourceUtils.IndexConfigContext> indexConfigContexts = new ArrayList<>();
         long consistentRandomSeed = random().nextLong();
         for (Tuple<String, Boolean> index : INDEX_PREFIX_TO_ENABLED) {
             Supplier<Integer> dimensionSupplier = randomIntegerSupplier(consistentRandomSeed, MIN_DIMENSION, MAX_DIMENSION);
             Supplier<Integer> binaryDimensionSupplier = randomIntegerSupplier(consistentRandomSeed, MIN_DIMENSION, MAX_DIMENSION, 8);
             Supplier<Integer> randomDocCountSupplier = randomIntegerSupplier(consistentRandomSeed, MIN_DOCS, MAX_DOCS);
-            DerivedSourceUtils.IndexConfigContext indexConfigContext = DerivedSourceUtils.IndexConfigContext.builder()
-                .indexName(getIndexName(testSuitePrefix, index.v1(), addRandom))
+            DerivedSourceUtils.IndexConfigContext.IndexConfigContextBuilder<?, ?> builder = DerivedSourceUtils.IndexConfigContext.builder();
+            if (coreEnabled) {
+                builder.coreDerivedEnabled(index.v2());
+            } else {
+                builder.derivedEnabled(index.v2());
+            }
+            DerivedSourceUtils.IndexConfigContext indexConfigContext = builder.indexName(
+                getIndexName(testSuitePrefix, index.v1(), addRandom)
+            )
                 .docCount(randomDocCountSupplier.get())
-                .derivedEnabled(index.v2())
                 .random(new Random(consistentRandomSeed))
                 .fields(
                     List.of(
@@ -142,8 +154,14 @@ public class DerivedSourceTestCase extends KNNRestTestCase {
                             .nullProb(addNull ? DerivedSourceUtils.DEFAULT_NULL_PROB : 0)
                             .isUpdate(true)
                             .build(),
-                        DerivedSourceUtils.TextFieldType.builder().fieldPath("test-text").build(),
-                        DerivedSourceUtils.IntFieldType.builder().fieldPath("test-int").build()
+                        DerivedSourceUtils.TextFieldType.builder()
+                            .fieldPath("test-text")
+                            .nullProb(addNull ? DerivedSourceUtils.DEFAULT_NULL_PROB : 0)
+                            .build(),
+                        DerivedSourceUtils.IntFieldType.builder()
+                            .fieldPath("test-int")
+                            .nullProb(addNull ? DerivedSourceUtils.DEFAULT_NULL_PROB : 0)
+                            .build()
                     )
                 )
                 .build();
@@ -151,6 +169,10 @@ public class DerivedSourceTestCase extends KNNRestTestCase {
             indexConfigContexts.add(indexConfigContext);
         }
         return indexConfigContexts;
+    }
+
+    protected List<DerivedSourceUtils.IndexConfigContext> getFlatIndexContexts(String testSuitePrefix, boolean addRandom, boolean addNull) {
+        return getFlatIndexContexts(testSuitePrefix, addRandom, addNull, false);
     }
 
     /**
@@ -494,16 +516,27 @@ public class DerivedSourceTestCase extends KNNRestTestCase {
      *     }
      *   }
      */
-    protected List<DerivedSourceUtils.IndexConfigContext> getNestedIndexContexts(String testSuitePrefix, boolean addRandom) {
+    protected List<DerivedSourceUtils.IndexConfigContext> getNestedIndexContexts(
+        String testSuitePrefix,
+        boolean addRandom,
+        boolean addNull,
+        boolean coreEnabled
+    ) {
         List<DerivedSourceUtils.IndexConfigContext> indexConfigContexts = new ArrayList<>();
         long consistentRandomSeed = random().nextLong();
         for (Tuple<String, Boolean> index : INDEX_PREFIX_TO_ENABLED) {
             Supplier<Integer> dimensionSupplier = randomIntegerSupplier(consistentRandomSeed, MIN_DIMENSION, MAX_DIMENSION);
             Supplier<Integer> randomDocCountSupplier = randomIntegerSupplier(consistentRandomSeed, MIN_DOCS, MAX_DOCS);
-            DerivedSourceUtils.IndexConfigContext indexConfigContext = DerivedSourceUtils.IndexConfigContext.builder()
-                .indexName(getIndexName(testSuitePrefix, index.v1(), addRandom))
+            DerivedSourceUtils.IndexConfigContext.IndexConfigContextBuilder<?, ?> builder = DerivedSourceUtils.IndexConfigContext.builder();
+            if (coreEnabled) {
+                builder.coreDerivedEnabled(index.v2());
+            } else {
+                builder.derivedEnabled(index.v2());
+            }
+            DerivedSourceUtils.IndexConfigContext indexConfigContext = builder.indexName(
+                getIndexName(testSuitePrefix, index.v1(), addRandom)
+            )
                 .docCount(randomDocCountSupplier.get())
-                .derivedEnabled(index.v2())
                 .random(new Random(consistentRandomSeed))
                 .fields(
                     List.of(
@@ -514,6 +547,7 @@ public class DerivedSourceTestCase extends KNNRestTestCase {
                                     DerivedSourceUtils.KNNVectorFieldTypeContext.builder()
                                         .dimension(dimensionSupplier.get())
                                         .fieldPath("object_1.test_vector")
+                                        .nullProb(addNull ? DerivedSourceUtils.DEFAULT_NULL_PROB : 0)
                                         .build(),
                                     DerivedSourceUtils.NestedFieldContext.builder()
                                         .fieldPath("object_1.nested_1")
@@ -522,12 +556,15 @@ public class DerivedSourceTestCase extends KNNRestTestCase {
                                                 DerivedSourceUtils.KNNVectorFieldTypeContext.builder()
                                                     .dimension(dimensionSupplier.get())
                                                     .fieldPath("object_1.nested_1.test_vector")
+                                                    .nullProb(addNull ? DerivedSourceUtils.DEFAULT_NULL_PROB : 0)
                                                     .build()
                                             )
                                         )
+                                        .nullProb(addNull ? DerivedSourceUtils.DEFAULT_NULL_PROB : 0)
                                         .build()
                                 )
                             )
+                            .nullProb(addNull ? DerivedSourceUtils.DEFAULT_NULL_PROB : 0)
                             .build(),
                         DerivedSourceUtils.NestedFieldContext.builder()
                             .fieldPath("nested_1")
@@ -536,10 +573,12 @@ public class DerivedSourceTestCase extends KNNRestTestCase {
                                     DerivedSourceUtils.KNNVectorFieldTypeContext.builder()
                                         .dimension(dimensionSupplier.get())
                                         .fieldPath("nested_1.test_vector")
+                                        .nullProb(addNull ? DerivedSourceUtils.DEFAULT_NULL_PROB : 0)
                                         .build(),
                                     DerivedSourceUtils.KNNVectorFieldTypeContext.builder()
                                         .dimension(dimensionSupplier.get())
                                         .fieldPath("nested_1.update_vector")
+                                        .nullProb(addNull ? DerivedSourceUtils.DEFAULT_NULL_PROB : 0)
                                         .isUpdate(true)
                                         .build(),
                                     DerivedSourceUtils.ObjectFieldContext.builder()
@@ -549,13 +588,16 @@ public class DerivedSourceTestCase extends KNNRestTestCase {
                                                 DerivedSourceUtils.KNNVectorFieldTypeContext.builder()
                                                     .dimension(dimensionSupplier.get())
                                                     .fieldPath("nested_1.object_1.test_vector")
+                                                    .nullProb(addNull ? DerivedSourceUtils.DEFAULT_NULL_PROB : 0)
                                                     .build(),
                                                 DerivedSourceUtils.IntFieldType.builder().fieldPath("nested_1.object_1.test-int").build()
                                             )
                                         )
+                                        .nullProb(addNull ? DerivedSourceUtils.DEFAULT_NULL_PROB : 0)
                                         .build()
                                 )
                             )
+                            .nullProb(addNull ? DerivedSourceUtils.DEFAULT_NULL_PROB : 0)
                             .build(),
                         DerivedSourceUtils.NestedFieldContext.builder()
                             .fieldPath("nested_2")
@@ -565,11 +607,13 @@ public class DerivedSourceTestCase extends KNNRestTestCase {
                                     DerivedSourceUtils.KNNVectorFieldTypeContext.builder()
                                         .dimension(dimensionSupplier.get())
                                         .fieldPath("nested_2.test_vector")
+                                        .nullProb(addNull ? DerivedSourceUtils.DEFAULT_NULL_PROB : 0)
                                         .build(),
                                     DerivedSourceUtils.KNNVectorFieldTypeContext.builder()
                                         .fieldPath("nested_2.update_vector")
                                         .isUpdate(true)
                                         .dimension(dimensionSupplier.get())
+                                        .nullProb(addNull ? DerivedSourceUtils.DEFAULT_NULL_PROB : 0)
                                         .build(),
                                     DerivedSourceUtils.NestedFieldContext.builder()
                                         .fieldPath("nested_2.nested_3")
@@ -578,11 +622,13 @@ public class DerivedSourceTestCase extends KNNRestTestCase {
                                                 DerivedSourceUtils.KNNVectorFieldTypeContext.builder()
                                                     .dimension(dimensionSupplier.get())
                                                     .fieldPath("nested_2.nested_3.test_vector")
+                                                    .nullProb(addNull ? DerivedSourceUtils.DEFAULT_NULL_PROB : 0)
                                                     .build(),
                                                 DerivedSourceUtils.KNNVectorFieldTypeContext.builder()
                                                     .dimension(dimensionSupplier.get())
                                                     .fieldPath("nested_2.nested_3.update_vector")
                                                     .isUpdate(true)
+                                                    .nullProb(addNull ? DerivedSourceUtils.DEFAULT_NULL_PROB : 0)
                                                     .build(),
                                                 DerivedSourceUtils.IntFieldType.builder().fieldPath("nested_2.nested_3.test-int").build()
                                             )
@@ -590,15 +636,18 @@ public class DerivedSourceTestCase extends KNNRestTestCase {
                                         .build()
                                 )
                             )
+                            .nullProb(addNull ? DerivedSourceUtils.DEFAULT_NULL_PROB : 0)
                             .build(),
                         DerivedSourceUtils.KNNVectorFieldTypeContext.builder()
                             .dimension(dimensionSupplier.get())
                             .fieldPath("test_vector")
+                            .nullProb(addNull ? DerivedSourceUtils.DEFAULT_NULL_PROB : 0)
                             .build(),
                         DerivedSourceUtils.KNNVectorFieldTypeContext.builder()
                             .dimension(dimensionSupplier.get())
                             .fieldPath("update_vector")
                             .isUpdate(true)
+                            .nullProb(addNull ? DerivedSourceUtils.DEFAULT_NULL_PROB : 0)
                             .build(),
                         DerivedSourceUtils.TextFieldType.builder().fieldPath("test-text").build(),
                         DerivedSourceUtils.IntFieldType.builder().fieldPath("test-int").build()
@@ -609,6 +658,14 @@ public class DerivedSourceTestCase extends KNNRestTestCase {
             indexConfigContexts.add(indexConfigContext);
         }
         return indexConfigContexts;
+    }
+
+    protected List<DerivedSourceUtils.IndexConfigContext> getNestedIndexContexts(
+        String testSuitePrefix,
+        boolean addRandom,
+        boolean addNull
+    ) {
+        return getNestedIndexContexts(testSuitePrefix, addRandom, addNull, false);
     }
 
     /**
@@ -641,17 +698,24 @@ public class DerivedSourceTestCase extends KNNRestTestCase {
     protected List<DerivedSourceUtils.IndexConfigContext> getIndexContextsWithMetaFields(
         String testSuitePrefix,
         boolean addRandom,
-        boolean addNull
+        boolean addNull,
+        boolean coreEnabled
     ) {
         List<DerivedSourceUtils.IndexConfigContext> indexConfigContexts = new ArrayList<>();
         long consistentRandomSeed = random().nextLong();
         for (Tuple<String, Boolean> index : INDEX_PREFIX_TO_ENABLED) {
             Supplier<Integer> dimensionSupplier = randomIntegerSupplier(consistentRandomSeed, MIN_DIMENSION, MAX_DIMENSION);
             Supplier<Integer> randomDocCountSupplier = randomIntegerSupplier(consistentRandomSeed, MIN_DOCS, MAX_DOCS);
-            DerivedSourceUtils.IndexConfigContext indexConfigContext = DerivedSourceUtils.IndexConfigContext.builder()
-                .indexName(getIndexName(testSuitePrefix, index.v1(), addRandom))
+            DerivedSourceUtils.IndexConfigContext.IndexConfigContextBuilder<?, ?> builder = DerivedSourceUtils.IndexConfigContext.builder();
+            if (coreEnabled) {
+                builder.coreDerivedEnabled(index.v2());
+            } else {
+                builder.derivedEnabled(index.v2());
+            }
+            DerivedSourceUtils.IndexConfigContext indexConfigContext = builder.indexName(
+                getIndexName(testSuitePrefix, index.v1(), addRandom)
+            )
                 .docCount(randomDocCountSupplier.get())
-                .derivedEnabled(index.v2())
                 .random(new Random(consistentRandomSeed))
                 .fields(
                     List.of(
@@ -660,8 +724,14 @@ public class DerivedSourceTestCase extends KNNRestTestCase {
                             .nullProb(addNull ? DerivedSourceUtils.DEFAULT_NULL_PROB : 0)
                             .fieldPath("test_float_vector")
                             .build(),
-                        DerivedSourceUtils.TextFieldType.builder().fieldPath("test-text").build(),
-                        DerivedSourceUtils.IntFieldType.builder().fieldPath("test-int").build()
+                        DerivedSourceUtils.TextFieldType.builder()
+                            .fieldPath("test-text")
+                            .nullProb(addNull ? DerivedSourceUtils.DEFAULT_NULL_PROB : 0)
+                            .build(),
+                        DerivedSourceUtils.IntFieldType.builder()
+                            .fieldPath("test-int")
+                            .nullProb(addNull ? DerivedSourceUtils.DEFAULT_NULL_PROB : 0)
+                            .build()
                     )
                 )
                 .isRoutingEnabled(true)
@@ -670,6 +740,14 @@ public class DerivedSourceTestCase extends KNNRestTestCase {
             indexConfigContexts.add(indexConfigContext);
         }
         return indexConfigContexts;
+    }
+
+    protected List<DerivedSourceUtils.IndexConfigContext> getIndexContextsWithMetaFields(
+        String testSuitePrefix,
+        boolean addRandom,
+        boolean addNull
+    ) {
+        return getIndexContextsWithMetaFields(testSuitePrefix, addRandom, addNull, false);
     }
 
     @SneakyThrows

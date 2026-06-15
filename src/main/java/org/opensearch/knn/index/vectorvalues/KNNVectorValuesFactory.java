@@ -22,6 +22,7 @@ import org.apache.lucene.index.VectorEncoding;
 import org.apache.lucene.search.DocIdSetIterator;
 import org.opensearch.knn.common.FieldInfoExtractor;
 import org.opensearch.knn.index.VectorDataType;
+import org.opensearch.knn.index.codec.jvector.JVectorFloatVectorValues;
 
 import java.io.IOException;
 import java.util.Map;
@@ -102,7 +103,8 @@ public final class KNNVectorValuesFactory {
      * @param leafReader {@link LeafReader}
      * @return {@link KNNVectorValues}
      */
-    public static <T> KNNVectorValues<T> getVectorValues(final FieldInfo fieldInfo, final LeafReader leafReader) throws IOException {
+    public static <T> KNNVectorValues<T> getDerivedSourcesVectorValues(final FieldInfo fieldInfo, final LeafReader leafReader)
+        throws IOException {
         final DocIdSetIterator docIdSetIterator;
         if (!fieldInfo.hasVectorValues()) {
             docIdSetIterator = DocValues.getBinary(leafReader, fieldInfo.getName());
@@ -115,24 +117,32 @@ public final class KNNVectorValuesFactory {
                 new KNNVectorValuesIterator.DocIdsIteratorValues(leafReader.getByteVectorValues(fieldInfo.getName()))
             );
         } else if (fieldInfo.getVectorEncoding() == VectorEncoding.FLOAT32) {
-            return getVectorValues(
-                FieldInfoExtractor.extractVectorDataType(fieldInfo),
-                new KNNVectorValuesIterator.DocIdsIteratorValues(leafReader.getFloatVectorValues(fieldInfo.getName()))
-            );
+            final FloatVectorValues knnVectorValues = leafReader.getFloatVectorValues(fieldInfo.getName());
+            if (knnVectorValues instanceof JVectorFloatVectorValues jfvv) {
+                return getVectorValues(
+                    FieldInfoExtractor.extractVectorDataType(fieldInfo),
+                    new KNNVectorValuesIterator.DocIdsIteratorValues(jfvv)
+                );
+            } else {
+                return getVectorValues(
+                    FieldInfoExtractor.extractVectorDataType(fieldInfo),
+                    new KNNVectorValuesIterator.DocIdsIteratorValues(knnVectorValues)
+                );
+            }
         } else {
             throw new IllegalArgumentException("Invalid Vector encoding provided, hence cannot return VectorValues");
         }
     }
 
     /**
-     * Returns a {@link KNNVectorValues} for the given {@link FieldInfo} and {@link LeafReader}
+     * Returns a {@link KNNVectorValues} for the given {@link FieldInfo} and {@link LeafReader} that support derived sources
      *
      * @param fieldInfo {@link FieldInfo}
      * @param docValuesProducer {@link DocValuesProducer}
      * @param knnVectorsReader {@link KnnVectorsReader}
      * @return {@link KNNVectorValues}
      */
-    public static <T> KNNVectorValues<T> getVectorValues(
+    public static <T> KNNVectorValues<T> getDerivedSourcesVectorValues(
         final FieldInfo fieldInfo,
         final DocValuesProducer docValuesProducer,
         final KnnVectorsReader knnVectorsReader
@@ -151,7 +161,12 @@ public final class KNNVectorValuesFactory {
             } else {
                 throw new IllegalArgumentException("Invalid Vector encoding provided, hence cannot return VectorValues");
             }
-            return getVectorValues(vectorDataType, new KNNVectorValuesIterator.DocIdsIteratorValues(knnVectorValues));
+
+            if (knnVectorValues instanceof JVectorFloatVectorValues jfvv) {
+                return getVectorValues(vectorDataType, new KNNVectorValuesIterator.DocIdsIteratorValues(jfvv));
+            } else {
+                return getVectorValues(vectorDataType, new KNNVectorValuesIterator.DocIdsIteratorValues(knnVectorValues));
+            }
         } else if (docValuesProducer != null) {
             return getVectorValues(
                 FieldInfoExtractor.extractVectorDataType(fieldInfo),

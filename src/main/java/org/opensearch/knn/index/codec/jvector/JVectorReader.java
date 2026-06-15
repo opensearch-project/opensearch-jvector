@@ -18,9 +18,17 @@ import io.github.jbellis.jvector.graph.similarity.SearchScoreProvider;
 import io.github.jbellis.jvector.quantization.NVQuantization;
 import io.github.jbellis.jvector.quantization.PQVectors;
 import io.github.jbellis.jvector.quantization.ProductQuantization;
+import io.github.jbellis.jvector.vector.VectorSimilarityFunction;
 import io.github.jbellis.jvector.vector.VectorizationProvider;
 import io.github.jbellis.jvector.vector.types.VectorFloat;
 import io.github.jbellis.jvector.vector.types.VectorTypeSupport;
+import java.io.Closeable;
+import java.io.IOException;
+import java.lang.reflect.Field;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import lombok.extern.log4j.Log4j2;
 import org.apache.lucene.codecs.CodecUtil;
 import org.apache.lucene.codecs.KnnVectorsReader;
@@ -30,18 +38,8 @@ import org.apache.lucene.search.KnnCollector;
 import org.apache.lucene.store.*;
 import org.apache.lucene.util.Bits;
 import org.apache.lucene.util.IOUtils;
-import io.github.jbellis.jvector.vector.VectorSimilarityFunction;
 import org.opensearch.knn.common.KNNConstants;
 import org.opensearch.knn.plugin.stats.KNNCounter;
-
-import java.io.Closeable;
-import java.io.IOException;
-import java.lang.reflect.Field;
-
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 
 @Log4j2
 public class JVectorReader extends KnnVectorsReader {
@@ -105,7 +103,7 @@ public class JVectorReader extends KnnVectorsReader {
         final FieldEntry fieldEntry = fieldEntryMap.get(field);
         return new JVectorFloatVectorValues(
             fieldEntry.index,
-            fieldEntry.similarityFunction,
+            fieldEntry.fieldInfo.getVectorSimilarityFunction(),
             fieldEntry.graphNodeIdToDocMap,
             fieldEntry.nvqInlineQuantization
         );
@@ -164,18 +162,32 @@ public class JVectorReader extends KnnVectorsReader {
         VectorFloat<?> q = VECTOR_TYPE_SUPPORT.createFloatVector(target);
         final SearchScoreProvider ssp;
 
+        // Get the Lucene similarity function to check if we need to transform scores
+        final FieldEntry fieldEntry = fieldEntryMap.get(field);
+        final org.apache.lucene.index.VectorSimilarityFunction luceneSimilarityFunction = fieldEntry.fieldInfo
+            .getVectorSimilarityFunction();
+        final VectorSimilarityFunction vectorSimilarityFunction = fieldEntry.similarityFunction;
+
         try (var view = index.getView()) {
             final long graphSearchStart = System.currentTimeMillis();
-            final FieldEntry fe = fieldEntryMap.get(field);
-            if (fe.pqVectors != null) {
+            if (fieldEntryMap.get(field).pqVectors != null) { // Quantized, use the precomputed score function
+                final PQVectors pqVectors = fieldEntryMap.get(field).pqVectors;
+                // SearchScoreProvider that does a first pass with the loaded-in-memory PQVectors,
+                // then reranks with the exact vectors that are stored on disk in the index
                 // PQ blob as approximate first pass; reranker reads inline vectors (NVQ or full-precision)
-                ScoreFunction.ApproximateScoreFunction asf = fe.pqVectors.precomputedScoreFunctionFor(q, fe.similarityFunction);
-                ScoreFunction.ExactScoreFunction reranker = view.rerankerFor(q, fe.similarityFunction);
+                ScoreFunction.ApproximateScoreFunction asf = pqVectors.precomputedScoreFunctionFor(q, vectorSimilarityFunction);
+                ScoreFunction.ExactScoreFunction reranker = wrapExactScoreFunction(
+                    view.rerankerFor(q, vectorSimilarityFunction),
+                    luceneSimilarityFunction,
+                    vectorSimilarityFunction
+                );
                 ssp = new DefaultSearchScoreProvider(asf, reranker);
             } else if (fe.nvqInlineQuantization != null) { // NVQ inline without PQ blob
-                ssp = new DefaultSearchScoreProvider(view.rerankerFor(q, fe.similarityFunction));
-            } else {
-                ssp = DefaultSearchScoreProvider.exact(q, fe.similarityFunction, view);
+                ssp = new DefaultSearchScoreProvider(view.rerankerFor(q, vectorSimilarityFunction));
+            } else { // Not quantized, used typical searcher
+                ScoreFunction.ExactScoreFunction esf = DefaultSearchScoreProvider.exact(q, vectorSimilarityFunction, view)
+                    .exactScoreFunction();
+                ssp = new DefaultSearchScoreProvider(wrapExactScoreFunction(esf, luceneSimilarityFunction, vectorSimilarityFunction));
             }
             final GraphNodeIdToDocMap jvectorLuceneDocMap = fe.graphNodeIdToDocMap;
             // Convert the acceptDocs bitmap from Lucene to jVector ordinal bitmap filter
@@ -198,6 +210,7 @@ public class JVectorReader extends KnnVectorsReader {
                     jvectorKnnCollector.getRerankFloor(),
                     compatibleBits
                 );
+
                 for (SearchResult.NodeScore ns : searchResults.getNodes()) {
                     jvectorKnnCollector.collect(jvectorLuceneDocMap.getLuceneDocId(ns.node), ns.score);
                 }
@@ -232,6 +245,35 @@ public class JVectorReader extends KnnVectorsReader {
                     jvectorKnnCollector.incVisitedCount(visitedCount);
                 }
             }
+        }
+    }
+
+    /**
+     * Wraps an ExactScoreFunction to handle score transformation between jVector and Lucene similarity functions for innerproduct.
+     *
+     * @param delegate the base ExactScoreFunction to wrap
+     * @param luceneSimilarityFunction the Lucene similarity function
+     * @param jvectorSimilarityFunction the jVector similarity function
+     * @return a wrapped ExactScoreFunction that applies score transformation if needed
+     */
+    private static ScoreFunction.ExactScoreFunction wrapExactScoreFunction(
+        ScoreFunction.ExactScoreFunction delegate,
+        org.apache.lucene.index.VectorSimilarityFunction luceneSimilarityFunction,
+        VectorSimilarityFunction jvectorSimilarityFunction
+    ) {
+        // Lucene's MAXIMUM_INNER_PRODUCT formula is: 1 + dotProduct
+        // jVector's DOT_PRODUCT returns: (1 + dotProduct) / 2
+        // To convert: score * 2 = (1 + dotProduct) / 2 * 2 = 1 + dotProduct
+        if (luceneSimilarityFunction == org.apache.lucene.index.VectorSimilarityFunction.MAXIMUM_INNER_PRODUCT
+            && jvectorSimilarityFunction == VectorSimilarityFunction.DOT_PRODUCT) {
+            return new ScoreFunction.ExactScoreFunction() {
+                @Override
+                public float similarityTo(int node2) {
+                    return delegate.similarityTo(node2) * 2.0f;
+                }
+            };
+        } else {
+            return delegate;
         }
     }
 
@@ -407,7 +449,8 @@ public class JVectorReader extends KnnVectorsReader {
         public static final List<VectorSimilarityFunction> JVECTOR_SUPPORTED_SIMILARITY_FUNCTIONS = List.of(
             VectorSimilarityFunction.EUCLIDEAN,
             VectorSimilarityFunction.DOT_PRODUCT,
-            VectorSimilarityFunction.COSINE
+            VectorSimilarityFunction.COSINE,
+            VectorSimilarityFunction.DOT_PRODUCT
         );
 
         public static final Map<org.apache.lucene.index.VectorSimilarityFunction, VectorSimilarityFunction> LUCENE_TO_JVECTOR_MAP = Map.of(
@@ -416,7 +459,9 @@ public class JVectorReader extends KnnVectorsReader {
             org.apache.lucene.index.VectorSimilarityFunction.DOT_PRODUCT,
             VectorSimilarityFunction.DOT_PRODUCT,
             org.apache.lucene.index.VectorSimilarityFunction.COSINE,
-            VectorSimilarityFunction.COSINE
+            VectorSimilarityFunction.COSINE,
+            org.apache.lucene.index.VectorSimilarityFunction.MAXIMUM_INNER_PRODUCT,
+            VectorSimilarityFunction.DOT_PRODUCT
         );
 
         public static int distFuncToOrd(org.apache.lucene.index.VectorSimilarityFunction func) {

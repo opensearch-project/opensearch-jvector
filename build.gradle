@@ -16,7 +16,7 @@ buildscript {
     ext {
         // build.version_qualifier parameter applies to jvector plugin artifacts only. OpenSearch version must be set
         // explicitly as 'opensearch.version' property, for instance opensearch.version=2.0.0-rc1-SNAPSHOT
-        opensearch_version = System.getProperty("opensearch.version", "3.7.0-SNAPSHOT")
+        opensearch_version = System.getProperty("opensearch.version", "3.8.0-SNAPSHOT")
         opensearch_build = opensearch_version.replaceAll(/(\.\d)([^\d]*)$/, '$1.0$2')
         common_utils_version = System.getProperty("common_utils.version", opensearch_build)
         version_qualifier = System.getProperty("build.version_qualifier", "")
@@ -60,7 +60,7 @@ plugins {
     id 'java-test-fixtures'
     id 'idea'
     id 'eclipse'
-    id "com.diffplug.spotless" version "6.25.0" apply false
+    id "com.diffplug.spotless" version "8.4.0" apply false
     id 'io.freefair.lombok' version '8.14'
     id "de.undercouch.download" version "5.3.0"
     id "me.champeau.jmh" version "0.7.1"
@@ -313,6 +313,11 @@ task release(type: Copy, group: 'build') {
 dependencies {
     api "org.opensearch:opensearch:${opensearch_version}"
     compileOnly "org.opensearch.plugin:opensearch-scripting-painless-spi:${versions.opensearch}"
+    
+    // gRPC support dependencies (provided at runtime by OpenSearch)
+    compileOnly "org.opensearch.plugin:transport-grpc-spi:${opensearch_version}"
+    compileOnly "org.opensearch:protobufs:${versions.opensearchprotobufs}"
+    
     // Declare guava as compile time since guava will come from OpenSearch transport-grpc module.
     compileOnly group: 'com.google.guava', name: 'guava', version: "${versions.guava}"
     api "org.apache.commons:commons-lang3:${versions.commonslang}"
@@ -323,6 +328,17 @@ dependencies {
     // Add netty dependency so we can use it within internal test clusters (not just external ones)
     testImplementation "org.opensearch.plugin:transport-netty4-client:${opensearch_version}"
     testImplementation("com.google.guava:guava:${versions.guava}")
+    
+    // gRPC integration test dependencies (following neural-search pattern)
+    testImplementation "org.opensearch:protobufs:${versions.opensearchprotobufs}"
+    testImplementation "org.opensearch.plugin:transport-grpc-spi:${opensearch_version}"
+    testImplementation "io.grpc:grpc-api:${versions.grpc}"
+    testImplementation "io.grpc:grpc-core:${versions.grpc}"
+    testImplementation "io.grpc:grpc-netty-shaded:${versions.grpc}"
+    testImplementation "io.grpc:grpc-stub:${versions.grpc}"
+    testImplementation "io.grpc:grpc-protobuf:${versions.grpc}"
+    testImplementation "io.grpc:grpc-protobuf-lite:${versions.grpc}"
+    testRuntimeOnly "io.perfmark:perfmark-api:0.27.0"
 
     testFixturesImplementation("com.google.guava:guava:${versions.guava}") {
         exclude group: 'com.google.errorprone', module: 'error_prone_annotations'
@@ -427,6 +443,37 @@ integTest {
         getClusters().forEach { cluster ->
             cluster.waitForAllConditions()
         }
+        
+        // Discover the actual gRPC port from the cluster log.
+        // The gRPC transport binds to the first available port in 9400-9500,
+        // which may differ from 9400 due to port conflicts or dual-stack binding.
+        // Only discover when NOT using an external cluster (tests.rest.cluster),
+        // since the Gradle-managed cluster's gRPC port is irrelevant for external clusters.
+        if (System.getProperty("tests.rest.cluster") == null) {
+            getClusters().forEach { cluster ->
+                def logFile = new File(cluster.nodes.first().workingDir.toFile(), "logs/integTest.log")
+                // Retry to handle race condition where gRPC transport hasn't written port to log yet
+                def grpcPort = null
+                for (int attempt = 0; attempt < 10 && grpcPort == null; attempt++) {
+                    if (logFile.exists()) {
+                        def matcher = (logFile.text =~ /Netty4GrpcServerTransport.*publish_address \{([^}]+):(\d+)\}/)
+                        if (matcher.find()) {
+                            grpcPort = matcher.group(2)
+                        }
+                    }
+                    if (grpcPort == null) {
+                        logger.lifecycle("Waiting for gRPC port in log file (attempt ${attempt + 1}/10)...")
+                        Thread.sleep(1000)
+                    }
+                }
+                if (grpcPort != null) {
+                    systemProperty 'tests.grpc.port', grpcPort
+                    logger.lifecycle("Discovered gRPC port: ${grpcPort}")
+                } else {
+                    logger.warn("Could not discover gRPC port from cluster log — gRPC tests will use default port 9400")
+                }
+            }
+        }
     }
 
     // The -Ddebug.es option makes the cluster debuggable; this makes the tests debuggable
@@ -440,6 +487,11 @@ testClusters.integTest { cluster ->
     testDistribution = "ARCHIVE"
     systemProperty "java.security.policy", "file://${project.rootDir}/src/main/plugin-metadata/plugin-security.policy"
     systemProperty 'log4j.configurationFile', "${project.rootDir}/src/test/resources/log4j2.properties"
+    
+    // Enable gRPC transport module (following neural-search pattern)
+    setting("aux.transport.types", "[transport-grpc]")
+    // Bind gRPC to IPv4 loopback to avoid dual-stack port mismatch
+    setting("grpc.bind_host", "127.0.0.1")
 
     // Optionally install security
     if (System.getProperty("security.enabled") != null) {
