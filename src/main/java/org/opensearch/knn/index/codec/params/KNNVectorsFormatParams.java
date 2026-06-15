@@ -6,6 +6,7 @@
 package org.opensearch.knn.index.codec.params;
 
 import lombok.Getter;
+import lombok.extern.log4j.Log4j2;
 import org.opensearch.knn.common.KNNConstants;
 import org.opensearch.knn.index.SpaceType;
 import org.opensearch.knn.index.codec.jvector.JVectorFormat;
@@ -17,6 +18,7 @@ import java.util.function.Function;
  * Class provides params for LuceneHNSWVectorsFormat
  */
 @Getter
+@Log4j2
 public class KNNVectorsFormatParams {
     private int maxConnections;
     private int beamWidth;
@@ -146,8 +148,19 @@ public class KNNVectorsFormatParams {
     private void initNumNvqSubvectors(final Map<String, Object> params) {
         if (params != null && params.containsKey(KNNConstants.METHOD_PARAMETER_NUM_NVQ_SUBVECTORS)) {
             this.numNvqSubvectors = (int) params.get(KNNConstants.METHOD_PARAMETER_NUM_NVQ_SUBVECTORS);
-            return;
-        }
+            log.info(
+                "NVQ is used, and {} is set to {}",
+                KNNConstants.METHOD_PARAMETER_NUM_NVQ_SUBVECTORS,
+                KNNConstants.DEFAULT_NUM_NVQ_SUBVECTORS
+            );
+        } else if (params.containsKey(KNNConstants.METHOD_PARAMETER_QUANTIZATION_TYPE)
+            && params.get(KNNConstants.METHOD_PARAMETER_QUANTIZATION_TYPE).equals(KNNConstants.QUANTIZATION_TYPE_NVQ)) {
+                log.info(
+                    "NVQ is used, and {} not set; defaulting to {}",
+                    KNNConstants.METHOD_PARAMETER_NUM_NVQ_SUBVECTORS,
+                    KNNConstants.DEFAULT_NUM_NVQ_SUBVECTORS
+                );
+            }
         this.numNvqSubvectors = KNNConstants.DEFAULT_NUM_NVQ_SUBVECTORS;
     }
 

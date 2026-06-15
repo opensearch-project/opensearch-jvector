@@ -281,6 +281,28 @@ public class JVectorFormat extends KnnVectorsFormat {
         return compressedBytes;
     }
 
+    /**
+     * Returns the default number of NVQ subvectors for a given vector dimension.
+     *
+     * <p>Unlike PQ (which stores only 1 byte per subvector as a centroid index), each NVQ
+     * subvector carries 28 bytes of fixed overhead: four floats (growthRate, midpoint, minValue,
+     * maxValue) and three ints for the sigmoid parameterization. To keep the NVQ inline graph
+     * smaller than full-precision storage ({@code dim × 4} bytes), M must satisfy:
+     *
+     * <pre>  4 + dim + 28 × M  &lt;  4 × dim   →   M  &lt;  3 × dim / 28</pre>
+     *
+     * This method targets roughly 32-dimensional subvectors, which amortizes the per-subvector
+     * overhead reasonably (28-byte overhead vs 32 bytes of data) while giving the NVQ sigmoid
+     * enough dimensions to model local non-linearity. The resulting compressed size is
+     * approximately {@code 2 × dim} bytes per vector — about 2× smaller than full precision.
+     *
+     * @param dim the original vector dimension
+     * @return the number of NVQ subvectors (at least 1)
+     */
+    public static int getDefaultNvqSubvectorsForDimension(int dim) {
+        return Math.max(1, dim / 32);
+    }
+
     public static ForkJoinPool getPhysicalCoreExecutor() {
         final int estimatedPhysicalCoreCount = Integer.getInteger(
             "jvector.physical_core_count",
