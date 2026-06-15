@@ -10,6 +10,7 @@
   - [Prerequisites](#prerequisites)
   - [Installation](#installation)
   - [Verify Installation](#verify-installation)
+  - [[Optional] Download and install Jvector compatible neural search](#optional-download-and-install-jvector-compatible-neural-search)
   - [Running the Demo](#running-the-demo)
   - [Your First Index and Search](#your-first-index-and-search)
 - [Index Management](#index-management)
@@ -50,7 +51,6 @@ The OpenSearch JVector plugin is a pure Java implementation of vector similarity
 **High-Level Benefits:**
 - **Scalable**: Handle billions of documents across thousands of dimensions using DiskANN
 - **Fast**: Pure Java implementation with minimal overhead and SIMD acceleration
-- **Lightweight**: Self-contained, no native dependencies, builds in seconds
 - **Efficient Updates**: Incremental merges that extend existing graphs rather than rebuilding from scratch
 
 ### Key Features
@@ -71,7 +71,7 @@ The plugin exposes the same `knn_vector` field type and `knn` query used by the 
 ### Prerequisites
 
 - **OpenSearch**: Version 3.x or later
-- **Java**: JDK 21 or later (required by OpenSearch 3.x)
+- **Java**: JDK 21 or later (required by OpenSearch 3.5)
 - **Memory**: Sufficient RAM for your vector dataset (see [Memory Management](#memory-management))
 - **Disk Space**: Adequate storage for indices and vector data with buffer for merging segments
 
@@ -162,6 +162,16 @@ node-1     opensearch-jvector  3.5.0.0
 - Default username is `admin`, password is set via `OPENSEARCH_INITIAL_ADMIN_PASSWORD`
 - For development with self-signed certificates, add `--insecure` or `-k` flag to curl commands
 - For production, configure proper SSL certificates
+
+### [Optional] Download and install Jvector compatible neural search
+
+If you want to use neural search capabilities with JVector, you can install the JVector-compatible neural search plugin from:
+
+**https://github.com/IBM/neural-search-jvector**
+
+This plugin provides neural search functionality that works with the JVector engine.
+
+---
 
 ### Running the Demo
 
@@ -523,14 +533,14 @@ Wait for the operation to complete before querying — it runs synchronously and
 
 #### Incremental Merge Advantage
 
-Unlike Lucene's full rebuild, jVector performs an *incremental merge* — nodes from smaller segments are inserted into the existing graph rather than re-indexing from scratch. This makes merges on large indexes dramatically faster.
+JVector performs an *incremental merge* — nodes from smaller segments are inserted into the existing graph rather than re-indexing from scratch. This makes merges on large indexes dramatically faster.
 
 **Key Benefits:**
 - Merge time grows more linearly with index size
 - Faster updates for large indices
 - Reduced resource consumption during merges
 
-To prevent the leading (largest) segment from being touched during merge:
+To disable the leading segment merge feature:
 
 ```json
 "parameters": {
@@ -940,7 +950,7 @@ curl -X PUT "http://localhost:9200/pq-index" \
 ```
 
 **Rules:**
-- `num_pq_subspaces` must be ≤ `dimension` and ideally a divisor of it
+- `num_pq_subspaces` must be ≤ `dimension` and ideally a divisor of `dimension`
 - Quantization training is triggered automatically once the segment has at least `min_batch_size_for_quantization` documents
 - More subspaces = less compression but better recall
 
@@ -1072,7 +1082,7 @@ The default is `l2` when `space_type` is omitted.
 
 ---
 
-## Next Steps
+## Additional Resources
 
 - **Benchmarks**: See [README.md](../README.md#incremental-merges) for performance comparisons
 - **Developer Guide**: See [DEVELOPER_GUIDE.md](../DEVELOPER_GUIDE.md) for contributing to the plugin
