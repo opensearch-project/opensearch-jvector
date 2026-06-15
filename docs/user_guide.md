@@ -166,8 +166,7 @@ node-1     opensearch-jvector  3.5.0.0
 ### [Optional] Download and install Jvector compatible neural search
 
 If you want to use neural search capabilities with JVector, you can install the JVector-compatible neural search plugin from:
-
-**https://github.com/IBM/neural-search-jvector**
+**https://github.com/IBM/neural-search-jvector/releases**
 
 This plugin provides neural search functionality that works with the JVector engine.
 
