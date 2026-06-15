@@ -296,7 +296,14 @@ public class JVectorWriter extends KnnVectorsWriter {
             randomAccessVectorValues.size(),
             segmentWriteState.segmentInfo.name
         );
-        final var vectorIndexFieldMetadata = writeGraph(graph, randomAccessVectorValues, fieldInfo, compressedVectors, auxiliaryPqVectors, graphNodeIdToDocMap);
+        final var vectorIndexFieldMetadata = writeGraph(
+            graph,
+            randomAccessVectorValues,
+            fieldInfo,
+            compressedVectors,
+            auxiliaryPqVectors,
+            graphNodeIdToDocMap
+        );
         meta.writeInt(fieldInfo.number);
         vectorIndexFieldMetadata.toOutput(meta);
 
@@ -373,14 +380,10 @@ public class JVectorWriter extends KnnVectorsWriter {
                 final NVQuantization nvQuantization = nvqVectors.getNVQuantization();
                 log.info("Writing NVQ vectors inline with graph nodes for field {}", fieldInfo.name);
                 try (
-                    var writer = new OnDiskSequentialGraphIndexWriter.Builder(graph, jVectorIndexWriter).with(
-                        new NVQ(nvQuantization)
-                    ).build()
+                    var writer = new OnDiskSequentialGraphIndexWriter.Builder(graph, jVectorIndexWriter).with(new NVQ(nvQuantization))
+                        .build()
                 ) {
-                    var suppliers = Feature.singleStateFactory(
-                        FeatureId.NVQ_VECTORS,
-                        nodeId -> new NVQ.State(nvqVectors.get(nodeId))
-                    );
+                    var suppliers = Feature.singleStateFactory(FeatureId.NVQ_VECTORS, nodeId -> new NVQ.State(nvqVectors.get(nodeId)));
                     writer.write(suppliers);
                     long endGraphOffset = jVectorIndexWriter.position();
                     resultBuilder.vectorIndexOffset(startOffset);
@@ -482,9 +485,7 @@ public class JVectorWriter extends KnnVectorsWriter {
         final String fieldName = fieldInfo.name;
         log.info("Computing NVQ parameters for field {} for {} vectors", fieldName, randomAccessVectorValues.size());
         final long start = Clock.systemDefaultZone().millis();
-        final int nSubVectors = numNvqSubvectors == org.opensearch.knn.common.KNNConstants.DEFAULT_NUM_NVQ_SUBVECTORS
-            ? numberOfSubspacesPerVectorSupplier.apply(randomAccessVectorValues.dimension())
-            : numNvqSubvectors;
+        final int nSubVectors = numNvqSubvectors;
         NVQuantization nvq = NVQuantization.compute(randomAccessVectorValues, nSubVectors);
         final long trainingTime = Clock.systemDefaultZone().millis() - start;
         log.info("Computed NVQ parameters for field {}, in {} millis", fieldName, trainingTime);
