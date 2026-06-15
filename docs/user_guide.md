@@ -70,7 +70,7 @@ The plugin exposes the same `knn_vector` field type and `knn` query used by the 
 
 ### Prerequisites
 
-- **OpenSearch**: Version 3.x or later
+- **OpenSearch**: Version 3.5 or later
 - **Java**: JDK 21 or later (required by OpenSearch 3.5)
 - **Memory**: Sufficient RAM for your vector dataset (see [Memory Management](#memory-management))
 - **Disk Space**: Adequate storage for indices and vector data with buffer for merging segments
