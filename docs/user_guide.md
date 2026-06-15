@@ -743,7 +743,7 @@ curl -X POST "http://localhost:9200/my-vectors/_search" \
 
 To combine vector similarity search with traditional text search, OpenSearch provides a dedicated [Hybrid Search](https://opensearch.org/docs/latest/search-plugins/hybrid-search/) plugin. It properly normalizes and combines scores from different query types.
 
-**Note:** The Hybrid Search plugin currently has tight integration with the official k-NN plugin and does not support `opensearch-jvector` at the moment. There are ongoing efforts to address this gap.
+**Note:** The `neural-search` plugin currently has tight integration with the official k-NN plugin and does not support `opensearch-jvector` at the moment. There are ongoing efforts to address this gap.
 
 #### Nested Field Search
 
