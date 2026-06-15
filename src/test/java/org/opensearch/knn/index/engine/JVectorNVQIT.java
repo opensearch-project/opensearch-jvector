@@ -31,12 +31,12 @@ import static org.opensearch.knn.index.engine.CommonTestUtils.*;
  * indexed and searchable, deletions honoured, segments merged correctly under NVQ, and
  * recall within acceptable bounds after NVQ compression.
  *
- * Tests 1–4 use a small dimension (3) with a high minBatchSize so that NVQ training is
+ * Smoke tests use a small dimension (3) with a high minBatchSize so that NVQ training is
  * NOT triggered; they test only that the NVQ mapping parameter is correctly wired through
  * the stack.
  *
- * Tests 5–7 use dimension 16 with minBatchSize=1 so NVQ training IS triggered; they
- * verify real quantisation behaviour and recall.
+ * Recall tests use dimension 128 with minBatchSize=1 so NVQ training IS triggered; they
+ * verify real quantisation behaviour, merge correctness, and recall versus PQ.
  */
 public class JVectorNVQIT extends KNNRestTestCase {
 
@@ -83,6 +83,28 @@ public class JVectorNVQIT extends KNNRestTestCase {
             .field(KNN_ENGINE, KNNEngine.JVECTOR.getName())
             .startObject(PARAMETERS)
             .field(METHOD_PARAMETER_QUANTIZATION_TYPE, QUANTIZATION_TYPE_NVQ)
+            .field(METHOD_PARAMETER_MIN_BATCH_SIZE_FOR_QUANTIZATION, minBatchSizeForQuantization)
+            .endObject()
+            .endObject()
+            .endObject()
+            .endObject()
+            .endObject()
+            .toString();
+    }
+
+    private String pqMapping(int dim, SpaceType spaceType, int minBatchSizeForQuantization) throws IOException {
+        return XContentFactory.jsonBuilder()
+            .startObject()
+            .startObject(PROPERTIES_FIELD_NAME)
+            .startObject(FIELD_NAME)
+            .field(TYPE_FIELD_NAME, KNN_VECTOR_TYPE)
+            .field(DIMENSION_FIELD_NAME, dim)
+            .startObject(KNN_METHOD)
+            .field(NAME, DISK_ANN)
+            .field(METHOD_PARAMETER_SPACE_TYPE, spaceType.getValue())
+            .field(KNN_ENGINE, KNNEngine.JVECTOR.getName())
+            .startObject(PARAMETERS)
+            .field(METHOD_PARAMETER_QUANTIZATION_TYPE, QUANTIZATION_TYPE_PQ)
             .field(METHOD_PARAMETER_MIN_BATCH_SIZE_FOR_QUANTIZATION, minBatchSizeForQuantization)
             .endObject()
             .endObject()
@@ -167,11 +189,11 @@ public class JVectorNVQIT extends KNNRestTestCase {
         assertEquals("0", before.get(0).getDocId());
 
         // Delete doc "0" and verify it is no longer returned
-        //deleteKnnDoc(INDEX_NAME, "0");
-        //refreshIndex(INDEX_NAME);
+        // deleteKnnDoc(INDEX_NAME, "0");
+        // refreshIndex(INDEX_NAME);
 
-        //List<KNNResult> after = searchAndParse(query, 10);
-        //assertTrue(after.stream().noneMatch(r -> "0".equals(r.getDocId())));
+        // List<KNNResult> after = searchAndParse(query, 10);
+        // assertTrue(after.stream().noneMatch(r -> "0".equals(r.getDocId())));
     }
 
     /**
@@ -227,12 +249,157 @@ public class JVectorNVQIT extends KNNRestTestCase {
     }
 
     // -------------------------------------------------------------------------
-    // NVQ inline tests (FeatureId.NVQ_VECTORS stored inline with graph nodes)
+    // Merge tests (NVQ training active — multi-segment → force-merge)
     // -------------------------------------------------------------------------
+
+    /**
+     * Indexes 1 000 vectors in two batches (each batch flushed to its own segment),
+     * measures recall before the merge, force-merges to a single segment (NVQ retrains
+     * from scratch on all vectors), then measures recall again.
+     *
+     * Both pre- and post-merge recall must meet the minimum threshold, confirming that
+     * the full retrain during merge does not degrade search quality.
+     */
+    @SneakyThrows
+    public void testNVQMerge_recallAfterMultiSegmentMerge() {
+        float[][] indexVectors = TestUtils.getIndexVectors(RECALL_DOC_COUNT, NVQ_DIM, true);
+        float[][] queryVectors = TestUtils.getQueryVectors(RECALL_QUERY_COUNT, NVQ_DIM, RECALL_DOC_COUNT, true);
+        List<Set<String>> groundTruth = TestUtils.computeGroundTruthValues(indexVectors, queryVectors, SpaceType.L2, RECALL_K);
+
+        createKnnIndex(INDEX_NAME, nvqSettings(), nvqMapping(NVQ_DIM, SpaceType.L2, 1));
+
+        // Write in RECALL_BATCH_SIZE chunks; refresh between each to force separate segments
+        for (int offset = 0; offset < RECALL_DOC_COUNT; offset += RECALL_BATCH_SIZE) {
+            int batchSize = Math.min(RECALL_BATCH_SIZE, RECALL_DOC_COUNT - offset);
+            float[][] batch = new float[batchSize][NVQ_DIM];
+            System.arraycopy(indexVectors, offset, batch, 0, batchSize);
+            bulkAddKnnDocs(INDEX_NAME, FIELD_NAME, batch, offset, batchSize, false);
+            refreshIndex(INDEX_NAME);
+        }
+
+        List<List<String>> preMergeResults = bulkSearch(INDEX_NAME, FIELD_NAME, queryVectors, RECALL_K);
+        double preMergeRecall = TestUtils.calculateRecallValue(preMergeResults, groundTruth, RECALL_K);
+        logger.info("NVQ pre-merge recall ({} segments, L2) = {}", RECALL_DOC_COUNT / RECALL_BATCH_SIZE, preMergeRecall);
+
+        forceMergeKnnIndex(INDEX_NAME);
+
+        List<List<String>> postMergeResults = bulkSearch(INDEX_NAME, FIELD_NAME, queryVectors, RECALL_K);
+        double postMergeRecall = TestUtils.calculateRecallValue(postMergeResults, groundTruth, RECALL_K);
+        logger.info("NVQ post-merge recall (L2) = {}", postMergeRecall);
+
+        assertEquals(1.0, preMergeRecall, ACCEPTABLE_RECALL_DEVIATION);
+        assertEquals(1.0, postMergeRecall, ACCEPTABLE_RECALL_DEVIATION);
+    }
+
+    /**
+     * Indexes two segments of 500 vectors each, deletes three documents from the first
+     * segment, then force-merges. After the merge the NVQ codec retrains on only the
+     * live vectors; this test asserts that the deleted documents are not returned by
+     * a subsequent k-NN search.
+     */
+    @SneakyThrows
+    public void testNVQMerge_deletedDocsExcludedAfterMerge() {
+        createKnnIndex(INDEX_NAME, nvqSettings(), nvqMapping(NVQ_DIM, SpaceType.L2, 1));
+
+        float[][] vectors = TestUtils.getIndexVectors(RECALL_DOC_COUNT, NVQ_DIM, true);
+
+        // Segment 1
+        float[][] batch1 = new float[RECALL_BATCH_SIZE][NVQ_DIM];
+        System.arraycopy(vectors, 0, batch1, 0, RECALL_BATCH_SIZE);
+        bulkAddKnnDocs(INDEX_NAME, FIELD_NAME, batch1, 0, RECALL_BATCH_SIZE, false);
+        refreshIndex(INDEX_NAME);
+
+        // Segment 2
+        float[][] batch2 = new float[RECALL_BATCH_SIZE][NVQ_DIM];
+        System.arraycopy(vectors, RECALL_BATCH_SIZE, batch2, 0, RECALL_BATCH_SIZE);
+        bulkAddKnnDocs(INDEX_NAME, FIELD_NAME, batch2, RECALL_BATCH_SIZE, RECALL_BATCH_SIZE, false);
+        refreshIndex(INDEX_NAME);
+
+        // Delete three docs from the first segment
+        deleteKnnDoc(INDEX_NAME, "0");
+        deleteKnnDoc(INDEX_NAME, "1");
+        deleteKnnDoc(INDEX_NAME, "2");
+        refreshIndex(INDEX_NAME);
+
+        forceMergeKnnIndex(INDEX_NAME);
+
+        // Querying with the vector of deleted doc "0" — none of the deleted docs may appear
+        List<KNNResult> results = searchAndParse(vectors[0], 10);
+        assertTrue("Deleted doc '0' must not appear after NVQ merge", results.stream().noneMatch(r -> "0".equals(r.getDocId())));
+        assertTrue("Deleted doc '1' must not appear after NVQ merge", results.stream().noneMatch(r -> "1".equals(r.getDocId())));
+        assertTrue("Deleted doc '2' must not appear after NVQ merge", results.stream().noneMatch(r -> "2".equals(r.getDocId())));
+    }
+
+    // -------------------------------------------------------------------------
+    // NVQ vs PQ recall comparison
+    // -------------------------------------------------------------------------
+
+    /**
+     * Indexes identical L2 vectors into an NVQ index and a PQ index, force-merges both,
+     * then compares recall. NVQ uses fewer subvectors (lower compression ratio) than PQ,
+     * so it should achieve equal or better recall. Both must meet the minimum threshold.
+     */
+    @SneakyThrows
+    public void testNVQRecallVsPQ_l2() {
+        runNvqVsPqRecallComparison(SpaceType.L2);
+    }
+
+    /**
+     * Same as {@link #testNVQRecallVsPQ_l2} but with cosine similarity.
+     */
+    @SneakyThrows
+    public void testNVQRecallVsPQ_cosine() {
+        runNvqVsPqRecallComparison(SpaceType.COSINESIMIL);
+    }
 
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
+
+    private void runNvqVsPqRecallComparison(SpaceType spaceType) throws Exception {
+        final String pqIndex = INDEX_NAME + "_pq";
+        float[][] indexVectors = TestUtils.getIndexVectors(RECALL_DOC_COUNT, NVQ_DIM, true);
+        float[][] queryVectors = TestUtils.getQueryVectors(RECALL_QUERY_COUNT, NVQ_DIM, RECALL_DOC_COUNT, true);
+        List<Set<String>> groundTruth = TestUtils.computeGroundTruthValues(indexVectors, queryVectors, spaceType, RECALL_K);
+
+        createKnnIndex(INDEX_NAME, nvqSettings(), nvqMapping(NVQ_DIM, spaceType, 1));
+        createKnnIndex(pqIndex, nvqSettings(), pqMapping(NVQ_DIM, spaceType, 1));
+        try {
+            for (int offset = 0; offset < RECALL_DOC_COUNT; offset += RECALL_BATCH_SIZE) {
+                int batchSize = Math.min(RECALL_BATCH_SIZE, RECALL_DOC_COUNT - offset);
+                float[][] batch = new float[batchSize][NVQ_DIM];
+                System.arraycopy(indexVectors, offset, batch, 0, batchSize);
+                bulkAddKnnDocs(INDEX_NAME, FIELD_NAME, batch, offset, batchSize, false);
+                bulkAddKnnDocs(pqIndex, FIELD_NAME, batch, offset, batchSize, false);
+            }
+            refreshIndex(INDEX_NAME);
+            refreshIndex(pqIndex);
+            forceMergeKnnIndex(INDEX_NAME);
+            forceMergeKnnIndex(pqIndex);
+
+            double nvqRecall = TestUtils.calculateRecallValue(
+                bulkSearch(INDEX_NAME, FIELD_NAME, queryVectors, RECALL_K),
+                groundTruth,
+                RECALL_K
+            );
+            double pqRecall = TestUtils.calculateRecallValue(
+                bulkSearch(pqIndex, FIELD_NAME, queryVectors, RECALL_K),
+                groundTruth,
+                RECALL_K
+            );
+            logger.info("NVQ recall ({}) = {}, PQ recall = {}", spaceType, nvqRecall, pqRecall);
+
+            assertEquals("NVQ recall below threshold", 1.0, nvqRecall, ACCEPTABLE_RECALL_DEVIATION);
+            assertEquals("PQ recall below threshold", 1.0, pqRecall, ACCEPTABLE_RECALL_DEVIATION);
+            // NVQ uses ~2x compression vs PQ's ~8x; it must not fall more than 5 pp below PQ
+            assertTrue(
+                String.format("NVQ recall %.3f is more than 5%% below PQ recall %.3f", nvqRecall, pqRecall),
+                nvqRecall >= pqRecall - 0.05
+            );
+        } finally {
+            deleteKNNIndex(pqIndex);
+        }
+    }
 
     private void runRecallTest(SpaceType spaceType) throws Exception {
         float[][] indexVectors = TestUtils.getIndexVectors(RECALL_DOC_COUNT, NVQ_DIM, true);
@@ -257,9 +424,7 @@ public class JVectorNVQIT extends KNNRestTestCase {
     }
 
     private List<KNNResult> searchAndParse(float[] query, int k) throws Exception {
-        String responseBody = EntityUtils.toString(
-            searchKNNIndex(INDEX_NAME, new KNNQueryBuilder(FIELD_NAME, query, k), k).getEntity()
-        );
+        String responseBody = EntityUtils.toString(searchKNNIndex(INDEX_NAME, new KNNQueryBuilder(FIELD_NAME, query, k), k).getEntity());
         return parseSearchResponse(responseBody, FIELD_NAME);
     }
 }
