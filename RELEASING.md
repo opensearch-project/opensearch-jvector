@@ -42,19 +42,16 @@ The release process is standard across repositories in this org and is run by a 
 
 **DO NOT cut a tag by going to release section of Github UI. It will mess up the Github Action.**
 
-Note: A maintainer must remember to perform steps 1, 2 and 4 (require total of 3 maintainers, 1 cut tag, 2 approve).
-1. Run these commands from the upstream opensearch-jvector repository, not a forked one: 
+Note: A maintainer must remember to perform steps 1, 2, 4 and 5 (require total of 2 maintainers, 1 to cut tag and another to approve).
+1. Identify the commit to release and create a tag on it from the upstream opensearch-jvector repository, not a forked one:
 ```
-git checkout main
 git fetch origin
-git rebase origin/main
-git tag <version>
-git push origin <version> 
+git tag <tag-name> <commit-sha>
+git push origin <tag-name>
 ```
 2. Wait for Github Actions to run and open the newly created issue. Two maintainers should comment `approve` in the issue.
-3. Wait for Jenkins to be triggered, pull the artifacts built by Actions, push to sonatype release channel on remote. Wait for an hour or so for Sonatype to copy it into Maven Central.
-4. Bump [build.gradle](./build.gradle), update [release-notes](./release-notes/), and clean up entries from [CHANGELOG.md](./CHANGELOG.md) via a PR.
-
-
-Thanks.
+3. The [release-drafter.yml](.github/workflows/release-drafter.yml) will be automatically kicked off and a pre-release will be created.
+4. This pre-release triggers the [jenkins release workflow](https://build.ci.opensearch.org/job/opensearch-jvector-release) as a result of which the client is released on [maven central](https://central.sonatype.com/). Please note that the release workflow is triggered only if created release is in pre-release state.
+5. Once the above release workflow is successful, it creates a GitHub issue requesting maintainers to manually publish the pre-release to release on GitHub.
+6. Bump [build.gradle](./build.gradle), update [release-notes](./release-notes/), and clean up entries from [CHANGELOG.md](./CHANGELOG.md) via a PR.
 
