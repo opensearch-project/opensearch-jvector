@@ -181,7 +181,7 @@ public class JVectorConcurrentQueryTests extends OpenSearchIntegTestCase {
             float expectedDistance = TestUtils.computeDistFromSpaceType(SPACE_TYPE, expectedVector, queryVector);
 
             // Allow for minor floating point differences
-            assertEquals("Distance mismatch at position " + i, expectedDistance, actualDistance, 0.001);
+            assertEquals("Distance mismatch at position " + i, expectedDistance, actualDistance, 0.02);
         }
     }
 

@@ -9,6 +9,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * Support for experimental native jvector  [478](https://github.com/opensearch-project/opensearch-jvector/issues/478)
 ### Enhancements
 ### Bug Fixes
+- Fix dynamic template and mixed cases [515](https://github.com/opensearch-project/opensearch-jvector/pull/515)
+
 ### Infrastructure
 ### Documentation
 ### Documentation

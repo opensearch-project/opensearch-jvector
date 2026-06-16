@@ -12,6 +12,7 @@ import java.util.Arrays;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -49,11 +50,7 @@ public class DerivedSourceSegmentAttributeParser {
      * @param vectorFieldTypes List of vector field names
      * @param isNested Whether the vector field is nested or not
      */
-    public static void addDerivedVectorFieldsSegmentInfoAttribute(
-        SegmentInfo segmentInfo,
-        List<String> vectorFieldTypes,
-        boolean isNested
-    ) {
+    public static void addDerivedVectorFieldsSegmentInfoAttribute(SegmentInfo segmentInfo, Set<String> vectorFieldTypes, boolean isNested) {
         if (segmentInfo == null) {
             throw new IllegalArgumentException("SegmentInfo cannot be null");
         }
