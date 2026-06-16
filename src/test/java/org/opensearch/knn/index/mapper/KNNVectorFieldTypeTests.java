@@ -219,7 +219,7 @@ public class KNNVectorFieldTypeTests extends KNNTestCase {
         expectThrows(IllegalStateException.class, () -> knnVectorFieldType.transformQueryVector(queryVector));
     }
 
-        public void testDocValueFormat_nullFormatAndTimezone_returnsRaw() {
+    public void testDocValueFormat_nullFormatAndTimezone_returnsRaw() {
         KNNMethodContext knnMethodContext = getDefaultKNNMethodContext();
         KNNVectorFieldType fieldType = new KNNVectorFieldType(
             FIELD_NAME,
@@ -231,7 +231,7 @@ public class KNNVectorFieldTypeTests extends KNNTestCase {
         assertSame(KNNVectorDocValueFormat.BINARY_FORMAT, format);
     }
 
-   public void testDocValueFormat_arrayFormat_returnsArrayFormat() {
+    public void testDocValueFormat_arrayFormat_returnsArrayFormat() {
         KNNMethodContext knnMethodContext = getDefaultKNNMethodContext();
         KNNVectorFieldType fieldType = new KNNVectorFieldType(
             FIELD_NAME,

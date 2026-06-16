@@ -33,8 +33,9 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 
+import static org.opensearch.knn.common.KNNConstants.DISK_ANN;
+import static org.opensearch.knn.common.KNNConstants.LUCENE_NAME;
 import static org.opensearch.knn.common.KNNConstants.METHOD_HNSW;
-import static org.opensearch.knn.common.KNNConstants.DISK_ANN;;
 
 /**
  * Integration tests for the docvalue_fields feature on knn_vector fields.
@@ -51,51 +52,94 @@ public class DocValueFieldsIT extends KNNRestTestCase {
     private static final float[] VECTOR_3 = { 9.0f, 10.0f, 11.0f, 12.0f };
 
     @After
-    public void cleanUp() {
+    public void cleanUp() throws Exception {
+        // Delete all test indices to ensure clean state for next test
+        // Use wildcard delete to remove all indices starting with TEST_INDEX prefix
         try {
-            deleteKNNIndex(TEST_INDEX);
-        } catch (Exception e) {
-            // Index may not exist, ignore
+            Request request = new Request("DELETE", "/" + TEST_INDEX + "*");
+            client().performRequest(request);
+        } catch (ResponseException e) {
+            // Indices may not exist, ignore 404 errors
+            if (e.getResponse().getStatusLine().getStatusCode() != 404) {
+                throw e;
+            }
         }
     }
 
+    private String getMethod(KNNEngine engine) {
+        return engine.getName().equals(LUCENE_NAME) ? METHOD_HNSW : DISK_ANN;
+    }
+
     /**
-     * Verifies that docvalue_fields returns correct vectors for both JVector and Lucene HNSW indexes
+     * Verifies that docvalue_fields returns correct vectors for both Jvector and Lucene indexes
      * when _source is disabled. Validates each doc ID's returned vector matches its indexed vector.
      */
     @SneakyThrows
-    public void testDocValueFields_faissAndLuceneHnsw_returnsCorrectVectorsWithoutSource() {
-        for (KNNEngine engine : List.of(KNNEngine.JVECTOR, KNNEngine.LUCENE)) {
-            String indexName = TEST_INDEX + "_" + engine.getName();
-            createHnswIndex(indexName, engine);
-            indexTestDocuments(indexName);
-            forceMergeKnnIndex(indexName);
+    public void testDocValueFields_lucene_returnsCorrectVectorsWithoutSource() {
+        KNNEngine engine = KNNEngine.LUCENE;
+        String indexName = TEST_INDEX + "_" + engine.getName();
+        createHnswIndex(indexName, engine);
+        indexTestDocuments(indexName);
+        forceMergeKnnIndex(indexName);
 
-            String query = buildSortedDocValueFieldsQuery();
-            Response response = searchKNNIndex(indexName, query, 10);
-            String responseBody = EntityUtils.toString(response.getEntity());
-            List<Map<String, Object>> hits = parseSearchHits(responseBody);
+        String query = buildSortedDocValueFieldsQuery();
+        Response response = searchKNNIndex(indexName, query, 10);
+        String responseBody = EntityUtils.toString(response.getEntity());
+        List<Map<String, Object>> hits = parseSearchHits(responseBody);
 
-            assertEquals("[" + engine.getName() + "] Expected 3 hits", 3, hits.size());
+        assertEquals("[" + engine.getName() + "] Expected 3 hits", 3, hits.size());
 
-            Map<String, List<Double>> docIdToVector = new java.util.LinkedHashMap<>();
-            for (Map<String, Object> hit : hits) {
-                assertNull("[" + engine.getName() + "] _source should be null", hit.get("_source"));
-                assertNotNull("[" + engine.getName() + "] fields should be present", hit.get("fields"));
-                String docId = (String) hit.get("_id");
-                List<List<Double>> vectorField = getDocValueField(hit, VECTOR_FIELD);
-                assertNotNull("[" + engine.getName() + "] vector field should not be null for doc " + docId, vectorField);
-                assertFalse("[" + engine.getName() + "] vector field should not be empty for doc " + docId, vectorField.isEmpty());
-                assertEquals("[" + engine.getName() + "] dimension mismatch for doc " + docId, DIMENSION, vectorField.get(0).size());
-                docIdToVector.put(docId, vectorField.get(0));
-            }
-
-            assertVectorForDoc(docIdToVector, "1", VECTOR_1, engine.getName());
-            assertVectorForDoc(docIdToVector, "2", VECTOR_2, engine.getName());
-            assertVectorForDoc(docIdToVector, "3", VECTOR_3, engine.getName());
-
-            deleteKNNIndex(indexName);
+        Map<String, List<Double>> docIdToVector = new java.util.LinkedHashMap<>();
+        for (Map<String, Object> hit : hits) {
+            assertNull("[" + engine.getName() + "] _source should be null", hit.get("_source"));
+            assertNotNull("[" + engine.getName() + "] fields should be present", hit.get("fields"));
+            String docId = (String) hit.get("_id");
+            List<List<Double>> vectorField = getDocValueField(hit, VECTOR_FIELD);
+            assertNotNull("[" + engine.getName() + "] vector field should not be null for doc " + docId, vectorField);
+            assertFalse("[" + engine.getName() + "] vector field should not be empty for doc " + docId, vectorField.isEmpty());
+            assertEquals("[" + engine.getName() + "] dimension mismatch for doc " + docId, DIMENSION, vectorField.get(0).size());
+            docIdToVector.put(docId, vectorField.get(0));
         }
+
+        assertVectorForDoc(docIdToVector, "1", VECTOR_1, engine.getName());
+        assertVectorForDoc(docIdToVector, "2", VECTOR_2, engine.getName());
+        assertVectorForDoc(docIdToVector, "3", VECTOR_3, engine.getName());
+    }
+
+    /**
+    * Verifies that docvalue_fields returns correct vectors for both Jvector and Lucene indexes
+    * when _source is disabled. Validates each doc ID's returned vector matches its indexed vector.
+    */
+    @SneakyThrows
+    public void testDocValueFields_jvector_returnsCorrectVectorsWithoutSource() {
+        KNNEngine engine = KNNEngine.JVECTOR;
+        String indexName = TEST_INDEX + "_" + engine.getName();
+        createJVectorIndex(engine, indexName);
+        indexTestDocuments(indexName);
+        forceMergeKnnIndex(indexName);
+
+        String query = buildSortedDocValueFieldsQuery();
+        Response response = searchKNNIndex(indexName, query, 10);
+        String responseBody = EntityUtils.toString(response.getEntity());
+        List<Map<String, Object>> hits = parseSearchHits(responseBody);
+
+        assertEquals("[" + engine.getName() + "] Expected 3 hits", 3, hits.size());
+
+        Map<String, List<Double>> docIdToVector = new java.util.LinkedHashMap<>();
+        for (Map<String, Object> hit : hits) {
+            assertNull("[" + engine.getName() + "] _source should be null", hit.get("_source"));
+            assertNotNull("[" + engine.getName() + "] fields should be present", hit.get("fields"));
+            String docId = (String) hit.get("_id");
+            List<List<Double>> vectorField = getDocValueField(hit, VECTOR_FIELD);
+            assertNotNull("[" + engine.getName() + "] vector field should not be null for doc " + docId, vectorField);
+            assertFalse("[" + engine.getName() + "] vector field should not be empty for doc " + docId, vectorField.isEmpty());
+            assertEquals("[" + engine.getName() + "] dimension mismatch for doc " + docId, DIMENSION, vectorField.get(0).size());
+            docIdToVector.put(docId, vectorField.get(0));
+        }
+
+        assertVectorForDoc(docIdToVector, "1", VECTOR_1, engine.getName());
+        assertVectorForDoc(docIdToVector, "2", VECTOR_2, engine.getName());
+        assertVectorForDoc(docIdToVector, "3", VECTOR_3, engine.getName());
     }
 
     /**
@@ -104,7 +148,7 @@ public class DocValueFieldsIT extends KNNRestTestCase {
      */
     @SneakyThrows
     public void testDocValueFields_vectorValuesMatchSource() {
-        createHnswIndex(KNNEngine.JVECTOR);
+        createHnswIndex(KNNEngine.LUCENE);
         indexTestDocuments();
 
         // Fetch all docs with _source
@@ -178,7 +222,7 @@ public class DocValueFieldsIT extends KNNRestTestCase {
      */
     @SneakyThrows
     public void testDocValueFields_withKnnQuery_topK() {
-        createHnswIndex(KNNEngine.JVECTOR);
+        createHnswIndex(KNNEngine.LUCENE);
         indexTestDocuments();
 
         String query = buildDocValueFieldsQuery(VECTOR_1, false);
@@ -209,7 +253,7 @@ public class DocValueFieldsIT extends KNNRestTestCase {
      */
     @SneakyThrows
     public void testDocValueFields_withMatchAllQuery() {
-        createHnswIndex(KNNEngine.JVECTOR);
+        createHnswIndex(KNNEngine.LUCENE);
         indexTestDocuments();
 
         String query = buildSortedDocValueFieldsQuery();
@@ -243,7 +287,7 @@ public class DocValueFieldsIT extends KNNRestTestCase {
         String indexName = TEST_INDEX + "_high_dim";
 
         KNNJsonIndexMappingsBuilder.Method method = KNNJsonIndexMappingsBuilder.Method.builder()
-            .methodName(METHOD_HNSW)
+            .methodName(DISK_ANN)
             .spaceType(SpaceType.L2.getValue())
             .engine(KNNEngine.JVECTOR.getName())
             .build();
@@ -296,8 +340,6 @@ public class DocValueFieldsIT extends KNNRestTestCase {
         for (int i = 0; i < highDimension; i++) {
             assertEquals(vector768[i], vectorField.get(0).get(i).floatValue(), 0.001f);
         }
-
-        deleteKNNIndex(indexName);
     }
 
     /**
@@ -314,7 +356,7 @@ public class DocValueFieldsIT extends KNNRestTestCase {
             .field("type", "knn_vector")
             .field("dimension", DIMENSION)
             .startObject("method")
-            .field("name", METHOD_HNSW)
+            .field("name", DISK_ANN)
             .field("space_type", SpaceType.L2.getValue())
             .field("engine", KNNEngine.JVECTOR.getName())
             .endObject()
@@ -323,7 +365,7 @@ public class DocValueFieldsIT extends KNNRestTestCase {
             .field("type", "knn_vector")
             .field("dimension", DIMENSION)
             .startObject("method")
-            .field("name", METHOD_HNSW)
+            .field("name", DISK_ANN)
             .field("space_type", SpaceType.L2.getValue())
             .field("engine", KNNEngine.JVECTOR.getName())
             .endObject()
@@ -390,9 +432,9 @@ public class DocValueFieldsIT extends KNNRestTestCase {
             .field("type", "knn_vector")
             .field("dimension", DIMENSION)
             .startObject("method")
-            .field("name", DISK_ANN)
+            .field("name", METHOD_HNSW)
             .field("space_type", SpaceType.L2.getValue())
-            .field("engine", KNNEngine.JVECTOR.getName())
+            .field("engine", KNNEngine.LUCENE.getName())
             .endObject()
             .endObject()
             .startObject(numericField)
@@ -439,7 +481,7 @@ public class DocValueFieldsIT extends KNNRestTestCase {
      */
     @SneakyThrows
     public void testDocValueFields_withSourceEnabled() {
-        createHnswIndex(KNNEngine.JVECTOR);
+        createHnswIndex(KNNEngine.LUCENE);
         addKnnDoc(TEST_INDEX, "1", VECTOR_FIELD, Floats.asList(VECTOR_1).toArray());
         refreshIndex(TEST_INDEX);
 
@@ -460,7 +502,7 @@ public class DocValueFieldsIT extends KNNRestTestCase {
      */
     @SneakyThrows
     public void testDocValueFields_sourceDisabled_onlyDocValues() {
-        createHnswIndex(KNNEngine.JVECTOR);
+        createJVectorIndex(KNNEngine.JVECTOR);
         addKnnDoc(TEST_INDEX, "1", VECTOR_FIELD, Floats.asList(VECTOR_1).toArray());
         refreshIndex(TEST_INDEX);
 
@@ -482,7 +524,7 @@ public class DocValueFieldsIT extends KNNRestTestCase {
      */
     @SneakyThrows
     public void testDocValueFields_emptyIndex_returnsEmptyHits() {
-        createHnswIndex(KNNEngine.JVECTOR);
+        createJVectorIndex(KNNEngine.JVECTOR);
 
         String query = XContentFactory.jsonBuilder()
             .startObject()
@@ -513,7 +555,7 @@ public class DocValueFieldsIT extends KNNRestTestCase {
      */
     @SneakyThrows
     public void testDocValueFields_afterDocDeletion_noGhostVectors() {
-        createHnswIndex(KNNEngine.JVECTOR);
+        createHnswIndex(KNNEngine.LUCENE);
         addKnnDoc(TEST_INDEX, "1", VECTOR_FIELD, Floats.asList(VECTOR_1).toArray());
         addKnnDoc(TEST_INDEX, "2", VECTOR_FIELD, Floats.asList(VECTOR_2).toArray());
         refreshIndex(TEST_INDEX);
@@ -553,7 +595,7 @@ public class DocValueFieldsIT extends KNNRestTestCase {
      */
     @SneakyThrows
     public void testDocValueFields_afterForcemerge_returnsCorrectly() {
-        createHnswIndex(KNNEngine.JVECTOR);
+        createHnswIndex(KNNEngine.LUCENE);
         addKnnDoc(TEST_INDEX, "1", VECTOR_FIELD, Floats.asList(VECTOR_1).toArray());
         addKnnDoc(TEST_INDEX, "2", VECTOR_FIELD, Floats.asList(VECTOR_2).toArray());
         addKnnDoc(TEST_INDEX, "3", VECTOR_FIELD, Floats.asList(VECTOR_3).toArray());
@@ -595,7 +637,7 @@ public class DocValueFieldsIT extends KNNRestTestCase {
      */
     @SneakyThrows
     public void testDocValueFields_paginationWithFrom() {
-        createHnswIndex(KNNEngine.JVECTOR);
+        createHnswIndex(KNNEngine.LUCENE);
         for (int i = 0; i < 10; i++) {
             float[] vec = new float[] { i * 1.0f, i * 2.0f, i * 3.0f, i * 4.0f };
             addKnnDoc(TEST_INDEX, String.valueOf(i), VECTOR_FIELD, Floats.asList(vec).toArray());
@@ -634,263 +676,250 @@ public class DocValueFieldsIT extends KNNRestTestCase {
 
     /**
      * Verifies that docvalue_fields with array format on BYTE vector fields returns correct
-     * integer arrays for both Faiss and Lucene engines.
+     * integer arrays for both Lucene engine
      */
     @SneakyThrows
     public void testDocValueFields_byteVectorField_arrayFormat_returnsIntegerArray() {
         Byte[] byteVector1 = { 1, -2, 127, -128 };
         Byte[] byteVector2 = { 0, 50, -50, 100 };
 
-        for (KNNEngine engine : List.of(KNNEngine.JVECTOR, KNNEngine.LUCENE)) {
-            String indexName = TEST_INDEX + "_byte_array_" + engine.getName();
-            KNNJsonIndexMappingsBuilder.Method method = KNNJsonIndexMappingsBuilder.Method.builder()
-                .methodName(METHOD_HNSW)
-                .spaceType(SpaceType.L2.getValue())
-                .engine(engine.getName())
-                .build();
+        KNNEngine engine = KNNEngine.LUCENE;
+        String indexName = TEST_INDEX + "_byte_array_" + engine.getName();
+        KNNJsonIndexMappingsBuilder.Method method = KNNJsonIndexMappingsBuilder.Method.builder()
+            .methodName(METHOD_HNSW)
+            .spaceType(SpaceType.L2.getValue())
+            .engine(engine.getName())
+            .build();
 
-            String mapping = KNNJsonIndexMappingsBuilder.builder()
-                .fieldName(VECTOR_FIELD)
-                .dimension(DIMENSION)
-                .vectorDataType(VectorDataType.BYTE.getValue())
-                .method(method)
-                .build()
-                .getIndexMapping();
+        String mapping = KNNJsonIndexMappingsBuilder.builder()
+            .fieldName(VECTOR_FIELD)
+            .dimension(DIMENSION)
+            .vectorDataType(VectorDataType.BYTE.getValue())
+            .method(method)
+            .build()
+            .getIndexMapping();
 
-            createKnnIndex(indexName, mapping);
-            addKnnDoc(indexName, "1", VECTOR_FIELD, byteVector1);
-            addKnnDoc(indexName, "2", VECTOR_FIELD, byteVector2);
-            refreshIndex(indexName);
+        createKnnIndex(indexName, mapping);
+        addKnnDoc(indexName, "1", VECTOR_FIELD, byteVector1);
+        addKnnDoc(indexName, "2", VECTOR_FIELD, byteVector2);
+        refreshIndex(indexName);
 
-            String query = XContentFactory.jsonBuilder()
-                .startObject()
-                .startObject("query")
-                .startObject("match_all")
-                .endObject()
-                .endObject()
-                .startArray("docvalue_fields")
-                .startObject()
-                .field("field", VECTOR_FIELD)
-                .field("format", "array")
-                .endObject()
-                .endArray()
-                .field("_source", false)
-                .startObject("sort")
-                .field("_id", "asc")
-                .endObject()
-                .endObject()
-                .toString();
+        String query = XContentFactory.jsonBuilder()
+            .startObject()
+            .startObject("query")
+            .startObject("match_all")
+            .endObject()
+            .endObject()
+            .startArray("docvalue_fields")
+            .startObject()
+            .field("field", VECTOR_FIELD)
+            .field("format", "array")
+            .endObject()
+            .endArray()
+            .field("_source", false)
+            .startObject("sort")
+            .field("_id", "asc")
+            .endObject()
+            .endObject()
+            .toString();
 
-            Response response = searchKNNIndex(indexName, query, 10);
-            String responseBody = EntityUtils.toString(response.getEntity());
-            List<Map<String, Object>> hits = parseSearchHits(responseBody);
+        Response response = searchKNNIndex(indexName, query, 10);
+        String responseBody = EntityUtils.toString(response.getEntity());
+        List<Map<String, Object>> hits = parseSearchHits(responseBody);
 
-            assertEquals("[" + engine.getName() + "] Expected 2 hits", 2, hits.size());
+        assertEquals("[" + engine.getName() + "] Expected 2 hits", 2, hits.size());
 
-            List<List<Integer>> dvField1 = getIntDocValueField(hits.get(0), VECTOR_FIELD);
-            assertNotNull("[" + engine.getName() + "] doc 1 should have vector", dvField1);
-            assertEquals(1, dvField1.size());
-            assertByteVectorEquals("[" + engine.getName() + "] doc 1", byteVector1, dvField1.get(0));
+        List<List<Integer>> dvField1 = getIntDocValueField(hits.get(0), VECTOR_FIELD);
+        assertNotNull("[" + engine.getName() + "] doc 1 should have vector", dvField1);
+        assertEquals(1, dvField1.size());
+        assertByteVectorEquals("[" + engine.getName() + "] doc 1", byteVector1, dvField1.get(0));
 
-            List<List<Integer>> dvField2 = getIntDocValueField(hits.get(1), VECTOR_FIELD);
-            assertNotNull("[" + engine.getName() + "] doc 2 should have vector", dvField2);
-            assertEquals(1, dvField2.size());
-            assertByteVectorEquals("[" + engine.getName() + "] doc 2", byteVector2, dvField2.get(0));
-
-            deleteKNNIndex(indexName);
-        }
+        List<List<Integer>> dvField2 = getIntDocValueField(hits.get(1), VECTOR_FIELD);
+        assertNotNull("[" + engine.getName() + "] doc 2 should have vector", dvField2);
+        assertEquals(1, dvField2.size());
+        assertByteVectorEquals("[" + engine.getName() + "] doc 2", byteVector2, dvField2.get(0));
     }
 
     /**
      * Verifies that docvalue_fields with binary (base64) format on BYTE vector fields returns
-     * correct base64-encoded byte arrays for both Faiss and Lucene engines.
+     * correct base64-encoded byte arrays for Lucene engine
      */
     @SneakyThrows
     public void testDocValueFields_byteVectorField_binaryFormat_returnsBase64() {
         Byte[] byteVector = { 10, -20, 127, -128 };
 
-        for (KNNEngine engine : List.of(KNNEngine.JVECTOR, KNNEngine.LUCENE)) {
-            String indexName = TEST_INDEX + "_byte_binary_" + engine.getName();
-            KNNJsonIndexMappingsBuilder.Method method = KNNJsonIndexMappingsBuilder.Method.builder()
-                .methodName(METHOD_HNSW)
-                .spaceType(SpaceType.L2.getValue())
-                .engine(engine.getName())
-                .build();
+        KNNEngine engine = KNNEngine.LUCENE;
 
-            String mapping = KNNJsonIndexMappingsBuilder.builder()
-                .fieldName(VECTOR_FIELD)
-                .dimension(DIMENSION)
-                .vectorDataType(VectorDataType.BYTE.getValue())
-                .method(method)
-                .build()
-                .getIndexMapping();
+        String indexName = TEST_INDEX + "_byte_binary_" + engine.getName();
+        KNNJsonIndexMappingsBuilder.Method method = KNNJsonIndexMappingsBuilder.Method.builder()
+            .methodName(METHOD_HNSW)
+            .spaceType(SpaceType.L2.getValue())
+            .engine(engine.getName())
+            .build();
 
-            createKnnIndex(indexName, mapping);
-            addKnnDoc(indexName, "1", VECTOR_FIELD, byteVector);
-            refreshIndex(indexName);
+        String mapping = KNNJsonIndexMappingsBuilder.builder()
+            .fieldName(VECTOR_FIELD)
+            .dimension(DIMENSION)
+            .vectorDataType(VectorDataType.BYTE.getValue())
+            .method(method)
+            .build()
+            .getIndexMapping();
 
-            String query = XContentFactory.jsonBuilder()
-                .startObject()
-                .startObject("query")
-                .startObject("match_all")
-                .endObject()
-                .endObject()
-                .startArray("docvalue_fields")
-                .startObject()
-                .field("field", VECTOR_FIELD)
-                .field("format", "binary")
-                .endObject()
-                .endArray()
-                .field("_source", false)
-                .endObject()
-                .toString();
+        createKnnIndex(indexName, mapping);
+        addKnnDoc(indexName, "1", VECTOR_FIELD, byteVector);
+        refreshIndex(indexName);
 
-            Response response = searchKNNIndex(indexName, query, 1);
-            String responseBody = EntityUtils.toString(response.getEntity());
-            List<Map<String, Object>> hits = parseSearchHits(responseBody);
+        String query = XContentFactory.jsonBuilder()
+            .startObject()
+            .startObject("query")
+            .startObject("match_all")
+            .endObject()
+            .endObject()
+            .startArray("docvalue_fields")
+            .startObject()
+            .field("field", VECTOR_FIELD)
+            .field("format", "binary")
+            .endObject()
+            .endArray()
+            .field("_source", false)
+            .endObject()
+            .toString();
 
-            assertEquals(1, hits.size());
-            List<String> binaryValues = getBinaryDocValueField(hits.get(0), VECTOR_FIELD);
-            assertNotNull("[" + engine.getName() + "] binary field should not be null", binaryValues);
-            assertEquals(1, binaryValues.size());
+        Response response = searchKNNIndex(indexName, query, 1);
+        String responseBody = EntityUtils.toString(response.getEntity());
+        List<Map<String, Object>> hits = parseSearchHits(responseBody);
 
-            byte[] decoded = Base64.getDecoder().decode(binaryValues.get(0));
-            assertEquals("[" + engine.getName() + "] decoded length mismatch", byteVector.length, decoded.length);
-            for (int i = 0; i < byteVector.length; i++) {
-                assertEquals("[" + engine.getName() + "] byte mismatch at index " + i, byteVector[i].byteValue(), decoded[i]);
-            }
+        assertEquals(1, hits.size());
+        List<String> binaryValues = getBinaryDocValueField(hits.get(0), VECTOR_FIELD);
+        assertNotNull("[" + engine.getName() + "] binary field should not be null", binaryValues);
+        assertEquals(1, binaryValues.size());
 
-            deleteKNNIndex(indexName);
+        byte[] decoded = Base64.getDecoder().decode(binaryValues.get(0));
+        assertEquals("[" + engine.getName() + "] decoded length mismatch", byteVector.length, decoded.length);
+        for (int i = 0; i < byteVector.length; i++) {
+            assertEquals("[" + engine.getName() + "] byte mismatch at index " + i, byteVector[i].byteValue(), decoded[i]);
         }
     }
 
     /**
      * Verifies that docvalue_fields with array format on BINARY vector fields returns correct
-     * integer arrays for both Faiss and Lucene engines.
+     * integer arrays for both Lucene engine
      */
     @SneakyThrows
     public void testDocValueFields_binaryVectorField_arrayFormat_returnsIntegerArray() {
         int binaryDimension = 8; // 8 bits = 1 byte
         Byte[] binaryVector1 = { -86 }; // 0xAA = 10101010
         Byte[] binaryVector2 = { 85 };  // 0x55 = 01010101
+        KNNEngine engine = KNNEngine.LUCENE;
+        String indexName = TEST_INDEX + "_binary_array_" + engine.getName();
+        KNNJsonIndexMappingsBuilder.Method method = KNNJsonIndexMappingsBuilder.Method.builder()
+            .methodName(METHOD_HNSW)
+            .engine(engine.getName())
+            .build();
 
-        for (KNNEngine engine : List.of(KNNEngine.JVECTOR, KNNEngine.LUCENE)) {
-            String indexName = TEST_INDEX + "_binary_array_" + engine.getName();
-            KNNJsonIndexMappingsBuilder.Method method = KNNJsonIndexMappingsBuilder.Method.builder()
-                .methodName(METHOD_HNSW)
-                .engine(engine.getName())
-                .build();
+        String mapping = KNNJsonIndexMappingsBuilder.builder()
+            .fieldName(VECTOR_FIELD)
+            .dimension(binaryDimension)
+            .vectorDataType(VectorDataType.BINARY.getValue())
+            .method(method)
+            .build()
+            .getIndexMapping();
 
-            String mapping = KNNJsonIndexMappingsBuilder.builder()
-                .fieldName(VECTOR_FIELD)
-                .dimension(binaryDimension)
-                .vectorDataType(VectorDataType.BINARY.getValue())
-                .method(method)
-                .build()
-                .getIndexMapping();
+        createKnnIndex(indexName, mapping);
+        addKnnDoc(indexName, "1", VECTOR_FIELD, binaryVector1);
+        addKnnDoc(indexName, "2", VECTOR_FIELD, binaryVector2);
+        refreshIndex(indexName);
 
-            createKnnIndex(indexName, mapping);
-            addKnnDoc(indexName, "1", VECTOR_FIELD, binaryVector1);
-            addKnnDoc(indexName, "2", VECTOR_FIELD, binaryVector2);
-            refreshIndex(indexName);
+        String query = XContentFactory.jsonBuilder()
+            .startObject()
+            .startObject("query")
+            .startObject("match_all")
+            .endObject()
+            .endObject()
+            .startArray("docvalue_fields")
+            .startObject()
+            .field("field", VECTOR_FIELD)
+            .field("format", "array")
+            .endObject()
+            .endArray()
+            .field("_source", false)
+            .startObject("sort")
+            .field("_id", "asc")
+            .endObject()
+            .endObject()
+            .toString();
 
-            String query = XContentFactory.jsonBuilder()
-                .startObject()
-                .startObject("query")
-                .startObject("match_all")
-                .endObject()
-                .endObject()
-                .startArray("docvalue_fields")
-                .startObject()
-                .field("field", VECTOR_FIELD)
-                .field("format", "array")
-                .endObject()
-                .endArray()
-                .field("_source", false)
-                .startObject("sort")
-                .field("_id", "asc")
-                .endObject()
-                .endObject()
-                .toString();
+        Response response = searchKNNIndex(indexName, query, 10);
+        String responseBody = EntityUtils.toString(response.getEntity());
+        List<Map<String, Object>> hits = parseSearchHits(responseBody);
 
-            Response response = searchKNNIndex(indexName, query, 10);
-            String responseBody = EntityUtils.toString(response.getEntity());
-            List<Map<String, Object>> hits = parseSearchHits(responseBody);
+        assertEquals("[" + engine.getName() + "] Expected 2 hits", 2, hits.size());
 
-            assertEquals("[" + engine.getName() + "] Expected 2 hits", 2, hits.size());
+        List<List<Integer>> dvField1 = getIntDocValueField(hits.get(0), VECTOR_FIELD);
+        assertNotNull("[" + engine.getName() + "] doc 1 should have vector", dvField1);
+        assertByteVectorEquals("[" + engine.getName() + "] doc 1", binaryVector1, dvField1.get(0));
 
-            List<List<Integer>> dvField1 = getIntDocValueField(hits.get(0), VECTOR_FIELD);
-            assertNotNull("[" + engine.getName() + "] doc 1 should have vector", dvField1);
-            assertByteVectorEquals("[" + engine.getName() + "] doc 1", binaryVector1, dvField1.get(0));
-
-            List<List<Integer>> dvField2 = getIntDocValueField(hits.get(1), VECTOR_FIELD);
-            assertNotNull("[" + engine.getName() + "] doc 2 should have vector", dvField2);
-            assertByteVectorEquals("[" + engine.getName() + "] doc 2", binaryVector2, dvField2.get(0));
-
-            deleteKNNIndex(indexName);
-        }
+        List<List<Integer>> dvField2 = getIntDocValueField(hits.get(1), VECTOR_FIELD);
+        assertNotNull("[" + engine.getName() + "] doc 2 should have vector", dvField2);
+        assertByteVectorEquals("[" + engine.getName() + "] doc 2", binaryVector2, dvField2.get(0));
     }
 
     /**
      * Verifies that docvalue_fields with binary (base64) format on BINARY vector fields returns
-     * correct base64-encoded byte arrays for both Faiss and Lucene engines.
+     * correct base64-encoded byte arrays for both JVector and Lucene engines.
      */
     @SneakyThrows
     public void testDocValueFields_binaryVectorField_binaryFormat_returnsBase64() {
         int binaryDimension = 8;
         Byte[] binaryVector = { 42 };
+        KNNEngine engine = KNNEngine.LUCENE;
+        String indexName = TEST_INDEX + "_binary_b64_" + engine.getName();
+        KNNJsonIndexMappingsBuilder.Method method = KNNJsonIndexMappingsBuilder.Method.builder()
+            .methodName(METHOD_HNSW)
+            .engine(engine.getName())
+            .build();
 
-        for (KNNEngine engine : List.of(KNNEngine.JVECTOR, KNNEngine.LUCENE)) {
-            String indexName = TEST_INDEX + "_binary_b64_" + engine.getName();
-            KNNJsonIndexMappingsBuilder.Method method = KNNJsonIndexMappingsBuilder.Method.builder()
-                .methodName(METHOD_HNSW)
-                .engine(engine.getName())
-                .build();
+        String mapping = KNNJsonIndexMappingsBuilder.builder()
+            .fieldName(VECTOR_FIELD)
+            .dimension(binaryDimension)
+            .vectorDataType(VectorDataType.BINARY.getValue())
+            .method(method)
+            .build()
+            .getIndexMapping();
 
-            String mapping = KNNJsonIndexMappingsBuilder.builder()
-                .fieldName(VECTOR_FIELD)
-                .dimension(binaryDimension)
-                .vectorDataType(VectorDataType.BINARY.getValue())
-                .method(method)
-                .build()
-                .getIndexMapping();
+        createKnnIndex(indexName, mapping);
+        addKnnDoc(indexName, "1", VECTOR_FIELD, binaryVector);
+        refreshIndex(indexName);
 
-            createKnnIndex(indexName, mapping);
-            addKnnDoc(indexName, "1", VECTOR_FIELD, binaryVector);
-            refreshIndex(indexName);
+        String query = XContentFactory.jsonBuilder()
+            .startObject()
+            .startObject("query")
+            .startObject("match_all")
+            .endObject()
+            .endObject()
+            .startArray("docvalue_fields")
+            .startObject()
+            .field("field", VECTOR_FIELD)
+            .field("format", "binary")
+            .endObject()
+            .endArray()
+            .field("_source", false)
+            .endObject()
+            .toString();
 
-            String query = XContentFactory.jsonBuilder()
-                .startObject()
-                .startObject("query")
-                .startObject("match_all")
-                .endObject()
-                .endObject()
-                .startArray("docvalue_fields")
-                .startObject()
-                .field("field", VECTOR_FIELD)
-                .field("format", "binary")
-                .endObject()
-                .endArray()
-                .field("_source", false)
-                .endObject()
-                .toString();
+        Response response = searchKNNIndex(indexName, query, 1);
+        String responseBody = EntityUtils.toString(response.getEntity());
+        List<Map<String, Object>> hits = parseSearchHits(responseBody);
 
-            Response response = searchKNNIndex(indexName, query, 1);
-            String responseBody = EntityUtils.toString(response.getEntity());
-            List<Map<String, Object>> hits = parseSearchHits(responseBody);
+        assertEquals(1, hits.size());
+        List<String> binaryValues = getBinaryDocValueField(hits.get(0), VECTOR_FIELD);
+        assertNotNull("[" + engine.getName() + "] binary field should not be null", binaryValues);
+        assertEquals(1, binaryValues.size());
 
-            assertEquals(1, hits.size());
-            List<String> binaryValues = getBinaryDocValueField(hits.get(0), VECTOR_FIELD);
-            assertNotNull("[" + engine.getName() + "] binary field should not be null", binaryValues);
-            assertEquals(1, binaryValues.size());
-
-            byte[] decoded = Base64.getDecoder().decode(binaryValues.get(0));
-            assertEquals("[" + engine.getName() + "] decoded length mismatch", binaryVector.length, decoded.length);
-            for (int i = 0; i < binaryVector.length; i++) {
-                assertEquals("[" + engine.getName() + "] byte mismatch at index " + i, binaryVector[i].byteValue(), decoded[i]);
-            }
-
-            deleteKNNIndex(indexName);
+        byte[] decoded = Base64.getDecoder().decode(binaryValues.get(0));
+        assertEquals("[" + engine.getName() + "] decoded length mismatch", binaryVector.length, decoded.length);
+        for (int i = 0; i < binaryVector.length; i++) {
+            assertEquals("[" + engine.getName() + "] byte mismatch at index " + i, binaryVector[i].byteValue(), decoded[i]);
         }
     }
 
@@ -905,7 +934,7 @@ public class DocValueFieldsIT extends KNNRestTestCase {
         KNNJsonIndexMappingsBuilder.Method method = KNNJsonIndexMappingsBuilder.Method.builder()
             .methodName(METHOD_HNSW)
             .spaceType(SpaceType.L2.getValue())
-            .engine(KNNEngine.JVECTOR.getName())
+            .engine(KNNEngine.LUCENE.getName())
             .build();
 
         String mapping = KNNJsonIndexMappingsBuilder.builder()
@@ -979,8 +1008,6 @@ public class DocValueFieldsIT extends KNNRestTestCase {
                 assertEquals(fromSource.get(j), fromDocValues.get(0).get(j), 0.001);
             }
         }
-
-        deleteKNNIndex(indexName);
     }
 
     /**
@@ -994,7 +1021,7 @@ public class DocValueFieldsIT extends KNNRestTestCase {
         KNNJsonIndexMappingsBuilder.Method method = KNNJsonIndexMappingsBuilder.Method.builder()
             .methodName(METHOD_HNSW)
             .spaceType(SpaceType.L2.getValue())
-            .engine(KNNEngine.JVECTOR.getName())
+            .engine(KNNEngine.LUCENE.getName())
             .build();
 
         String mapping = KNNJsonIndexMappingsBuilder.builder()
@@ -1069,8 +1096,6 @@ public class DocValueFieldsIT extends KNNRestTestCase {
                 assertEquals(fromSource.get(j), fromDocValues.get(0).get(j), 0.001);
             }
         }
-
-        deleteKNNIndex(indexName);
     }
 
     /**
@@ -1079,7 +1104,7 @@ public class DocValueFieldsIT extends KNNRestTestCase {
      */
     @SneakyThrows
     public void testDocValueFields_customFormat_throwsError() {
-        createHnswIndex(KNNEngine.JVECTOR);
+        createHnswIndex(KNNEngine.LUCENE);
         addKnnDoc(TEST_INDEX, "1", VECTOR_FIELD, Floats.asList(VECTOR_1).toArray());
         refreshIndex(TEST_INDEX);
 
@@ -1105,93 +1130,91 @@ public class DocValueFieldsIT extends KNNRestTestCase {
 
     /**
      * Verifies that the default format (no format specified) returns base64-encoded binary
-     * for both Faiss and Lucene engines, since binary is now the default doc value format.
+     * for Lucene engine, since binary is now the default doc value format.
      */
     @SneakyThrows
     public void testDocValueFields_defaultFormat_returnsBinaryBase64() {
-        for (KNNEngine engine : List.of(KNNEngine.JVECTOR, KNNEngine.LUCENE)) {
-            String indexName = TEST_INDEX + "_default_fmt_" + engine.getName();
+        KNNEngine engine = KNNEngine.LUCENE;
+        String indexName = TEST_INDEX + "_default_fmt_" + engine.getName();
 
-            KNNJsonIndexMappingsBuilder.Method method = KNNJsonIndexMappingsBuilder.Method.builder()
-                .methodName(DISK_ANN)
-                .spaceType(SpaceType.L2.getValue())
-                .engine(engine.getName())
-                .build();
+        KNNJsonIndexMappingsBuilder.Method method = KNNJsonIndexMappingsBuilder.Method.builder()
+            .methodName(METHOD_HNSW)
+            .spaceType(SpaceType.L2.getValue())
+            .engine(engine.getName())
+            .build();
 
-            String mapping = KNNJsonIndexMappingsBuilder.builder()
-                .fieldName(VECTOR_FIELD)
-                .dimension(DIMENSION)
-                .vectorDataType(VectorDataType.FLOAT.getValue())
-                .method(method)
-                .build()
-                .getIndexMapping();
+        String mapping = KNNJsonIndexMappingsBuilder.builder()
+            .fieldName(VECTOR_FIELD)
+            .dimension(DIMENSION)
+            .vectorDataType(VectorDataType.FLOAT.getValue())
+            .method(method)
+            .build()
+            .getIndexMapping();
 
-            createKnnIndex(indexName, mapping);
-            addKnnDoc(indexName, "1", VECTOR_FIELD, Floats.asList(VECTOR_1).toArray());
-            addKnnDoc(indexName, "2", VECTOR_FIELD, Floats.asList(VECTOR_2).toArray());
-            refreshIndex(indexName);
+        createKnnIndex(indexName, mapping);
+        addKnnDoc(indexName, "1", VECTOR_FIELD, Floats.asList(VECTOR_1).toArray());
+        addKnnDoc(indexName, "2", VECTOR_FIELD, Floats.asList(VECTOR_2).toArray());
+        refreshIndex(indexName);
 
-            // No format specified — should default to binary
-            String query = XContentFactory.jsonBuilder()
-                .startObject()
-                .startObject("query")
-                .startObject("knn")
-                .startObject(VECTOR_FIELD)
-                .field("vector", VECTOR_1)
-                .field("k", 2)
-                .endObject()
-                .endObject()
-                .endObject()
-                .array("docvalue_fields", VECTOR_FIELD)
-                .field("_source", false)
-                .endObject()
-                .toString();
+        // No format specified — should default to binary
+        String query = XContentFactory.jsonBuilder()
+            .startObject()
+            .startObject("query")
+            .startObject("knn")
+            .startObject(VECTOR_FIELD)
+            .field("vector", VECTOR_1)
+            .field("k", 2)
+            .endObject()
+            .endObject()
+            .endObject()
+            .array("docvalue_fields", VECTOR_FIELD)
+            .field("_source", false)
+            .endObject()
+            .toString();
 
-            Response response = searchKNNIndex(indexName, query, 2);
-            String responseBody = EntityUtils.toString(response.getEntity());
-            List<Map<String, Object>> hits = parseSearchHits(responseBody);
+        Response response = searchKNNIndex(indexName, query, 2);
+        String responseBody = EntityUtils.toString(response.getEntity());
+        List<Map<String, Object>> hits = parseSearchHits(responseBody);
 
-            assertEquals("Expected 2 hits for engine " + engine.getName(), 2, hits.size());
+        assertEquals("Expected 2 hits for engine " + engine.getName(), 2, hits.size());
 
-            float[][] expectedVectors = { VECTOR_1, VECTOR_2 };
-            for (int i = 0; i < hits.size(); i++) {
-                List<String> binaryValues = getBinaryDocValueField(hits.get(i), VECTOR_FIELD);
-                assertNotNull("Default format should return binary for engine " + engine.getName(), binaryValues);
-                assertEquals(1, binaryValues.size());
+        float[][] expectedVectors = { VECTOR_1, VECTOR_2 };
+        for (int i = 0; i < hits.size(); i++) {
+            List<String> binaryValues = getBinaryDocValueField(hits.get(i), VECTOR_FIELD);
+            assertNotNull("Default format should return binary for engine " + engine.getName(), binaryValues);
+            assertEquals(1, binaryValues.size());
 
-                String base64Value = binaryValues.get(0);
-                assertNotNull(base64Value);
-                assertFalse(base64Value.isEmpty());
+            String base64Value = binaryValues.get(0);
+            assertNotNull(base64Value);
+            assertFalse(base64Value.isEmpty());
 
-                byte[] decoded = Base64.getDecoder().decode(base64Value);
-                assertEquals(DIMENSION * Float.BYTES, decoded.length);
+            byte[] decoded = Base64.getDecoder().decode(base64Value);
+            assertEquals(DIMENSION * Float.BYTES, decoded.length);
 
-                ByteBuffer buffer = ByteBuffer.wrap(decoded).order(ByteOrder.LITTLE_ENDIAN);
-                for (int j = 0; j < DIMENSION; j++) {
-                    assertEquals(
-                        "Mismatch at index " + j + " for engine " + engine.getName(),
-                        expectedVectors[i][j],
-                        buffer.getFloat(),
-                        0.001f
-                    );
-                }
+            ByteBuffer buffer = ByteBuffer.wrap(decoded).order(ByteOrder.LITTLE_ENDIAN);
+            for (int j = 0; j < DIMENSION; j++) {
+                assertEquals(
+                    "Mismatch at index " + j + " for engine " + engine.getName(),
+                    expectedVectors[i][j],
+                    buffer.getFloat(),
+                    0.001f
+                );
             }
-
-            deleteKNNIndex(indexName);
         }
     }
 
     /**
      * Verifies that explicitly requesting binary format returns a valid base64-encoded
-     * little-endian float vector for both Faiss and Lucene engines.
+     * little-endian float vector for both JVector and Lucene engines.
      */
     @SneakyThrows
     public void testDocValueFields_explicitBinaryFormat_returnsCorrectBase64ForBothEngines() {
         for (KNNEngine engine : List.of(KNNEngine.JVECTOR, KNNEngine.LUCENE)) {
+            String methodName = getMethod(engine);
             String indexName = TEST_INDEX + "_binary_fmt_" + engine.getName();
 
             KNNJsonIndexMappingsBuilder.Method method = KNNJsonIndexMappingsBuilder.Method.builder()
-                .methodName(METHOD_HNSW)
+                .methodName(methodName)
                 .spaceType(SpaceType.L2.getValue())
                 .engine(engine.getName())
                 .build();
@@ -1261,8 +1284,6 @@ public class DocValueFieldsIT extends KNNRestTestCase {
                     );
                 }
             }
-
-            deleteKNNIndex(indexName);
         }
     }
 
@@ -1341,8 +1362,6 @@ public class DocValueFieldsIT extends KNNRestTestCase {
         for (int i = 0; i < DIMENSION; i++) {
             assertEquals("Vector component mismatch at index " + i, VECTOR_1[i], firstHitVector.get(0).get(i).floatValue(), 0.001f);
         }
-
-        deleteKNNIndex(indexName);
     }
 
     /**
@@ -1364,7 +1383,7 @@ public class DocValueFieldsIT extends KNNRestTestCase {
             .startObject("method")
             .field("name", METHOD_HNSW)
             .field("space_type", SpaceType.L2.getValue())
-            .field("engine", KNNEngine.JVECTOR.getName())
+            .field("engine", KNNEngine.LUCENE.getName())
             .endObject()
             .endObject()
             .startObject(textField)
@@ -1425,8 +1444,6 @@ public class DocValueFieldsIT extends KNNRestTestCase {
         assertEquals("2", hit2.get("_id"));
         List<List<Double>> vectorField2 = getDocValueField(hit2, VECTOR_FIELD);
         assertNull("Doc without vector should not have docvalue_fields for vector", vectorField2);
-
-        deleteKNNIndex(indexName);
     }
 
     // Nested field tests
@@ -1475,8 +1492,6 @@ public class DocValueFieldsIT extends KNNRestTestCase {
         // Nested fields are not accessible via top-level docvalue_fields
         List<List<Double>> vectorField = getDocValueField(hits.get(0), nestedVectorField);
         assertNull(vectorField);
-
-        deleteKNNIndex(indexName);
     }
 
     /**
@@ -1546,8 +1561,6 @@ public class DocValueFieldsIT extends KNNRestTestCase {
                 assertEquals(DIMENSION, vectorField.get(0).size());
             }
         }
-
-        deleteKNNIndex(indexName);
     }
 
     /**
@@ -1641,8 +1654,6 @@ public class DocValueFieldsIT extends KNNRestTestCase {
         for (int i = 0; i < sourceVector.size(); i++) {
             assertEquals(sourceVector.get(i), dvVector.get(0).get(i), 0.001);
         }
-
-        deleteKNNIndex(indexName);
     }
 
     /**
@@ -1743,8 +1754,6 @@ public class DocValueFieldsIT extends KNNRestTestCase {
 
         // Doc 1 has 3 nested vectors, Doc 2 has 2 nested vectors (one nested obj has no vector)
         assertEquals(5, totalInnerHitsWithVector);
-
-        deleteKNNIndex(indexName);
     }
 
     // Helper methods
@@ -1791,7 +1800,6 @@ public class DocValueFieldsIT extends KNNRestTestCase {
         for (int i = 0; i < DIMENSION; i++) {
             assertEquals("Float mismatch at " + i, VECTOR_1[i], floatDv.get(0).get(i).floatValue(), 0.001f);
         }
-        deleteKNNIndex(floatIndex);
 
         // --- Byte: base64 raw bytes ---
         String byteIndex = TEST_INDEX + "_base64_byte";
@@ -1825,7 +1833,6 @@ public class DocValueFieldsIT extends KNNRestTestCase {
         List<List<Integer>> byteDv = getIntDocValueField(byteHits.get(0), VECTOR_FIELD);
         assertNotNull(byteDv);
         assertByteVectorEquals("Byte base64", byteVector, byteDv.get(0));
-        deleteKNNIndex(byteIndex);
 
         // --- Binary: base64 raw bytes (dimension = bits, 32 bits = 4 bytes) ---
         int binaryDimension = 32;
@@ -1854,7 +1861,6 @@ public class DocValueFieldsIT extends KNNRestTestCase {
         List<List<Integer>> binaryDv = getIntDocValueField(binaryHits.get(0), VECTOR_FIELD);
         assertNotNull(binaryDv);
         assertByteVectorEquals("Binary base64", binaryVector, binaryDv.get(0));
-        deleteKNNIndex(binaryIndex);
     }
 
     /**
@@ -1932,8 +1938,6 @@ public class DocValueFieldsIT extends KNNRestTestCase {
             assertEquals("vec1 mismatch at " + i, VECTOR_1[i], vec1.get(0).get(i).floatValue(), 0.001f);
             assertEquals("vec2 mismatch at " + i, VECTOR_1[i], vec2.get(0).get(i).floatValue(), 0.001f);
         }
-
-        deleteKNNIndex(indexName);
     }
 
     /**
@@ -2013,7 +2017,6 @@ public class DocValueFieldsIT extends KNNRestTestCase {
         binaryReq.setJsonEntity("{\"" + VECTOR_FIELD + "\":\"" + invalidBinaryBase64 + "\"}");
         ResponseException binaryEx = expectThrows(ResponseException.class, () -> client().performRequest(binaryReq));
         assertTrue(binaryEx.getMessage().contains("must be 8 times"));
-        deleteKNNIndex(binaryIndex);
     }
 
     /**
@@ -2033,9 +2036,9 @@ public class DocValueFieldsIT extends KNNRestTestCase {
             .vectorDataType(VectorDataType.FLOAT.getValue())
             .method(
                 KNNJsonIndexMappingsBuilder.Method.builder()
-                    .methodName(DISK_ANN)
+                    .methodName(METHOD_HNSW)
                     .spaceType(SpaceType.L2.getValue())
-                    .engine(KNNEngine.JVECTOR.getName())
+                    .engine(KNNEngine.LUCENE.getName())
                     .build()
             )
             .build()
@@ -2102,9 +2105,6 @@ public class DocValueFieldsIT extends KNNRestTestCase {
         }
         assertAllDocsHaveCorrectVectors(sourceIndex, numDocs, updatedVectors);
         assertAllDocsHaveCorrectVectors(destIndex, numDocs, updatedVectors);
-
-        deleteKNNIndex(sourceIndex);
-        deleteKNNIndex(destIndex);
     }
 
     private void assertAllDocsHaveCorrectVectors(String indexName, int expectedCount, float[][] expectedVectors) throws Exception {
@@ -2149,9 +2149,9 @@ public class DocValueFieldsIT extends KNNRestTestCase {
         }
     }
 
-    private void createHnswIndex(KNNEngine engine) throws Exception {
+    private void createIndex(KNNEngine engine, String methodName, String indexName) throws Exception {
         KNNJsonIndexMappingsBuilder.Method method = KNNJsonIndexMappingsBuilder.Method.builder()
-            .methodName(METHOD_HNSW)
+            .methodName(methodName)
             .spaceType(SpaceType.L2.getValue())
             .engine(engine.getName())
             .build();
@@ -2164,7 +2164,19 @@ public class DocValueFieldsIT extends KNNRestTestCase {
             .build()
             .getIndexMapping();
 
-        createKnnIndex(TEST_INDEX, mapping);
+        createKnnIndex(indexName, mapping);
+    }
+
+    private void createHnswIndex(KNNEngine engine) throws Exception {
+        createIndex(engine, METHOD_HNSW, TEST_INDEX);
+    }
+
+    private void createJVectorIndex(KNNEngine engine) throws Exception {
+        createIndex(engine, DISK_ANN, TEST_INDEX);
+    }
+
+    private void createJVectorIndex(KNNEngine engine, String indexName) throws Exception {
+        createIndex(engine, DISK_ANN, indexName);
     }
 
     private void createHnswIndex(String indexName, KNNEngine engine) throws Exception {
@@ -2217,21 +2229,6 @@ public class DocValueFieldsIT extends KNNRestTestCase {
             builder.field("_source", false);
         }
         return builder.endObject().toString();
-    }
-
-    private String buildSourceQuery(float[] queryVector) throws IOException {
-        return XContentFactory.jsonBuilder()
-            .startObject()
-            .startObject("query")
-            .startObject("knn")
-            .startObject(VECTOR_FIELD)
-            .field("vector", queryVector)
-            .field("k", 1)
-            .endObject()
-            .endObject()
-            .endObject()
-            .endObject()
-            .toString();
     }
 
     @SuppressWarnings("unchecked")
@@ -2388,4 +2385,3 @@ public class DocValueFieldsIT extends KNNRestTestCase {
         }
     }
 }
-
