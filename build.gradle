@@ -352,12 +352,12 @@ dependencies {
     // Explicitly include a safe version of json-smart for test fixtures
     testFixturesImplementation group: 'net.minidev', name: 'json-smart', version: "${versions.json_smart}"
     testFixturesImplementation "org.opensearch:common-utils:${common_utils_version}"
-    implementation 'com.github.oshi:oshi-core:6.4.13'
+    implementation 'com.github.oshi:oshi-core:6.12.0'
     implementation "org.slf4j:slf4j-api:${versions.slf4j}"
 
     implementation "io.github.jbellis:jvector:${jvector_version}"
     //api "io.github.jbellis:jvector-native:${jvector_version}"
-    implementation 'org.agrona:agrona:1.20.0'
+    implementation 'org.agrona:agrona:1.23.1'
 
     // Add this line for SLF4J 2.x compatibility
     implementation "org.apache.logging.log4j:log4j-slf4j2-impl:${versions.log4j}"
