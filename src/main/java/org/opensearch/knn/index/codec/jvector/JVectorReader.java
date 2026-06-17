@@ -110,12 +110,21 @@ public class JVectorReader extends KnnVectorsReader {
     @Override
     public FloatVectorValues getFloatVectorValues(String field) throws IOException {
         final FieldEntry fieldEntry = fieldEntryMap.get(field);
-        return new JVectorFloatVectorValues(
-            fieldEntry.index,
-            fieldEntry.similarityFunction,
-            fieldEntry.graphNodeIdToDocMap,
-            fieldEntry.nvqInlineQuantization
-        );
+        if (fieldEntry.nvqInlineQuantization != null) {
+            return new JVectorFloatVectorValues(
+                fieldEntry.index,
+                fieldEntry.similarityFunction,
+                fieldEntry.graphNodeIdToDocMap,
+                fieldEntry.nvqInlineQuantization
+            );
+        } else {
+            return new JVectorFloatVectorValues(
+                fieldEntry.index,
+                fieldEntry.similarityFunction,
+                fieldEntry.fieldInfo.getVectorSimilarityFunction(),
+                fieldEntry.graphNodeIdToDocMap
+            );
+        }
     }
 
     @Override
@@ -185,12 +194,14 @@ public class JVectorReader extends KnnVectorsReader {
                 ScoreFunction.ApproximateScoreFunction asf = fe.pqVectors.precomputedScoreFunctionFor(q, fe.similarityFunction);
                 ScoreFunction.ExactScoreFunction reranker = view.rerankerFor(q, fe.similarityFunction);
                 ssp = new DefaultSearchScoreProvider(asf, reranker);
-            } else if (fe.nvqInlineQuantization != null) { // NVQ inline without PQ blob
-                ssp = new DefaultSearchScoreProvider(view.rerankerFor(q, fe.similarityFunction));
-            } else {
-                ssp = DefaultSearchScoreProvider.exact(q, fe.similarityFunction, view);
+            } else if (fieldEntry.nvqInlineQuantization != null) { // NVQ inline without PQ blob
+                ssp = new DefaultSearchScoreProvider(view.rerankerFor(q, vectorSimilarityFunction));
+            } else { // Not quantized, used typical searcher
+                ScoreFunction.ExactScoreFunction esf = DefaultSearchScoreProvider.exact(q, vectorSimilarityFunction, view)
+                    .exactScoreFunction();
+                ssp = new DefaultSearchScoreProvider(wrapExactScoreFunction(esf, luceneSimilarityFunction, vectorSimilarityFunction));
             }
-            final GraphNodeIdToDocMap jvectorLuceneDocMap = fe.graphNodeIdToDocMap;
+            final GraphNodeIdToDocMap jvectorLuceneDocMap = fieldEntry.graphNodeIdToDocMap;
             // Convert the acceptDocs bitmap from Lucene to jVector ordinal bitmap filter
             // Logic works as follows: if acceptDocs is null, we accept all ordinals. Otherwise, we check if the jVector ordinal has a
             // corresponding Lucene doc ID accepted by acceptDocs filter.

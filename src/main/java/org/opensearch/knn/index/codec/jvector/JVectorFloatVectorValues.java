@@ -32,18 +32,30 @@ public class JVectorFloatVectorValues extends FloatVectorValues {
     // Reusable scratch buffer for inline NVQ dequantization (safe: access is serialised by the caller).
     private final NVQuantization.QuantizedVector nvqScratch;
 
+    /** Full-precision (non-NVQ) constructor — Lucene similarity available for vectorScorer(). */
     public JVectorFloatVectorValues(
         OnDiskGraphIndex onDiskGraphIndex,
         VectorSimilarityFunction similarityFunction,
         org.apache.lucene.index.VectorSimilarityFunction luceneSimilarityFunction,
         GraphNodeIdToDocMap graphNodeIdToDocMap
     ) throws IOException {
-        this(onDiskGraphIndex, similarityFunction, graphNodeIdToDocMap, null);
+        this(onDiskGraphIndex, similarityFunction, luceneSimilarityFunction, graphNodeIdToDocMap, null);
     }
 
+    /** NVQ-inline constructor — luceneSimilarityFunction not available; vectorScorer() unsupported. */
     public JVectorFloatVectorValues(
         OnDiskGraphIndex onDiskGraphIndex,
         VectorSimilarityFunction similarityFunction,
+        GraphNodeIdToDocMap graphNodeIdToDocMap,
+        NVQuantization nvqInline
+    ) throws IOException {
+        this(onDiskGraphIndex, similarityFunction, null, graphNodeIdToDocMap, nvqInline);
+    }
+
+    private JVectorFloatVectorValues(
+        OnDiskGraphIndex onDiskGraphIndex,
+        VectorSimilarityFunction similarityFunction,
+        org.apache.lucene.index.VectorSimilarityFunction luceneSimilarityFunction,
         GraphNodeIdToDocMap graphNodeIdToDocMap,
         NVQuantization nvqInline
     ) throws IOException {

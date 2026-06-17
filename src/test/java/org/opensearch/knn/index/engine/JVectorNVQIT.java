@@ -42,6 +42,7 @@ public class JVectorNVQIT extends KNNRestTestCase {
 
     private static final int SMALL_DIM = 3;
     private static final int NVQ_DIM = 128;
+    private static final int NVQ_DIM_1536 = 1536;
     private static final int SHARD_COUNT = 1;
     private static final int REPLICA_COUNT = 0;
 
@@ -50,7 +51,8 @@ public class JVectorNVQIT extends KNNRestTestCase {
     private static final int RECALL_BATCH_SIZE = 500;
     private static final int RECALL_QUERY_COUNT = 50;
     private static final int RECALL_K = 10;
-    private static final double ACCEPTABLE_RECALL_DEVIATION = 0.25; // recall >= 0.75
+    private static final double ACCEPTABLE_RECALL_DEVIATION = 0.25;      // recall >= 0.75
+    private static final double HIGH_DIM_ACCEPTABLE_RECALL_DEVIATION = 0.40; // recall >= 0.60, for high-dim / small-corpus tests
 
     @After
     public final void cleanUp() throws IOException {
@@ -335,13 +337,28 @@ public class JVectorNVQIT extends KNNRestTestCase {
     // -------------------------------------------------------------------------
 
     /**
-     * Indexes identical L2 vectors into an NVQ index and a PQ index, force-merges both,
-     * then compares recall. NVQ uses fewer subvectors (lower compression ratio) than PQ,
-     * so it should achieve equal or better recall. Both must meet the minimum threshold.
+     * Indexes identical L2 vectors (dim=128) into an NVQ index and a PQ index, force-merges
+     * both, then measures and compares recall and on-disk storage size.
+     *
+     * <p>PQ writes full-precision vectors inline with each graph node (for reranking) plus a
+     * compact PQ blob (for fast traversal), making its total storage larger than NVQ. NVQ
+     * replaces the full-precision inline vectors with NVQ-quantized inline vectors, which are
+     * significantly smaller, while still appending an auxiliary PQ blob for traversal. The test
+     * logs both sizes and recalls so the storage-vs-quality trade-off can be observed directly.
      */
     @SneakyThrows
     public void testNVQRecallVsPQ_l2() {
-        runNvqVsPqRecallComparison(SpaceType.L2);
+        runNvqVsPqStorageAndRecallComparison(NVQ_DIM, SpaceType.L2, ACCEPTABLE_RECALL_DEVIATION);
+    }
+
+    /**
+     * Same as {@link #testNVQRecallVsPQ_l2} but at dim=1536 (typical embedding model output).
+     * At higher dimensions the NVQ storage saving over PQ grows because the full-precision
+     * inline vectors dominate PQ's footprint while NVQ's per-subvector overhead amortises better.
+     */
+    @SneakyThrows
+    public void testNVQRecallVsPQ_l2_dim1536() {
+        runNvqVsPqStorageAndRecallComparison(NVQ_DIM_1536, SpaceType.L2, HIGH_DIM_ACCEPTABLE_RECALL_DEVIATION);
     }
 
     /**
@@ -355,6 +372,74 @@ public class JVectorNVQIT extends KNNRestTestCase {
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
+
+    private void runNvqVsPqStorageAndRecallComparison(int dim, SpaceType spaceType, double recallDeviation) throws Exception {
+        final String pqIndex = INDEX_NAME + "_pq";
+        float[][] indexVectors = TestUtils.getIndexVectors(RECALL_DOC_COUNT, dim, true);
+        float[][] queryVectors = TestUtils.getQueryVectors(RECALL_QUERY_COUNT, dim, RECALL_DOC_COUNT, true);
+        List<Set<String>> groundTruth = TestUtils.computeGroundTruthValues(indexVectors, queryVectors, spaceType, RECALL_K);
+
+        createKnnIndex(INDEX_NAME, nvqSettings(), nvqMapping(dim, spaceType, 1));
+        createKnnIndex(pqIndex, nvqSettings(), pqMapping(dim, spaceType, 1));
+        try {
+            for (int offset = 0; offset < RECALL_DOC_COUNT; offset += RECALL_BATCH_SIZE) {
+                int batchSize = Math.min(RECALL_BATCH_SIZE, RECALL_DOC_COUNT - offset);
+                float[][] batch = new float[batchSize][dim];
+                System.arraycopy(indexVectors, offset, batch, 0, batchSize);
+                bulkAddKnnDocs(INDEX_NAME, FIELD_NAME, batch, offset, batchSize, false);
+                bulkAddKnnDocs(pqIndex, FIELD_NAME, batch, offset, batchSize, false);
+            }
+            refreshIndex(INDEX_NAME);
+            refreshIndex(pqIndex);
+            forceMergeKnnIndex(INDEX_NAME);
+            forceMergeKnnIndex(pqIndex);
+
+            // Recall
+            double nvqRecall = TestUtils.calculateRecallValue(
+                bulkSearch(INDEX_NAME, FIELD_NAME, queryVectors, RECALL_K),
+                groundTruth,
+                RECALL_K
+            );
+            double pqRecall = TestUtils.calculateRecallValue(
+                bulkSearch(pqIndex, FIELD_NAME, queryVectors, RECALL_K),
+                groundTruth,
+                RECALL_K
+            );
+
+            // Storage
+            int nvqBytes = indexSizeInBytes(INDEX_NAME);
+            int pqBytes = indexSizeInBytes(pqIndex);
+            double sizeRatio = (double) nvqBytes / pqBytes;
+
+            logger.info(
+                "Storage comparison ({}, {} docs, dim={}): NVQ={} bytes, PQ={} bytes, NVQ/PQ ratio={}",
+                spaceType, RECALL_DOC_COUNT, dim, nvqBytes, pqBytes, String.format("%.2f", sizeRatio)
+            );
+            logger.info("Recall comparison ({}, dim={}): NVQ={}, PQ={}", spaceType, dim, nvqRecall, pqRecall);
+
+            assertEquals("NVQ recall below threshold", 1.0, nvqRecall, recallDeviation);
+            assertEquals("PQ recall below threshold", 1.0, pqRecall, recallDeviation);
+            assertTrue("NVQ index size must be positive", nvqBytes > 0);
+            assertTrue("PQ index size must be positive", pqBytes > 0);
+            // PQ writes full-precision InlineVectors per graph node (dim × 4 bytes each) plus the
+            // PQ compressed blob, so PQ is substantially larger than NVQ, which stores only the
+            // NVQ-quantized inline vectors (much smaller than full precision) plus the auxiliary
+            // PQ blob. NVQ must therefore produce a smaller index than PQ.
+            assertTrue(
+                String.format("NVQ index (%d bytes) should be smaller than PQ index (%d bytes)", nvqBytes, pqBytes),
+                nvqBytes < pqBytes
+            );
+            assertTrue(
+                String.format(
+                    "NVQ recall %.3f is more than 5%% below PQ recall %.3f (NVQ/PQ size ratio %.2f)",
+                    nvqRecall, pqRecall, sizeRatio
+                ),
+                nvqRecall >= pqRecall - 0.05
+            );
+        } finally {
+            deleteKNNIndex(pqIndex);
+        }
+    }
 
     private void runNvqVsPqRecallComparison(SpaceType spaceType) throws Exception {
         final String pqIndex = INDEX_NAME + "_pq";
@@ -391,7 +476,7 @@ public class JVectorNVQIT extends KNNRestTestCase {
 
             assertEquals("NVQ recall below threshold", 1.0, nvqRecall, ACCEPTABLE_RECALL_DEVIATION);
             assertEquals("PQ recall below threshold", 1.0, pqRecall, ACCEPTABLE_RECALL_DEVIATION);
-            // NVQ uses ~2x compression vs PQ's ~8x; it must not fall more than 5 pp below PQ
+            // NVQ is smaller than PQ (NVQ-quantized inline vs full-precision inline); it must not fall more than 5 pp below PQ in recall
             assertTrue(
                 String.format("NVQ recall %.3f is more than 5%% below PQ recall %.3f", nvqRecall, pqRecall),
                 nvqRecall >= pqRecall - 0.05
