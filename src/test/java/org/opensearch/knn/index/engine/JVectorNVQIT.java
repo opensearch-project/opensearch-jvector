@@ -413,7 +413,12 @@ public class JVectorNVQIT extends KNNRestTestCase {
 
             logger.info(
                 "Storage comparison ({}, {} docs, dim={}): NVQ={} bytes, PQ={} bytes, NVQ/PQ ratio={}",
-                spaceType, RECALL_DOC_COUNT, dim, nvqBytes, pqBytes, String.format("%.2f", sizeRatio)
+                spaceType,
+                RECALL_DOC_COUNT,
+                dim,
+                nvqBytes,
+                pqBytes,
+                String.format("%.2f", sizeRatio)
             );
             logger.info("Recall comparison ({}, dim={}): NVQ={}, PQ={}", spaceType, dim, nvqRecall, pqRecall);
 
@@ -432,7 +437,9 @@ public class JVectorNVQIT extends KNNRestTestCase {
             assertTrue(
                 String.format(
                     "NVQ recall %.3f is more than 5%% below PQ recall %.3f (NVQ/PQ size ratio %.2f)",
-                    nvqRecall, pqRecall, sizeRatio
+                    nvqRecall,
+                    pqRecall,
+                    sizeRatio
                 ),
                 nvqRecall >= pqRecall - 0.05
             );
