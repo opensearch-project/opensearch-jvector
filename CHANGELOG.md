@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Features
 ### Enhancements
 ### Bug Fixes
+- Fix NPE due to an attempt to read the segment with no graph [552](https://github.com/opensearch-project/opensearch-jvector/pull/552)
+
 ### Infrastructure
 ### Documentation
 ### Documentation
