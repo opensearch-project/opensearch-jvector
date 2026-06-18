@@ -877,6 +877,27 @@ curl -X PUT "http://localhost:9200/my-vectors/_settings" \
 
 **Note:** Vector queries are typically unique, so caching may have limited benefit.
 
+#### Retrieving vector fields using docvalue_fields
+
+You can retrieve `knn_vector` fields using `docvalue_fields` instead of the `_source`. This is faster because OpenSearch reads the vector directly from `doc_values` rather than parsing the full `_source` document.
+
+Retrieving `knn_vector` fields from `doc_values` supports all vector data types (`float`, `byte`, and `binary`), all compression levels, for Lucene engine, `float` for JVector engine. You can use it on existing indexes without reindexing.
+
+| Format | Description |
+| :--- | :--- |
+| `binary` (Default) | Returns vectors as Base64-encoded little-endian byte strings. Provides approximately 2x throughput improvement over the `array` format for JSON transport and reduces response payload size by 30--40%. |
+| `array` | Returns vectors as JSON numeric arrays. |
+
+```bash
+curl -X PUT "http://localhost:9200/my-index/_search" \
+  -H "Content-Type: application/json" -d '
+{
+  "docvalue_fields.field": "my_vector",
+  "docvalue_fields.format": "array",
+  "_source": false
+}'
+```
+
 ### Memory Management
 
 #### Memory Estimation
