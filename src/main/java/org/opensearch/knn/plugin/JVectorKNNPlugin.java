@@ -11,7 +11,7 @@ import org.opensearch.index.engine.EngineFactory;
 import org.opensearch.index.shard.IndexSettingProvider;
 import org.opensearch.knn.index.codec.derivedsource.DerivedSourceIndexOperationListener;
 import org.opensearch.index.query.QueryBuilder;
-import org.opensearch.knn.index.codec.jvector.VectorizationProviderWrapper;
+import org.opensearch.knn.index.codec.jvector.VectorizationProviderType;
 import org.opensearch.knn.plugin.search.KNNConcurrentSearchRequestDecider;
 import org.opensearch.knn.index.util.KNNClusterUtil;
 import org.opensearch.knn.index.query.KNNQueryBuilder;
@@ -223,8 +223,7 @@ public class JVectorKNNPlugin extends Plugin
                 if (templateAndRequestSettings.getAsBoolean(KNNSettings.KNN_INDEX, false)) {
                     return Settings.builder()
                         .put(KNN_DERIVED_SOURCE_ENABLED, true)
-                        .put(KNN_VECTORIZATION_PROVIDER, VectorizationProviderWrapper.AUTO_DETECT.getName()) // TODO: refactor later.
-                                                                                                             // Determine if its needed.
+                        .put(KNN_VECTORIZATION_PROVIDER, VectorizationProviderType.DEFAULT_PROVIDER.getName())
                         .build();
                 }
                 return Settings.EMPTY;

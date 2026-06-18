@@ -9,7 +9,7 @@ import lombok.Getter;
 import org.opensearch.knn.common.KNNConstants;
 import org.opensearch.knn.index.SpaceType;
 import org.opensearch.knn.index.codec.jvector.JVectorFormat;
-import org.opensearch.knn.index.codec.jvector.VectorizationProviderWrapper;
+import org.opensearch.knn.index.codec.jvector.VectorizationProviderType;
 
 import java.util.Map;
 import java.util.function.Function;
@@ -28,7 +28,7 @@ public class KNNVectorsFormatParams {
     private Function<Integer, Integer> numberOfSubspacesPerVectorSupplier;
     private final SpaceType spaceType;
     private boolean leadingSegmentMergeDisabled;
-    private VectorizationProviderWrapper vectorizationProviderWrapper;
+    private VectorizationProviderType vectorizationProviderType;
 
     public KNNVectorsFormatParams(final Map<String, Object> params, int defaultMaxConnections, int defaultBeamWidth) {
         this(
@@ -73,7 +73,7 @@ public class KNNVectorsFormatParams {
         int defaultMinBatchSizeForQuantization,
         boolean defaultHierarchyEnabled,
         SpaceType spaceType,
-        VectorizationProviderWrapper vectorizationProviderWrapper
+        VectorizationProviderType vectorizationProviderType
     ) {
         initMaxConnections(params, defaultMaxConnections);
         initBeamWidth(params, defaultBeamWidth);
@@ -84,7 +84,7 @@ public class KNNVectorsFormatParams {
         initNumberOfSubspacesPerVectorSupplier(params);
         this.spaceType = spaceType;
         initLeadingSegmentMergeDisabled(params, KNNConstants.DEFAULT_LEADING_SEGMENT_MERGE_DISABLED);
-        this.vectorizationProviderWrapper = vectorizationProviderWrapper;
+        this.vectorizationProviderType = vectorizationProviderType;
     }
 
     public boolean validate(final Map<String, Object> params) {

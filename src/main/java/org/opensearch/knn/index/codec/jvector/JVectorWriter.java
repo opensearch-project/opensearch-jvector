@@ -14,7 +14,6 @@ import io.github.jbellis.jvector.graph.diversity.VamanaDiversityProvider;
 import io.github.jbellis.jvector.graph.similarity.BuildScoreProvider;
 import io.github.jbellis.jvector.quantization.PQVectors;
 import io.github.jbellis.jvector.quantization.ProductQuantization;
-import io.github.jbellis.jvector.vector.VectorizationProvider;
 import io.github.jbellis.jvector.vector.types.VectorFloat;
 import io.github.jbellis.jvector.vector.types.VectorTypeSupport;
 import lombok.AllArgsConstructor;
@@ -99,8 +98,7 @@ public class JVectorWriter extends KnnVectorsWriter {
     private final ForkJoinPool simdPoolFlush;
     private final ForkJoinPool parallelismPool;
 
-    private final VectorizationProviderWrapper vectorizationProviderWrapper;
-
+    private final VectorizationProviderType vectorizationProviderType;
     private boolean finished = false;
 
     public JVectorWriter(
@@ -116,7 +114,7 @@ public class JVectorWriter extends KnnVectorsWriter {
         final ForkJoinPool simdPoolMerge,
         final ForkJoinPool simdPoolFlush,
         final ForkJoinPool parallelismPool,
-        VectorizationProviderWrapper vectorizationProviderWrapper
+        VectorizationProviderType vectorizationProviderType
     ) throws IOException {
         this.segmentWriteState = segmentWriteState;
         this.maxConn = maxConn;
@@ -130,7 +128,7 @@ public class JVectorWriter extends KnnVectorsWriter {
         this.simdPoolMerge = simdPoolMerge;
         this.simdPoolFlush = simdPoolFlush;
         this.parallelismPool = parallelismPool;
-        this.vectorizationProviderWrapper = vectorizationProviderWrapper;
+        this.vectorizationProviderType = vectorizationProviderType;
 
         String metaFileName = IndexFileNames.segmentFileName(
             segmentWriteState.segmentInfo.name,
@@ -186,7 +184,7 @@ public class JVectorWriter extends KnnVectorsWriter {
         FieldWriter<?> newField = new FieldWriter<>(
             fieldInfo,
             segmentWriteState.segmentInfo.name,
-            vectorizationProviderWrapper.getVectorTypeSupport()
+            vectorizationProviderType.getVectorTypeSupport()
         );
 
         fields.add(newField);
@@ -350,8 +348,7 @@ public class JVectorWriter extends KnnVectorsWriter {
                 .vectorEncoding(fieldInfo.getVectorEncoding())
                 .vectorSimilarityFunction(fieldInfo.getVectorSimilarityFunction())
                 .vectorDimension(randomAccessVectorValues.dimension())
-                .graphNodeIdToDocMap(graphNodeIdToDocMap)
-                .vectorizationProviderWrapper(vectorizationProviderWrapper);
+                .graphNodeIdToDocMap(graphNodeIdToDocMap);
 
             try (
                 var writer = new OnDiskSequentialGraphIndexWriter.Builder(graph, jVectorIndexWriter).with(
@@ -437,7 +434,6 @@ public class JVectorWriter extends KnnVectorsWriter {
         long pqCodebooksAndVectorsOffset;
         long pqCodebooksAndVectorsLength;
         float degreeOverflow; // important when leveraging cache
-        VectorizationProviderWrapper vectorizationProviderWrapper;
         GraphNodeIdToDocMap graphNodeIdToDocMap;
 
         public void toOutput(IndexOutput out) throws IOException {
@@ -451,10 +447,9 @@ public class JVectorWriter extends KnnVectorsWriter {
             out.writeVLong(pqCodebooksAndVectorsLength);
             out.writeInt(Float.floatToIntBits(degreeOverflow));
             graphNodeIdToDocMap.toOutput(out);
-            out.writeInt(vectorizationProviderWrapper.getId());
         }
 
-        public VectorIndexFieldMetadata(IndexInput in, int version) throws IOException {
+        public VectorIndexFieldMetadata(IndexInput in) throws IOException {
             this.fieldNumber = in.readInt();
             this.vectorEncoding = readVectorEncoding(in);
             this.vectorSimilarityFunction = JVectorReader.VectorSimilarityMapper.ordToLuceneDistFunc(in.readInt());
@@ -465,14 +460,6 @@ public class JVectorWriter extends KnnVectorsWriter {
             this.pqCodebooksAndVectorsLength = in.readVLong();
             this.degreeOverflow = Float.intBitsToFloat(in.readInt());
             this.graphNodeIdToDocMap = new GraphNodeIdToDocMap(in);
-
-            if (version >= JVectorFormat.VERSION_WITH_VECTORIZATION_PROVIDER) {
-                this.vectorizationProviderWrapper = VectorizationProviderWrapper.ordToProvider(in.readInt());
-            } else {
-                // TODO: verify assumption - we can safely use panama for older indicies.
-                // We should not use AUTO_DETECT here, because if native flag enabled, it will use wrong provider.
-                this.vectorizationProviderWrapper = VectorizationProviderWrapper.PANAMA;
-            }
         }
 
     }
@@ -981,7 +968,10 @@ public class JVectorWriter extends KnnVectorsWriter {
                         continue;
                     }
                     final FloatVectorValues values = readers[i].getFloatVectorValues(fieldName);
-                    final RandomAccessVectorValues randomAccessVectorValues = new RandomAccessVectorValuesOverVectorValues(values);
+                    final RandomAccessVectorValues randomAccessVectorValues = new RandomAccessVectorValuesOverVectorValues(
+                        values,
+                        vectorizationProviderType
+                    );
                     leadingCompressor.refine(randomAccessVectorValues);
                 }
                 final long end = Clock.systemDefaultZone().millis();
@@ -1289,11 +1279,12 @@ public class JVectorWriter extends KnnVectorsWriter {
     }
 
     static class RandomAccessVectorValuesOverVectorValues implements RandomAccessVectorValues {
-        private final VectorTypeSupport VECTOR_TYPE_SUPPORT = VectorizationProvider.getInstance().getVectorTypeSupport();
         private final FloatVectorValues values;
+        private final VectorTypeSupport vectorTypeSupport;
 
-        public RandomAccessVectorValuesOverVectorValues(FloatVectorValues values) {
+        public RandomAccessVectorValuesOverVectorValues(FloatVectorValues values, VectorizationProviderType vectorizationProviderType) {
             this.values = values;
+            this.vectorTypeSupport = vectorizationProviderType.getVectorTypeSupport();
         }
 
         @Override
@@ -1314,7 +1305,7 @@ public class JVectorWriter extends KnnVectorsWriter {
                     final float[] vector = values.vectorValue(nodeId);
                     final float[] copy = new float[vector.length];
                     System.arraycopy(vector, 0, copy, 0, vector.length);
-                    return VECTOR_TYPE_SUPPORT.createFloatVector(copy);
+                    return vectorTypeSupport.createFloatVector(copy);
                 }
             } catch (IOException e) {
                 log.error("Error retrieving vector at ordinal {}", nodeId, e);

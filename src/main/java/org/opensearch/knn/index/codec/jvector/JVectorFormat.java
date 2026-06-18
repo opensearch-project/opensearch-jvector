@@ -30,8 +30,7 @@ public class JVectorFormat extends KnnVectorsFormat {
     public static final String NEIGHBORS_SCORE_CACHE_EXTENSION = "neighbors-score-cache-" + JVECTOR_FILES_SUFFIX;
 
     public static final int VERSION_START = 0;
-    public static final int VERSION_WITH_VECTORIZATION_PROVIDER = 1;
-    public static final int VERSION_CURRENT = VERSION_WITH_VECTORIZATION_PROVIDER;
+    public static final int VERSION_CURRENT = VERSION_START;
     public static final int DEFAULT_MAX_CONN = 32;
     public static final int DEFAULT_BEAM_WIDTH = 100;
     // Unfortunately, this can't be managed yet by the OpenSearch ThreadPool because it's not supporting {@link ForkJoinPool} types
@@ -50,7 +49,7 @@ public class JVectorFormat extends KnnVectorsFormat {
     private final ForkJoinPool simdPoolMerge;
     private final ForkJoinPool simdPoolFlush;
     private final ForkJoinPool parallelismPool;
-    private final VectorizationProviderWrapper vectorizationProviderWrapper;
+    private final VectorizationProviderType vectorizationProviderType;
 
     public JVectorFormat() {
         this(
@@ -66,7 +65,7 @@ public class JVectorFormat extends KnnVectorsFormat {
             SIMD_POOL_MERGE,
             SIMD_POOL_FLUSH,
             PARALLELISM_POOL,
-            VectorizationProviderWrapper.AUTO_DETECT.resolve()
+            VectorizationProviderType.DEFAULT_PROVIDER
         );
     }
 
@@ -88,7 +87,7 @@ public class JVectorFormat extends KnnVectorsFormat {
             SIMD_POOL_MERGE,
             SIMD_POOL_FLUSH,
             PARALLELISM_POOL,
-            VectorizationProviderWrapper.AUTO_DETECT.resolve()
+            VectorizationProviderType.DEFAULT_PROVIDER
 
         );
     }
@@ -113,7 +112,7 @@ public class JVectorFormat extends KnnVectorsFormat {
             simdPoolMerge,
             simdPoolFlush,
             parallelismPool,
-            VectorizationProviderWrapper.AUTO_DETECT.resolve()
+            VectorizationProviderType.DEFAULT_PROVIDER
         );
     }
 
@@ -140,7 +139,7 @@ public class JVectorFormat extends KnnVectorsFormat {
             SIMD_POOL_MERGE,
             SIMD_POOL_FLUSH,
             PARALLELISM_POOL,
-            VectorizationProviderWrapper.AUTO_DETECT.resolve()
+            VectorizationProviderType.DEFAULT_PROVIDER
         );
     }
 
@@ -153,7 +152,7 @@ public class JVectorFormat extends KnnVectorsFormat {
         int minBatchSizeForQuantization,
         boolean hierarchyEnabled,
         boolean leadingSegmentMergeDisabled,
-        VectorizationProviderWrapper vectorizationProviderWrapper
+        VectorizationProviderType vectorizationProviderType
     ) {
         this(
             NAME,
@@ -168,7 +167,7 @@ public class JVectorFormat extends KnnVectorsFormat {
             SIMD_POOL_MERGE,
             SIMD_POOL_FLUSH,
             PARALLELISM_POOL,
-            vectorizationProviderWrapper.resolve()
+            vectorizationProviderType
         );
     }
 
@@ -185,7 +184,7 @@ public class JVectorFormat extends KnnVectorsFormat {
         final ForkJoinPool simdPoolMerge,
         final ForkJoinPool simdPoolFlush,
         final ForkJoinPool parallelismPool,
-        VectorizationProviderWrapper vectorizationProviderWrapper
+        VectorizationProviderType vectorizationProviderType
     ) {
         super(name);
         this.maxConn = maxConn;
@@ -199,7 +198,7 @@ public class JVectorFormat extends KnnVectorsFormat {
         this.simdPoolMerge = simdPoolMerge;
         this.simdPoolFlush = simdPoolFlush;
         this.parallelismPool = parallelismPool;
-        this.vectorizationProviderWrapper = vectorizationProviderWrapper.resolve();
+        this.vectorizationProviderType = vectorizationProviderType;
     }
 
     @Override
@@ -217,13 +216,13 @@ public class JVectorFormat extends KnnVectorsFormat {
             simdPoolMerge,
             simdPoolFlush,
             parallelismPool,
-            vectorizationProviderWrapper
+            vectorizationProviderType
         );
     }
 
     @Override
     public KnnVectorsReader fieldsReader(SegmentReadState state) throws IOException {
-        return new JVectorReader(state, vectorizationProviderWrapper);
+        return new JVectorReader(state, vectorizationProviderType);
     }
 
     @Override

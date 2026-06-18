@@ -9,7 +9,7 @@ import lombok.extern.log4j.Log4j2;
 import org.opensearch.OpenSearchParseException;
 import org.opensearch.action.admin.cluster.settings.ClusterUpdateSettingsRequest;
 import org.opensearch.action.admin.cluster.settings.ClusterUpdateSettingsResponse;
-import org.opensearch.knn.index.codec.jvector.VectorizationProviderWrapper;
+import org.opensearch.knn.index.codec.jvector.VectorizationProviderType;
 import org.opensearch.transport.client.Client;
 import org.opensearch.cluster.metadata.IndexMetadata;
 import org.opensearch.cluster.service.ClusterService;
@@ -291,11 +291,10 @@ public class KNNSettings {
         }
     };
 
-    public static final Setting<VectorizationProviderWrapper> KNN_VECTORIZATION_PROVIDER_SETTING = new Setting<>(
+    public static final Setting<VectorizationProviderType> KNN_VECTORIZATION_PROVIDER_SETTING = new Setting<>(
         KNN_VECTORIZATION_PROVIDER,
-        VectorizationProviderWrapper.AUTO_DETECT.getName(),
-        VectorizationProviderWrapper::getByName,
-        new VectorizationProviderValidator(),
+        VectorizationProviderType.DEFAULT_PROVIDER.getName(),
+        VectorizationProviderType::getByName,
         IndexScope,
         Final,
         UnmodifiableOnRestore
@@ -624,7 +623,7 @@ public class KNNSettings {
         return KNN_DERIVED_SOURCE_ENABLED_SETTING.get(settings);
     }
 
-    public static VectorizationProviderWrapper getKNNVectorizationProvider(Settings settings) {
+    public static VectorizationProviderType getKNNVectorizationProvider(Settings settings) {
         return KNN_VECTORIZATION_PROVIDER_SETTING.get(settings);
     }
 
@@ -749,19 +748,6 @@ public class KNNSettings {
         public void validate(String value) {
             try {
                 SpaceType.getSpace(value);
-            } catch (IllegalArgumentException ex) {
-                throw new InvalidParameterException(ex.getMessage());
-            }
-        }
-    }
-
-    static class VectorizationProviderValidator implements Setting.Validator<VectorizationProviderWrapper> {
-
-        @Override
-        public void validate(VectorizationProviderWrapper value) {
-            try {
-                // TODO: add validation later - check if given VectorizationProvider is supported.
-                System.out.println("Ok");
             } catch (IllegalArgumentException ex) {
                 throw new InvalidParameterException(ex.getMessage());
             }
