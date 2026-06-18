@@ -63,7 +63,7 @@ plugins {
     id "com.diffplug.spotless" version "8.4.0" apply false
     id 'io.freefair.lombok' version '8.14.4'
     id "de.undercouch.download" version "5.3.0"
-    id "me.champeau.jmh" version "0.7.1"
+    id "me.champeau.jmh" version "0.7.2"
 }
 
 apply from: 'gradle/formatting.gradle'
