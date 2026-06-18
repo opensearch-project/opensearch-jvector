@@ -59,7 +59,7 @@ public class KNNTestCase extends OpenSearchTestCase {
             JVectorFormat.SIMD_POOL_MERGE.shutdown();
             JVectorFormat.SIMD_POOL_FLUSH.shutdown();
             JVectorFormat.PARALLELISM_POOL.shutdown();
-            PhysicalCoreExecutor.instance.close();
+            PhysicalCoreExecutor.instance().close();
         }));
 
     }

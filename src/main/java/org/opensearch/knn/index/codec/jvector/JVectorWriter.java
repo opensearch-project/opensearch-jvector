@@ -1009,12 +1009,15 @@ public class JVectorWriter extends KnnVectorsWriter {
          */
         public void merge() throws IOException {
             final RemappedRandomAccessVectorValues compactRavvEarly = new RemappedRandomAccessVectorValues(this, compactOrdsToRavvOrds);
+
+            // The merged segments ends up with no vectors (empty graph), nothing to merge there
             if (compactRavvEarly.size() == 0) {
                 log.info("No vectors for field {} in segment {}", fieldInfo.name, mergeState.segmentInfo.name);
-                return;
-            }
-
-            if (quantization instanceof JVectorIndexQuantization.NVQ) {
+                var bsp = BuildScoreProvider.randomAccessScoreProvider(compactRavvEarly, getVectorSimilarityFunction(fieldInfo));
+                var graph = getGraph(bsp, compactRavvEarly, fieldInfo, segmentWriteState.segmentInfo.name, simdPoolMerge);
+                graph.setAllMutationsCompleted();
+                writeField(fieldInfo, compactRavvEarly, null, compactOrdToDocMap, graph);
+            } else if (quantization instanceof JVectorIndexQuantization.NVQ) {
                 mergeNVQ(compactRavvEarly);
             } else {
                 mergePQ(compactRavvEarly);
