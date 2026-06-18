@@ -11,6 +11,7 @@ This document contains a list of maintainers in this repo. See [opensearch-proje
 | Chris Mills     | [sandoichi](https://github.com/sandoichi)             | IBM         |
 | Akash Shankaran | [akash-shankaran](https://github.com/akash-shankaran) | IBM         |
 | Andriy Redko    | [reta](https://github.com/reta)                       | IBM         |
+| Medha Srivatsa  | [MedhaSrivatsa](https://github.com/MedhaSrivatsa)     | IBM         |
 
 ## Emeritus
 
