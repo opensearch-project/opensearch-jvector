@@ -5,6 +5,7 @@
 
 package org.opensearch.knn.integ;
 
+import com.carrotsearch.randomizedtesting.annotations.ParametersFactory;
 import com.google.common.primitives.Floats;
 import lombok.SneakyThrows;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
@@ -29,7 +30,9 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Base64;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -56,28 +59,52 @@ public class DocValueFieldsIT extends KNNRestTestCase {
         void accept(T t, U u) throws Exception;
     }
 
-    private class TestEngines {
-        private ThrowingBiConsumer<KNNEngine, String> fn;
-        private KNNEngine engine;
-        private String methodName;
-        private String indexName;
+    public static class TestEngines {
+        private final KNNEngine engine;
+        private final String methodName;
+        private final String indexName;
+        private DocValueFieldsIT testInstance;
 
-        TestEngines(KNNEngine engine, ThrowingBiConsumer<KNNEngine, String> fn, String methodName) {
-            this.fn = fn;
+        TestEngines(KNNEngine engine, String methodName) {
             this.engine = engine;
             this.methodName = methodName;
             this.indexName = TEST_INDEX + "_" + engine.getName();
         }
 
+        public void setTestInstance(DocValueFieldsIT instance) {
+            this.testInstance = instance;
+        }
+
         public void createIndex() throws Exception {
-            fn.accept(engine, indexName);
+            if (engine == KNNEngine.JVECTOR) {
+                testInstance.createJVectorIndex(engine, indexName);
+            } else if (engine == KNNEngine.LUCENE) {
+                testInstance.createHnswIndex(engine, indexName);
+            }
+        }
+
+        @Override
+        public String toString() {
+            return engine.getName();
         }
     }
 
-    private final List<TestEngines> testEngines = List.of(
-        new TestEngines(KNNEngine.JVECTOR, this::createJVectorIndex, DISK_ANN),
-        new TestEngines(KNNEngine.LUCENE, this::createHnswIndex, METHOD_HNSW)
-    );
+    private final TestEngines te;
+
+    public DocValueFieldsIT(TestEngines te) {
+        this.te = te;
+        if (te != null) {
+            te.setTestInstance(this);
+        }
+    }
+
+    @ParametersFactory
+    public static Collection<Object[]> parameters() {
+        return Arrays.asList(
+            new Object[] { new TestEngines(KNNEngine.JVECTOR, DISK_ANN) },
+            new Object[] { new TestEngines(KNNEngine.LUCENE, METHOD_HNSW) }
+        );
+    }
 
     @After
     public void cleanUp() throws Exception {
@@ -100,34 +127,32 @@ public class DocValueFieldsIT extends KNNRestTestCase {
      */
     @SneakyThrows
     public void testDocValueFields_returnsCorrectVectorsWithoutSource() {
-        for (TestEngines te : testEngines) {
-            te.createIndex();
-            indexTestDocuments(te.indexName);
-            forceMergeKnnIndex(te.indexName);
+        te.createIndex();
+        indexTestDocuments(te.indexName);
+        forceMergeKnnIndex(te.indexName);
 
-            String query = buildSortedDocValueFieldsQuery();
-            Response response = searchKNNIndex(te.indexName, query, 10);
-            String responseBody = EntityUtils.toString(response.getEntity());
-            List<Map<String, Object>> hits = parseSearchHits(responseBody);
+        String query = buildSortedDocValueFieldsQuery();
+        Response response = searchKNNIndex(te.indexName, query, 10);
+        String responseBody = EntityUtils.toString(response.getEntity());
+        List<Map<String, Object>> hits = parseSearchHits(responseBody);
 
-            assertEquals("[" + te.engine.getName() + "] Expected 3 hits", 3, hits.size());
+        assertEquals("[" + te.engine.getName() + "] Expected 3 hits", 3, hits.size());
 
-            Map<String, List<Double>> docIdToVector = new LinkedHashMap<>();
-            for (Map<String, Object> hit : hits) {
-                assertNull("[" + te.engine.getName() + "] _source should be null", hit.get("_source"));
-                assertNotNull("[" + te.engine.getName() + "] fields should be present", hit.get("fields"));
-                String docId = (String) hit.get("_id");
-                List<List<Double>> vectorField = getDocValueField(hit, VECTOR_FIELD);
-                assertNotNull("[" + te.engine.getName() + "] vector field should not be null for doc " + docId, vectorField);
-                assertFalse("[" + te.engine.getName() + "] vector field should not be empty for doc " + docId, vectorField.isEmpty());
-                assertEquals("[" + te.engine.getName() + "] dimension mismatch for doc " + docId, DIMENSION, vectorField.get(0).size());
-                docIdToVector.put(docId, vectorField.get(0));
-            }
-
-            assertVectorForDoc(docIdToVector, "1", VECTOR_1, te.engine.getName());
-            assertVectorForDoc(docIdToVector, "2", VECTOR_2, te.engine.getName());
-            assertVectorForDoc(docIdToVector, "3", VECTOR_3, te.engine.getName());
+        Map<String, List<Double>> docIdToVector = new LinkedHashMap<>();
+        for (Map<String, Object> hit : hits) {
+            assertNull("[" + te.engine.getName() + "] _source should be null", hit.get("_source"));
+            assertNotNull("[" + te.engine.getName() + "] fields should be present", hit.get("fields"));
+            String docId = (String) hit.get("_id");
+            List<List<Double>> vectorField = getDocValueField(hit, VECTOR_FIELD);
+            assertNotNull("[" + te.engine.getName() + "] vector field should not be null for doc " + docId, vectorField);
+            assertFalse("[" + te.engine.getName() + "] vector field should not be empty for doc " + docId, vectorField.isEmpty());
+            assertEquals("[" + te.engine.getName() + "] dimension mismatch for doc " + docId, DIMENSION, vectorField.get(0).size());
+            docIdToVector.put(docId, vectorField.get(0));
         }
+
+        assertVectorForDoc(docIdToVector, "1", VECTOR_1, te.engine.getName());
+        assertVectorForDoc(docIdToVector, "2", VECTOR_2, te.engine.getName());
+        assertVectorForDoc(docIdToVector, "3", VECTOR_3, te.engine.getName());
     }
 
     /**
@@ -136,74 +161,71 @@ public class DocValueFieldsIT extends KNNRestTestCase {
      */
     @SneakyThrows
     public void testDocValueFields_vectorValuesMatchSource() {
-        for (TestEngines te : testEngines) {
-            te.createIndex();
-            indexTestDocuments(te.indexName);
-            // Fetch all docs with _source
-            String sourceQuery = XContentFactory.jsonBuilder()
-                .startObject()
-                .startObject("query")
-                .startObject("match_all")
-                .endObject()
-                .endObject()
-                .startObject("sort")
-                .field("_id", "asc")
-                .endObject()
-                .endObject()
-                .toString();
+        te.createIndex();
+        indexTestDocuments(te.indexName);
+        // Fetch all docs with _source
+        String sourceQuery = XContentFactory.jsonBuilder()
+            .startObject()
+            .startObject("query")
+            .startObject("match_all")
+            .endObject()
+            .endObject()
+            .startObject("sort")
+            .field("_id", "asc")
+            .endObject()
+            .endObject()
+            .toString();
 
-            Response sourceResponse = searchKNNIndex(te.indexName, sourceQuery, 10);
-            String sourceBody = EntityUtils.toString(sourceResponse.getEntity());
-            List<Map<String, Object>> sourceHits = parseSearchHits(sourceBody);
+        Response sourceResponse = searchKNNIndex(te.indexName, sourceQuery, 10);
+        String sourceBody = EntityUtils.toString(sourceResponse.getEntity());
+        List<Map<String, Object>> sourceHits = parseSearchHits(sourceBody);
 
-            // Fetch all docs with docvalue_fields (explicitly request array format)
-            String dvQuery = XContentFactory.jsonBuilder()
-                .startObject()
-                .startObject("query")
-                .startObject("match_all")
-                .endObject()
-                .endObject()
-                .startArray("docvalue_fields")
-                .startObject()
-                .field("field", VECTOR_FIELD)
-                .field("format", "array")
-                .endObject()
-                .endArray()
-                .field("_source", true)
-                .startObject("sort")
-                .field("_id", "asc")
-                .endObject()
-                .endObject()
-                .toString();
+        // Fetch all docs with docvalue_fields (explicitly request array format)
+        String dvQuery = XContentFactory.jsonBuilder()
+            .startObject()
+            .startObject("query")
+            .startObject("match_all")
+            .endObject()
+            .endObject()
+            .startArray("docvalue_fields")
+            .startObject()
+            .field("field", VECTOR_FIELD)
+            .field("format", "array")
+            .endObject()
+            .endArray()
+            .field("_source", true)
+            .startObject("sort")
+            .field("_id", "asc")
+            .endObject()
+            .endObject()
+            .toString();
 
-            Response dvResponse = searchKNNIndex(te.indexName, dvQuery, 10);
-            String dvBody = EntityUtils.toString(dvResponse.getEntity());
-            List<Map<String, Object>> dvHits = parseSearchHits(dvBody);
+        Response dvResponse = searchKNNIndex(te.indexName, dvQuery, 10);
+        String dvBody = EntityUtils.toString(dvResponse.getEntity());
+        List<Map<String, Object>> dvHits = parseSearchHits(dvBody);
 
-            assertEquals(3, sourceHits.size());
-            assertEquals(3, dvHits.size());
+        assertEquals(3, sourceHits.size());
+        assertEquals(3, dvHits.size());
 
-            // Collect all source and docvalue vectors
-            List<List<Double>> sourceVectors = new ArrayList<>();
-            List<List<Double>> dvVectors = new ArrayList<>();
-            for (int i = 0; i < sourceHits.size(); i++) {
-                sourceVectors.add(getSourceVector(sourceHits.get(i), VECTOR_FIELD));
-                List<List<Double>> dvField = getDocValueField(dvHits.get(i), VECTOR_FIELD);
-                assertNotNull(dvField);
-                dvVectors.add(dvField.get(0));
-            }
-
-            // Validate all vectors match
-            for (int i = 0; i < sourceVectors.size(); i++) {
-                List<Double> fromSource = sourceVectors.get(i);
-                List<Double> fromDocValues = dvVectors.get(i);
-                assertEquals("Dimension mismatch for doc " + i, fromSource.size(), fromDocValues.size());
-                for (int j = 0; j < fromSource.size(); j++) {
-                    assertEquals("Value mismatch at index " + j + " for doc " + i, fromSource.get(j), fromDocValues.get(j), 0.001);
-                }
-            }
+        // Collect all source and docvalue vectors
+        List<List<Double>> sourceVectors = new ArrayList<>();
+        List<List<Double>> dvVectors = new ArrayList<>();
+        for (int i = 0; i < sourceHits.size(); i++) {
+            sourceVectors.add(getSourceVector(sourceHits.get(i), VECTOR_FIELD));
+            List<List<Double>> dvField = getDocValueField(dvHits.get(i), VECTOR_FIELD);
+            assertNotNull(dvField);
+            dvVectors.add(dvField.get(0));
         }
 
+        // Validate all vectors match
+        for (int i = 0; i < sourceVectors.size(); i++) {
+            List<Double> fromSource = sourceVectors.get(i);
+            List<Double> fromDocValues = dvVectors.get(i);
+            assertEquals("Dimension mismatch for doc " + i, fromSource.size(), fromDocValues.size());
+            for (int j = 0; j < fromSource.size(); j++) {
+                assertEquals("Value mismatch at index " + j + " for doc " + i, fromSource.get(j), fromDocValues.get(j), 0.001);
+            }
+        }
     }
 
     /**
@@ -212,30 +234,28 @@ public class DocValueFieldsIT extends KNNRestTestCase {
      */
     @SneakyThrows
     public void testDocValueFields_withKnnQuery_topK() {
-        for (TestEngines te : testEngines) {
-            te.createIndex();
-            indexTestDocuments(te.indexName);
-            String query = buildDocValueFieldsQuery(VECTOR_1, false);
-            Response response = searchKNNIndex(te.indexName, query, 3);
-            String responseBody = EntityUtils.toString(response.getEntity());
-            List<Map<String, Object>> hits = parseSearchHits(responseBody);
+        te.createIndex();
+        indexTestDocuments(te.indexName);
+        String query = buildDocValueFieldsQuery(VECTOR_1, false);
+        Response response = searchKNNIndex(te.indexName, query, 3);
+        String responseBody = EntityUtils.toString(response.getEntity());
+        List<Map<String, Object>> hits = parseSearchHits(responseBody);
 
-            assertEquals(3, hits.size());
+        assertEquals(3, hits.size());
 
-            Map<String, List<Double>> docIdToVector = new java.util.LinkedHashMap<>();
-            for (Map<String, Object> hit : hits) {
-                String docId = (String) hit.get("_id");
-                List<List<Double>> vectorField = getDocValueField(hit, VECTOR_FIELD);
-                assertNotNull(vectorField);
-                assertEquals(1, vectorField.size());
-                assertEquals(DIMENSION, vectorField.get(0).size());
-                docIdToVector.put(docId, vectorField.get(0));
-            }
-
-            assertVectorForDoc(docIdToVector, "1", VECTOR_1);
-            assertVectorForDoc(docIdToVector, "2", VECTOR_2);
-            assertVectorForDoc(docIdToVector, "3", VECTOR_3);
+        Map<String, List<Double>> docIdToVector = new java.util.LinkedHashMap<>();
+        for (Map<String, Object> hit : hits) {
+            String docId = (String) hit.get("_id");
+            List<List<Double>> vectorField = getDocValueField(hit, VECTOR_FIELD);
+            assertNotNull(vectorField);
+            assertEquals(1, vectorField.size());
+            assertEquals(DIMENSION, vectorField.get(0).size());
+            docIdToVector.put(docId, vectorField.get(0));
         }
+
+        assertVectorForDoc(docIdToVector, "1", VECTOR_1);
+        assertVectorForDoc(docIdToVector, "2", VECTOR_2);
+        assertVectorForDoc(docIdToVector, "3", VECTOR_3);
     }
 
     /**
@@ -244,30 +264,28 @@ public class DocValueFieldsIT extends KNNRestTestCase {
      */
     @SneakyThrows
     public void testDocValueFields_withMatchAllQuery() {
-        for (TestEngines te : testEngines) {
-            te.createIndex();
-            indexTestDocuments(te.indexName);
+        te.createIndex();
+        indexTestDocuments(te.indexName);
 
-            String query = buildSortedDocValueFieldsQuery();
-            Response response = searchKNNIndex(te.indexName, query, 10);
-            String responseBody = EntityUtils.toString(response.getEntity());
-            List<Map<String, Object>> hits = parseSearchHits(responseBody);
+        String query = buildSortedDocValueFieldsQuery();
+        Response response = searchKNNIndex(te.indexName, query, 10);
+        String responseBody = EntityUtils.toString(response.getEntity());
+        List<Map<String, Object>> hits = parseSearchHits(responseBody);
 
-            assertEquals(3, hits.size());
+        assertEquals(3, hits.size());
 
-            Map<String, List<Double>> docIdToVector = new java.util.LinkedHashMap<>();
-            for (Map<String, Object> hit : hits) {
-                String docId = (String) hit.get("_id");
-                List<List<Double>> vectorField = getDocValueField(hit, VECTOR_FIELD);
-                assertNotNull(vectorField);
-                assertEquals(DIMENSION, vectorField.get(0).size());
-                docIdToVector.put(docId, vectorField.get(0));
-            }
-
-            assertVectorForDoc(docIdToVector, "1", VECTOR_1);
-            assertVectorForDoc(docIdToVector, "2", VECTOR_2);
-            assertVectorForDoc(docIdToVector, "3", VECTOR_3);
+        Map<String, List<Double>> docIdToVector = new java.util.LinkedHashMap<>();
+        for (Map<String, Object> hit : hits) {
+            String docId = (String) hit.get("_id");
+            List<List<Double>> vectorField = getDocValueField(hit, VECTOR_FIELD);
+            assertNotNull(vectorField);
+            assertEquals(DIMENSION, vectorField.get(0).size());
+            docIdToVector.put(docId, vectorField.get(0));
         }
+
+        assertVectorForDoc(docIdToVector, "1", VECTOR_1);
+        assertVectorForDoc(docIdToVector, "2", VECTOR_2);
+        assertVectorForDoc(docIdToVector, "3", VECTOR_3);
     }
 
     /**
@@ -278,62 +296,60 @@ public class DocValueFieldsIT extends KNNRestTestCase {
     public void testDocValueFields_highDimension_768d() {
         int highDimension = 768;
 
-        for (TestEngines te : testEngines) {
-            String indexName = te.indexName + "_high_dim";
-            KNNJsonIndexMappingsBuilder.Method method = KNNJsonIndexMappingsBuilder.Method.builder()
-                .methodName(te.methodName)
-                .spaceType(SpaceType.L2.getValue())
-                .engine(te.engine.getName())
-                .build();
+        String indexName = te.indexName + "_high_dim";
+        KNNJsonIndexMappingsBuilder.Method method = KNNJsonIndexMappingsBuilder.Method.builder()
+            .methodName(te.methodName)
+            .spaceType(SpaceType.L2.getValue())
+            .engine(te.engine.getName())
+            .build();
 
-            String mapping = KNNJsonIndexMappingsBuilder.builder()
-                .fieldName(VECTOR_FIELD)
-                .dimension(highDimension)
-                .vectorDataType(VectorDataType.FLOAT.getValue())
-                .method(method)
-                .build()
-                .getIndexMapping();
+        String mapping = KNNJsonIndexMappingsBuilder.builder()
+            .fieldName(VECTOR_FIELD)
+            .dimension(highDimension)
+            .vectorDataType(VectorDataType.FLOAT.getValue())
+            .method(method)
+            .build()
+            .getIndexMapping();
 
-            createKnnIndex(indexName, mapping);
+        createKnnIndex(indexName, mapping);
 
-            float[] vector768 = new float[highDimension];
-            for (int i = 0; i < highDimension; i++) {
-                vector768[i] = (float) (i * 0.01);
-            }
-            addKnnDoc(indexName, "1", VECTOR_FIELD, Floats.asList(vector768).toArray());
-            refreshIndex(indexName);
+        float[] vector768 = new float[highDimension];
+        for (int i = 0; i < highDimension; i++) {
+            vector768[i] = (float) (i * 0.01);
+        }
+        addKnnDoc(indexName, "1", VECTOR_FIELD, Floats.asList(vector768).toArray());
+        refreshIndex(indexName);
 
-            String query = XContentFactory.jsonBuilder()
-                .startObject()
-                .startObject("query")
-                .startObject("knn")
-                .startObject(VECTOR_FIELD)
-                .field("vector", vector768)
-                .field("k", 1)
-                .endObject()
-                .endObject()
-                .endObject()
-                .startArray("docvalue_fields")
-                .startObject()
-                .field("field", VECTOR_FIELD)
-                .field("format", "array")
-                .endObject()
-                .endArray()
-                .field("_source", false)
-                .endObject()
-                .toString();
+        String query = XContentFactory.jsonBuilder()
+            .startObject()
+            .startObject("query")
+            .startObject("knn")
+            .startObject(VECTOR_FIELD)
+            .field("vector", vector768)
+            .field("k", 1)
+            .endObject()
+            .endObject()
+            .endObject()
+            .startArray("docvalue_fields")
+            .startObject()
+            .field("field", VECTOR_FIELD)
+            .field("format", "array")
+            .endObject()
+            .endArray()
+            .field("_source", false)
+            .endObject()
+            .toString();
 
-            Response response = searchKNNIndex(indexName, query, 1);
-            String responseBody = EntityUtils.toString(response.getEntity());
-            List<Map<String, Object>> hits = parseSearchHits(responseBody);
+        Response response = searchKNNIndex(indexName, query, 1);
+        String responseBody = EntityUtils.toString(response.getEntity());
+        List<Map<String, Object>> hits = parseSearchHits(responseBody);
 
-            assertEquals(1, hits.size());
-            List<List<Double>> vectorField = getDocValueField(hits.get(0), VECTOR_FIELD);
-            assertNotNull(vectorField);
-            assertEquals(highDimension, vectorField.get(0).size());
-            for (int i = 0; i < highDimension; i++) {
-                assertEquals(vector768[i], vectorField.get(0).get(i).floatValue(), 0.001f);
-            }
+        assertEquals(1, hits.size());
+        List<List<Double>> vectorField = getDocValueField(hits.get(0), VECTOR_FIELD);
+        assertNotNull(vectorField);
+        assertEquals(highDimension, vectorField.get(0).size());
+        for (int i = 0; i < highDimension; i++) {
+            assertEquals(vector768[i], vectorField.get(0).get(i).floatValue(), 0.001f);
         }
     }
 
@@ -345,75 +361,73 @@ public class DocValueFieldsIT extends KNNRestTestCase {
     public void testDocValueFields_multipleVectorFields() {
         String secondVectorField = "second_vector";
 
-        for (TestEngines te : testEngines) {
-            String mapping = XContentFactory.jsonBuilder()
-                .startObject()
-                .startObject("properties")
-                .startObject(VECTOR_FIELD)
-                .field("type", "knn_vector")
-                .field("dimension", DIMENSION)
-                .startObject("method")
-                .field("name", te.methodName)
-                .field("space_type", SpaceType.L2.getValue())
-                .field("engine", te.engine.getName())
-                .endObject()
-                .endObject()
-                .startObject(secondVectorField)
-                .field("type", "knn_vector")
-                .field("dimension", DIMENSION)
-                .startObject("method")
-                .field("name", te.methodName)
-                .field("space_type", SpaceType.L2.getValue())
-                .field("engine", te.engine.getName())
-                .endObject()
-                .endObject()
-                .endObject()
-                .endObject()
-                .toString();
+        String mapping = XContentFactory.jsonBuilder()
+            .startObject()
+            .startObject("properties")
+            .startObject(VECTOR_FIELD)
+            .field("type", "knn_vector")
+            .field("dimension", DIMENSION)
+            .startObject("method")
+            .field("name", te.methodName)
+            .field("space_type", SpaceType.L2.getValue())
+            .field("engine", te.engine.getName())
+            .endObject()
+            .endObject()
+            .startObject(secondVectorField)
+            .field("type", "knn_vector")
+            .field("dimension", DIMENSION)
+            .startObject("method")
+            .field("name", te.methodName)
+            .field("space_type", SpaceType.L2.getValue())
+            .field("engine", te.engine.getName())
+            .endObject()
+            .endObject()
+            .endObject()
+            .endObject()
+            .toString();
 
-            createKnnIndex(te.indexName, mapping);
+        createKnnIndex(te.indexName, mapping);
 
-            XContentBuilder docBuilder = XContentFactory.jsonBuilder()
-                .startObject()
-                .field(VECTOR_FIELD, VECTOR_1)
-                .field(secondVectorField, VECTOR_2)
-                .endObject();
-            Request request = new Request("POST", "/" + te.indexName + "/_doc/1?refresh=true");
-            request.setJsonEntity(docBuilder.toString());
-            client().performRequest(request);
+        XContentBuilder docBuilder = XContentFactory.jsonBuilder()
+            .startObject()
+            .field(VECTOR_FIELD, VECTOR_1)
+            .field(secondVectorField, VECTOR_2)
+            .endObject();
+        Request request = new Request("POST", "/" + te.indexName + "/_doc/1?refresh=true");
+        request.setJsonEntity(docBuilder.toString());
+        client().performRequest(request);
 
-            String query = XContentFactory.jsonBuilder()
-                .startObject()
-                .startObject("query")
-                .startObject("match_all")
-                .endObject()
-                .endObject()
-                .startArray("docvalue_fields")
-                .startObject()
-                .field("field", VECTOR_FIELD)
-                .field("format", "array")
-                .endObject()
-                .startObject()
-                .field("field", secondVectorField)
-                .field("format", "array")
-                .endObject()
-                .endArray()
-                .field("_source", false)
-                .endObject()
-                .toString();
+        String query = XContentFactory.jsonBuilder()
+            .startObject()
+            .startObject("query")
+            .startObject("match_all")
+            .endObject()
+            .endObject()
+            .startArray("docvalue_fields")
+            .startObject()
+            .field("field", VECTOR_FIELD)
+            .field("format", "array")
+            .endObject()
+            .startObject()
+            .field("field", secondVectorField)
+            .field("format", "array")
+            .endObject()
+            .endArray()
+            .field("_source", false)
+            .endObject()
+            .toString();
 
-            Response response = searchKNNIndex(te.indexName, query, 1);
-            String responseBody = EntityUtils.toString(response.getEntity());
-            List<Map<String, Object>> hits = parseSearchHits(responseBody);
+        Response response = searchKNNIndex(te.indexName, query, 1);
+        String responseBody = EntityUtils.toString(response.getEntity());
+        List<Map<String, Object>> hits = parseSearchHits(responseBody);
 
-            assertEquals(1, hits.size());
-            List<List<Double>> firstVector = getDocValueField(hits.get(0), VECTOR_FIELD);
-            List<List<Double>> secondVector = getDocValueField(hits.get(0), secondVectorField);
-            assertNotNull(firstVector);
-            assertNotNull(secondVector);
-            assertEquals(DIMENSION, firstVector.get(0).size());
-            assertEquals(DIMENSION, secondVector.get(0).size());
-        }
+        assertEquals(1, hits.size());
+        List<List<Double>> firstVector = getDocValueField(hits.get(0), VECTOR_FIELD);
+        List<List<Double>> secondVector = getDocValueField(hits.get(0), secondVectorField);
+        assertNotNull(firstVector);
+        assertNotNull(secondVector);
+        assertEquals(DIMENSION, firstVector.get(0).size());
+        assertEquals(DIMENSION, secondVector.get(0).size());
     }
 
     /**
@@ -424,56 +438,54 @@ public class DocValueFieldsIT extends KNNRestTestCase {
     public void testDocValueFields_mixedWithScalarFields() {
         String numericField = "price";
 
-        for (TestEngines te : testEngines) {
-            String mapping = XContentFactory.jsonBuilder()
-                .startObject()
-                .startObject("properties")
-                .startObject(VECTOR_FIELD)
-                .field("type", "knn_vector")
-                .field("dimension", DIMENSION)
-                .startObject("method")
-                .field("name", te.methodName)
-                .field("space_type", SpaceType.L2.getValue())
-                .field("engine", te.engine.getName())
-                .endObject()
-                .endObject()
-                .startObject(numericField)
-                .field("type", "long")
-                .endObject()
-                .endObject()
-                .endObject()
-                .toString();
+        String mapping = XContentFactory.jsonBuilder()
+            .startObject()
+            .startObject("properties")
+            .startObject(VECTOR_FIELD)
+            .field("type", "knn_vector")
+            .field("dimension", DIMENSION)
+            .startObject("method")
+            .field("name", te.methodName)
+            .field("space_type", SpaceType.L2.getValue())
+            .field("engine", te.engine.getName())
+            .endObject()
+            .endObject()
+            .startObject(numericField)
+            .field("type", "long")
+            .endObject()
+            .endObject()
+            .endObject()
+            .toString();
 
-            createKnnIndex(te.indexName, mapping);
-            addKnnDocWithNumericField(te.indexName, "1", VECTOR_FIELD, Floats.asList(VECTOR_1).toArray(), numericField, 100L);
-            refreshIndex(te.indexName);
+        createKnnIndex(te.indexName, mapping);
+        addKnnDocWithNumericField(te.indexName, "1", VECTOR_FIELD, Floats.asList(VECTOR_1).toArray(), numericField, 100L);
+        refreshIndex(te.indexName);
 
-            String query = XContentFactory.jsonBuilder()
-                .startObject()
-                .startObject("query")
-                .startObject("match_all")
-                .endObject()
-                .endObject()
-                .startArray("docvalue_fields")
-                .startObject()
-                .field("field", VECTOR_FIELD)
-                .field("format", "array")
-                .endObject()
-                .value(numericField)
-                .endArray()
-                .field("_source", false)
-                .endObject()
-                .toString();
+        String query = XContentFactory.jsonBuilder()
+            .startObject()
+            .startObject("query")
+            .startObject("match_all")
+            .endObject()
+            .endObject()
+            .startArray("docvalue_fields")
+            .startObject()
+            .field("field", VECTOR_FIELD)
+            .field("format", "array")
+            .endObject()
+            .value(numericField)
+            .endArray()
+            .field("_source", false)
+            .endObject()
+            .toString();
 
-            Response response = searchKNNIndex(te.indexName, query, 1);
-            String responseBody = EntityUtils.toString(response.getEntity());
-            List<Map<String, Object>> hits = parseSearchHits(responseBody);
+        Response response = searchKNNIndex(te.indexName, query, 1);
+        String responseBody = EntityUtils.toString(response.getEntity());
+        List<Map<String, Object>> hits = parseSearchHits(responseBody);
 
-            assertEquals(1, hits.size());
-            Map<String, Object> fields = getFields(hits.get(0));
-            assertNotNull(fields.get(VECTOR_FIELD));
-            assertNotNull(fields.get(numericField));
-        }
+        assertEquals(1, hits.size());
+        Map<String, Object> fields = getFields(hits.get(0));
+        assertNotNull(fields.get(VECTOR_FIELD));
+        assertNotNull(fields.get(numericField));
     }
 
     /**
@@ -482,21 +494,19 @@ public class DocValueFieldsIT extends KNNRestTestCase {
      */
     @SneakyThrows
     public void testDocValueFields_withSourceEnabled() {
-        for (TestEngines te : testEngines) {
-            te.createIndex();
-            addKnnDoc(te.indexName, "1", VECTOR_FIELD, Floats.asList(VECTOR_1).toArray());
-            refreshIndex(te.indexName);
+        te.createIndex();
+        addKnnDoc(te.indexName, "1", VECTOR_FIELD, Floats.asList(VECTOR_1).toArray());
+        refreshIndex(te.indexName);
 
-            String query = buildDocValueFieldsQuery(VECTOR_1, true);
-            Response response = searchKNNIndex(te.indexName, query, 1);
-            String responseBody = EntityUtils.toString(response.getEntity());
-            List<Map<String, Object>> hits = parseSearchHits(responseBody);
+        String query = buildDocValueFieldsQuery(VECTOR_1, true);
+        Response response = searchKNNIndex(te.indexName, query, 1);
+        String responseBody = EntityUtils.toString(response.getEntity());
+        List<Map<String, Object>> hits = parseSearchHits(responseBody);
 
-            assertEquals(1, hits.size());
-            assertNotNull(hits.get(0).get("_source"));
-            List<List<Double>> vectorField = getDocValueField(hits.get(0), VECTOR_FIELD);
-            assertNotNull(vectorField);
-        }
+        assertEquals(1, hits.size());
+        assertNotNull(hits.get(0).get("_source"));
+        List<List<Double>> vectorField = getDocValueField(hits.get(0), VECTOR_FIELD);
+        assertNotNull(vectorField);
     }
 
     /**
@@ -505,23 +515,21 @@ public class DocValueFieldsIT extends KNNRestTestCase {
      */
     @SneakyThrows
     public void testDocValueFields_sourceDisabled_onlyDocValues() {
-        for (TestEngines te : testEngines) {
-            te.createIndex();
+        te.createIndex();
 
-            addKnnDoc(te.indexName, "1", VECTOR_FIELD, Floats.asList(VECTOR_1).toArray());
-            refreshIndex(te.indexName);
+        addKnnDoc(te.indexName, "1", VECTOR_FIELD, Floats.asList(VECTOR_1).toArray());
+        refreshIndex(te.indexName);
 
-            String query = buildDocValueFieldsQuery(VECTOR_1, false);
-            Response response = searchKNNIndex(te.indexName, query, 1);
-            String responseBody = EntityUtils.toString(response.getEntity());
-            List<Map<String, Object>> hits = parseSearchHits(responseBody);
+        String query = buildDocValueFieldsQuery(VECTOR_1, false);
+        Response response = searchKNNIndex(te.indexName, query, 1);
+        String responseBody = EntityUtils.toString(response.getEntity());
+        List<Map<String, Object>> hits = parseSearchHits(responseBody);
 
-            assertEquals(1, hits.size());
-            assertNull(hits.get(0).get("_source"));
-            List<List<Double>> vectorField = getDocValueField(hits.get(0), VECTOR_FIELD);
-            assertNotNull(vectorField);
-            assertEquals(DIMENSION, vectorField.get(0).size());
-        }
+        assertEquals(1, hits.size());
+        assertNull(hits.get(0).get("_source"));
+        List<List<Double>> vectorField = getDocValueField(hits.get(0), VECTOR_FIELD);
+        assertNotNull(vectorField);
+        assertEquals(DIMENSION, vectorField.get(0).size());
     }
 
     /**
@@ -530,31 +538,29 @@ public class DocValueFieldsIT extends KNNRestTestCase {
      */
     @SneakyThrows
     public void testDocValueFields_emptyIndex_returnsEmptyHits() {
-        for (TestEngines te : testEngines) {
-            te.createIndex();
+        te.createIndex();
 
-            String query = XContentFactory.jsonBuilder()
-                .startObject()
-                .startObject("query")
-                .startObject("match_all")
-                .endObject()
-                .endObject()
-                .startArray("docvalue_fields")
-                .startObject()
-                .field("field", VECTOR_FIELD)
-                .field("format", "array")
-                .endObject()
-                .endArray()
-                .field("_source", false)
-                .endObject()
-                .toString();
+        String query = XContentFactory.jsonBuilder()
+            .startObject()
+            .startObject("query")
+            .startObject("match_all")
+            .endObject()
+            .endObject()
+            .startArray("docvalue_fields")
+            .startObject()
+            .field("field", VECTOR_FIELD)
+            .field("format", "array")
+            .endObject()
+            .endArray()
+            .field("_source", false)
+            .endObject()
+            .toString();
 
-            Response response = searchKNNIndex(te.indexName, query, 10);
-            String responseBody = EntityUtils.toString(response.getEntity());
-            List<Map<String, Object>> hits = parseSearchHits(responseBody);
+        Response response = searchKNNIndex(te.indexName, query, 10);
+        String responseBody = EntityUtils.toString(response.getEntity());
+        List<Map<String, Object>> hits = parseSearchHits(responseBody);
 
-            assertTrue(hits.isEmpty());
-        }
+        assertTrue(hits.isEmpty());
     }
 
     /**
@@ -563,40 +569,38 @@ public class DocValueFieldsIT extends KNNRestTestCase {
      */
     @SneakyThrows
     public void testDocValueFields_afterDocDeletion_noGhostVectors() {
-        for (TestEngines te : testEngines) {
-            te.createIndex();
-            addKnnDoc(te.indexName, "1", VECTOR_FIELD, Floats.asList(VECTOR_1).toArray());
-            addKnnDoc(te.indexName, "2", VECTOR_FIELD, Floats.asList(VECTOR_2).toArray());
-            refreshIndex(te.indexName);
+        te.createIndex();
+        addKnnDoc(te.indexName, "1", VECTOR_FIELD, Floats.asList(VECTOR_1).toArray());
+        addKnnDoc(te.indexName, "2", VECTOR_FIELD, Floats.asList(VECTOR_2).toArray());
+        refreshIndex(te.indexName);
 
-            deleteKnnDoc(te.indexName, "1");
-            refreshIndex(te.indexName);
+        deleteKnnDoc(te.indexName, "1");
+        refreshIndex(te.indexName);
 
-            String query = XContentFactory.jsonBuilder()
-                .startObject()
-                .startObject("query")
-                .startObject("match_all")
-                .endObject()
-                .endObject()
-                .startArray("docvalue_fields")
-                .startObject()
-                .field("field", VECTOR_FIELD)
-                .field("format", "array")
-                .endObject()
-                .endArray()
-                .field("_source", false)
-                .endObject()
-                .toString();
+        String query = XContentFactory.jsonBuilder()
+            .startObject()
+            .startObject("query")
+            .startObject("match_all")
+            .endObject()
+            .endObject()
+            .startArray("docvalue_fields")
+            .startObject()
+            .field("field", VECTOR_FIELD)
+            .field("format", "array")
+            .endObject()
+            .endArray()
+            .field("_source", false)
+            .endObject()
+            .toString();
 
-            Response response = searchKNNIndex(te.indexName, query, 10);
-            String responseBody = EntityUtils.toString(response.getEntity());
-            List<Map<String, Object>> hits = parseSearchHits(responseBody);
+        Response response = searchKNNIndex(te.indexName, query, 10);
+        String responseBody = EntityUtils.toString(response.getEntity());
+        List<Map<String, Object>> hits = parseSearchHits(responseBody);
 
-            assertEquals(1, hits.size());
-            assertEquals("2", hits.get(0).get("_id"));
-            List<List<Double>> vectorField = getDocValueField(hits.get(0), VECTOR_FIELD);
-            assertNotNull(vectorField);
-        }
+        assertEquals(1, hits.size());
+        assertEquals("2", hits.get(0).get("_id"));
+        List<List<Double>> vectorField = getDocValueField(hits.get(0), VECTOR_FIELD);
+        assertNotNull(vectorField);
     }
 
     /**
@@ -605,41 +609,39 @@ public class DocValueFieldsIT extends KNNRestTestCase {
      */
     @SneakyThrows
     public void testDocValueFields_afterForcemerge_returnsCorrectly() {
-        for (TestEngines te : testEngines) {
-            te.createIndex();
-            addKnnDoc(te.indexName, "1", VECTOR_FIELD, Floats.asList(VECTOR_1).toArray());
-            addKnnDoc(te.indexName, "2", VECTOR_FIELD, Floats.asList(VECTOR_2).toArray());
-            addKnnDoc(te.indexName, "3", VECTOR_FIELD, Floats.asList(VECTOR_3).toArray());
-            refreshIndex(te.indexName);
+        te.createIndex();
+        addKnnDoc(te.indexName, "1", VECTOR_FIELD, Floats.asList(VECTOR_1).toArray());
+        addKnnDoc(te.indexName, "2", VECTOR_FIELD, Floats.asList(VECTOR_2).toArray());
+        addKnnDoc(te.indexName, "3", VECTOR_FIELD, Floats.asList(VECTOR_3).toArray());
+        refreshIndex(te.indexName);
 
-            forceMergeKnnIndex(te.indexName);
+        forceMergeKnnIndex(te.indexName);
 
-            String query = XContentFactory.jsonBuilder()
-                .startObject()
-                .startObject("query")
-                .startObject("match_all")
-                .endObject()
-                .endObject()
-                .startArray("docvalue_fields")
-                .startObject()
-                .field("field", VECTOR_FIELD)
-                .field("format", "array")
-                .endObject()
-                .endArray()
-                .field("_source", false)
-                .endObject()
-                .toString();
+        String query = XContentFactory.jsonBuilder()
+            .startObject()
+            .startObject("query")
+            .startObject("match_all")
+            .endObject()
+            .endObject()
+            .startArray("docvalue_fields")
+            .startObject()
+            .field("field", VECTOR_FIELD)
+            .field("format", "array")
+            .endObject()
+            .endArray()
+            .field("_source", false)
+            .endObject()
+            .toString();
 
-            Response response = searchKNNIndex(te.indexName, query, 10);
-            String responseBody = EntityUtils.toString(response.getEntity());
-            List<Map<String, Object>> hits = parseSearchHits(responseBody);
+        Response response = searchKNNIndex(te.indexName, query, 10);
+        String responseBody = EntityUtils.toString(response.getEntity());
+        List<Map<String, Object>> hits = parseSearchHits(responseBody);
 
-            assertEquals(3, hits.size());
-            for (Map<String, Object> hit : hits) {
-                List<List<Double>> vectorField = getDocValueField(hit, VECTOR_FIELD);
-                assertNotNull(vectorField);
-                assertEquals(DIMENSION, vectorField.get(0).size());
-            }
+        assertEquals(3, hits.size());
+        for (Map<String, Object> hit : hits) {
+            List<List<Double>> vectorField = getDocValueField(hit, VECTOR_FIELD);
+            assertNotNull(vectorField);
+            assertEquals(DIMENSION, vectorField.get(0).size());
         }
     }
 
@@ -649,42 +651,40 @@ public class DocValueFieldsIT extends KNNRestTestCase {
      */
     @SneakyThrows
     public void testDocValueFields_paginationWithFrom() {
-        for (TestEngines te : testEngines) {
-            te.createIndex();
-            for (int i = 0; i < 10; i++) {
-                float[] vec = new float[] { i * 1.0f, i * 2.0f, i * 3.0f, i * 4.0f };
-                addKnnDoc(te.indexName, String.valueOf(i), VECTOR_FIELD, Floats.asList(vec).toArray());
-            }
-            refreshIndex(te.indexName);
+        te.createIndex();
+        for (int i = 0; i < 10; i++) {
+            float[] vec = new float[] { i * 1.0f, i * 2.0f, i * 3.0f, i * 4.0f };
+            addKnnDoc(te.indexName, String.valueOf(i), VECTOR_FIELD, Floats.asList(vec).toArray());
+        }
+        refreshIndex(te.indexName);
 
-            String query = XContentFactory.jsonBuilder()
-                .startObject()
-                .startObject("query")
-                .startObject("match_all")
-                .endObject()
-                .endObject()
-                .startArray("docvalue_fields")
-                .startObject()
-                .field("field", VECTOR_FIELD)
-                .field("format", "array")
-                .endObject()
-                .endArray()
-                .field("_source", false)
-                .field("from", 5)
-                .field("size", 5)
-                .endObject()
-                .toString();
+        String query = XContentFactory.jsonBuilder()
+            .startObject()
+            .startObject("query")
+            .startObject("match_all")
+            .endObject()
+            .endObject()
+            .startArray("docvalue_fields")
+            .startObject()
+            .field("field", VECTOR_FIELD)
+            .field("format", "array")
+            .endObject()
+            .endArray()
+            .field("_source", false)
+            .field("from", 5)
+            .field("size", 5)
+            .endObject()
+            .toString();
 
-            Response response = performSearch(te.indexName, query);
-            String responseBody = EntityUtils.toString(response.getEntity());
-            List<Map<String, Object>> hits = parseSearchHits(responseBody);
+        Response response = performSearch(te.indexName, query);
+        String responseBody = EntityUtils.toString(response.getEntity());
+        List<Map<String, Object>> hits = parseSearchHits(responseBody);
 
-            assertEquals(5, hits.size());
-            for (Map<String, Object> hit : hits) {
-                List<List<Double>> vectorField = getDocValueField(hit, VECTOR_FIELD);
-                assertNotNull(vectorField);
-                assertEquals(DIMENSION, vectorField.get(0).size());
-            }
+        assertEquals(5, hits.size());
+        for (Map<String, Object> hit : hits) {
+            List<List<Double>> vectorField = getDocValueField(hit, VECTOR_FIELD);
+            assertNotNull(vectorField);
+            assertEquals(DIMENSION, vectorField.get(0).size());
         }
     }
 
@@ -816,82 +816,80 @@ public class DocValueFieldsIT extends KNNRestTestCase {
      */
     @SneakyThrows
     public void testDocValueFields_knnDerivedSourceEnabled_vectorsMatchSource() {
-        for (TestEngines te : testEngines) {
-            KNNJsonIndexMappingsBuilder.Method method = KNNJsonIndexMappingsBuilder.Method.builder()
-                .methodName(te.methodName)
-                .spaceType(SpaceType.L2.getValue())
-                .engine(te.engine.getName())
-                .build();
+        KNNJsonIndexMappingsBuilder.Method method = KNNJsonIndexMappingsBuilder.Method.builder()
+            .methodName(te.methodName)
+            .spaceType(SpaceType.L2.getValue())
+            .engine(te.engine.getName())
+            .build();
 
-            String mapping = KNNJsonIndexMappingsBuilder.builder()
-                .fieldName(VECTOR_FIELD)
-                .dimension(DIMENSION)
-                .vectorDataType(VectorDataType.FLOAT.getValue())
-                .method(method)
-                .build()
-                .getIndexMapping();
+        String mapping = KNNJsonIndexMappingsBuilder.builder()
+            .fieldName(VECTOR_FIELD)
+            .dimension(DIMENSION)
+            .vectorDataType(VectorDataType.FLOAT.getValue())
+            .method(method)
+            .build()
+            .getIndexMapping();
 
-            Settings settings = Settings.builder()
-                .put("number_of_shards", 1)
-                .put("number_of_replicas", 0)
-                .put("index.knn", true)
-                .put(KNNSettings.KNN_DERIVED_SOURCE_ENABLED, true)
-                .build();
+        Settings settings = Settings.builder()
+            .put("number_of_shards", 1)
+            .put("number_of_replicas", 0)
+            .put("index.knn", true)
+            .put(KNNSettings.KNN_DERIVED_SOURCE_ENABLED, true)
+            .build();
 
-            createKnnIndex(te.indexName, settings, mapping);
-            addKnnDoc(te.indexName, "1", VECTOR_FIELD, Floats.asList(VECTOR_1).toArray());
-            addKnnDoc(te.indexName, "2", VECTOR_FIELD, Floats.asList(VECTOR_2).toArray());
-            refreshIndex(te.indexName);
+        createKnnIndex(te.indexName, settings, mapping);
+        addKnnDoc(te.indexName, "1", VECTOR_FIELD, Floats.asList(VECTOR_1).toArray());
+        addKnnDoc(te.indexName, "2", VECTOR_FIELD, Floats.asList(VECTOR_2).toArray());
+        refreshIndex(te.indexName);
 
-            // Fetch with _source to get baseline vectors
-            String sourceQuery = XContentFactory.jsonBuilder()
-                .startObject()
-                .startObject("query")
-                .startObject("match_all")
-                .endObject()
-                .endObject()
-                .startObject("sort")
-                .field("_id", "asc")
-                .endObject()
-                .endObject()
-                .toString();
+        // Fetch with _source to get baseline vectors
+        String sourceQuery = XContentFactory.jsonBuilder()
+            .startObject()
+            .startObject("query")
+            .startObject("match_all")
+            .endObject()
+            .endObject()
+            .startObject("sort")
+            .field("_id", "asc")
+            .endObject()
+            .endObject()
+            .toString();
 
-            Response sourceResponse = searchKNNIndex(te.indexName, sourceQuery, 2);
-            String sourceBody = EntityUtils.toString(sourceResponse.getEntity());
-            List<Map<String, Object>> sourceHits = parseSearchHits(sourceBody);
+        Response sourceResponse = searchKNNIndex(te.indexName, sourceQuery, 2);
+        String sourceBody = EntityUtils.toString(sourceResponse.getEntity());
+        List<Map<String, Object>> sourceHits = parseSearchHits(sourceBody);
 
-            // Fetch with docvalue_fields (explicitly request array format)
-            String dvQuery = XContentFactory.jsonBuilder()
-                .startObject()
-                .startObject("query")
-                .startObject("match_all")
-                .endObject()
-                .endObject()
-                .startArray("docvalue_fields")
-                .startObject()
-                .field("field", VECTOR_FIELD)
-                .field("format", "array")
-                .endObject()
-                .endArray()
-                .field("_source", false)
-                .startObject("sort")
-                .field("_id", "asc")
-                .endObject()
-                .endObject()
-                .toString();
-            Response dvResponse = searchKNNIndex(te.indexName, dvQuery, 2);
-            String dvBody = EntityUtils.toString(dvResponse.getEntity());
-            List<Map<String, Object>> dvHits = parseSearchHits(dvBody);
+        // Fetch with docvalue_fields (explicitly request array format)
+        String dvQuery = XContentFactory.jsonBuilder()
+            .startObject()
+            .startObject("query")
+            .startObject("match_all")
+            .endObject()
+            .endObject()
+            .startArray("docvalue_fields")
+            .startObject()
+            .field("field", VECTOR_FIELD)
+            .field("format", "array")
+            .endObject()
+            .endArray()
+            .field("_source", false)
+            .startObject("sort")
+            .field("_id", "asc")
+            .endObject()
+            .endObject()
+            .toString();
+        Response dvResponse = searchKNNIndex(te.indexName, dvQuery, 2);
+        String dvBody = EntityUtils.toString(dvResponse.getEntity());
+        List<Map<String, Object>> dvHits = parseSearchHits(dvBody);
 
-            assertEquals(sourceHits.size(), dvHits.size());
-            for (int i = 0; i < sourceHits.size(); i++) {
-                List<Double> fromSource = getSourceVector(sourceHits.get(i), VECTOR_FIELD);
-                List<List<Double>> fromDocValues = getDocValueField(dvHits.get(i), VECTOR_FIELD);
-                assertNotNull(fromDocValues);
-                assertEquals(fromSource.size(), fromDocValues.get(0).size());
-                for (int j = 0; j < fromSource.size(); j++) {
-                    assertEquals(fromSource.get(j), fromDocValues.get(0).get(j), 0.001);
-                }
+        assertEquals(sourceHits.size(), dvHits.size());
+        for (int i = 0; i < sourceHits.size(); i++) {
+            List<Double> fromSource = getSourceVector(sourceHits.get(i), VECTOR_FIELD);
+            List<List<Double>> fromDocValues = getDocValueField(dvHits.get(i), VECTOR_FIELD);
+            assertNotNull(fromDocValues);
+            assertEquals(fromSource.size(), fromDocValues.get(0).size());
+            for (int j = 0; j < fromSource.size(); j++) {
+                assertEquals(fromSource.get(j), fromDocValues.get(0).get(j), 0.001);
             }
         }
     }
@@ -902,86 +900,84 @@ public class DocValueFieldsIT extends KNNRestTestCase {
      */
     @SneakyThrows
     public void testDocValueFields_coreDerivedSourceEnabled_vectorsMatchSource() {
-        for (TestEngines te : testEngines) {
-            String indexName = te.indexName + "_core_derived";
+        String indexName = te.indexName + "_core_derived";
 
-            KNNJsonIndexMappingsBuilder.Method method = KNNJsonIndexMappingsBuilder.Method.builder()
-                .methodName(te.methodName)
-                .spaceType(SpaceType.L2.getValue())
-                .engine(te.engine.getName())
-                .build();
+        KNNJsonIndexMappingsBuilder.Method method = KNNJsonIndexMappingsBuilder.Method.builder()
+            .methodName(te.methodName)
+            .spaceType(SpaceType.L2.getValue())
+            .engine(te.engine.getName())
+            .build();
 
-            String mapping = KNNJsonIndexMappingsBuilder.builder()
-                .fieldName(VECTOR_FIELD)
-                .dimension(DIMENSION)
-                .vectorDataType(VectorDataType.FLOAT.getValue())
-                .method(method)
-                .build()
-                .getIndexMapping();
+        String mapping = KNNJsonIndexMappingsBuilder.builder()
+            .fieldName(VECTOR_FIELD)
+            .dimension(DIMENSION)
+            .vectorDataType(VectorDataType.FLOAT.getValue())
+            .method(method)
+            .build()
+            .getIndexMapping();
 
-            Settings settings = Settings.builder()
-                .put("number_of_shards", 1)
-                .put("number_of_replicas", 0)
-                .put("index.knn", true)
-                .put(IndexSettings.INDEX_DERIVED_SOURCE_SETTING.getKey(), true)
-                .put(IndexSettings.INDEX_DERIVED_SOURCE_TRANSLOG_ENABLED_SETTING.getKey(), true)
-                .build();
+        Settings settings = Settings.builder()
+            .put("number_of_shards", 1)
+            .put("number_of_replicas", 0)
+            .put("index.knn", true)
+            .put(IndexSettings.INDEX_DERIVED_SOURCE_SETTING.getKey(), true)
+            .put(IndexSettings.INDEX_DERIVED_SOURCE_TRANSLOG_ENABLED_SETTING.getKey(), true)
+            .build();
 
-            createKnnIndex(indexName, settings, mapping);
-            addKnnDoc(indexName, "1", VECTOR_FIELD, Floats.asList(VECTOR_1).toArray());
-            addKnnDoc(indexName, "2", VECTOR_FIELD, Floats.asList(VECTOR_2).toArray());
-            refreshIndex(indexName);
+        createKnnIndex(indexName, settings, mapping);
+        addKnnDoc(indexName, "1", VECTOR_FIELD, Floats.asList(VECTOR_1).toArray());
+        addKnnDoc(indexName, "2", VECTOR_FIELD, Floats.asList(VECTOR_2).toArray());
+        refreshIndex(indexName);
 
-            // Fetch with _source to get baseline vectors (reconstructed from derived source)
-            String sourceQuery = XContentFactory.jsonBuilder()
-                .startObject()
-                .startObject("query")
-                .startObject("match_all")
-                .endObject()
-                .endObject()
-                .startObject("sort")
-                .field("_id", "asc")
-                .endObject()
-                .endObject()
-                .toString();
+        // Fetch with _source to get baseline vectors (reconstructed from derived source)
+        String sourceQuery = XContentFactory.jsonBuilder()
+            .startObject()
+            .startObject("query")
+            .startObject("match_all")
+            .endObject()
+            .endObject()
+            .startObject("sort")
+            .field("_id", "asc")
+            .endObject()
+            .endObject()
+            .toString();
 
-            Response sourceResponse = searchKNNIndex(indexName, sourceQuery, 2);
-            String sourceBody = EntityUtils.toString(sourceResponse.getEntity());
-            List<Map<String, Object>> sourceHits = parseSearchHits(sourceBody);
+        Response sourceResponse = searchKNNIndex(indexName, sourceQuery, 2);
+        String sourceBody = EntityUtils.toString(sourceResponse.getEntity());
+        List<Map<String, Object>> sourceHits = parseSearchHits(sourceBody);
 
-            // Fetch with docvalue_fields (reads directly from doc values, not derived source)
-            String dvQuery = XContentFactory.jsonBuilder()
-                .startObject()
-                .startObject("query")
-                .startObject("match_all")
-                .endObject()
-                .endObject()
-                .startArray("docvalue_fields")
-                .startObject()
-                .field("field", VECTOR_FIELD)
-                .field("format", "array")
-                .endObject()
-                .endArray()
-                .field("_source", false)
-                .startObject("sort")
-                .field("_id", "asc")
-                .endObject()
-                .endObject()
-                .toString();
+        // Fetch with docvalue_fields (reads directly from doc values, not derived source)
+        String dvQuery = XContentFactory.jsonBuilder()
+            .startObject()
+            .startObject("query")
+            .startObject("match_all")
+            .endObject()
+            .endObject()
+            .startArray("docvalue_fields")
+            .startObject()
+            .field("field", VECTOR_FIELD)
+            .field("format", "array")
+            .endObject()
+            .endArray()
+            .field("_source", false)
+            .startObject("sort")
+            .field("_id", "asc")
+            .endObject()
+            .endObject()
+            .toString();
 
-            Response dvResponse = searchKNNIndex(indexName, dvQuery, 2);
-            String dvBody = EntityUtils.toString(dvResponse.getEntity());
-            List<Map<String, Object>> dvHits = parseSearchHits(dvBody);
+        Response dvResponse = searchKNNIndex(indexName, dvQuery, 2);
+        String dvBody = EntityUtils.toString(dvResponse.getEntity());
+        List<Map<String, Object>> dvHits = parseSearchHits(dvBody);
 
-            assertEquals(sourceHits.size(), dvHits.size());
-            for (int i = 0; i < sourceHits.size(); i++) {
-                List<Double> fromSource = getSourceVector(sourceHits.get(i), VECTOR_FIELD);
-                List<List<Double>> fromDocValues = getDocValueField(dvHits.get(i), VECTOR_FIELD);
-                assertNotNull(fromDocValues);
-                assertEquals(fromSource.size(), fromDocValues.get(0).size());
-                for (int j = 0; j < fromSource.size(); j++) {
-                    assertEquals(fromSource.get(j), fromDocValues.get(0).get(j), 0.001);
-                }
+        assertEquals(sourceHits.size(), dvHits.size());
+        for (int i = 0; i < sourceHits.size(); i++) {
+            List<Double> fromSource = getSourceVector(sourceHits.get(i), VECTOR_FIELD);
+            List<List<Double>> fromDocValues = getDocValueField(dvHits.get(i), VECTOR_FIELD);
+            assertNotNull(fromDocValues);
+            assertEquals(fromSource.size(), fromDocValues.get(0).size());
+            for (int j = 0; j < fromSource.size(); j++) {
+                assertEquals(fromSource.get(j), fromDocValues.get(0).get(j), 0.001);
             }
         }
     }
@@ -992,30 +988,28 @@ public class DocValueFieldsIT extends KNNRestTestCase {
      */
     @SneakyThrows
     public void testDocValueFields_customFormat_throwsError() {
-        for (TestEngines te : testEngines) {
-            te.createIndex();
-            addKnnDoc(te.indexName, "1", VECTOR_FIELD, Floats.asList(VECTOR_1).toArray());
-            refreshIndex(te.indexName);
+        te.createIndex();
+        addKnnDoc(te.indexName, "1", VECTOR_FIELD, Floats.asList(VECTOR_1).toArray());
+        refreshIndex(te.indexName);
 
-            String query = XContentFactory.jsonBuilder()
-                .startObject()
-                .startObject("query")
-                .startObject("match_all")
-                .endObject()
-                .endObject()
-                .startArray("docvalue_fields")
-                .startObject()
-                .field("field", VECTOR_FIELD)
-                .field("format", "epoch_millis")
-                .endObject()
-                .endArray()
-                .field("_source", false)
-                .endObject()
-                .toString();
+        String query = XContentFactory.jsonBuilder()
+            .startObject()
+            .startObject("query")
+            .startObject("match_all")
+            .endObject()
+            .endObject()
+            .startArray("docvalue_fields")
+            .startObject()
+            .field("field", VECTOR_FIELD)
+            .field("format", "epoch_millis")
+            .endObject()
+            .endArray()
+            .field("_source", false)
+            .endObject()
+            .toString();
 
-            ResponseException ex = expectThrows(ResponseException.class, () -> searchKNNIndex(te.indexName, query, 1));
-            assertTrue(ex.getMessage().contains("Unsupported knn_vector docvalue_fields format"));
-        }
+        ResponseException ex = expectThrows(ResponseException.class, () -> searchKNNIndex(te.indexName, query, 1));
+        assertTrue(ex.getMessage().contains("Unsupported knn_vector docvalue_fields format"));
     }
 
     /**
@@ -1099,63 +1093,61 @@ public class DocValueFieldsIT extends KNNRestTestCase {
      */
     @SneakyThrows
     public void testDocValueFields_explicitBinaryFormat_returnsCorrectBase64ForBothEngines() {
-        for (TestEngines te : testEngines) {
-            te.createIndex();
-            addKnnDoc(te.indexName, "1", VECTOR_FIELD, Floats.asList(VECTOR_1).toArray());
-            addKnnDoc(te.indexName, "2", VECTOR_FIELD, Floats.asList(VECTOR_2).toArray());
-            refreshIndex(te.indexName);
+        te.createIndex();
+        addKnnDoc(te.indexName, "1", VECTOR_FIELD, Floats.asList(VECTOR_1).toArray());
+        addKnnDoc(te.indexName, "2", VECTOR_FIELD, Floats.asList(VECTOR_2).toArray());
+        refreshIndex(te.indexName);
 
-            String query = XContentFactory.jsonBuilder()
-                .startObject()
-                .startObject("query")
-                .startObject("knn")
-                .startObject(VECTOR_FIELD)
-                .field("vector", VECTOR_1)
-                .field("k", 2)
-                .endObject()
-                .endObject()
-                .endObject()
-                .startArray("docvalue_fields")
-                .startObject()
-                .field("field", VECTOR_FIELD)
-                .field("format", "binary")
-                .endObject()
-                .endArray()
-                .field("_source", false)
-                .endObject()
-                .toString();
+        String query = XContentFactory.jsonBuilder()
+            .startObject()
+            .startObject("query")
+            .startObject("knn")
+            .startObject(VECTOR_FIELD)
+            .field("vector", VECTOR_1)
+            .field("k", 2)
+            .endObject()
+            .endObject()
+            .endObject()
+            .startArray("docvalue_fields")
+            .startObject()
+            .field("field", VECTOR_FIELD)
+            .field("format", "binary")
+            .endObject()
+            .endArray()
+            .field("_source", false)
+            .endObject()
+            .toString();
 
-            Response response = searchKNNIndex(te.indexName, query, 2);
-            String responseBody = EntityUtils.toString(response.getEntity());
-            List<Map<String, Object>> hits = parseSearchHits(responseBody);
+        Response response = searchKNNIndex(te.indexName, query, 2);
+        String responseBody = EntityUtils.toString(response.getEntity());
+        List<Map<String, Object>> hits = parseSearchHits(responseBody);
 
-            assertEquals("Expected 2 hits for engine " + te.engine.getName(), 2, hits.size());
+        assertEquals("Expected 2 hits for engine " + te.engine.getName(), 2, hits.size());
 
-            // KNN with VECTOR_1 as query: closest is VECTOR_1, then VECTOR_2
-            float[][] expectedVectors = { VECTOR_1, VECTOR_2 };
-            for (int i = 0; i < hits.size(); i++) {
-                Map<String, Object> fields = getFields(hits.get(i));
-                assertNotNull("Fields should not be null for engine " + te.engine.getName(), fields);
-                List<String> binaryValues = getBinaryDocValueField(hits.get(i), VECTOR_FIELD);
-                assertNotNull("Binary field should not be null for engine " + te.engine.getName(), binaryValues);
-                assertEquals(1, binaryValues.size());
+        // KNN with VECTOR_1 as query: closest is VECTOR_1, then VECTOR_2
+        float[][] expectedVectors = { VECTOR_1, VECTOR_2 };
+        for (int i = 0; i < hits.size(); i++) {
+            Map<String, Object> fields = getFields(hits.get(i));
+            assertNotNull("Fields should not be null for engine " + te.engine.getName(), fields);
+            List<String> binaryValues = getBinaryDocValueField(hits.get(i), VECTOR_FIELD);
+            assertNotNull("Binary field should not be null for engine " + te.engine.getName(), binaryValues);
+            assertEquals(1, binaryValues.size());
 
-                String base64Value = binaryValues.get(0);
-                assertNotNull(base64Value);
-                assertFalse(base64Value.isEmpty());
+            String base64Value = binaryValues.get(0);
+            assertNotNull(base64Value);
+            assertFalse(base64Value.isEmpty());
 
-                byte[] decoded = Base64.getDecoder().decode(base64Value);
-                assertEquals(DIMENSION * Float.BYTES, decoded.length);
+            byte[] decoded = Base64.getDecoder().decode(base64Value);
+            assertEquals(DIMENSION * Float.BYTES, decoded.length);
 
-                ByteBuffer buffer = ByteBuffer.wrap(decoded).order(ByteOrder.LITTLE_ENDIAN);
-                for (int j = 0; j < DIMENSION; j++) {
-                    assertEquals(
-                        "Mismatch at index " + j + " for engine " + te.engine.getName(),
-                        expectedVectors[i][j],
-                        buffer.getFloat(),
-                        0.001f
-                    );
-                }
+            ByteBuffer buffer = ByteBuffer.wrap(decoded).order(ByteOrder.LITTLE_ENDIAN);
+            for (int j = 0; j < DIMENSION; j++) {
+                assertEquals(
+                    "Mismatch at index " + j + " for engine " + te.engine.getName(),
+                    expectedVectors[i][j],
+                    buffer.getFloat(),
+                    0.001f
+                );
             }
         }
     }
@@ -1244,80 +1236,78 @@ public class DocValueFieldsIT extends KNNRestTestCase {
      */
     @SneakyThrows
     public void testDocValueFields_docsWithoutVectorField_returnsEmptyFields() {
-        for (TestEngines te : testEngines) {
-            String textField = "title";
+        String textField = "title";
 
-            String mapping = XContentFactory.jsonBuilder()
-                .startObject()
-                .startObject("properties")
-                .startObject(VECTOR_FIELD)
-                .field("type", "knn_vector")
-                .field("dimension", DIMENSION)
-                .startObject("method")
-                .field("name", te.methodName)
-                .field("space_type", SpaceType.L2.getValue())
-                .field("engine", te.engine.getName())
-                .endObject()
-                .endObject()
-                .startObject(textField)
-                .field("type", "keyword")
-                .endObject()
-                .endObject()
-                .endObject()
-                .toString();
+        String mapping = XContentFactory.jsonBuilder()
+            .startObject()
+            .startObject("properties")
+            .startObject(VECTOR_FIELD)
+            .field("type", "knn_vector")
+            .field("dimension", DIMENSION)
+            .startObject("method")
+            .field("name", te.methodName)
+            .field("space_type", SpaceType.L2.getValue())
+            .field("engine", te.engine.getName())
+            .endObject()
+            .endObject()
+            .startObject(textField)
+            .field("type", "keyword")
+            .endObject()
+            .endObject()
+            .endObject()
+            .toString();
 
-            Settings settings = Settings.builder().put("number_of_shards", 1).put("number_of_replicas", 0).put("index.knn", true).build();
+        Settings settings = Settings.builder().put("number_of_shards", 1).put("number_of_replicas", 0).put("index.knn", true).build();
 
-            createKnnIndex(te.indexName, settings, mapping);
+        createKnnIndex(te.indexName, settings, mapping);
 
-            // Index a doc WITH the vector field
-            addKnnDoc(te.indexName, "1", VECTOR_FIELD, Floats.asList(VECTOR_1).toArray());
-            refreshIndex(te.indexName);
+        // Index a doc WITH the vector field
+        addKnnDoc(te.indexName, "1", VECTOR_FIELD, Floats.asList(VECTOR_1).toArray());
+        refreshIndex(te.indexName);
 
-            // Index a doc WITHOUT the vector field (in a separate segment)
-            Request request = new Request("POST", "/" + te.indexName + "/_doc/2?refresh=true");
-            request.setJsonEntity("{\"title\": \"no vector here\"}");
-            client().performRequest(request);
+        // Index a doc WITHOUT the vector field (in a separate segment)
+        Request request = new Request("POST", "/" + te.indexName + "/_doc/2?refresh=true");
+        request.setJsonEntity("{\"title\": \"no vector here\"}");
+        client().performRequest(request);
 
-            // match_all query asking for docvalue_fields on the vector field
-            String query = XContentFactory.jsonBuilder()
-                .startObject()
-                .startObject("query")
-                .startObject("match_all")
-                .endObject()
-                .endObject()
-                .startArray("docvalue_fields")
-                .startObject()
-                .field("field", VECTOR_FIELD)
-                .field("format", "array")
-                .endObject()
-                .endArray()
-                .field("_source", true)
-                .startObject("sort")
-                .field("_id", "asc")
-                .endObject()
-                .endObject()
-                .toString();
+        // match_all query asking for docvalue_fields on the vector field
+        String query = XContentFactory.jsonBuilder()
+            .startObject()
+            .startObject("query")
+            .startObject("match_all")
+            .endObject()
+            .endObject()
+            .startArray("docvalue_fields")
+            .startObject()
+            .field("field", VECTOR_FIELD)
+            .field("format", "array")
+            .endObject()
+            .endArray()
+            .field("_source", true)
+            .startObject("sort")
+            .field("_id", "asc")
+            .endObject()
+            .endObject()
+            .toString();
 
-            Response response = searchKNNIndex(te.indexName, query, 10);
-            String responseBody = EntityUtils.toString(response.getEntity());
-            List<Map<String, Object>> hits = parseSearchHits(responseBody);
+        Response response = searchKNNIndex(te.indexName, query, 10);
+        String responseBody = EntityUtils.toString(response.getEntity());
+        List<Map<String, Object>> hits = parseSearchHits(responseBody);
 
-            assertEquals(2, hits.size());
+        assertEquals(2, hits.size());
 
-            // Doc 1 has the vector field
-            Map<String, Object> hit1 = hits.get(0);
-            assertEquals("1", hit1.get("_id"));
-            List<List<Double>> vectorField1 = getDocValueField(hit1, VECTOR_FIELD);
-            assertNotNull("Doc with vector should have docvalue_fields", vectorField1);
-            assertEquals(DIMENSION, vectorField1.get(0).size());
+        // Doc 1 has the vector field
+        Map<String, Object> hit1 = hits.get(0);
+        assertEquals("1", hit1.get("_id"));
+        List<List<Double>> vectorField1 = getDocValueField(hit1, VECTOR_FIELD);
+        assertNotNull("Doc with vector should have docvalue_fields", vectorField1);
+        assertEquals(DIMENSION, vectorField1.get(0).size());
 
-            // Doc 2 does NOT have the vector field — should have no vector in fields
-            Map<String, Object> hit2 = hits.get(1);
-            assertEquals("2", hit2.get("_id"));
-            List<List<Double>> vectorField2 = getDocValueField(hit2, VECTOR_FIELD);
-            assertNull("Doc without vector should not have docvalue_fields for vector", vectorField2);
-        }
+        // Doc 2 does NOT have the vector field — should have no vector in fields
+        Map<String, Object> hit2 = hits.get(1);
+        assertEquals("2", hit2.get("_id"));
+        List<List<Double>> vectorField2 = getDocValueField(hit2, VECTOR_FIELD);
+        assertNull("Doc without vector should not have docvalue_fields for vector", vectorField2);
     }
 
     // Nested field tests
@@ -1743,76 +1733,74 @@ public class DocValueFieldsIT extends KNNRestTestCase {
      */
     @SneakyThrows
     public void testIndexing_base64VsArray_sameKnnSearchResults() {
-        for (TestEngines te : testEngines) {
-            String indexName = te.indexName + "_base64_vs_array";
+        String indexName = te.indexName + "_base64_vs_array";
 
-            createKnnIndex(
-                indexName,
-                KNNJsonIndexMappingsBuilder.builder()
-                    .fieldName(VECTOR_FIELD)
-                    .dimension(DIMENSION)
-                    .vectorDataType(VectorDataType.FLOAT.getValue())
-                    .method(
-                        KNNJsonIndexMappingsBuilder.Method.builder()
-                            .methodName(te.methodName)
-                            .spaceType(SpaceType.L2.getValue())
-                            .engine(te.engine.getName())
-                            .build()
-                    )
-                    .build()
-                    .getIndexMapping()
-            );
+        createKnnIndex(
+            indexName,
+            KNNJsonIndexMappingsBuilder.builder()
+                .fieldName(VECTOR_FIELD)
+                .dimension(DIMENSION)
+                .vectorDataType(VectorDataType.FLOAT.getValue())
+                .method(
+                    KNNJsonIndexMappingsBuilder.Method.builder()
+                        .methodName(te.methodName)
+                        .spaceType(SpaceType.L2.getValue())
+                        .engine(te.engine.getName())
+                        .build()
+                )
+                .build()
+                .getIndexMapping()
+        );
 
-            // Index doc 1 via JSON array
-            addKnnDoc(indexName, "1", VECTOR_FIELD, Floats.asList(VECTOR_1).toArray());
+        // Index doc 1 via JSON array
+        addKnnDoc(indexName, "1", VECTOR_FIELD, Floats.asList(VECTOR_1).toArray());
 
-            // Index doc 2 via base64 string (same vector as VECTOR_1)
-            ByteBuffer buffer = ByteBuffer.allocate(DIMENSION * Float.BYTES).order(ByteOrder.LITTLE_ENDIAN);
-            for (float v : VECTOR_1) {
-                buffer.putFloat(v);
-            }
-            String base64Vector = Base64.getEncoder().encodeToString(buffer.array());
-            Request request = new Request("POST", "/" + indexName + "/_doc/2?refresh=true");
-            request.setJsonEntity("{\"" + VECTOR_FIELD + "\":\"" + base64Vector + "\"}");
-            client().performRequest(request);
+        // Index doc 2 via base64 string (same vector as VECTOR_1)
+        ByteBuffer buffer = ByteBuffer.allocate(DIMENSION * Float.BYTES).order(ByteOrder.LITTLE_ENDIAN);
+        for (float v : VECTOR_1) {
+            buffer.putFloat(v);
+        }
+        String base64Vector = Base64.getEncoder().encodeToString(buffer.array());
+        Request request = new Request("POST", "/" + indexName + "/_doc/2?refresh=true");
+        request.setJsonEntity("{\"" + VECTOR_FIELD + "\":\"" + base64Vector + "\"}");
+        client().performRequest(request);
 
-            // Index doc 3 via JSON array (different vector)
-            addKnnDoc(indexName, "3", VECTOR_FIELD, Floats.asList(VECTOR_3).toArray());
-            refreshIndex(indexName);
+        // Index doc 3 via JSON array (different vector)
+        addKnnDoc(indexName, "3", VECTOR_FIELD, Floats.asList(VECTOR_3).toArray());
+        refreshIndex(indexName);
 
-            // KNN search for VECTOR_1 should return doc 1 and doc 2 with same vectors
-            String query = XContentFactory.jsonBuilder()
-                .startObject()
-                .startObject("query")
-                .startObject("knn")
-                .startObject(VECTOR_FIELD)
-                .field("vector", VECTOR_1)
-                .field("k", 3)
-                .endObject()
-                .endObject()
-                .endObject()
-                .startArray("docvalue_fields")
-                .startObject()
-                .field("field", VECTOR_FIELD)
-                .field("format", "array")
-                .endObject()
-                .endArray()
-                .field("_source", false)
-                .endObject()
-                .toString();
+        // KNN search for VECTOR_1 should return doc 1 and doc 2 with same vectors
+        String query = XContentFactory.jsonBuilder()
+            .startObject()
+            .startObject("query")
+            .startObject("knn")
+            .startObject(VECTOR_FIELD)
+            .field("vector", VECTOR_1)
+            .field("k", 3)
+            .endObject()
+            .endObject()
+            .endObject()
+            .startArray("docvalue_fields")
+            .startObject()
+            .field("field", VECTOR_FIELD)
+            .field("format", "array")
+            .endObject()
+            .endArray()
+            .field("_source", false)
+            .endObject()
+            .toString();
 
-            Response response = searchKNNIndex(indexName, query, 3);
-            List<Map<String, Object>> hits = parseSearchHits(EntityUtils.toString(response.getEntity()));
-            assertEquals(3, hits.size());
+        Response response = searchKNNIndex(indexName, query, 3);
+        List<Map<String, Object>> hits = parseSearchHits(EntityUtils.toString(response.getEntity()));
+        assertEquals(3, hits.size());
 
-            List<List<Double>> vec1 = getDocValueField(hits.get(0), VECTOR_FIELD);
-            List<List<Double>> vec2 = getDocValueField(hits.get(1), VECTOR_FIELD);
-            assertNotNull(vec1);
-            assertNotNull(vec2);
-            for (int i = 0; i < DIMENSION; i++) {
-                assertEquals("vec1 mismatch at " + i, VECTOR_1[i], vec1.get(0).get(i).floatValue(), 0.001f);
-                assertEquals("vec2 mismatch at " + i, VECTOR_1[i], vec2.get(0).get(i).floatValue(), 0.001f);
-            }
+        List<List<Double>> vec1 = getDocValueField(hits.get(0), VECTOR_FIELD);
+        List<List<Double>> vec2 = getDocValueField(hits.get(1), VECTOR_FIELD);
+        assertNotNull(vec1);
+        assertNotNull(vec2);
+        for (int i = 0; i < DIMENSION; i++) {
+            assertEquals("vec1 mismatch at " + i, VECTOR_1[i], vec1.get(0).get(i).floatValue(), 0.001f);
+            assertEquals("vec2 mismatch at " + i, VECTOR_1[i], vec2.get(0).get(i).floatValue(), 0.001f);
         }
     }
 
@@ -1822,33 +1810,31 @@ public class DocValueFieldsIT extends KNNRestTestCase {
      */
     @SneakyThrows
     public void testIndexing_invalidBase64_throwsError() {
-        for (TestEngines te : testEngines) {
-            // --- Float: 3 bytes is not a valid float vector (not multiple of 4) ---
-            String floatIndex = te.indexName + "_base64_invalid_float";
-            createKnnIndex(
-                floatIndex,
-                KNNJsonIndexMappingsBuilder.builder()
-                    .fieldName(VECTOR_FIELD)
-                    .dimension(DIMENSION)
-                    .vectorDataType(VectorDataType.FLOAT.getValue())
-                    .method(
-                        KNNJsonIndexMappingsBuilder.Method.builder()
-                            .methodName(te.methodName)
-                            .spaceType(SpaceType.L2.getValue())
-                            .engine(te.engine.getName())
-                            .build()
-                    )
-                    .build()
-                    .getIndexMapping()
-            );
+        // --- Float: 3 bytes is not a valid float vector (not multiple of 4) ---
+        String floatIndex = te.indexName + "_base64_invalid_float";
+        createKnnIndex(
+            floatIndex,
+            KNNJsonIndexMappingsBuilder.builder()
+                .fieldName(VECTOR_FIELD)
+                .dimension(DIMENSION)
+                .vectorDataType(VectorDataType.FLOAT.getValue())
+                .method(
+                    KNNJsonIndexMappingsBuilder.Method.builder()
+                        .methodName(te.methodName)
+                        .spaceType(SpaceType.L2.getValue())
+                        .engine(te.engine.getName())
+                        .build()
+                )
+                .build()
+                .getIndexMapping()
+        );
 
-            String invalidFloatBase64 = Base64.getEncoder().encodeToString(new byte[] { 1, 2, 3 });
-            Request floatReq = new Request("POST", "/" + floatIndex + "/_doc/1?refresh=true");
-            floatReq.setJsonEntity("{\"" + VECTOR_FIELD + "\":\"" + invalidFloatBase64 + "\"}");
-            ResponseException floatEx = expectThrows(ResponseException.class, () -> client().performRequest(floatReq));
-            assertTrue(floatEx.getMessage().contains("invalid byte length"));
-            deleteKNNIndex(floatIndex);
-        }
+        String invalidFloatBase64 = Base64.getEncoder().encodeToString(new byte[] { 1, 2, 3 });
+        Request floatReq = new Request("POST", "/" + floatIndex + "/_doc/1?refresh=true");
+        floatReq.setJsonEntity("{\"" + VECTOR_FIELD + "\":\"" + invalidFloatBase64 + "\"}");
+        ResponseException floatEx = expectThrows(ResponseException.class, () -> client().performRequest(floatReq));
+        assertTrue(floatEx.getMessage().contains("invalid byte length"));
+        deleteKNNIndex(floatIndex);
 
         // --- Byte: 5 bytes for dimension=4 is wrong ---
         String byteIndex = TEST_INDEX + "_base64_invalid_byte";
@@ -1904,87 +1890,85 @@ public class DocValueFieldsIT extends KNNRestTestCase {
      */
     @SneakyThrows
     public void testIndexing_base64_reindexAndUpdateByQuery() {
-        for (TestEngines te : testEngines) {
-            String sourceIndex = te.indexName + "_base64_reindex_src";
-            String destIndex = te.indexName + "_base64_reindex_dest";
-            int numDocs = 10;
+        String sourceIndex = te.indexName + "_base64_reindex_src";
+        String destIndex = te.indexName + "_base64_reindex_dest";
+        int numDocs = 10;
 
-            String mapping = KNNJsonIndexMappingsBuilder.builder()
-                .fieldName(VECTOR_FIELD)
-                .dimension(DIMENSION)
-                .vectorDataType(VectorDataType.FLOAT.getValue())
-                .method(
-                    KNNJsonIndexMappingsBuilder.Method.builder()
-                        .methodName(te.methodName)
-                        .spaceType(SpaceType.L2.getValue())
-                        .engine(te.engine.getName())
-                        .build()
-                )
-                .build()
-                .getIndexMapping();
+        String mapping = KNNJsonIndexMappingsBuilder.builder()
+            .fieldName(VECTOR_FIELD)
+            .dimension(DIMENSION)
+            .vectorDataType(VectorDataType.FLOAT.getValue())
+            .method(
+                KNNJsonIndexMappingsBuilder.Method.builder()
+                    .methodName(te.methodName)
+                    .spaceType(SpaceType.L2.getValue())
+                    .engine(te.engine.getName())
+                    .build()
+            )
+            .build()
+            .getIndexMapping();
 
-            createKnnIndex(sourceIndex, mapping);
+        createKnnIndex(sourceIndex, mapping);
 
-            // Ingest 10 docs via base64
-            float[][] vectors = new float[numDocs][DIMENSION];
-            for (int i = 0; i < numDocs; i++) {
-                for (int d = 0; d < DIMENSION; d++) {
-                    vectors[i][d] = (i + 1) * (d + 1) * 0.1f;
-                }
-                ByteBuffer buffer = ByteBuffer.allocate(DIMENSION * Float.BYTES).order(ByteOrder.LITTLE_ENDIAN);
-                for (float v : vectors[i]) {
-                    buffer.putFloat(v);
-                }
-                String base64 = Base64.getEncoder().encodeToString(buffer.array());
-                Request req = new Request("POST", "/" + sourceIndex + "/_doc/" + i + "?refresh=true");
-                req.setJsonEntity("{\"" + VECTOR_FIELD + "\":\"" + base64 + "\"}");
-                client().performRequest(req);
-            }
-            refreshIndex(sourceIndex);
-
-            // Validate all docs on source index
-            assertAllDocsHaveCorrectVectors(sourceIndex, numDocs, vectors);
-
-            // Reindex to destination
-            createKnnIndex(destIndex, mapping);
-            reindex(sourceIndex, destIndex);
-            refreshIndex(destIndex);
-
-            // Validate all docs on dest index
-            assertAllDocsHaveCorrectVectors(destIndex, numDocs, vectors);
-
-            // Update all docs in both indices via update_by_query with a new vector
-            float[] updatedVector = new float[DIMENSION];
+        // Ingest 10 docs via base64
+        float[][] vectors = new float[numDocs][DIMENSION];
+        for (int i = 0; i < numDocs; i++) {
             for (int d = 0; d < DIMENSION; d++) {
-                updatedVector[d] = 99.0f + d;
+                vectors[i][d] = (i + 1) * (d + 1) * 0.1f;
             }
-            StringBuilder scriptSource = new StringBuilder("ctx._source." + VECTOR_FIELD + " = [");
-            for (int d = 0; d < DIMENSION; d++) {
-                if (d > 0) scriptSource.append(",");
-                scriptSource.append(updatedVector[d]).append("f");
+            ByteBuffer buffer = ByteBuffer.allocate(DIMENSION * Float.BYTES).order(ByteOrder.LITTLE_ENDIAN);
+            for (float v : vectors[i]) {
+                buffer.putFloat(v);
             }
-            scriptSource.append("]");
-
-            String updateQuery = XContentFactory.jsonBuilder()
-                .startObject()
-                .startObject("script")
-                .field("source", scriptSource.toString())
-                .field("lang", "painless")
-                .endObject()
-                .endObject()
-                .toString();
-
-            updateKnnDocByQuery(sourceIndex, updateQuery);
-            updateKnnDocByQuery(destIndex, updateQuery);
-
-            // After update, all docs should have the same updated vector
-            float[][] updatedVectors = new float[numDocs][DIMENSION];
-            for (int i = 0; i < numDocs; i++) {
-                System.arraycopy(updatedVector, 0, updatedVectors[i], 0, DIMENSION);
-            }
-            assertAllDocsHaveCorrectVectors(sourceIndex, numDocs, updatedVectors);
-            assertAllDocsHaveCorrectVectors(destIndex, numDocs, updatedVectors);
+            String base64 = Base64.getEncoder().encodeToString(buffer.array());
+            Request req = new Request("POST", "/" + sourceIndex + "/_doc/" + i + "?refresh=true");
+            req.setJsonEntity("{\"" + VECTOR_FIELD + "\":\"" + base64 + "\"}");
+            client().performRequest(req);
         }
+        refreshIndex(sourceIndex);
+
+        // Validate all docs on source index
+        assertAllDocsHaveCorrectVectors(sourceIndex, numDocs, vectors);
+
+        // Reindex to destination
+        createKnnIndex(destIndex, mapping);
+        reindex(sourceIndex, destIndex);
+        refreshIndex(destIndex);
+
+        // Validate all docs on dest index
+        assertAllDocsHaveCorrectVectors(destIndex, numDocs, vectors);
+
+        // Update all docs in both indices via update_by_query with a new vector
+        float[] updatedVector = new float[DIMENSION];
+        for (int d = 0; d < DIMENSION; d++) {
+            updatedVector[d] = 99.0f + d;
+        }
+        StringBuilder scriptSource = new StringBuilder("ctx._source." + VECTOR_FIELD + " = [");
+        for (int d = 0; d < DIMENSION; d++) {
+            if (d > 0) scriptSource.append(",");
+            scriptSource.append(updatedVector[d]).append("f");
+        }
+        scriptSource.append("]");
+
+        String updateQuery = XContentFactory.jsonBuilder()
+            .startObject()
+            .startObject("script")
+            .field("source", scriptSource.toString())
+            .field("lang", "painless")
+            .endObject()
+            .endObject()
+            .toString();
+
+        updateKnnDocByQuery(sourceIndex, updateQuery);
+        updateKnnDocByQuery(destIndex, updateQuery);
+
+        // After update, all docs should have the same updated vector
+        float[][] updatedVectors = new float[numDocs][DIMENSION];
+        for (int i = 0; i < numDocs; i++) {
+            System.arraycopy(updatedVector, 0, updatedVectors[i], 0, DIMENSION);
+        }
+        assertAllDocsHaveCorrectVectors(sourceIndex, numDocs, updatedVectors);
+        assertAllDocsHaveCorrectVectors(destIndex, numDocs, updatedVectors);
     }
 
     private void assertAllDocsHaveCorrectVectors(String indexName, int expectedCount, float[][] expectedVectors) throws Exception {
