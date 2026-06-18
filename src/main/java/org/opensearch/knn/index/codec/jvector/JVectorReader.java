@@ -16,9 +16,7 @@ import io.github.jbellis.jvector.graph.similarity.SearchScoreProvider;
 import io.github.jbellis.jvector.quantization.PQVectors;
 import io.github.jbellis.jvector.quantization.ProductQuantization;
 import io.github.jbellis.jvector.vector.VectorSimilarityFunction;
-import io.github.jbellis.jvector.vector.VectorizationProvider;
 import io.github.jbellis.jvector.vector.types.VectorFloat;
-import io.github.jbellis.jvector.vector.types.VectorTypeSupport;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.HashMap;
@@ -41,14 +39,13 @@ import java.nio.ByteOrder;
 
 @Log4j2
 public class JVectorReader extends KnnVectorsReader {
-    private static final VectorTypeSupport VECTOR_TYPE_SUPPORT = VectorizationProvider.getInstance().getVectorTypeSupport();
-
     private final FieldInfos fieldInfos;
     private final String baseDataFileName;
     // Maps field name to field entries
     private final Map<String, FieldEntry> fieldEntryMap = new HashMap<>(1);
     private final Directory directory;
     private final SegmentReadState state;
+    private VectorizationProviderWrapper vectorizationProviderWrapper;
 
     public JVectorReader(SegmentReadState state) throws IOException {
         this.state = state;
@@ -79,6 +76,11 @@ public class JVectorReader extends KnnVectorsReader {
                 IOUtils.closeWhileHandlingException(this);
             }
         }
+    }
+
+    public JVectorReader(SegmentReadState state, VectorizationProviderWrapper vectorizationProviderWrapper) throws IOException {
+        this(state);
+        this.vectorizationProviderWrapper = vectorizationProviderWrapper;
     }
 
     @Override
@@ -152,7 +154,7 @@ public class JVectorReader extends KnnVectorsReader {
         }
 
         // search for a random vector using a GraphSearcher and SearchScoreProvider
-        VectorFloat<?> q = VECTOR_TYPE_SUPPORT.createFloatVector(target);
+        VectorFloat<?> q = vectorizationProviderWrapper.getVectorTypeSupport().createFloatVector(target);
         final SearchScoreProvider ssp;
 
         // Get the Lucene similarity function to check if we need to transform scores
@@ -320,10 +322,7 @@ public class JVectorReader extends KnnVectorsReader {
             this.pqCodebooksAndVectorsOffset = vectorIndexFieldMetadata.getPqCodebooksAndVectorsOffset();
             this.dimension = vectorIndexFieldMetadata.getVectorDimension();
             this.graphNodeIdToDocMap = vectorIndexFieldMetadata.getGraphNodeIdToDocMap();
-            VectorizationProviderMapper.VectorizationProvider provider = vectorIndexFieldMetadata.getVectorizationProvider();
-            var byteOrder = provider.equals(VectorizationProviderMapper.VectorizationProvider.NATIVE)
-                ? ByteOrder.LITTLE_ENDIAN
-                : ByteOrder.BIG_ENDIAN;
+            ByteOrder byteOrder = vectorIndexFieldMetadata.getVectorizationProviderWrapper().getByteOrder();
 
             this.vectorIndexFieldDataFileName = baseDataFileName + "_" + fieldInfo.name + "." + JVectorFormat.VECTOR_INDEX_EXTENSION;
             this.neighborsScoreCacheIndexFieldFileName = baseDataFileName
@@ -442,41 +441,6 @@ public class JVectorReader extends KnnVectorsReader {
                 }
             }
             throw new IllegalStateException("No matching Lucene VectorSimilarityFunction found for ordinal: " + ord);
-        }
-    }
-
-    public static class VectorizationProviderMapper {
-        static String PROVIDER_CLASS_NAME = io.github.jbellis.jvector.vector.VectorizationProvider.getInstance().getClass().getName();
-
-        public enum VectorizationProvider {
-            NON_NATIVE,
-            NATIVE,
-        }
-
-        /**
-         * Simplified list of vector vectorization providers supported by <a href="https://github.com/jbellis/jvector">jVector library</a>
-         * The providers orders matter in this list because it is later used to resolve the similarity function by ordinal.
-         * - {@code VectorizationProvider.NON_NATIVE} - refers to all providers (DefaultVectorizationProvider, PanamaVectorizationProvider)
-         * - {@code VectorizationProvider.NATIVE} - refers to NativeVectorizationProvider
-         * Use case to distinguish vectorization provider was introduced due to difference in ByteOrder for native provider.
-         */
-        public static final List<VectorizationProvider> JVECTOR_SUPPORTED_PROVIDERS = List.of(
-            VectorizationProvider.NON_NATIVE,
-            VectorizationProvider.NATIVE
-        );
-
-        public static int providerToOrd() {
-            if (PROVIDER_CLASS_NAME.contains("Native")) {
-                return JVECTOR_SUPPORTED_PROVIDERS.indexOf(VectorizationProvider.NATIVE);
-            }
-            return JVECTOR_SUPPORTED_PROVIDERS.indexOf(VectorizationProvider.NON_NATIVE);
-        }
-
-        public static VectorizationProvider ordToProvider(int ord) {
-            if (ord < 0 || ord >= JVECTOR_SUPPORTED_PROVIDERS.size()) {
-                throw new IllegalArgumentException("Invalid ordinal: " + ord);
-            }
-            return JVECTOR_SUPPORTED_PROVIDERS.get(ord);
         }
     }
 }

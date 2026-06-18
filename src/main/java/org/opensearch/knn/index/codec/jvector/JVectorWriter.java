@@ -99,6 +99,8 @@ public class JVectorWriter extends KnnVectorsWriter {
     private final ForkJoinPool simdPoolFlush;
     private final ForkJoinPool parallelismPool;
 
+    private final VectorizationProviderWrapper vectorizationProviderWrapper;
+
     private boolean finished = false;
 
     public JVectorWriter(
@@ -113,7 +115,8 @@ public class JVectorWriter extends KnnVectorsWriter {
         boolean leadingSegmentMergeDisabled,
         final ForkJoinPool simdPoolMerge,
         final ForkJoinPool simdPoolFlush,
-        final ForkJoinPool parallelismPool
+        final ForkJoinPool parallelismPool,
+        VectorizationProviderWrapper vectorizationProviderWrapper
     ) throws IOException {
         this.segmentWriteState = segmentWriteState;
         this.maxConn = maxConn;
@@ -127,6 +130,7 @@ public class JVectorWriter extends KnnVectorsWriter {
         this.simdPoolMerge = simdPoolMerge;
         this.simdPoolFlush = simdPoolFlush;
         this.parallelismPool = parallelismPool;
+        this.vectorizationProviderWrapper = vectorizationProviderWrapper;
 
         String metaFileName = IndexFileNames.segmentFileName(
             segmentWriteState.segmentInfo.name,
@@ -179,7 +183,11 @@ public class JVectorWriter extends KnnVectorsWriter {
             log.error(errorMessage);
             throw new UnsupportedOperationException(errorMessage);
         }
-        FieldWriter<?> newField = new FieldWriter<>(fieldInfo, segmentWriteState.segmentInfo.name);
+        FieldWriter<?> newField = new FieldWriter<>(
+            fieldInfo,
+            segmentWriteState.segmentInfo.name,
+            vectorizationProviderWrapper.getVectorTypeSupport()
+        );
 
         fields.add(newField);
         return newField;
@@ -342,7 +350,8 @@ public class JVectorWriter extends KnnVectorsWriter {
                 .vectorEncoding(fieldInfo.getVectorEncoding())
                 .vectorSimilarityFunction(fieldInfo.getVectorSimilarityFunction())
                 .vectorDimension(randomAccessVectorValues.dimension())
-                .graphNodeIdToDocMap(graphNodeIdToDocMap);
+                .graphNodeIdToDocMap(graphNodeIdToDocMap)
+                .vectorizationProviderWrapper(vectorizationProviderWrapper);
 
             try (
                 var writer = new OnDiskSequentialGraphIndexWriter.Builder(graph, jVectorIndexWriter).with(
@@ -428,7 +437,7 @@ public class JVectorWriter extends KnnVectorsWriter {
         long pqCodebooksAndVectorsOffset;
         long pqCodebooksAndVectorsLength;
         float degreeOverflow; // important when leveraging cache
-        JVectorReader.VectorizationProviderMapper.VectorizationProvider vectorizationProvider;
+        VectorizationProviderWrapper vectorizationProviderWrapper;
         GraphNodeIdToDocMap graphNodeIdToDocMap;
 
         public void toOutput(IndexOutput out) throws IOException {
@@ -442,7 +451,7 @@ public class JVectorWriter extends KnnVectorsWriter {
             out.writeVLong(pqCodebooksAndVectorsLength);
             out.writeInt(Float.floatToIntBits(degreeOverflow));
             graphNodeIdToDocMap.toOutput(out);
-            out.writeInt(JVectorReader.VectorizationProviderMapper.providerToOrd());
+            out.writeInt(vectorizationProviderWrapper.getId());
         }
 
         public VectorIndexFieldMetadata(IndexInput in, int version) throws IOException {
@@ -458,9 +467,11 @@ public class JVectorWriter extends KnnVectorsWriter {
             this.graphNodeIdToDocMap = new GraphNodeIdToDocMap(in);
 
             if (version >= JVectorFormat.VERSION_WITH_VECTORIZATION_PROVIDER) {
-                this.vectorizationProvider = JVectorReader.VectorizationProviderMapper.ordToProvider(in.readInt());
+                this.vectorizationProviderWrapper = VectorizationProviderWrapper.ordToProvider(in.readInt());
             } else {
-                this.vectorizationProvider = JVectorReader.VectorizationProviderMapper.VectorizationProvider.NON_NATIVE;
+                // TODO: verify assumption - we can safely use panama for older indicies.
+                // We should not use AUTO_DETECT here, because if native flag enabled, it will use wrong provider.
+                this.vectorizationProviderWrapper = VectorizationProviderWrapper.PANAMA;
             }
         }
 
@@ -510,7 +521,7 @@ public class JVectorWriter extends KnnVectorsWriter {
      * This is often specialized to support specific implementations, such as float[] or byte[] vectors.
      */
     static class FieldWriter<T> extends KnnFieldVectorsWriter<T> {
-        private static final VectorTypeSupport VECTOR_TYPE_SUPPORT = VectorizationProvider.getInstance().getVectorTypeSupport();
+        private final VectorTypeSupport vectorTypeSupport;
         private final long SHALLOW_SIZE = RamUsageEstimator.shallowSizeOfInstance(FieldWriter.class);
         @Getter
         private final FieldInfo fieldInfo;
@@ -521,13 +532,14 @@ public class JVectorWriter extends KnnVectorsWriter {
         private final List<VectorFloat<?>> vectors = new ArrayList<>();
         private final List<Integer> docIds = new ArrayList<>();
 
-        FieldWriter(FieldInfo fieldInfo, String segmentName) {
+        FieldWriter(FieldInfo fieldInfo, String segmentName, VectorTypeSupport vectorTypeSupport) {
             /**
              * For creating a new field from a flat field vectors writer.
              */
             this.randomAccessVectorValues = new ListRandomAccessVectorValues(vectors, fieldInfo.getVectorDimension());
             this.fieldInfo = fieldInfo;
             this.segmentName = segmentName;
+            this.vectorTypeSupport = vectorTypeSupport;
         }
 
         @Override
@@ -542,7 +554,7 @@ public class JVectorWriter extends KnnVectorsWriter {
             }
             docIds.add(docID);
             if (vectorValue instanceof float[]) {
-                vectors.add(VECTOR_TYPE_SUPPORT.createFloatVector(vectorValue));
+                vectors.add(vectorTypeSupport.createFloatVector(vectorValue));
             } else if (vectorValue instanceof byte[]) {
                 final String errorMessage = "byte[] vectors are not supported in JVector. "
                     + "Instead you should only use float vectors and leverage product quantization during indexing."

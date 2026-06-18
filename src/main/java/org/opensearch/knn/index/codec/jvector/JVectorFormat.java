@@ -50,6 +50,7 @@ public class JVectorFormat extends KnnVectorsFormat {
     private final ForkJoinPool simdPoolMerge;
     private final ForkJoinPool simdPoolFlush;
     private final ForkJoinPool parallelismPool;
+    private final VectorizationProviderWrapper vectorizationProviderWrapper;
 
     public JVectorFormat() {
         this(
@@ -64,7 +65,8 @@ public class JVectorFormat extends KnnVectorsFormat {
             KNNConstants.DEFAULT_LEADING_SEGMENT_MERGE_DISABLED,
             SIMD_POOL_MERGE,
             SIMD_POOL_FLUSH,
-            PARALLELISM_POOL
+            PARALLELISM_POOL,
+            VectorizationProviderWrapper.AUTO_DETECT.resolve()
         );
     }
 
@@ -85,7 +87,9 @@ public class JVectorFormat extends KnnVectorsFormat {
             leadingSegmentMergeDisabled,
             SIMD_POOL_MERGE,
             SIMD_POOL_FLUSH,
-            PARALLELISM_POOL
+            PARALLELISM_POOL,
+            VectorizationProviderWrapper.AUTO_DETECT.resolve()
+
         );
     }
 
@@ -108,7 +112,8 @@ public class JVectorFormat extends KnnVectorsFormat {
             leadingSegmentMergeDisabled,
             simdPoolMerge,
             simdPoolFlush,
-            parallelismPool
+            parallelismPool,
+            VectorizationProviderWrapper.AUTO_DETECT.resolve()
         );
     }
 
@@ -134,7 +139,36 @@ public class JVectorFormat extends KnnVectorsFormat {
             leadingSegmentMergeDisabled,
             SIMD_POOL_MERGE,
             SIMD_POOL_FLUSH,
-            PARALLELISM_POOL
+            PARALLELISM_POOL,
+            VectorizationProviderWrapper.AUTO_DETECT.resolve()
+        );
+    }
+
+    public JVectorFormat(
+        int maxConn,
+        int beamWidth,
+        float neighborOverflow,
+        float alpha,
+        Function<Integer, Integer> numberOfSubspacesPerVectorSupplier,
+        int minBatchSizeForQuantization,
+        boolean hierarchyEnabled,
+        boolean leadingSegmentMergeDisabled,
+        VectorizationProviderWrapper vectorizationProviderWrapper
+    ) {
+        this(
+            NAME,
+            maxConn,
+            beamWidth,
+            neighborOverflow,
+            alpha,
+            numberOfSubspacesPerVectorSupplier,
+            minBatchSizeForQuantization,
+            hierarchyEnabled,
+            leadingSegmentMergeDisabled,
+            SIMD_POOL_MERGE,
+            SIMD_POOL_FLUSH,
+            PARALLELISM_POOL,
+            vectorizationProviderWrapper.resolve()
         );
     }
 
@@ -150,7 +184,8 @@ public class JVectorFormat extends KnnVectorsFormat {
         boolean leadingSegmentMergeDisabled,
         final ForkJoinPool simdPoolMerge,
         final ForkJoinPool simdPoolFlush,
-        final ForkJoinPool parallelismPool
+        final ForkJoinPool parallelismPool,
+        VectorizationProviderWrapper vectorizationProviderWrapper
     ) {
         super(name);
         this.maxConn = maxConn;
@@ -164,6 +199,7 @@ public class JVectorFormat extends KnnVectorsFormat {
         this.simdPoolMerge = simdPoolMerge;
         this.simdPoolFlush = simdPoolFlush;
         this.parallelismPool = parallelismPool;
+        this.vectorizationProviderWrapper = vectorizationProviderWrapper.resolve();
     }
 
     @Override
@@ -180,13 +216,14 @@ public class JVectorFormat extends KnnVectorsFormat {
             leadingSegmentMergeDisabled,
             simdPoolMerge,
             simdPoolFlush,
-            parallelismPool
+            parallelismPool,
+            vectorizationProviderWrapper
         );
     }
 
     @Override
     public KnnVectorsReader fieldsReader(SegmentReadState state) throws IOException {
-        return new JVectorReader(state);
+        return new JVectorReader(state, vectorizationProviderWrapper);
     }
 
     @Override

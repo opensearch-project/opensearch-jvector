@@ -9,6 +9,7 @@ import lombok.Getter;
 import org.opensearch.knn.common.KNNConstants;
 import org.opensearch.knn.index.SpaceType;
 import org.opensearch.knn.index.codec.jvector.JVectorFormat;
+import org.opensearch.knn.index.codec.jvector.VectorizationProviderWrapper;
 
 import java.util.Map;
 import java.util.function.Function;
@@ -27,6 +28,7 @@ public class KNNVectorsFormatParams {
     private Function<Integer, Integer> numberOfSubspacesPerVectorSupplier;
     private final SpaceType spaceType;
     private boolean leadingSegmentMergeDisabled;
+    private VectorizationProviderWrapper vectorizationProviderWrapper;
 
     public KNNVectorsFormatParams(final Map<String, Object> params, int defaultMaxConnections, int defaultBeamWidth) {
         this(
@@ -60,6 +62,29 @@ public class KNNVectorsFormatParams {
         initNumberOfSubspacesPerVectorSupplier(params);
         this.spaceType = spaceType;
         initLeadingSegmentMergeDisabled(params, KNNConstants.DEFAULT_LEADING_SEGMENT_MERGE_DISABLED);
+    }
+
+    public KNNVectorsFormatParams(
+        final Map<String, Object> params,
+        int defaultMaxConnections,
+        int defaultBeamWidth,
+        float defaultAlpha,
+        float defaultNeighborOverflow,
+        int defaultMinBatchSizeForQuantization,
+        boolean defaultHierarchyEnabled,
+        SpaceType spaceType,
+        VectorizationProviderWrapper vectorizationProviderWrapper
+    ) {
+        initMaxConnections(params, defaultMaxConnections);
+        initBeamWidth(params, defaultBeamWidth);
+        initAlpha(params, defaultAlpha);
+        initNeighborOverflow(params, defaultNeighborOverflow);
+        initMinBatchSizeForQuantization(params, defaultMinBatchSizeForQuantization);
+        initHierarchyEnabled(params, defaultHierarchyEnabled);
+        initNumberOfSubspacesPerVectorSupplier(params);
+        this.spaceType = spaceType;
+        initLeadingSegmentMergeDisabled(params, KNNConstants.DEFAULT_LEADING_SEGMENT_MERGE_DISABLED);
+        this.vectorizationProviderWrapper = vectorizationProviderWrapper;
     }
 
     public boolean validate(final Map<String, Object> params) {
