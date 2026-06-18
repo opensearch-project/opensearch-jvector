@@ -892,6 +892,7 @@ Retrieving `knn_vector` fields from `doc_values` supports all vector data types 
 curl -X PUT "http://localhost:9200/my-index/_search" \
   -H "Content-Type: application/json" -d '
 {
+  "query": { "knn": { "my_vector": { "vector": [...], "k": 10 } } },
   "docvalue_fields.field": "my_vector",
   "docvalue_fields.format": "array",
   "_source": false
