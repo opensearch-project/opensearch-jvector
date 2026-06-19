@@ -48,7 +48,13 @@ public class JVectorFloatVectorValuesTests {
         when(mockView.liveNodes()).thenReturn(Bits.ALL);
         when(mockNodeMap.getMaxDoc()).thenReturn(SIZE);
 
-        vectorValues = new JVectorFloatVectorValues(mockIndex, VectorSimilarityFunction.EUCLIDEAN, mockNodeMap);
+        vectorValues = new JVectorFloatVectorValues(
+            mockIndex,
+            VectorSimilarityFunction.EUCLIDEAN,
+            org.apache.lucene.index.VectorSimilarityFunction.EUCLIDEAN,
+            mockNodeMap,
+            VectorizationProviderType.DEFAULT_PROVIDER.getVectorTypeSupport()
+        );
     }
 
     @Test
