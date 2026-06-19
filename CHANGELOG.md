@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [Unreleased 3.7](https://github.com/opensearch-project/opensearch-jvector/compare/3.7...HEAD)
 ### Features
 ### Enhancements
+- Implement resume() functionality to improve result quality for filtered searches ([#173](https://github.com/opensearch-project/opensearch-jvector/issues/173))
 ### Bug Fixes
 - Fix dynamic template and mixed cases [515](https://github.com/opensearch-project/opensearch-jvector/pull/515)
 
