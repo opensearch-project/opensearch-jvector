@@ -61,9 +61,9 @@ plugins {
     id 'idea'
     id 'eclipse'
     id "com.diffplug.spotless" version "8.4.0" apply false
-    id 'io.freefair.lombok' version '8.14'
+    id 'io.freefair.lombok' version '8.14.4'
     id "de.undercouch.download" version "5.3.0"
-    id "me.champeau.jmh" version "0.7.1"
+    id "me.champeau.jmh" version "0.7.3"
 }
 
 apply from: 'gradle/formatting.gradle'
@@ -357,7 +357,7 @@ dependencies {
 
     implementation "io.github.jbellis:jvector:${jvector_version}"
     //api "io.github.jbellis:jvector-native:${jvector_version}"
-    implementation 'org.agrona:agrona:1.20.0'
+    implementation 'org.agrona:agrona:1.23.1'
 
     // Add this line for SLF4J 2.x compatibility
     implementation "org.apache.logging.log4j:log4j-slf4j2-impl:${versions.log4j}"
