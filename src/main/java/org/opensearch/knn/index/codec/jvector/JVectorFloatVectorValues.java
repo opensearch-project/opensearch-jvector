@@ -8,7 +8,6 @@ package org.opensearch.knn.index.codec.jvector;
 import io.github.jbellis.jvector.graph.disk.OnDiskGraphIndex;
 import io.github.jbellis.jvector.util.Bits;
 import io.github.jbellis.jvector.vector.VectorSimilarityFunction;
-import io.github.jbellis.jvector.vector.VectorizationProvider;
 import io.github.jbellis.jvector.vector.types.VectorFloat;
 import io.github.jbellis.jvector.vector.types.VectorTypeSupport;
 import java.io.IOException;
@@ -17,20 +16,20 @@ import org.apache.lucene.search.VectorScorer;
 
 public class JVectorFloatVectorValues extends FloatVectorValues {
     public static final int NO_VECTOR = -1;
-    private static final VectorTypeSupport VECTOR_TYPE_SUPPORT = VectorizationProvider.getInstance().getVectorTypeSupport();
-
     private final OnDiskGraphIndex.View view;
     private final VectorSimilarityFunction similarityFunction;
     private final org.apache.lucene.index.VectorSimilarityFunction luceneSimilarityFunction;
     private final int dimension;
     private final int size;
     private final GraphNodeIdToDocMap graphNodeIdToDocMap;
+    private final VectorTypeSupport vectorTypeSupport;
 
     public JVectorFloatVectorValues(
         OnDiskGraphIndex onDiskGraphIndex,
         VectorSimilarityFunction similarityFunction,
         org.apache.lucene.index.VectorSimilarityFunction luceneSimilarityFunction,
-        GraphNodeIdToDocMap graphNodeIdToDocMap
+        GraphNodeIdToDocMap graphNodeIdToDocMap,
+        VectorTypeSupport vectorTypeSupport
     ) throws IOException {
         this.view = onDiskGraphIndex.getView();
         this.dimension = view.dimension();
@@ -38,6 +37,7 @@ public class JVectorFloatVectorValues extends FloatVectorValues {
         this.similarityFunction = similarityFunction;
         this.luceneSimilarityFunction = luceneSimilarityFunction;
         this.graphNodeIdToDocMap = graphNodeIdToDocMap;
+        this.vectorTypeSupport = vectorTypeSupport;
     }
 
     @Override
@@ -154,10 +154,9 @@ public class JVectorFloatVectorValues extends FloatVectorValues {
                 return array;
             }
 
-            // TODO: Use with Java 22+
-            // if (backing instanceof MemorySegment segment) {
-            // return segment.toArray(ValueLayout.JAVA_FLOAT);
-            // }
+            if (MemorySegmentFloatArrayUtil.isSupported(backing)) {
+                return MemorySegmentFloatArrayUtil.toFloatArray(backing, vector.length());
+            }
 
             float[] result = new float[vector.length()];
             for (int j = 0; j < vector.length(); j++) {
@@ -180,7 +179,7 @@ public class JVectorFloatVectorValues extends FloatVectorValues {
 
     @Override
     public VectorScorer scorer(float[] query) throws IOException {
-        return new JVectorVectorScorer(this, VECTOR_TYPE_SUPPORT.createFloatVector(query), similarityFunction, luceneSimilarityFunction);
+        return new JVectorVectorScorer(this, vectorTypeSupport.createFloatVector(query), similarityFunction, luceneSimilarityFunction);
     }
 
 }

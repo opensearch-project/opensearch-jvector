@@ -101,7 +101,8 @@ public class JVectorReader extends KnnVectorsReader {
             fieldEntry.index,
             fieldEntry.similarityFunction,
             fieldEntry.fieldInfo.getVectorSimilarityFunction(),
-            fieldEntry.graphNodeIdToDocMap
+            fieldEntry.graphNodeIdToDocMap,
+            vectorizationProviderType.getVectorTypeSupport()
         );
     }
 
