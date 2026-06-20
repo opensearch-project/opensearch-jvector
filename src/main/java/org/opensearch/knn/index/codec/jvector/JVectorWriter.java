@@ -45,7 +45,6 @@ import java.io.UnsupportedEncodingException;
 import java.time.Clock;
 import java.util.*;
 import java.util.concurrent.ForkJoinPool;
-import java.util.function.Function;
 import java.util.stream.IntStream;
 
 import static io.github.jbellis.jvector.quantization.KMeansPlusPlusClusterer.UNWEIGHTED;
@@ -93,13 +92,10 @@ public class JVectorWriter extends KnnVectorsWriter {
     private final int beamWidth;
     private final float degreeOverflow;
     private final float alpha;
-    private final Function<Integer, Integer> numberOfSubspacesPerVectorSupplier; // Number of subspaces used per vector for PQ quantization
-                                                                                 // as a function of the original dimension
+    private final JVectorIndexQuantization quantization;
     private final int minimumBatchSizeForQuantization; // Threshold for the vector count above which we will trigger PQ quantization
     private final boolean hierarchyEnabled;
     private final boolean leadingSegmentMergeDisabled;
-    private final String quantizationType;
-    private final int numNvqSubvectors;
 
     private final ForkJoinPool simdPoolMerge;
     private final ForkJoinPool simdPoolFlush;
@@ -113,12 +109,10 @@ public class JVectorWriter extends KnnVectorsWriter {
         int beamWidth,
         float degreeOverflow,
         float alpha,
-        Function<Integer, Integer> numberOfSubspacesPerVectorSupplier,
+        JVectorIndexQuantization quantization,
         int minimumBatchSizeForQuantization,
         boolean hierarchyEnabled,
         boolean leadingSegmentMergeDisabled,
-        String quantizationType,
-        int numNvqSubvectors,
         final ForkJoinPool simdPoolMerge,
         final ForkJoinPool simdPoolFlush,
         final ForkJoinPool parallelismPool
@@ -128,12 +122,10 @@ public class JVectorWriter extends KnnVectorsWriter {
         this.beamWidth = beamWidth;
         this.degreeOverflow = degreeOverflow;
         this.alpha = alpha;
-        this.numberOfSubspacesPerVectorSupplier = numberOfSubspacesPerVectorSupplier;
+        this.quantization = quantization;
         this.minimumBatchSizeForQuantization = minimumBatchSizeForQuantization;
         this.hierarchyEnabled = hierarchyEnabled;
         this.leadingSegmentMergeDisabled = leadingSegmentMergeDisabled;
-        this.quantizationType = quantizationType;
-        this.numNvqSubvectors = numNvqSubvectors;
         this.simdPoolMerge = simdPoolMerge;
         this.simdPoolFlush = simdPoolFlush;
         this.parallelismPool = parallelismPool;
@@ -230,7 +222,7 @@ public class JVectorWriter extends KnnVectorsWriter {
             final NVQVectors nvqVectors;
             final FieldInfo fieldInfo = field.fieldInfo;
             if (randomAccessVectorValues.size() >= minimumBatchSizeForQuantization) {
-                log.info("Calculating codebooks and compressed vectors for field {} using {}", fieldInfo.name, quantizationType);
+                log.info("Calculating codebooks and compressed vectors for field {} using {}", fieldInfo.name, quantization.getType());
                 if (isNVQ()) {
                     nvqVectors = getNVQVectors(randomAccessVectorValues, fieldInfo);
                     pqVectors = getPQVectors(randomAccessVectorValues, fieldInfo);
@@ -443,7 +435,10 @@ public class JVectorWriter extends KnnVectorsWriter {
         final VectorSimilarityFunction vectorSimilarityFunction = fieldInfo.getVectorSimilarityFunction();
         log.info("Computing PQ codebooks for field {} for {} vectors", fieldName, randomAccessVectorValues.size());
         final long start = Clock.systemDefaultZone().millis();
-        final var M = numberOfSubspacesPerVectorSupplier.apply(randomAccessVectorValues.dimension());
+        // NVQ auxiliary PQ always uses the PQ-default subspace count, not the NVQ subvector count
+        final int M = isNVQ()
+            ? JVectorIndexQuantization.PQ.defaultNumSubspaces(randomAccessVectorValues.dimension())
+            : quantization.numSubspaces(randomAccessVectorValues.dimension());
         final var numberOfClustersPerSubspace = Math.min(256, randomAccessVectorValues.size()); // number of centroids per
         // subspace
         ProductQuantization pq = ProductQuantization.compute(
@@ -478,14 +473,14 @@ public class JVectorWriter extends KnnVectorsWriter {
     static final byte QUANTIZATION_TYPE_NVQ_INLINE = 2;
 
     private boolean isNVQ() {
-        return org.opensearch.knn.common.KNNConstants.QUANTIZATION_TYPE_NVQ.equals(quantizationType);
+        return quantization instanceof JVectorIndexQuantization.NVQ;
     }
 
     private NVQVectors getNVQVectors(RandomAccessVectorValues randomAccessVectorValues, FieldInfo fieldInfo) throws IOException {
         final String fieldName = fieldInfo.name;
         log.info("Computing NVQ parameters for field {} for {} vectors", fieldName, randomAccessVectorValues.size());
         final long start = Clock.systemDefaultZone().millis();
-        final int nSubVectors = numNvqSubvectors;
+        final int nSubVectors = ((JVectorIndexQuantization.NVQ) quantization).getNumSubvectors();
         NVQuantization nvq = NVQuantization.compute(randomAccessVectorValues, nSubVectors);
         final long trainingTime = Clock.systemDefaultZone().millis() - start;
         log.info("Computed NVQ parameters for field {}, in {} millis", fieldName, trainingTime);

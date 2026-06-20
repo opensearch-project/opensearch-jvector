@@ -9,10 +9,9 @@ import lombok.Getter;
 import lombok.extern.log4j.Log4j2;
 import org.opensearch.knn.common.KNNConstants;
 import org.opensearch.knn.index.SpaceType;
-import org.opensearch.knn.index.codec.jvector.JVectorFormat;
+import org.opensearch.knn.index.codec.jvector.JVectorIndexQuantization;
 
 import java.util.Map;
-import java.util.function.Function;
 
 /**
  * Class provides params for LuceneHNSWVectorsFormat
@@ -26,11 +25,9 @@ public class KNNVectorsFormatParams {
     private float neighborOverflow;
     private int minBatchSizeForQuantization;
     private boolean hierarchyEnabled;
-    private Function<Integer, Integer> numberOfSubspacesPerVectorSupplier;
+    private JVectorIndexQuantization quantization;
     private final SpaceType spaceType;
     private boolean leadingSegmentMergeDisabled;
-    private String quantizationType;
-    private int numNvqSubvectors;
 
     public KNNVectorsFormatParams(final Map<String, Object> params, int defaultMaxConnections, int defaultBeamWidth) {
         this(
@@ -61,11 +58,9 @@ public class KNNVectorsFormatParams {
         initNeighborOverflow(params, defaultNeighborOverflow);
         initMinBatchSizeForQuantization(params, defaultMinBatchSizeForQuantization);
         initHierarchyEnabled(params, defaultHierarchyEnabled);
-        initNumberOfSubspacesPerVectorSupplier(params);
         this.spaceType = spaceType;
         initLeadingSegmentMergeDisabled(params, KNNConstants.DEFAULT_LEADING_SEGMENT_MERGE_DISABLED);
-        initQuantizationType(params);
-        initNumNvqSubvectors(params);
+        initQuantization(params);
     }
 
     public boolean validate(final Map<String, Object> params) {
@@ -120,15 +115,6 @@ public class KNNVectorsFormatParams {
         this.hierarchyEnabled = defaultHierarchyEnabled;
     }
 
-    private void initNumberOfSubspacesPerVectorSupplier(final Map<String, Object> params) {
-        if (params != null && params.containsKey(KNNConstants.METHOD_PARAMETER_NUM_PQ_SUBSPACES)) {
-            int numPQSubspaces = (int) params.get(KNNConstants.METHOD_PARAMETER_NUM_PQ_SUBSPACES);
-            this.numberOfSubspacesPerVectorSupplier = (originalDimension) -> numPQSubspaces;
-            return;
-        }
-        this.numberOfSubspacesPerVectorSupplier = JVectorFormat::getDefaultNumberOfSubspacesPerVector;
-    }
-
     private void initLeadingSegmentMergeDisabled(final Map<String, Object> params, boolean defaultLsmDisabled) {
         if (params != null && params.containsKey(KNNConstants.METHOD_PARAMETER_LEADING_SEGMENT_MERGE_DISABLED)) {
             this.leadingSegmentMergeDisabled = (boolean) params.get(KNNConstants.METHOD_PARAMETER_LEADING_SEGMENT_MERGE_DISABLED);
@@ -137,29 +123,28 @@ public class KNNVectorsFormatParams {
         this.leadingSegmentMergeDisabled = defaultLsmDisabled;
     }
 
-    private void initQuantizationType(final Map<String, Object> params) {
-        if (params != null && params.containsKey(KNNConstants.METHOD_PARAMETER_QUANTIZATION_TYPE)) {
-            this.quantizationType = (String) params.get(KNNConstants.METHOD_PARAMETER_QUANTIZATION_TYPE);
-            return;
-        }
-        this.quantizationType = KNNConstants.DEFAULT_QUANTIZATION_TYPE;
-    }
+    private void initQuantization(final Map<String, Object> params) {
+        String type = (params != null && params.containsKey(KNNConstants.METHOD_PARAMETER_QUANTIZATION_TYPE))
+            ? (String) params.get(KNNConstants.METHOD_PARAMETER_QUANTIZATION_TYPE)
+            : KNNConstants.DEFAULT_QUANTIZATION_TYPE;
 
-    private void initNumNvqSubvectors(final Map<String, Object> params) {
-        if (params != null && params.containsKey(KNNConstants.METHOD_PARAMETER_NUM_NVQ_SUBVECTORS)) {
-            this.numNvqSubvectors = (int) params.get(KNNConstants.METHOD_PARAMETER_NUM_NVQ_SUBVECTORS);
-            log.info("NVQ is used, and {} is set to {}", KNNConstants.METHOD_PARAMETER_NUM_NVQ_SUBVECTORS, this.numNvqSubvectors);
-            return;
-        }
-        this.numNvqSubvectors = KNNConstants.DEFAULT_NUM_NVQ_SUBVECTORS;
-        if (params != null
-            && params.containsKey(KNNConstants.METHOD_PARAMETER_QUANTIZATION_TYPE)
-            && params.get(KNNConstants.METHOD_PARAMETER_QUANTIZATION_TYPE).equals(KNNConstants.QUANTIZATION_TYPE_NVQ)) {
-            log.info(
-                "NVQ is used, and {} not set; defaulting to {}",
-                KNNConstants.METHOD_PARAMETER_NUM_NVQ_SUBVECTORS,
-                KNNConstants.DEFAULT_NUM_NVQ_SUBVECTORS
-            );
+        if (KNNConstants.QUANTIZATION_TYPE_NVQ.equals(type)) {
+            int numSubvectors = KNNConstants.DEFAULT_NUM_NVQ_SUBVECTORS;
+            if (params != null && params.containsKey(KNNConstants.METHOD_PARAMETER_NUM_NVQ_SUBVECTORS)) {
+                numSubvectors = (int) params.get(KNNConstants.METHOD_PARAMETER_NUM_NVQ_SUBVECTORS);
+                log.info("NVQ quantization: {} set to {}", KNNConstants.METHOD_PARAMETER_NUM_NVQ_SUBVECTORS, numSubvectors);
+            } else {
+                log.info("NVQ quantization: {} not set; defaulting to {}", KNNConstants.METHOD_PARAMETER_NUM_NVQ_SUBVECTORS, numSubvectors);
+                numSubvectors = JVectorIndexQuantization.NVQ.defaultNumSubvectors();
+            }
+            this.quantization = new JVectorIndexQuantization.NVQ(numSubvectors);
+        } else {
+            if (params != null && params.containsKey(KNNConstants.METHOD_PARAMETER_NUM_PQ_SUBSPACES)) {
+                int numSubspaces = (int) params.get(KNNConstants.METHOD_PARAMETER_NUM_PQ_SUBSPACES);
+                this.quantization = new JVectorIndexQuantization.PQ(numSubspaces);
+            } else {
+                this.quantization = new JVectorIndexQuantization.PQ();
+            }
         }
     }
 

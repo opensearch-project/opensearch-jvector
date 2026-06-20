@@ -31,6 +31,7 @@ import org.opensearch.knn.index.SpaceType;
 import org.opensearch.knn.index.VectorDataType;
 import org.opensearch.knn.index.codec.KNNCodecVersion;
 import org.opensearch.knn.index.codec.jvector.JVectorFormat;
+import org.opensearch.knn.index.codec.jvector.JVectorIndexQuantization;
 import org.opensearch.knn.index.query.KNNQueryBuilder;
 import org.opensearch.knn.plugin.JVectorKNNPlugin;
 
@@ -194,12 +195,10 @@ public class CommonTestUtils {
                                 JVectorFormat.DEFAULT_BEAM_WIDTH,
                                 KNNConstants.DEFAULT_NEIGHBOR_OVERFLOW_VALUE.floatValue(),
                                 KNNConstants.DEFAULT_ALPHA_VALUE.floatValue(),
-                                JVectorFormat::getDefaultNumberOfSubspacesPerVector,
+                                new JVectorIndexQuantization.NVQ(KNNConstants.DEFAULT_NUM_NVQ_SUBVECTORS),
                                 minBatchSizeForQuantization,
                                 KNNConstants.DEFAULT_HIERARCHY_ENABLED,
-                                leadingSegmentMergeDisabled,
-                                KNNConstants.QUANTIZATION_TYPE_NVQ,
-                                KNNConstants.DEFAULT_NUM_NVQ_SUBVECTORS
+                                leadingSegmentMergeDisabled
                             );
                         }
                     };
@@ -218,12 +217,10 @@ public class CommonTestUtils {
                                 JVectorFormat.DEFAULT_BEAM_WIDTH,
                                 KNNConstants.DEFAULT_NEIGHBOR_OVERFLOW_VALUE.floatValue(),
                                 KNNConstants.DEFAULT_ALPHA_VALUE.floatValue(),
-                                JVectorFormat::getDefaultNumberOfSubspacesPerVector,
+                                new JVectorIndexQuantization.NVQ(KNNConstants.DEFAULT_NUM_NVQ_SUBVECTORS),
                                 minBatchSizeForQuantization,
                                 KNNConstants.DEFAULT_HIERARCHY_ENABLED,
                                 leadingSegmentMergeDisabled,
-                                KNNConstants.QUANTIZATION_TYPE_NVQ,
-                                KNNConstants.DEFAULT_NUM_NVQ_SUBVECTORS,
                                 graphMergePool,
                                 graphMergePool,
                                 graphMergePool
