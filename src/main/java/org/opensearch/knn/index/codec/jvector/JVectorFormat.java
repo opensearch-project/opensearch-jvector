@@ -16,7 +16,6 @@ import org.opensearch.knn.common.KNNConstants;
 import java.io.IOException;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinWorkerThread;
-import java.util.function.Function;
 
 @Log4j2
 public class JVectorFormat extends KnnVectorsFormat {
@@ -41,14 +40,12 @@ public class JVectorFormat extends KnnVectorsFormat {
 
     private final int maxConn;
     private final int beamWidth;
-    private final Function<Integer, Integer> numberOfSubspacesPerVectorSupplier; // as a function of the original dimension
+    private final JVectorIndexQuantization quantization;
     private final int minBatchSizeForQuantization;
     private final float alpha;
     private final float neighborOverflow;
     private final boolean hierarchyEnabled;
     private final boolean leadingSegmentMergeDisabled;
-    private final String quantizationType;
-    private final int numNvqSubvectors;
     private final ForkJoinPool simdPoolMerge;
     private final ForkJoinPool simdPoolFlush;
     private final ForkJoinPool parallelismPool;
@@ -60,12 +57,10 @@ public class JVectorFormat extends KnnVectorsFormat {
             DEFAULT_BEAM_WIDTH,
             KNNConstants.DEFAULT_NEIGHBOR_OVERFLOW_VALUE.floatValue(),
             KNNConstants.DEFAULT_ALPHA_VALUE.floatValue(),
-            JVectorFormat::getDefaultNumberOfSubspacesPerVector,
+            new JVectorIndexQuantization.PQ(),
             KNNConstants.DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION,
             KNNConstants.DEFAULT_HIERARCHY_ENABLED,
             KNNConstants.DEFAULT_LEADING_SEGMENT_MERGE_DISABLED,
-            KNNConstants.DEFAULT_QUANTIZATION_TYPE,
-            KNNConstants.DEFAULT_NUM_NVQ_SUBVECTORS,
             SIMD_POOL_MERGE,
             SIMD_POOL_FLUSH,
             PARALLELISM_POOL
@@ -83,12 +78,10 @@ public class JVectorFormat extends KnnVectorsFormat {
             DEFAULT_BEAM_WIDTH,
             KNNConstants.DEFAULT_NEIGHBOR_OVERFLOW_VALUE.floatValue(),
             KNNConstants.DEFAULT_ALPHA_VALUE.floatValue(),
-            JVectorFormat::getDefaultNumberOfSubspacesPerVector,
+            new JVectorIndexQuantization.PQ(),
             minBatchSizeForQuantization,
             KNNConstants.DEFAULT_HIERARCHY_ENABLED,
             leadingSegmentMergeDisabled,
-            KNNConstants.DEFAULT_QUANTIZATION_TYPE,
-            KNNConstants.DEFAULT_NUM_NVQ_SUBVECTORS,
             SIMD_POOL_MERGE,
             SIMD_POOL_FLUSH,
             PARALLELISM_POOL
@@ -108,12 +101,10 @@ public class JVectorFormat extends KnnVectorsFormat {
             DEFAULT_BEAM_WIDTH,
             KNNConstants.DEFAULT_NEIGHBOR_OVERFLOW_VALUE.floatValue(),
             KNNConstants.DEFAULT_ALPHA_VALUE.floatValue(),
-            JVectorFormat::getDefaultNumberOfSubspacesPerVector,
+            new JVectorIndexQuantization.PQ(),
             minBatchSizeForQuantization,
             KNNConstants.DEFAULT_HIERARCHY_ENABLED,
             leadingSegmentMergeDisabled,
-            KNNConstants.DEFAULT_QUANTIZATION_TYPE,
-            KNNConstants.DEFAULT_NUM_NVQ_SUBVECTORS,
             simdPoolMerge,
             simdPoolFlush,
             parallelismPool
@@ -125,7 +116,7 @@ public class JVectorFormat extends KnnVectorsFormat {
         int beamWidth,
         float neighborOverflow,
         float alpha,
-        Function<Integer, Integer> numberOfSubspacesPerVectorSupplier,
+        JVectorIndexQuantization quantization,
         int minBatchSizeForQuantization,
         boolean hierarchyEnabled,
         boolean leadingSegmentMergeDisabled
@@ -136,42 +127,10 @@ public class JVectorFormat extends KnnVectorsFormat {
             beamWidth,
             neighborOverflow,
             alpha,
-            numberOfSubspacesPerVectorSupplier,
+            quantization,
             minBatchSizeForQuantization,
             hierarchyEnabled,
             leadingSegmentMergeDisabled,
-            KNNConstants.DEFAULT_QUANTIZATION_TYPE,
-            KNNConstants.DEFAULT_NUM_NVQ_SUBVECTORS,
-            SIMD_POOL_MERGE,
-            SIMD_POOL_FLUSH,
-            PARALLELISM_POOL
-        );
-    }
-
-    public JVectorFormat(
-        int maxConn,
-        int beamWidth,
-        float neighborOverflow,
-        float alpha,
-        Function<Integer, Integer> numberOfSubspacesPerVectorSupplier,
-        int minBatchSizeForQuantization,
-        boolean hierarchyEnabled,
-        boolean leadingSegmentMergeDisabled,
-        String quantizationType,
-        int numNvqSubvectors
-    ) {
-        this(
-            NAME,
-            maxConn,
-            beamWidth,
-            neighborOverflow,
-            alpha,
-            numberOfSubspacesPerVectorSupplier,
-            minBatchSizeForQuantization,
-            hierarchyEnabled,
-            leadingSegmentMergeDisabled,
-            quantizationType,
-            numNvqSubvectors,
             SIMD_POOL_MERGE,
             SIMD_POOL_FLUSH,
             PARALLELISM_POOL
@@ -184,12 +143,10 @@ public class JVectorFormat extends KnnVectorsFormat {
         int beamWidth,
         float neighborOverflow,
         float alpha,
-        Function<Integer, Integer> numberOfSubspacesPerVectorSupplier,
+        JVectorIndexQuantization quantization,
         int minBatchSizeForQuantization,
         boolean hierarchyEnabled,
         boolean leadingSegmentMergeDisabled,
-        String quantizationType,
-        int numNvqSubvectors,
         final ForkJoinPool simdPoolMerge,
         final ForkJoinPool simdPoolFlush,
         final ForkJoinPool parallelismPool
@@ -197,14 +154,12 @@ public class JVectorFormat extends KnnVectorsFormat {
         super(name);
         this.maxConn = maxConn;
         this.beamWidth = beamWidth;
-        this.numberOfSubspacesPerVectorSupplier = numberOfSubspacesPerVectorSupplier;
+        this.quantization = quantization;
         this.minBatchSizeForQuantization = minBatchSizeForQuantization;
         this.alpha = alpha;
         this.neighborOverflow = neighborOverflow;
         this.hierarchyEnabled = hierarchyEnabled;
         this.leadingSegmentMergeDisabled = leadingSegmentMergeDisabled;
-        this.quantizationType = quantizationType;
-        this.numNvqSubvectors = numNvqSubvectors;
         this.simdPoolMerge = simdPoolMerge;
         this.simdPoolFlush = simdPoolFlush;
         this.parallelismPool = parallelismPool;
@@ -218,12 +173,10 @@ public class JVectorFormat extends KnnVectorsFormat {
             beamWidth,
             neighborOverflow,
             alpha,
-            numberOfSubspacesPerVectorSupplier,
+            quantization,
             minBatchSizeForQuantization,
             hierarchyEnabled,
             leadingSegmentMergeDisabled,
-            quantizationType,
-            numNvqSubvectors,
             simdPoolMerge,
             simdPoolFlush,
             parallelismPool
@@ -239,68 +192,6 @@ public class JVectorFormat extends KnnVectorsFormat {
     public int getMaxDimensions(String s) {
         // Not a hard limit, but a reasonable default
         return 8192;
-    }
-
-    /**
-     * This method returns the default number of subspaces per vector for a given original dimension.
-     * Should be used as a default value for the number of subspaces per vector in case no value is provided.
-     *
-     * @param originalDimension original vector dimension
-     * @return default number of subspaces per vector
-     */
-    public static int getDefaultNumberOfSubspacesPerVector(int originalDimension) {
-        // the idea here is that higher dimensions compress well, but not so well that we should use fewer bits
-        // than a lower-dimension vector, which is what you could get with cutoff points to switch between (e.g.)
-        // D*0.5 and D*0.25. Thus, the following ensures that bytes per vector is strictly increasing with D.
-        int compressedBytes;
-        if (originalDimension <= 32) {
-            // We are compressing from 4-byte floats to single-byte codebook indexes,
-            // so this represents compression of 4x
-            // * GloVe-25 needs 25 BPV to achieve good recall
-            compressedBytes = originalDimension;
-        } else if (originalDimension <= 64) {
-            // * GloVe-50 performs fine at 25
-            compressedBytes = 32;
-        } else if (originalDimension <= 200) {
-            // * GloVe-100 and -200 perform well at 50 and 100 BPV, respectively
-            compressedBytes = (int) (originalDimension * 0.5);
-        } else if (originalDimension <= 400) {
-            // * NYTimes-256 actually performs fine at 64 BPV but we'll be conservative
-            // since we don't want BPV to decrease
-            compressedBytes = 100;
-        } else if (originalDimension <= 768) {
-            // allow BPV to increase linearly up to 192
-            compressedBytes = (int) (originalDimension * 0.25);
-        } else if (originalDimension <= 1536) {
-            // * ada002 vectors have good recall even at 192 BPV = compression of 32x
-            compressedBytes = 192;
-        } else {
-            // We have not tested recall with larger vectors than this, let's let it increase linearly
-            compressedBytes = (int) (originalDimension * 0.125);
-        }
-        return compressedBytes;
-    }
-
-    /**
-     * Returns the default number of NVQ subvectors for a given vector dimension.
-     *
-     * <p>Unlike PQ (which stores only 1 byte per subvector as a centroid index), each NVQ
-     * subvector carries 28 bytes of fixed overhead: four floats (growthRate, midpoint, minValue,
-     * maxValue) and three ints for the sigmoid parameterization. To keep the NVQ inline graph
-     * smaller than full-precision storage ({@code dim × 4} bytes), M must satisfy:
-     *
-     * <pre>  4 + dim + 28 × M  &lt;  4 × dim   →   M  &lt;  3 × dim / 28</pre>
-     *
-     * This method targets roughly 32-dimensional subvectors, which amortizes the per-subvector
-     * overhead reasonably (28-byte overhead vs 32 bytes of data) while giving the NVQ sigmoid
-     * enough dimensions to model local non-linearity. The resulting compressed size is
-     * approximately {@code 2 × dim} bytes per vector — about 2× smaller than full precision.
-     *
-     * @param dim the original vector dimension
-     * @return the number of NVQ subvectors (at least 1)
-     */
-    public static int getDefaultNvqSubvectorsForDimension(int dim) {
-        return Math.max(1, dim / 32);
     }
 
     public static ForkJoinPool getPhysicalCoreExecutor() {
