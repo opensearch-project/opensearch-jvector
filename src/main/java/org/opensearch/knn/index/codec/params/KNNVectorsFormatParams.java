@@ -148,20 +148,19 @@ public class KNNVectorsFormatParams {
     private void initNumNvqSubvectors(final Map<String, Object> params) {
         if (params != null && params.containsKey(KNNConstants.METHOD_PARAMETER_NUM_NVQ_SUBVECTORS)) {
             this.numNvqSubvectors = (int) params.get(KNNConstants.METHOD_PARAMETER_NUM_NVQ_SUBVECTORS);
+            log.info("NVQ is used, and {} is set to {}", KNNConstants.METHOD_PARAMETER_NUM_NVQ_SUBVECTORS, this.numNvqSubvectors);
+            return;
+        }
+        this.numNvqSubvectors = KNNConstants.DEFAULT_NUM_NVQ_SUBVECTORS;
+        if (params != null
+            && params.containsKey(KNNConstants.METHOD_PARAMETER_QUANTIZATION_TYPE)
+            && params.get(KNNConstants.METHOD_PARAMETER_QUANTIZATION_TYPE).equals(KNNConstants.QUANTIZATION_TYPE_NVQ)) {
             log.info(
-                "NVQ is used, and {} is set to {}",
+                "NVQ is used, and {} not set; defaulting to {}",
                 KNNConstants.METHOD_PARAMETER_NUM_NVQ_SUBVECTORS,
                 KNNConstants.DEFAULT_NUM_NVQ_SUBVECTORS
             );
-        } else if (params.containsKey(KNNConstants.METHOD_PARAMETER_QUANTIZATION_TYPE)
-            && params.get(KNNConstants.METHOD_PARAMETER_QUANTIZATION_TYPE).equals(KNNConstants.QUANTIZATION_TYPE_NVQ)) {
-                log.info(
-                    "NVQ is used, and {} not set; defaulting to {}",
-                    KNNConstants.METHOD_PARAMETER_NUM_NVQ_SUBVECTORS,
-                    KNNConstants.DEFAULT_NUM_NVQ_SUBVECTORS
-                );
-            }
-        this.numNvqSubvectors = KNNConstants.DEFAULT_NUM_NVQ_SUBVECTORS;
+        }
     }
 
 }

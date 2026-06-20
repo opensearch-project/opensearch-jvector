@@ -24,6 +24,7 @@ import io.github.jbellis.jvector.vector.types.VectorFloat;
 import io.github.jbellis.jvector.vector.types.VectorTypeSupport;
 import java.io.Closeable;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -39,15 +40,6 @@ import org.apache.lucene.util.Bits;
 import org.apache.lucene.util.IOUtils;
 import org.opensearch.knn.common.KNNConstants;
 import org.opensearch.knn.plugin.stats.KNNCounter;
-
-import java.io.Closeable;
-import java.io.IOException;
-import java.lang.reflect.Field;
-
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 
 @Log4j2
 public class JVectorReader extends KnnVectorsReader {
@@ -110,7 +102,7 @@ public class JVectorReader extends KnnVectorsReader {
     public FloatVectorValues getFloatVectorValues(String field) throws IOException {
         final FieldEntry fieldEntry = fieldEntryMap.get(field);
         if (fieldEntry.nvqInlineQuantization != null) {
-            return new JVectorFloatVectorValues(
+            return new JVectorQuantizedNvqVectorValues(
                 fieldEntry.index,
                 fieldEntry.similarityFunction,
                 fieldEntry.graphNodeIdToDocMap,
@@ -141,11 +133,6 @@ public class JVectorReader extends KnnVectorsReader {
         }
 
         return Optional.of(fieldEntry.pqVectors.getCompressor());
-    }
-
-    public Optional<NVQuantization> getNVQuantizationForField(String field) throws IOException {
-        final FieldEntry fieldEntry = fieldEntryMap.get(field);
-        return Optional.ofNullable(fieldEntry.nvqInlineQuantization);
     }
 
     public RandomAccessReader getNeighborsScoreCacheForField(String field) throws IOException {
@@ -329,7 +316,7 @@ public class JVectorReader extends KnnVectorsReader {
         private final OnDiskGraphIndex index;
         private final PQVectors pqVectors; // non-null when a PQ blob is present (PQ-only or NVQ+PQ)
         // NVQuantization extracted from the graph when NVQ is stored inline; null otherwise
-        final NVQuantization nvqInlineQuantization;
+        private final NVQuantization nvqInlineQuantization;
 
         public FieldEntry(FieldInfo fieldInfo, JVectorWriter.VectorIndexFieldMetadata vectorIndexFieldMetadata) throws IOException {
             this.fieldInfo = fieldInfo;
