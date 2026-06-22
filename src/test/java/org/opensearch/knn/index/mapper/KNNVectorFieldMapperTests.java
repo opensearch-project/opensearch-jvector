@@ -14,11 +14,13 @@ import org.opensearch.common.settings.IndexScopedSettings;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.common.xcontent.XContentFactory;
 import org.opensearch.core.xcontent.XContentBuilder;
+import org.opensearch.core.xcontent.XContentParser;
 import org.opensearch.index.IndexSettings;
 import org.opensearch.index.mapper.ContentPath;
 import org.opensearch.index.mapper.Mapper;
 import org.opensearch.index.mapper.MapperParsingException;
 import org.opensearch.index.mapper.MapperService;
+import org.opensearch.index.mapper.ParseContext;
 import org.opensearch.knn.KNNTestCase;
 import org.opensearch.knn.common.KNNConstants;
 import org.opensearch.knn.index.SpaceType;
@@ -883,5 +885,153 @@ public class KNNVectorFieldMapperTests extends KNNTestCase {
             });
             assertTrue(ex.getMessage(), ex.getMessage().contains(expectedErrMsg));
         }
+    }
+
+    /**
+     * Test that base64-encoded float vectors can be parsed correctly
+     */
+    @SneakyThrows
+    public void testGetFloatsFromContext_withBase64String() {
+        // Create a base64-encoded float vector (little-endian)
+        float[] expectedVector = { 1.0f, 2.0f, 3.0f, 4.0f };
+        java.nio.ByteBuffer buffer = java.nio.ByteBuffer.allocate(expectedVector.length * Float.BYTES)
+            .order(java.nio.ByteOrder.LITTLE_ENDIAN);
+        for (float v : expectedVector) {
+            buffer.putFloat(v);
+        }
+        String base64Vector = java.util.Base64.getEncoder().encodeToString(buffer.array());
+
+        XContentBuilder xContentBuilder = XContentFactory.jsonBuilder().startObject().field(TEST_FIELD_NAME, base64Vector).endObject();
+
+        Settings settings = Settings.builder().put(settings(CURRENT).build()).put(KNN_INDEX, true).build();
+
+        ParseContext parseContext = mock(ParseContext.class);
+        XContentParser parser = createParser(xContentBuilder);
+
+        parser.nextToken(); // START_OBJECT
+        parser.nextToken(); // FIELD_NAME
+        parser.nextToken(); // VALUE_STRING
+
+        when(parseContext.parser()).thenReturn(parser);
+        when(parseContext.path()).thenReturn(new ContentPath());
+
+        // Create mapper and test
+        KNNVectorFieldMapper.Builder builder = new KNNVectorFieldMapper.Builder(TEST_FIELD_NAME, CURRENT, null, null);
+        builder.dimension.setValue(expectedVector.length);
+        builder.setOriginalParameters(new OriginalMappingParameters(builder));
+        Mapper.BuilderContext builderContext = new Mapper.BuilderContext(settings, new ContentPath());
+        KNNVectorFieldMapper mapper = builder.build(builderContext);
+
+        java.util.Optional<float[]> result = mapper.getFloatsFromContext(parseContext, expectedVector.length);
+
+        assertTrue("Result should be present", result.isPresent());
+        float[] actualVector = result.get();
+        assertEquals("Vector length should match", expectedVector.length, actualVector.length);
+        for (int i = 0; i < expectedVector.length; i++) {
+            assertEquals("Vector value at index " + i + " should match", expectedVector[i], actualVector[i], 0.0001f);
+        }
+    }
+
+    /**
+     * Test that base64-encoded byte vectors can be parsed correctly
+     */
+    @SneakyThrows
+    public void testGetBytesFromContext_withBase64String() {
+        byte[] expectedVector = { 10, -20, 127, -128 };
+        String base64Vector = java.util.Base64.getEncoder().encodeToString(expectedVector);
+
+        XContentBuilder xContentBuilder = XContentFactory.jsonBuilder().startObject().field(TEST_FIELD_NAME, base64Vector).endObject();
+
+        Settings settings = Settings.builder().put(settings(CURRENT).build()).put(KNN_INDEX, true).build();
+
+        ParseContext parseContext = mock(ParseContext.class);
+        XContentParser parser = createParser(xContentBuilder);
+
+        parser.nextToken(); // START_OBJECT
+        parser.nextToken(); // FIELD_NAME
+        parser.nextToken(); // VALUE_STRING
+
+        when(parseContext.parser()).thenReturn(parser);
+        when(parseContext.path()).thenReturn(new ContentPath());
+
+        // Create mapper and test
+        KNNVectorFieldMapper.Builder builder = new KNNVectorFieldMapper.Builder(TEST_FIELD_NAME, CURRENT, null, null);
+        builder.dimension.setValue(expectedVector.length);
+        builder.vectorDataType.setValue(VectorDataType.BYTE);
+        builder.setOriginalParameters(new OriginalMappingParameters(builder));
+        Mapper.BuilderContext builderContext = new Mapper.BuilderContext(settings, new ContentPath());
+        KNNVectorFieldMapper mapper = builder.build(builderContext);
+
+        java.util.Optional<byte[]> result = mapper.getBytesFromContext(parseContext, expectedVector.length, VectorDataType.BYTE);
+
+        assertTrue("Result should be present", result.isPresent());
+        byte[] actualVector = result.get();
+        assertEquals("Vector length should match", expectedVector.length, actualVector.length);
+        for (int i = 0; i < expectedVector.length; i++) {
+            assertEquals("Vector value at index " + i + " should match", expectedVector[i], actualVector[i]);
+        }
+    }
+
+    /**
+     * Test that invalid base64 string throws appropriate exception for float vectors
+     */
+    @SneakyThrows
+    public void testGetFloatsFromContext_withInvalidBase64() {
+        String invalidBase64 = "not-valid-base64!@#";
+
+        XContentBuilder xContentBuilder = XContentFactory.jsonBuilder().startObject().field(TEST_FIELD_NAME, invalidBase64).endObject();
+
+        Settings settings = Settings.builder().put(settings(CURRENT).build()).put(KNN_INDEX, true).build();
+        ParseContext parseContext = mock(ParseContext.class);
+        XContentParser parser = createParser(xContentBuilder);
+
+        parser.nextToken(); // START_OBJECT
+        parser.nextToken(); // FIELD_NAME
+        parser.nextToken(); // VALUE_STRING
+
+        when(parseContext.parser()).thenReturn(parser);
+        when(parseContext.path()).thenReturn(new ContentPath());
+
+        KNNVectorFieldMapper.Builder builder = new KNNVectorFieldMapper.Builder(TEST_FIELD_NAME, CURRENT, null, null);
+        builder.dimension.setValue(4);
+        builder.setOriginalParameters(new OriginalMappingParameters(builder));
+        Mapper.BuilderContext builderContext = new Mapper.BuilderContext(settings, new ContentPath());
+        KNNVectorFieldMapper mapper = builder.build(builderContext);
+
+        expectThrows(IllegalArgumentException.class, () -> { mapper.getFloatsFromContext(parseContext, 4); });
+    }
+
+    /**
+     * Test that base64 with wrong byte length throws exception for float vectors
+     */
+    @SneakyThrows
+    public void testGetFloatsFromContext_withWrongByteLength() {
+        byte[] invalidBytes = { 1, 2, 3 }; // 3 bytes, not divisible by 4
+        String base64Vector = java.util.Base64.getEncoder().encodeToString(invalidBytes);
+
+        XContentBuilder xContentBuilder = XContentFactory.jsonBuilder().startObject().field(TEST_FIELD_NAME, base64Vector).endObject();
+
+        Settings settings = Settings.builder().put(settings(CURRENT).build()).put(KNN_INDEX, true).build();
+        ParseContext parseContext = mock(ParseContext.class);
+        XContentParser parser = createParser(xContentBuilder);
+
+        parser.nextToken(); // START_OBJECT
+        parser.nextToken(); // FIELD_NAME
+        parser.nextToken(); // VALUE_STRING
+
+        when(parseContext.parser()).thenReturn(parser);
+        when(parseContext.path()).thenReturn(new ContentPath());
+
+        KNNVectorFieldMapper.Builder builder = new KNNVectorFieldMapper.Builder(TEST_FIELD_NAME, CURRENT, null, null);
+        builder.dimension.setValue(4);
+        builder.setOriginalParameters(new OriginalMappingParameters(builder));
+        Mapper.BuilderContext builderContext = new Mapper.BuilderContext(settings, new ContentPath());
+        KNNVectorFieldMapper mapper = builder.build(builderContext);
+
+        IllegalArgumentException ex = expectThrows(IllegalArgumentException.class, () -> { mapper.getFloatsFromContext(parseContext, 4); });
+
+        // The error can be either about byte length not being a multiple of 4, or dimension mismatch
+        // Just verify that an exception was thrown - the specific message may vary
+        assertNotNull("Exception should have a message", ex.getMessage());
     }
 }
