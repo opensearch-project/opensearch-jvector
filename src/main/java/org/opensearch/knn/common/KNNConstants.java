@@ -101,7 +101,8 @@ public class KNNConstants {
     public static final String METHOD_PARAMETER_QUANTIZATION_TYPE = "advanced.quantization_type";
     public static final String METHOD_PARAMETER_NUM_NVQ_SUBVECTORS = "advanced.nvq.num_subvectors";
     public static final String QUANTIZATION_TYPE_PQ = "pq";
-    public static final String QUANTIZATION_TYPE_NVQ = "nvq";
+    // When NVQ is enabled, PQ blob is also used. There is no option to use NVQ without PQ presently.
+    public static final String QUANTIZATION_TYPE_NVQ = "nvq+pq";
     public static final String DEFAULT_QUANTIZATION_TYPE = QUANTIZATION_TYPE_PQ;
     public static final int DEFAULT_NUM_NVQ_SUBVECTORS = 2;
     public static final Double DEFAULT_ALPHA_VALUE = 1.2;

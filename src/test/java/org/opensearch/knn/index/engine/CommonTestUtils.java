@@ -139,50 +139,19 @@ public class CommonTestUtils {
     }
 
     public static Codec getCodec(int minBatchSizeForQuantization, boolean leadingSegmentMergeDisabled) {
-        return new FilterCodec(KNNCodecVersion.V_10_04_0.getCodecName(), new Lucene104Codec()) {
-            @Override
-            public KnnVectorsFormat knnVectorsFormat() {
-                return new PerFieldKnnVectorsFormat() {
-
-                    @Override
-                    public KnnVectorsFormat getKnnVectorsFormatForField(String field) {
-                        return new JVectorFormat(minBatchSizeForQuantization, leadingSegmentMergeDisabled);
-                    }
-                };
-            }
-        };
+        return getCodec(minBatchSizeForQuantization, leadingSegmentMergeDisabled, null);
     }
 
     public static Codec getCodec(int minBatchSizeForQuantization, boolean leadingSegmentMergeDisabled, ForkJoinPool graphMergePool) {
-        if (graphMergePool == null) {
-            return getCodec(minBatchSizeForQuantization, leadingSegmentMergeDisabled);
-        } else {
-            return new FilterCodec(KNNCodecVersion.V_10_04_0.getCodecName(), new Lucene104Codec()) {
-                @Override
-                public KnnVectorsFormat knnVectorsFormat() {
-                    return new PerFieldKnnVectorsFormat() {
-
-                        @Override
-                        public KnnVectorsFormat getKnnVectorsFormatForField(String field) {
-                            return new JVectorFormat(
-                                minBatchSizeForQuantization,
-                                leadingSegmentMergeDisabled,
-                                graphMergePool,
-                                graphMergePool,
-                                graphMergePool
-                            );
-                        }
-                    };
-                }
-            };
-        }
+        return getCodec(minBatchSizeForQuantization, leadingSegmentMergeDisabled, graphMergePool, new JVectorIndexQuantization.PQ());
     }
 
-    public static Codec getCodecWithNVQ(int minBatchSizeForQuantization, boolean leadingSegmentMergeDisabled) {
-        return getCodecWithNVQ(minBatchSizeForQuantization, leadingSegmentMergeDisabled, null);
-    }
-
-    public static Codec getCodecWithNVQ(int minBatchSizeForQuantization, boolean leadingSegmentMergeDisabled, ForkJoinPool graphMergePool) {
+    public static Codec getCodec(
+        int minBatchSizeForQuantization,
+        boolean leadingSegmentMergeDisabled,
+        ForkJoinPool graphMergePool,
+        JVectorIndexQuantization quantization
+    ) {
         if (graphMergePool == null) {
             return new FilterCodec(KNNCodecVersion.V_10_04_0.getCodecName(), new Lucene104Codec()) {
                 @Override
@@ -195,7 +164,7 @@ public class CommonTestUtils {
                                 JVectorFormat.DEFAULT_BEAM_WIDTH,
                                 KNNConstants.DEFAULT_NEIGHBOR_OVERFLOW_VALUE.floatValue(),
                                 KNNConstants.DEFAULT_ALPHA_VALUE.floatValue(),
-                                new JVectorIndexQuantization.NVQ(KNNConstants.DEFAULT_NUM_NVQ_SUBVECTORS),
+                                quantization,
                                 minBatchSizeForQuantization,
                                 KNNConstants.DEFAULT_HIERARCHY_ENABLED,
                                 leadingSegmentMergeDisabled
@@ -217,7 +186,7 @@ public class CommonTestUtils {
                                 JVectorFormat.DEFAULT_BEAM_WIDTH,
                                 KNNConstants.DEFAULT_NEIGHBOR_OVERFLOW_VALUE.floatValue(),
                                 KNNConstants.DEFAULT_ALPHA_VALUE.floatValue(),
-                                new JVectorIndexQuantization.NVQ(KNNConstants.DEFAULT_NUM_NVQ_SUBVECTORS),
+                                quantization,
                                 minBatchSizeForQuantization,
                                 KNNConstants.DEFAULT_HIERARCHY_ENABLED,
                                 leadingSegmentMergeDisabled,

@@ -5,6 +5,13 @@
 
 package org.opensearch.knn.index.codec.jvector;
 
+import io.github.jbellis.jvector.graph.disk.OnDiskGraphIndex;
+import io.github.jbellis.jvector.graph.disk.feature.FeatureId;
+import io.github.jbellis.jvector.quantization.NVQuantization;
+import io.github.jbellis.jvector.vector.VectorizationProvider;
+import io.github.jbellis.jvector.vector.types.VectorFloat;
+import io.github.jbellis.jvector.vector.types.VectorTypeSupport;
+import java.io.IOException;
 import java.util.function.Function;
 import org.opensearch.knn.common.KNNConstants;
 
@@ -18,7 +25,9 @@ import org.opensearch.knn.common.KNNConstants;
  * 1. PQ + full-precision vectors
  * 2. PQ + NVQ
  */
-public abstract class JVectorIndexQuantization {
+public sealed abstract class JVectorIndexQuantization {
+
+    static final VectorTypeSupport VECTOR_TYPE_SUPPORT = VectorizationProvider.getInstance().getVectorTypeSupport();
 
     /** String identifier used in REST params and on-disk serialization. */
     public abstract String getType();
@@ -26,15 +35,33 @@ public abstract class JVectorIndexQuantization {
     /** Returns the number of subspaces/subvectors to use for a vector of the given dimension. */
     public abstract int numSubspaces(int dimension);
 
+    /** Reads back (and, for lossy schemes, dequantizes) the float vector stored for {@code ord} in {@code view}. */
+    public abstract VectorFloat<?> vectorFloatValue(OnDiskGraphIndex.View view, int ord);
+
     // -----------------------------------------------------------------------
     // NVQ implementation
     // -----------------------------------------------------------------------
 
     public static final class NVQ extends JVectorIndexQuantization {
         private final int numSubvectors;
+        // Bound only when this instance is used to read back (dequantize) stored vectors; null at write/config time.
+        private final NVQuantization trainedQuantizer;
+        private final NVQuantization.QuantizedVector scratch;
 
         public NVQ(int numSubvectors) {
             this.numSubvectors = numSubvectors;
+            this.trainedQuantizer = null;
+            this.scratch = null;
+        }
+
+        /** Binds a trained {@link NVQuantization} so this instance can dequantize stored vectors. */
+        public NVQ(NVQuantization trainedQuantizer) {
+            this.numSubvectors = trainedQuantizer.subvectorSizesAndOffsets.length;
+            this.trainedQuantizer = trainedQuantizer;
+            this.scratch = NVQuantization.QuantizedVector.createEmpty(
+                trainedQuantizer.subvectorSizesAndOffsets,
+                trainedQuantizer.bitsPerDimension
+            );
         }
 
         public int getNumSubvectors() {
@@ -49,6 +76,23 @@ public abstract class JVectorIndexQuantization {
         @Override
         public int numSubspaces(int dimension) {
             return numSubvectors;
+        }
+
+        /**
+         * Dequantizes the NVQ-encoded bytes for {@code ord} back to approximate float values.
+         */
+        @Override
+        public VectorFloat<?> vectorFloatValue(OnDiskGraphIndex.View view, int ord) {
+            if (trainedQuantizer == null) {
+                throw new IllegalStateException("NVQ quantization is not bound to a trained quantizer; cannot dequantize");
+            }
+            try {
+                var reader = view.featureReaderForNode(ord, FeatureId.NVQ_VECTORS);
+                NVQuantization.QuantizedVector.loadInto(reader, scratch);
+                return nvqDequantize(scratch, trainedQuantizer);
+            } catch (IOException e) {
+                throw new RuntimeException("Failed to dequantize NVQ inline vector for ordinal " + ord, e);
+            }
         }
 
         /**
@@ -68,6 +112,64 @@ public abstract class JVectorIndexQuantization {
          */
         public static int defaultNumSubvectors() {
             return 2;
+        }
+
+        // -------------------------------------------------------------------------
+        // NVQ dequantization helpers
+        // -------------------------------------------------------------------------
+
+        /**
+         * Reconstructs an approximate float vector from a {@link NVQuantization.QuantizedVector}.
+         *
+         * The inverse of the NVQ encoding is:
+         * <pre>
+         *   scaledValue   = b * logisticScale + logisticBias      (map byte → sigmoid domain)
+         *   reconstructed = logit(scaledValue) / scaledGrowthRate + scaledMidpoint
+         * </pre>
+         * followed by adding back the {@code globalMean} that was subtracted during encoding.
+         */
+        private static VectorFloat<?> nvqDequantize(NVQuantization.QuantizedVector qv, NVQuantization nvq) {
+            VectorFloat<?> result = VECTOR_TYPE_SUPPORT.createFloatVector(nvq.originalDimension);
+            int offset = 0;
+            for (NVQuantization.QuantizedSubVector sv : qv.subVectors) {
+                float delta = sv.maxValue - sv.minValue;
+                float scaledGrowthRate = sv.growthRate / delta;
+                float scaledMidpoint = sv.midpoint * delta;
+                float logisticBias = logisticNQT(sv.minValue, scaledGrowthRate, scaledMidpoint);
+                float logisticScale = (logisticNQT(sv.maxValue, scaledGrowthRate, scaledMidpoint) - logisticBias) / 255.0f;
+                float inverseScaledGrowthRate = 1.0f / scaledGrowthRate;
+
+                for (int d = 0; d < sv.originalDimensions; d++) {
+                    int b = Byte.toUnsignedInt(sv.bytes.get(d));
+                    float scaledValue = Math.fma(b, logisticScale, logisticBias);
+                    result.set(offset + d, logitNQT(scaledValue, inverseScaledGrowthRate, scaledMidpoint));
+                }
+                offset += sv.originalDimensions;
+            }
+            // Add back global mean (subtracted during encoding)
+            for (int i = 0; i < nvq.originalDimension; i++) {
+                result.set(i, result.get(i) + nvq.globalMean.get(i));
+            }
+            return result;
+        }
+
+        /** Fast logistic function used by NVQ (mirrors DefaultVectorUtilSupport.logisticFunctionNQT). */
+        private static float logisticNQT(float value, float alpha, float x0) {
+            float temp = Math.fma(value, alpha, -alpha * x0);
+            int p = Math.round(temp + 0.5f);
+            int m = Float.floatToIntBits(Math.fma(temp - p, 0.5f, 1));
+            temp = Float.intBitsToFloat(m + (p << 23));
+            return temp / (temp + 1);
+        }
+
+        /** Fast logit (inverse logistic) used by NVQ (mirrors DefaultVectorUtilSupport.logitNQT). */
+        private static float logitNQT(float scaledValue, float inverseAlpha, float x0) {
+            float z = scaledValue / (1 - scaledValue);
+            int temp = Float.floatToIntBits(z);
+            int e = temp & 0x7f800000;
+            float p = (float) ((e >> 23) - 128);
+            float m = Float.intBitsToFloat((temp & 0x007fffff) + 0x3f800000);
+            return (m + p) * inverseAlpha + x0;
         }
     }
 
@@ -104,6 +206,12 @@ public abstract class JVectorIndexQuantization {
         @Override
         public int numSubspaces(int dimension) {
             return numSubspacesSupplier.apply(dimension);
+        }
+
+        /** PQ does not quantize the inline graph vectors; they are read back at full precision. */
+        @Override
+        public VectorFloat<?> vectorFloatValue(OnDiskGraphIndex.View view, int ord) {
+            return view.getVector(ord);
         }
 
         /**

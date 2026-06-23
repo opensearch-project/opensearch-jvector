@@ -5,7 +5,7 @@
 
 package org.opensearch.knn.index.codec.jvector;
 
-import static org.opensearch.knn.index.engine.CommonTestUtils.getCodecWithNVQ;
+import static org.opensearch.knn.index.engine.CommonTestUtils.getCodec;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -139,7 +139,14 @@ public class JVectorNVQTests extends LuceneTestCase {
 
         IndexWriterConfig iwc = LuceneTestCase.newIndexWriterConfig();
         iwc.setUseCompoundFile(false);
-        iwc.setCodec(getCodecWithNVQ(scenario.minNvqThreshold, scenario.leadingSegmentMergeDisabled, mergePool));
+        iwc.setCodec(
+            getCodec(
+                scenario.minNvqThreshold,
+                scenario.leadingSegmentMergeDisabled,
+                mergePool,
+                new JVectorIndexQuantization.NVQ(KNNConstants.DEFAULT_NUM_NVQ_SUBVECTORS)
+            )
+        );
         iwc.setMergePolicy(new ForceMergesOnlyMergePolicy(false));
         iwc.setMaxBufferedDocs(-1);
 

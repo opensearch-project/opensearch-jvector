@@ -25,6 +25,7 @@ public class JVectorFloatVectorValues extends FloatVectorValues {
     private final int dimension;
     private final int size;
     private final GraphNodeIdToDocMap graphNodeIdToDocMap;
+    private final JVectorIndexQuantization quantization;
 
     public JVectorFloatVectorValues(
         OnDiskGraphIndex onDiskGraphIndex,
@@ -32,17 +33,23 @@ public class JVectorFloatVectorValues extends FloatVectorValues {
         org.apache.lucene.index.VectorSimilarityFunction luceneSimilarityFunction,
         GraphNodeIdToDocMap graphNodeIdToDocMap
     ) throws IOException {
+        this(onDiskGraphIndex, similarityFunction, luceneSimilarityFunction, graphNodeIdToDocMap, new JVectorIndexQuantization.PQ());
+    }
+
+    protected JVectorFloatVectorValues(
+        OnDiskGraphIndex onDiskGraphIndex,
+        VectorSimilarityFunction similarityFunction,
+        org.apache.lucene.index.VectorSimilarityFunction luceneSimilarityFunction,
+        GraphNodeIdToDocMap graphNodeIdToDocMap,
+        JVectorIndexQuantization quantization
+    ) throws IOException {
         this.view = onDiskGraphIndex.getView();
         this.dimension = view.dimension();
         this.size = view.size();
         this.similarityFunction = similarityFunction;
         this.luceneSimilarityFunction = luceneSimilarityFunction;
         this.graphNodeIdToDocMap = graphNodeIdToDocMap;
-    }
-
-    /** Exposes the underlying view to subclasses (e.g. for NVQ dequantization). */
-    protected OnDiskGraphIndex.View getView() {
-        return view;
+        this.quantization = quantization;
     }
 
     @Override
@@ -56,7 +63,7 @@ public class JVectorFloatVectorValues extends FloatVectorValues {
     }
 
     public VectorFloat<?> vectorFloatValue(int ord) {
-        return view.getVector(ord);
+        return quantization.vectorFloatValue(view, ord);
     }
 
     public DocIndexIterator iterator() {
