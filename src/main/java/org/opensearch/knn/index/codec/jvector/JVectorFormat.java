@@ -222,7 +222,7 @@ public class JVectorFormat extends KnnVectorsFormat {
 
     @Override
     public KnnVectorsReader fieldsReader(SegmentReadState state) throws IOException {
-        return new JVectorReader(state, vectorizationProviderType);
+        return new JVectorReader(state);
     }
 
     @Override

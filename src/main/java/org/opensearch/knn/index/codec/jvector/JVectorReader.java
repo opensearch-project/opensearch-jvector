@@ -37,6 +37,8 @@ import org.opensearch.knn.plugin.stats.KNNCounter;
 
 import java.nio.ByteOrder;
 
+import static org.opensearch.knn.index.KNNSettings.KNN_VECTORIZATION_PROVIDER;
+
 @Log4j2
 public class JVectorReader extends KnnVectorsReader {
     private final FieldInfos fieldInfos;
@@ -47,9 +49,8 @@ public class JVectorReader extends KnnVectorsReader {
     private final SegmentReadState state;
     private final VectorizationProviderType vectorizationProviderType;
 
-    public JVectorReader(SegmentReadState state, VectorizationProviderType vectorizationProviderType) throws IOException {
+    public JVectorReader(SegmentReadState state) throws IOException {
         this.state = state;
-        this.vectorizationProviderType = vectorizationProviderType;
         this.fieldInfos = state.fieldInfos;
         this.baseDataFileName = state.segmentInfo.name + "_" + state.segmentSuffix;
         final String metaFileName = IndexFileNames.segmentFileName(
@@ -59,6 +60,17 @@ public class JVectorReader extends KnnVectorsReader {
         );
         this.directory = state.directory;
         boolean success = false;
+        String providerAttribute = state.segmentInfo.getAttribute(KNN_VECTORIZATION_PROVIDER);
+        if(providerAttribute != null) {
+            this.vectorizationProviderType = VectorizationProviderType.getByName(providerAttribute);
+        } else {
+            // Missing provider attribute means index was created before KNN_VECTORIZATION_PROVIDER was introduced
+            // We can safely assume it was created with Panama provider
+            log.debug("state.segmentInfo KNN_VECTORIZATION_PROVIDER attribute is missing, proceeding with fallback");
+            this.vectorizationProviderType = VectorizationProviderType.PANAMA;
+        }
+
+
         try (ChecksumIndexInput meta = state.directory.openChecksumInput(metaFileName)) {
             CodecUtil.checkIndexHeader(
                 meta,

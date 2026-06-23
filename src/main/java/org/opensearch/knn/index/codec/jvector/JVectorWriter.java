@@ -45,6 +45,7 @@ import java.util.stream.IntStream;
 
 import static io.github.jbellis.jvector.quantization.KMeansPlusPlusClusterer.UNWEIGHTED;
 import static org.apache.lucene.codecs.lucene99.Lucene99HnswVectorsReader.readVectorEncoding;
+import static org.opensearch.knn.index.KNNSettings.KNN_VECTORIZATION_PROVIDER;
 
 /**
  * JVectorWriter is responsible for writing vector data into index segments using the JVector library.
@@ -142,6 +143,7 @@ public class JVectorWriter extends KnnVectorsWriter {
             JVectorFormat.VECTOR_INDEX_EXTENSION
         );
         this.baseDataFileName = segmentWriteState.segmentInfo.name + "_" + segmentWriteState.segmentSuffix;
+        segmentWriteState.segmentInfo.putAttribute(KNN_VECTORIZATION_PROVIDER, vectorizationProviderType.getName());
 
         boolean success = false;
         try {
