@@ -5,6 +5,7 @@
 
 package org.opensearch.knn.index.mapper;
 
+import java.time.ZoneId;
 import java.util.Collections;
 import java.util.Optional;
 
@@ -18,10 +19,12 @@ import org.opensearch.index.mapper.ValueFetcher;
 import org.opensearch.index.query.QueryShardContext;
 import org.opensearch.index.query.QueryShardException;
 import org.opensearch.knn.KNNTestCase;
+import org.opensearch.knn.index.KNNVectorDocValueFormat;
 import org.opensearch.knn.index.KNNVectorIndexFieldData;
 import org.opensearch.knn.index.VectorDataType;
 import org.opensearch.knn.index.engine.KNNMethodContext;
 import org.opensearch.knn.index.query.rescore.RescoreContext;
+import org.opensearch.search.DocValueFormat;
 import org.opensearch.search.lookup.SearchLookup;
 
 public class KNNVectorFieldTypeTests extends KNNTestCase {
@@ -214,5 +217,69 @@ public class KNNVectorFieldTypeTests extends KNNTestCase {
         );
         float[] queryVector = new float[] { 1.0f, 2.0f, 3.0f };
         expectThrows(IllegalStateException.class, () -> knnVectorFieldType.transformQueryVector(queryVector));
+    }
+
+    public void testDocValueFormat_nullFormatAndTimezone_returnsRaw() {
+        KNNMethodContext knnMethodContext = getDefaultKNNMethodContext();
+        KNNVectorFieldType fieldType = new KNNVectorFieldType(
+            FIELD_NAME,
+            Collections.emptyMap(),
+            VectorDataType.FLOAT,
+            getMappingConfigForMethodMapping(knnMethodContext, 3)
+        );
+        DocValueFormat format = fieldType.docValueFormat(null, null);
+        assertSame(KNNVectorDocValueFormat.BINARY_FORMAT, format);
+    }
+
+    public void testDocValueFormat_arrayFormat_returnsArrayFormat() {
+        KNNMethodContext knnMethodContext = getDefaultKNNMethodContext();
+        KNNVectorFieldType fieldType = new KNNVectorFieldType(
+            FIELD_NAME,
+            Collections.emptyMap(),
+            VectorDataType.FLOAT,
+            getMappingConfigForMethodMapping(knnMethodContext, 3)
+        );
+        DocValueFormat format = fieldType.docValueFormat("array", null);
+        assertSame(KNNVectorDocValueFormat.ARRAY_FORMAT, format);
+        assertFalse(((KNNVectorDocValueFormat) format).isBinary());
+    }
+
+    public void testDocValueFormat_binaryFormat_returnsBinaryFormat() {
+        KNNMethodContext knnMethodContext = getDefaultKNNMethodContext();
+        KNNVectorFieldType fieldType = new KNNVectorFieldType(
+            FIELD_NAME,
+            Collections.emptyMap(),
+            VectorDataType.FLOAT,
+            getMappingConfigForMethodMapping(knnMethodContext, 3)
+        );
+        DocValueFormat format = fieldType.docValueFormat("binary", null);
+        assertSame(KNNVectorDocValueFormat.BINARY_FORMAT, format);
+        assertTrue(((KNNVectorDocValueFormat) format).isBinary());
+    }
+
+    public void testDocValueFormat_unsupportedFormat_throwsIllegalArgument() {
+        KNNMethodContext knnMethodContext = getDefaultKNNMethodContext();
+        KNNVectorFieldType fieldType = new KNNVectorFieldType(
+            FIELD_NAME,
+            Collections.emptyMap(),
+            VectorDataType.FLOAT,
+            getMappingConfigForMethodMapping(knnMethodContext, 3)
+        );
+        IllegalArgumentException ex = expectThrows(IllegalArgumentException.class, () -> fieldType.docValueFormat("epoch_millis", null));
+        assertTrue(ex.getMessage().contains("epoch_millis"));
+        assertTrue(ex.getMessage().contains("Unsupported knn_vector docvalue_fields format"));
+    }
+
+    public void testDocValueFormat_nonNullTimezone_throwsIllegalArgument() {
+        KNNMethodContext knnMethodContext = getDefaultKNNMethodContext();
+        KNNVectorFieldType fieldType = new KNNVectorFieldType(
+            FIELD_NAME,
+            Collections.emptyMap(),
+            VectorDataType.FLOAT,
+            getMappingConfigForMethodMapping(knnMethodContext, 3)
+        );
+        IllegalArgumentException ex = expectThrows(IllegalArgumentException.class, () -> fieldType.docValueFormat(null, ZoneId.of("UTC")));
+        assertTrue(ex.getMessage().contains(FIELD_NAME));
+        assertTrue(ex.getMessage().contains("does not support custom time zones"));
     }
 }

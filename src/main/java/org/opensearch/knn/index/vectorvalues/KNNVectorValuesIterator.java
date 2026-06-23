@@ -95,6 +95,11 @@ public interface KNNVectorValuesIterator {
             this.docIdSetIterator = docIdSetIterator;
         }
 
+        DocIdsIteratorValues(@NonNull final DocIdSetIterator docIdSetIterator, @NonNull final KnnVectorValues knnVectorValues) {
+            this.docIdSetIterator = docIdSetIterator;
+            this.knnVectorValues = knnVectorValues;
+        }
+
         public KnnVectorValues getKnnVectorValues() {
             return knnVectorValues;
         }
