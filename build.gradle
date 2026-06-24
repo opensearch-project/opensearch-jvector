@@ -345,7 +345,7 @@ dependencies {
     }
     // json-path 2.9.0 depends on slf4j 2.0.11, which conflicts with the version used by OpenSearch core.
     // Excluding slf4j here since json-path is only used for testing, and logging failures in this context are acceptable.
-    testFixturesImplementation('com.jayway.jsonpath:json-path:2.9.0') {
+    testFixturesImplementation('com.jayway.jsonpath:json-path:2.10.0') {
         exclude group: 'org.slf4j', module: 'slf4j-api'
         exclude group: 'net.minidev', module: 'json-smart'
     }
