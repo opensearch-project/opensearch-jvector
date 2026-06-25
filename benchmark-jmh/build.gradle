@@ -17,7 +17,7 @@ test.enabled = false
 assemble.enabled = false
 dependenciesInfo.enabled = false
 
-def awssdk_version="2.46.9"
+def awssdk_version="2.46.17"
 configurations.all {
     resolutionStrategy {
         force 'org.apache.commons:commons-math3:3.6.1'  // Force the newer version
@@ -45,7 +45,7 @@ dependencies {
 
     /********  Dependencies to poll datasets ********/
 
-    implementation 'io.jhdf:jhdf:0.6.10'
+    implementation 'io.jhdf:jhdf:0.11.0'
     /** Transient dependencies of jhdf **/
     api "org.apache.commons:commons-lang3:${versions.commonslang}"
     api('org.apache.commons:commons-math3:3.6.1')
@@ -65,7 +65,7 @@ dependencies {
      * while this is not ideal, the benefits of downloading the required datasets on-demand is better than bloating this repo by including the datasets
      */
     /**** Transitive dependencies of awssdk ****/
-    api("software.amazon.awssdk.crt:aws-crt:0.47.0")
+    api("software.amazon.awssdk.crt:aws-crt:0.47.1")
     api("software.amazon.awssdk:auth:${awssdk_version}")
     api("software.amazon.awssdk:annotations:${awssdk_version}")
     api("software.amazon.awssdk:apache-client:${awssdk_version}")
