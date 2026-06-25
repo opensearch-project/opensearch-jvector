@@ -458,16 +458,9 @@ public class InternalKNNEngineTests extends OpenSearchIntegTestCase {
         // Define batch sizes - mix of small and large batches
         int smallBatchSize = DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION / 4;
         int largeBatchSize = DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION * 2;
+        int vectorSize = largeBatchSize + (2 * smallBatchSize);
 
-        long seed = random().nextLong();
-        Random random = new Random(seed);
-
-        final float[][] vectors = new float[smallBatchSize + largeBatchSize + smallBatchSize][dimension];
-        for (int i = 0; i < vectors.length; i++) {
-            for (int j = 0; j < dimension; j++) {
-                vectors[i][j] = random.nextFloat();
-            }
-        }
+        final float[][] vectors = TestUtils.generateRandomVectors(vectorSize, dimension);
         final int firstSmallBatchOffset = 0;
         final int largeBatchOffset = firstSmallBatchOffset + smallBatchSize;
         final int secondSmallBatchOffset = largeBatchOffset + largeBatchSize;
