@@ -75,7 +75,7 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
 
         IndexWriterConfig config = newIndexWriterConfig();
         config.setUseCompoundFile(false);
-        config.setCodec(getCodec(1));
+        config.setCodec(getCodec(1, random().nextBoolean()));
         config.setMergePolicy(new ForceMergesOnlyMergePolicy());
         config.setMergeScheduler(new SerialMergeScheduler());
 
@@ -157,7 +157,7 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
 
         IndexWriterConfig config = newIndexWriterConfig();
         config.setUseCompoundFile(false);
-        config.setCodec(getCodec(1));
+        config.setCodec(getCodec(1, random().nextBoolean()));
         config.setMergePolicy(new ForceMergesOnlyMergePolicy());
         config.setMergeScheduler(new SerialMergeScheduler());
 
@@ -229,7 +229,7 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
 
         IndexWriterConfig config = newIndexWriterConfig();
         config.setUseCompoundFile(false);
-        config.setCodec(getCodec(1));
+        config.setCodec(getCodec(1, random().nextBoolean()));
         config.setMergePolicy(new ForceMergesOnlyMergePolicy());
         config.setMergeScheduler(new SerialMergeScheduler());
 
@@ -310,7 +310,7 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
 
         IndexWriterConfig config = newIndexWriterConfig();
         config.setUseCompoundFile(false);
-        config.setCodec(getCodec(1));
+        config.setCodec(getCodec(1, random().nextBoolean()));
         config.setMergePolicy(new ForceMergesOnlyMergePolicy());
         config.setMergeScheduler(new SerialMergeScheduler());
 
@@ -391,7 +391,9 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
 
         IndexWriterConfig config = newIndexWriterConfig();
         config.setUseCompoundFile(false);
-        config.setCodec(getCodec(random().nextBoolean() ? 1 : 10)); /* 1 to check empty PQ vectors, 10 to check empty graph */
+        config.setCodec(
+            getCodec(random().nextBoolean() ? 1 : 10, random().nextBoolean())
+        ); /* 1 to check empty PQ vectors, 10 to check empty graph */
         config.setMergePolicy(new ForceMergesOnlyMergePolicy());
         config.setMergeScheduler(new SerialMergeScheduler());
 
@@ -455,7 +457,7 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
 
         IndexWriterConfig config = newIndexWriterConfig();
         config.setUseCompoundFile(false);
-        config.setCodec(getCodec(1));
+        config.setCodec(getCodec(1, random().nextBoolean()));
         config.setMergePolicy(new ForceMergesOnlyMergePolicy());
         config.setMergeScheduler(new SerialMergeScheduler());
 
@@ -530,7 +532,7 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
 
         IndexWriterConfig config = newIndexWriterConfig();
         config.setUseCompoundFile(false);
-        config.setCodec(getCodec(1)); // Enable PQ
+        config.setCodec(getCodec(1, random().nextBoolean())); // Enable PQ
         // config.setCodec(getCodec(1000000)); // Disable PQ
         config.setMergePolicy(new ForceMergesOnlyMergePolicy());
         config.setMergeScheduler(new SerialMergeScheduler());
@@ -805,7 +807,7 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
 
         IndexWriterConfig config = newIndexWriterConfig();
         config.setUseCompoundFile(false);
-        config.setCodec(getCodec(1));
+        config.setCodec(getCodec(1, random().nextBoolean()));
         config.setMergePolicy(new ForceMergesOnlyMergePolicy());
         config.setMergeScheduler(new SerialMergeScheduler());
 
@@ -1058,7 +1060,7 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
 
         IndexWriterConfig config = newIndexWriterConfig();
         config.setUseCompoundFile(false);
-        config.setCodec(getCodec(1));
+        config.setCodec(getCodec(1, random().nextBoolean()));
         config.setMergePolicy(new ForceMergesOnlyMergePolicy());
         config.setMergeScheduler(new SerialMergeScheduler());
 
@@ -1209,7 +1211,7 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
 
         IndexWriterConfig config = newIndexWriterConfig();
         config.setUseCompoundFile(false);
-        config.setCodec(getCodec(1));
+        config.setCodec(getCodec(1, random().nextBoolean()));
         config.setMergePolicy(new ForceMergesOnlyMergePolicy());
         config.setMergeScheduler(new SerialMergeScheduler());
 
@@ -1366,7 +1368,7 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
 
         IndexWriterConfig config = newIndexWriterConfig();
         config.setUseCompoundFile(false);
-        config.setCodec(getCodec(1));
+        config.setCodec(getCodec(1, random().nextBoolean()));
         config.setMergePolicy(new ForceMergesOnlyMergePolicy());
         config.setMergeScheduler(new SerialMergeScheduler());
 

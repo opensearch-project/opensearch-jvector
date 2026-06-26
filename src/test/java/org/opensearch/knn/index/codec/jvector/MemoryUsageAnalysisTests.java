@@ -64,7 +64,7 @@ public class MemoryUsageAnalysisTests extends LuceneTestCase {
         Path indexPath = createTempDir("memory-test-index");
 
         // Configure the JVector codec
-        var codec = CommonTestUtils.getCodec();
+        var codec = CommonTestUtils.getCodec(random().nextBoolean());
 
         // Setup index writer with the JVector codec
         IndexWriterConfig config = new IndexWriterConfig().setCodec(codec)
