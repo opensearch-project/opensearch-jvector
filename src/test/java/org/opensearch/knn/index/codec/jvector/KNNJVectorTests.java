@@ -139,13 +139,16 @@ public class KNNJVectorTests extends LuceneTestCase {
      */
     @Test
     public void testJVectorKnnIndex_simpleCase_maxInnerProduct() throws IOException {
-        int k = 3; // The number of nearest neighbors to gather
-        int totalNumberOfDocs = 10;
+        final int k = 3; // The number of nearest neighbors to gather
+        final int totalNumberOfDocs = 10;
+        final Path indexPath = createTempDir();
+
         IndexWriterConfig indexWriterConfig = LuceneTestCase.newIndexWriterConfig();
         indexWriterConfig.setUseCompoundFile(false);
         indexWriterConfig.setCodec(getCodec());
         indexWriterConfig.setMergePolicy(new ForceMergesOnlyMergePolicy());
-        final Path indexPath = createTempDir();
+        indexWriterConfig.setMaxBufferedDocs(totalNumberOfDocs);
+
         log.info("Index path: {}", indexPath);
         try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter w = new IndexWriter(dir, indexWriterConfig)) {
             final float[] target = new float[] { 1.0f, 0.0f };
@@ -159,11 +162,12 @@ public class KNNJVectorTests extends LuceneTestCase {
             w.commit();
 
             try (IndexReader reader = DirectoryReader.open(w)) {
-                log.info("We should now have a single segment with 10 documents");
+                log.info("We should now have a single segment with {} documents", totalNumberOfDocs);
+
                 Assert.assertEquals(1, reader.getContext().leaves().size());
                 Assert.assertEquals(totalNumberOfDocs, reader.numDocs());
 
-                final Query filterQuery = new MatchAllDocsQuery();
+                final Query filterQuery = MatchAllDocsQuery.INSTANCE;
                 final IndexSearcher searcher = newSearcher(reader);
                 KnnFloatVectorQuery knnFloatVectorQuery = getJVectorKnnFloatVectorQuery("test_field", target, k, filterQuery);
                 TopDocs topDocs = searcher.search(knnFloatVectorQuery, k);
