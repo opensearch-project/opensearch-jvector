@@ -93,7 +93,7 @@ public class InternalKNNEngineTests extends OpenSearchIntegTestCase {
 
     private void createKnnIndexMappingWithJVectorEngine(int dimension, SpaceType spaceType, VectorDataType vectorDataType)
         throws Exception {
-        String mapping = CommonTestUtils.createIndexMapping(dimension, spaceType, vectorDataType);
+        String mapping = CommonTestUtils.createIndexMapping(dimension, spaceType, vectorDataType, randomBoolean());
         Settings indexSettings = CommonTestUtils.getDefaultIndexSettings();
         createKnnIndex(INDEX_NAME, indexSettings, mapping);
     }
