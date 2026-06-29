@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Added capability to retrieve float, binary and byte data types vectors using doc_values [#3321](https://github.com/opensearch-project/k-NN/pull/3321)
 
 ### Enhancements
+- Implement resume() functionality to improve result quality for filtered searches ([#173](https://github.com/opensearch-project/opensearch-jvector/issues/173))
 ### Bug Fixes
 - Fix dynamic template and mixed cases [538](https://github.com/opensearch-project/opensearch-jvector/pull/538)
 - Fix flaky testMixedBatchSizesForQuantization test case [564](https://github.com/opensearch-project/opensearch-jvector/pull/564)
