@@ -12,6 +12,7 @@ import org.junit.Test;
 import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 public class JVectorRandomAccessReaderTests {
 
@@ -153,5 +154,67 @@ public class JVectorRandomAccessReaderTests {
 
         ByteBuffer dst = ByteBuffer.allocate(16);
         Assert.assertThrows(EOFException.class, () -> reader.readFully(dst));
+    }
+
+    @Test
+    public void read_floats_bigEndian() throws IOException {
+        // 1.0f in BIG_ENDIAN: 0x3F800000
+        byte[] src = new byte[] {
+            0x3F,
+            (byte) 0x80,
+            0x00,
+            0x00, // 1.0f
+            0x40,
+            0x00,
+            0x00,
+            0x00  // 2.0f
+        };
+
+        JVectorRandomAccessReader reader = new JVectorRandomAccessReader(new ByteArrayIndexInput(src), ByteOrder.BIG_ENDIAN);
+
+        float[] result = new float[2];
+        reader.read(result, 0, 2);
+
+        Assert.assertEquals(1.0f, result[0], 0.0f);
+        Assert.assertEquals(2.0f, result[1], 0.0f);
+    }
+
+    @Test
+    public void read_floats_littleEndian() throws IOException {
+        // 1.0f in LITTLE_ENDIAN: 0x3F800000 reversed -> 0x00, 0x00, 0x80, 0x3F
+        byte[] src = new byte[] {
+            0x00,
+            0x00,
+            (byte) 0x80,
+            0x3F, // 1.0f
+            0x00,
+            0x00,
+            0x00,
+            0x40  // 2.0f
+        };
+
+        JVectorRandomAccessReader reader = new JVectorRandomAccessReader(new ByteArrayIndexInput(src), ByteOrder.LITTLE_ENDIAN);
+
+        float[] result = new float[2];
+        reader.read(result, 0, 2);
+
+        Assert.assertEquals(1.0f, result[0], 0.0f);
+        Assert.assertEquals(2.0f, result[1], 0.0f);
+    }
+
+    @Test
+    public void read_floats_sameBytes_differentOrder_produceDifferentValues() throws IOException {
+        byte[] src = new byte[] { 0x3F, (byte) 0x80, 0x00, 0x00 };
+
+        JVectorRandomAccessReader bigEndianReader = new JVectorRandomAccessReader(new ByteArrayIndexInput(src), ByteOrder.BIG_ENDIAN);
+        JVectorRandomAccessReader littleEndianReader = new JVectorRandomAccessReader(new ByteArrayIndexInput(src), ByteOrder.LITTLE_ENDIAN);
+
+        float[] bigEndianResult = new float[1];
+        float[] littleEndianResult = new float[1];
+
+        bigEndianReader.read(bigEndianResult, 0, 1);
+        littleEndianReader.read(littleEndianResult, 0, 1);
+
+        Assert.assertNotEquals(bigEndianResult[0], littleEndianResult[0], 0.0f);
     }
 }

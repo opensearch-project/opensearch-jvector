@@ -18,6 +18,7 @@ import org.opensearch.knn.index.engine.KNNEngine;
 import org.opensearch.knn.index.engine.KNNMethodContext;
 import org.opensearch.knn.index.mapper.KNNMappingConfig;
 import org.opensearch.knn.index.mapper.KNNVectorFieldType;
+import org.opensearch.knn.index.util.IndexUtil;
 
 import java.util.Locale;
 import java.util.Map;
@@ -122,7 +123,8 @@ public abstract class BasePerFieldKnnVectorsFormat extends PerFieldKnnVectorsFor
                     defaultNeighborOverflow,
                     defaultMinBatchSizeForQuantization,
                     defaultHierarchyEnabled,
-                    knnMethodContext.getSpaceType()
+                    knnMethodContext.getSpaceType(),
+                    IndexUtil.getVectorizationProvider(mapperService.get())
                 );
                 log.debug(
                     "Initialize KNN vector format for field [{}] with params [{}] = \"{}\" and [{}] = \"{}\"",

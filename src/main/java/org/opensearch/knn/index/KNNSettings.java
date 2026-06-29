@@ -9,6 +9,7 @@ import lombok.extern.log4j.Log4j2;
 import org.opensearch.OpenSearchParseException;
 import org.opensearch.action.admin.cluster.settings.ClusterUpdateSettingsRequest;
 import org.opensearch.action.admin.cluster.settings.ClusterUpdateSettingsResponse;
+import org.opensearch.knn.index.codec.jvector.VectorizationProviderType;
 import org.opensearch.transport.client.Client;
 import org.opensearch.cluster.metadata.IndexMetadata;
 import org.opensearch.cluster.service.ClusterService;
@@ -85,6 +86,7 @@ public class KNNSettings {
     public static final String KNN_FAISS_AVX512_SPR_DISABLED = "knn.faiss.avx512_spr.disabled";
     public static final String KNN_DISK_VECTOR_SHARD_LEVEL_RESCORING_DISABLED = "index.knn.disk.vector.shard_level_rescoring_disabled";
     public static final String KNN_DERIVED_SOURCE_ENABLED = "index.knn.derived_source.enabled";
+    public static final String KNN_VECTORIZATION_PROVIDER = "index.knn.vectorization.provider";
 
     /**
      * Default setting values
@@ -283,6 +285,34 @@ public class KNNSettings {
                 public void validate(String key, Object value, Object dependency) {
                     if (dependency instanceof Boolean isKnnEnabled && isKnnEnabled == false) {
                         throw new IllegalArgumentException("Index setting \"index.knn\" must be true in order to enabled derived source");
+                    }
+                }
+            });
+        }
+    };
+
+    public static final Setting<VectorizationProviderType> KNN_VECTORIZATION_PROVIDER_SETTING = new Setting<>(
+        KNN_VECTORIZATION_PROVIDER,
+        VectorizationProviderType.DEFAULT_PROVIDER.getName(),
+        VectorizationProviderType::getByName,
+        IndexScope,
+        Final,
+        UnmodifiableOnRestore
+    ) {
+        @Override
+        public Set<SettingDependency> getSettingsDependencies(String key) {
+            return Set.of(new SettingDependency() {
+                @Override
+                public Setting<Boolean> getSetting() {
+                    return IS_KNN_INDEX_SETTING;
+                }
+
+                @Override
+                public void validate(String key, Object value, Object dependency) {
+                    if (dependency instanceof Boolean isKnnEnabled && isKnnEnabled == false) {
+                        throw new IllegalArgumentException(
+                            "Index setting \"index.knn\" must be true in order to enabled vectorization provider"
+                        );
                     }
                 }
             });
@@ -517,6 +547,10 @@ public class KNNSettings {
             return KNN_DERIVED_SOURCE_ENABLED_SETTING;
         }
 
+        if (KNN_VECTORIZATION_PROVIDER.equals(key)) {
+            return KNN_VECTORIZATION_PROVIDER_SETTING;
+        }
+
         throw new IllegalArgumentException("Cannot find setting by key [" + key + "]");
     }
 
@@ -542,7 +576,8 @@ public class KNNSettings {
             QUANTIZATION_STATE_CACHE_SIZE_LIMIT_SETTING,
             QUANTIZATION_STATE_CACHE_EXPIRY_TIME_MINUTES_SETTING,
             KNN_DISK_VECTOR_SHARD_LEVEL_RESCORING_DISABLED_SETTING,
-            KNN_DERIVED_SOURCE_ENABLED_SETTING
+            KNN_DERIVED_SOURCE_ENABLED_SETTING,
+            KNN_VECTORIZATION_PROVIDER_SETTING
         );
         return Stream.concat(settings.stream(), Stream.concat(getFeatureFlags().stream(), dynamicCacheSettings.values().stream()))
             .collect(Collectors.toList());
@@ -586,6 +621,10 @@ public class KNNSettings {
      */
     public static boolean isKNNDerivedSourceEnabled(Settings settings) {
         return KNN_DERIVED_SOURCE_ENABLED_SETTING.get(settings);
+    }
+
+    public static VectorizationProviderType getKNNVectorizationProvider(Settings settings) {
+        return KNN_VECTORIZATION_PROVIDER_SETTING.get(settings);
     }
 
     public static boolean isFaissAVX512Disabled() {

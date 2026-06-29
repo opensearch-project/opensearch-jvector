@@ -16,9 +16,7 @@ import io.github.jbellis.jvector.graph.similarity.SearchScoreProvider;
 import io.github.jbellis.jvector.quantization.PQVectors;
 import io.github.jbellis.jvector.quantization.ProductQuantization;
 import io.github.jbellis.jvector.vector.VectorSimilarityFunction;
-import io.github.jbellis.jvector.vector.VectorizationProvider;
 import io.github.jbellis.jvector.vector.types.VectorFloat;
-import io.github.jbellis.jvector.vector.types.VectorTypeSupport;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.HashMap;
@@ -37,16 +35,19 @@ import org.apache.lucene.util.IOUtils;
 import org.opensearch.knn.common.KNNConstants;
 import org.opensearch.knn.plugin.stats.KNNCounter;
 
+import java.nio.ByteOrder;
+
+import static org.opensearch.knn.index.KNNSettings.KNN_VECTORIZATION_PROVIDER;
+
 @Log4j2
 public class JVectorReader extends KnnVectorsReader {
-    private static final VectorTypeSupport VECTOR_TYPE_SUPPORT = VectorizationProvider.getInstance().getVectorTypeSupport();
-
     private final FieldInfos fieldInfos;
     private final String baseDataFileName;
     // Maps field name to field entries
     private final Map<String, FieldEntry> fieldEntryMap = new HashMap<>(1);
     private final Directory directory;
     private final SegmentReadState state;
+    private final VectorizationProviderType vectorizationProviderType;
 
     public JVectorReader(SegmentReadState state) throws IOException {
         this.state = state;
@@ -59,6 +60,17 @@ public class JVectorReader extends KnnVectorsReader {
         );
         this.directory = state.directory;
         boolean success = false;
+        String providerAttribute = state.segmentInfo.getAttribute(KNN_VECTORIZATION_PROVIDER);
+        if(providerAttribute != null) {
+            this.vectorizationProviderType = VectorizationProviderType.getByName(providerAttribute);
+        } else {
+            // Missing provider attribute means index was created before KNN_VECTORIZATION_PROVIDER was introduced
+            // We can safely assume it was created with Panama provider
+            log.debug("state.segmentInfo KNN_VECTORIZATION_PROVIDER attribute is missing, proceeding with fallback");
+            this.vectorizationProviderType = VectorizationProviderType.PANAMA;
+        }
+
+
         try (ChecksumIndexInput meta = state.directory.openChecksumInput(metaFileName)) {
             CodecUtil.checkIndexHeader(
                 meta,
@@ -101,7 +113,8 @@ public class JVectorReader extends KnnVectorsReader {
             fieldEntry.index,
             fieldEntry.similarityFunction,
             fieldEntry.fieldInfo.getVectorSimilarityFunction(),
-            fieldEntry.graphNodeIdToDocMap
+            fieldEntry.graphNodeIdToDocMap,
+            vectorizationProviderType.getVectorTypeSupport()
         );
     }
 
@@ -150,7 +163,7 @@ public class JVectorReader extends KnnVectorsReader {
         }
 
         // search for a random vector using a GraphSearcher and SearchScoreProvider
-        VectorFloat<?> q = VECTOR_TYPE_SUPPORT.createFloatVector(target);
+        VectorFloat<?> q = vectorizationProviderType.getVectorTypeSupport().createFloatVector(target);
         final SearchScoreProvider ssp;
 
         // Get the Lucene similarity function to check if we need to transform scores
@@ -284,7 +297,7 @@ public class JVectorReader extends KnnVectorsReader {
             final FieldInfo fieldInfo = fieldInfos.fieldInfo(fieldNumber); // read field number
             JVectorWriter.VectorIndexFieldMetadata vectorIndexFieldMetadata = new JVectorWriter.VectorIndexFieldMetadata(meta);
             assert fieldInfo.number == vectorIndexFieldMetadata.getFieldNumber();
-            fieldEntryMap.put(fieldInfo.name, new FieldEntry(fieldInfo, vectorIndexFieldMetadata));
+            fieldEntryMap.put(fieldInfo.name, new FieldEntry(fieldInfo, vectorIndexFieldMetadata, vectorizationProviderType));
         }
     }
 
@@ -306,7 +319,11 @@ public class JVectorReader extends KnnVectorsReader {
         private final OnDiskGraphIndex index;
         private final PQVectors pqVectors; // The product quantized vectors with their codebooks
 
-        public FieldEntry(FieldInfo fieldInfo, JVectorWriter.VectorIndexFieldMetadata vectorIndexFieldMetadata) throws IOException {
+        public FieldEntry(
+            FieldInfo fieldInfo,
+            JVectorWriter.VectorIndexFieldMetadata vectorIndexFieldMetadata,
+            VectorizationProviderType vectorizationProviderType
+        ) throws IOException {
             this.fieldInfo = fieldInfo;
             this.similarityFunction = VectorSimilarityMapper.ordToDistFunc(
                 vectorIndexFieldMetadata.getVectorSimilarityFunction().ordinal()
@@ -318,6 +335,7 @@ public class JVectorReader extends KnnVectorsReader {
             this.pqCodebooksAndVectorsOffset = vectorIndexFieldMetadata.getPqCodebooksAndVectorsOffset();
             this.dimension = vectorIndexFieldMetadata.getVectorDimension();
             this.graphNodeIdToDocMap = vectorIndexFieldMetadata.getGraphNodeIdToDocMap();
+            ByteOrder byteOrder = vectorizationProviderType.getByteOrder();
 
             this.vectorIndexFieldDataFileName = baseDataFileName + "_" + fieldInfo.name + "." + JVectorFormat.VECTOR_INDEX_EXTENSION;
             this.neighborsScoreCacheIndexFieldFileName = baseDataFileName
@@ -336,7 +354,8 @@ public class JVectorReader extends KnnVectorsReader {
             this.indexReaderSupplier = new JVectorRandomAccessReader.Supplier(
                 directory.openInput(vectorIndexFieldDataFileName, state.context),
                 0,
-                sliceLength
+                sliceLength,
+                byteOrder
             );
             this.index = OnDiskGraphIndex.load(indexReaderSupplier, vectorIndexOffset);
 
@@ -349,7 +368,8 @@ public class JVectorReader extends KnnVectorsReader {
                 this.pqCodebooksReaderSupplier = new JVectorRandomAccessReader.Supplier(
                     directory.openInput(vectorIndexFieldDataFileName, IOContext.READONCE),
                     pqCodebooksAndVectorsOffset,
-                    pqCodebooksAndVectorsLength
+                    pqCodebooksAndVectorsLength,
+                    byteOrder
                 );
                 log.debug(
                     "Loading PQ codebooks and vectors for field {}, with numbers of vectors: {}",
@@ -367,7 +387,7 @@ public class JVectorReader extends KnnVectorsReader {
             final IndexInput indexInput = directory.openInput(neighborsScoreCacheIndexFieldFileName, state.context);
             CodecUtil.readIndexHeader(indexInput);
 
-            this.neighborsScoreCacheIndexReaderSupplier = new JVectorRandomAccessReader.Supplier(indexInput);
+            this.neighborsScoreCacheIndexReaderSupplier = new JVectorRandomAccessReader.Supplier(indexInput, byteOrder);
         }
 
         @Override

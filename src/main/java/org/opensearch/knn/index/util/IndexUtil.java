@@ -16,6 +16,7 @@ import org.opensearch.index.mapper.FieldMapper;
 import org.opensearch.index.mapper.MapperService;
 import org.opensearch.index.mapper.SourceFieldMapper;
 import org.opensearch.knn.common.KNNConstants;
+import org.opensearch.knn.index.codec.jvector.VectorizationProviderType;
 import org.opensearch.knn.index.engine.KNNMethodContext;
 import org.opensearch.knn.index.KNNSettings;
 import org.opensearch.knn.index.engine.MethodComponentContext;
@@ -406,6 +407,20 @@ public class IndexUtil {
             return false;
         }
         return true;
+    }
+
+    public static VectorizationProviderType getVectorizationProvider(MapperService mapperService) {
+        VectorizationProviderType defaultValue = VectorizationProviderType.DEFAULT_PROVIDER;
+
+        if (mapperService == null) {
+            return defaultValue;
+        }
+
+        if (mapperService.getIndexSettings().getIndexVersionCreated().before(Version.V_3_8_0)) {
+            return VectorizationProviderType.PANAMA;
+        }
+
+        return KNNSettings.KNN_VECTORIZATION_PROVIDER_SETTING.get(mapperService.getIndexSettings().getSettings());
     }
 
     public static boolean isDerivedEnabledForField(KNNVectorFieldType knnVectorFieldType, MapperService mapperService) {

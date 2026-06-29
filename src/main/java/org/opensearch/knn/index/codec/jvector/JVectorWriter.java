@@ -14,7 +14,6 @@ import io.github.jbellis.jvector.graph.diversity.VamanaDiversityProvider;
 import io.github.jbellis.jvector.graph.similarity.BuildScoreProvider;
 import io.github.jbellis.jvector.quantization.PQVectors;
 import io.github.jbellis.jvector.quantization.ProductQuantization;
-import io.github.jbellis.jvector.vector.VectorizationProvider;
 import io.github.jbellis.jvector.vector.types.VectorFloat;
 import io.github.jbellis.jvector.vector.types.VectorTypeSupport;
 import lombok.AllArgsConstructor;
@@ -46,6 +45,7 @@ import java.util.stream.IntStream;
 
 import static io.github.jbellis.jvector.quantization.KMeansPlusPlusClusterer.UNWEIGHTED;
 import static org.apache.lucene.codecs.lucene99.Lucene99HnswVectorsReader.readVectorEncoding;
+import static org.opensearch.knn.index.KNNSettings.KNN_VECTORIZATION_PROVIDER;
 
 /**
  * JVectorWriter is responsible for writing vector data into index segments using the JVector library.
@@ -99,6 +99,7 @@ public class JVectorWriter extends KnnVectorsWriter {
     private final ForkJoinPool simdPoolFlush;
     private final ForkJoinPool parallelismPool;
 
+    private final VectorizationProviderType vectorizationProviderType;
     private boolean finished = false;
 
     public JVectorWriter(
@@ -113,7 +114,8 @@ public class JVectorWriter extends KnnVectorsWriter {
         boolean leadingSegmentMergeDisabled,
         final ForkJoinPool simdPoolMerge,
         final ForkJoinPool simdPoolFlush,
-        final ForkJoinPool parallelismPool
+        final ForkJoinPool parallelismPool,
+        VectorizationProviderType vectorizationProviderType
     ) throws IOException {
         this.segmentWriteState = segmentWriteState;
         this.maxConn = maxConn;
@@ -127,6 +129,7 @@ public class JVectorWriter extends KnnVectorsWriter {
         this.simdPoolMerge = simdPoolMerge;
         this.simdPoolFlush = simdPoolFlush;
         this.parallelismPool = parallelismPool;
+        this.vectorizationProviderType = vectorizationProviderType;
 
         String metaFileName = IndexFileNames.segmentFileName(
             segmentWriteState.segmentInfo.name,
@@ -140,6 +143,7 @@ public class JVectorWriter extends KnnVectorsWriter {
             JVectorFormat.VECTOR_INDEX_EXTENSION
         );
         this.baseDataFileName = segmentWriteState.segmentInfo.name + "_" + segmentWriteState.segmentSuffix;
+        segmentWriteState.segmentInfo.putAttribute(KNN_VECTORIZATION_PROVIDER, vectorizationProviderType.getName());
 
         boolean success = false;
         try {
@@ -179,7 +183,11 @@ public class JVectorWriter extends KnnVectorsWriter {
             log.error(errorMessage);
             throw new UnsupportedOperationException(errorMessage);
         }
-        FieldWriter<?> newField = new FieldWriter<>(fieldInfo, segmentWriteState.segmentInfo.name);
+        FieldWriter<?> newField = new FieldWriter<>(
+            fieldInfo,
+            segmentWriteState.segmentInfo.name,
+            vectorizationProviderType.getVectorTypeSupport()
+        );
 
         fields.add(newField);
         return newField;
@@ -502,7 +510,7 @@ public class JVectorWriter extends KnnVectorsWriter {
      * This is often specialized to support specific implementations, such as float[] or byte[] vectors.
      */
     static class FieldWriter<T> extends KnnFieldVectorsWriter<T> {
-        private static final VectorTypeSupport VECTOR_TYPE_SUPPORT = VectorizationProvider.getInstance().getVectorTypeSupport();
+        private final VectorTypeSupport vectorTypeSupport;
         private final long SHALLOW_SIZE = RamUsageEstimator.shallowSizeOfInstance(FieldWriter.class);
         @Getter
         private final FieldInfo fieldInfo;
@@ -513,13 +521,14 @@ public class JVectorWriter extends KnnVectorsWriter {
         private final List<VectorFloat<?>> vectors = new ArrayList<>();
         private final List<Integer> docIds = new ArrayList<>();
 
-        FieldWriter(FieldInfo fieldInfo, String segmentName) {
+        FieldWriter(FieldInfo fieldInfo, String segmentName, VectorTypeSupport vectorTypeSupport) {
             /**
              * For creating a new field from a flat field vectors writer.
              */
             this.randomAccessVectorValues = new ListRandomAccessVectorValues(vectors, fieldInfo.getVectorDimension());
             this.fieldInfo = fieldInfo;
             this.segmentName = segmentName;
+            this.vectorTypeSupport = vectorTypeSupport;
         }
 
         @Override
@@ -534,7 +543,7 @@ public class JVectorWriter extends KnnVectorsWriter {
             }
             docIds.add(docID);
             if (vectorValue instanceof float[]) {
-                vectors.add(VECTOR_TYPE_SUPPORT.createFloatVector(vectorValue));
+                vectors.add(vectorTypeSupport.createFloatVector(vectorValue));
             } else if (vectorValue instanceof byte[]) {
                 final String errorMessage = "byte[] vectors are not supported in JVector. "
                     + "Instead you should only use float vectors and leverage product quantization during indexing."
@@ -961,7 +970,10 @@ public class JVectorWriter extends KnnVectorsWriter {
                         continue;
                     }
                     final FloatVectorValues values = readers[i].getFloatVectorValues(fieldName);
-                    final RandomAccessVectorValues randomAccessVectorValues = new RandomAccessVectorValuesOverVectorValues(values);
+                    final RandomAccessVectorValues randomAccessVectorValues = new RandomAccessVectorValuesOverVectorValues(
+                        values,
+                        vectorizationProviderType
+                    );
                     leadingCompressor.refine(randomAccessVectorValues);
                 }
                 final long end = Clock.systemDefaultZone().millis();
@@ -1269,11 +1281,12 @@ public class JVectorWriter extends KnnVectorsWriter {
     }
 
     static class RandomAccessVectorValuesOverVectorValues implements RandomAccessVectorValues {
-        private final VectorTypeSupport VECTOR_TYPE_SUPPORT = VectorizationProvider.getInstance().getVectorTypeSupport();
         private final FloatVectorValues values;
+        private final VectorTypeSupport vectorTypeSupport;
 
-        public RandomAccessVectorValuesOverVectorValues(FloatVectorValues values) {
+        public RandomAccessVectorValuesOverVectorValues(FloatVectorValues values, VectorizationProviderType vectorizationProviderType) {
             this.values = values;
+            this.vectorTypeSupport = vectorizationProviderType.getVectorTypeSupport();
         }
 
         @Override
@@ -1294,7 +1307,7 @@ public class JVectorWriter extends KnnVectorsWriter {
                     final float[] vector = values.vectorValue(nodeId);
                     final float[] copy = new float[vector.length];
                     System.arraycopy(vector, 0, copy, 0, vector.length);
-                    return VECTOR_TYPE_SUPPORT.createFloatVector(copy);
+                    return vectorTypeSupport.createFloatVector(copy);
                 }
             } catch (IOException e) {
                 log.error("Error retrieving vector at ordinal {}", nodeId, e);
