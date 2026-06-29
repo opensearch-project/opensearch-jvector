@@ -10,9 +10,12 @@ import io.github.jbellis.jvector.disk.ReaderSupplier;
 import io.github.jbellis.jvector.graph.GraphSearcher;
 import io.github.jbellis.jvector.graph.SearchResult;
 import io.github.jbellis.jvector.graph.disk.OnDiskGraphIndex;
+import io.github.jbellis.jvector.graph.disk.feature.FeatureId;
+import io.github.jbellis.jvector.graph.disk.feature.NVQ;
 import io.github.jbellis.jvector.graph.similarity.DefaultSearchScoreProvider;
 import io.github.jbellis.jvector.graph.similarity.ScoreFunction;
 import io.github.jbellis.jvector.graph.similarity.SearchScoreProvider;
+import io.github.jbellis.jvector.quantization.NVQuantization;
 import io.github.jbellis.jvector.quantization.PQVectors;
 import io.github.jbellis.jvector.quantization.ProductQuantization;
 import io.github.jbellis.jvector.vector.VectorSimilarityFunction;
@@ -21,6 +24,7 @@ import io.github.jbellis.jvector.vector.types.VectorFloat;
 import io.github.jbellis.jvector.vector.types.VectorTypeSupport;
 import java.io.Closeable;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -60,7 +64,7 @@ public class JVectorReader extends KnnVectorsReader {
         this.directory = state.directory;
         boolean success = false;
         try (ChecksumIndexInput meta = state.directory.openChecksumInput(metaFileName)) {
-            CodecUtil.checkIndexHeader(
+            final int version = CodecUtil.checkIndexHeader(
                 meta,
                 JVectorFormat.META_CODEC_NAME,
                 JVectorFormat.VERSION_START,
@@ -68,7 +72,7 @@ public class JVectorReader extends KnnVectorsReader {
                 state.segmentInfo.getId(),
                 state.segmentSuffix
             );
-            readFields(meta);
+            readFields(meta, version);
             CodecUtil.checkFooter(meta);
 
             success = true;
@@ -97,12 +101,21 @@ public class JVectorReader extends KnnVectorsReader {
     @Override
     public FloatVectorValues getFloatVectorValues(String field) throws IOException {
         final FieldEntry fieldEntry = fieldEntryMap.get(field);
-        return new JVectorFloatVectorValues(
-            fieldEntry.index,
-            fieldEntry.similarityFunction,
-            fieldEntry.fieldInfo.getVectorSimilarityFunction(),
-            fieldEntry.graphNodeIdToDocMap
-        );
+        if (fieldEntry.nvqInlineQuantization != null) {
+            return new JVectorQuantizedNvqVectorValues(
+                fieldEntry.index,
+                fieldEntry.similarityFunction,
+                fieldEntry.graphNodeIdToDocMap,
+                fieldEntry.nvqInlineQuantization
+            );
+        } else {
+            return new JVectorFloatVectorValues(
+                fieldEntry.index,
+                fieldEntry.similarityFunction,
+                fieldEntry.fieldInfo.getVectorSimilarityFunction(),
+                fieldEntry.graphNodeIdToDocMap
+            );
+        }
     }
 
     @Override
@@ -161,23 +174,20 @@ public class JVectorReader extends KnnVectorsReader {
 
         try (var view = index.getView()) {
             final long graphSearchStart = System.currentTimeMillis();
-            if (fieldEntryMap.get(field).pqVectors != null) { // Quantized, use the precomputed score function
-                final PQVectors pqVectors = fieldEntryMap.get(field).pqVectors;
-                // SearchScoreProvider that does a first pass with the loaded-in-memory PQVectors,
-                // then reranks with the exact vectors that are stored on disk in the index
-                ScoreFunction.ApproximateScoreFunction asf = pqVectors.precomputedScoreFunctionFor(q, vectorSimilarityFunction);
-                ScoreFunction.ExactScoreFunction reranker = wrapExactScoreFunction(
-                    view.rerankerFor(q, vectorSimilarityFunction),
-                    luceneSimilarityFunction,
-                    vectorSimilarityFunction
-                );
+            final FieldEntry fe = fieldEntryMap.get(field);
+            if (fe.pqVectors != null) {
+                // PQ blob as approximate first pass; reranker reads inline vectors (NVQ or full-precision)
+                ScoreFunction.ApproximateScoreFunction asf = fe.pqVectors.precomputedScoreFunctionFor(q, fe.similarityFunction);
+                ScoreFunction.ExactScoreFunction reranker = view.rerankerFor(q, fe.similarityFunction);
                 ssp = new DefaultSearchScoreProvider(asf, reranker);
+            } else if (fieldEntry.nvqInlineQuantization != null) { // NVQ inline without PQ blob
+                ssp = new DefaultSearchScoreProvider(view.rerankerFor(q, vectorSimilarityFunction));
             } else { // Not quantized, used typical searcher
                 ScoreFunction.ExactScoreFunction esf = DefaultSearchScoreProvider.exact(q, vectorSimilarityFunction, view)
                     .exactScoreFunction();
                 ssp = new DefaultSearchScoreProvider(wrapExactScoreFunction(esf, luceneSimilarityFunction, vectorSimilarityFunction));
             }
-            final GraphNodeIdToDocMap jvectorLuceneDocMap = fieldEntryMap.get(field).graphNodeIdToDocMap;
+            final GraphNodeIdToDocMap jvectorLuceneDocMap = fieldEntry.graphNodeIdToDocMap;
             // Convert the acceptDocs bitmap from Lucene to jVector ordinal bitmap filter
             // Logic works as follows: if acceptDocs is null, we accept all ordinals. Otherwise, we check if the jVector ordinal has a
             // corresponding Lucene doc ID accepted by acceptDocs filter.
@@ -279,10 +289,10 @@ public class JVectorReader extends KnnVectorsReader {
         fieldEntryMap.clear();
     }
 
-    private void readFields(ChecksumIndexInput meta) throws IOException {
+    private void readFields(ChecksumIndexInput meta, int version) throws IOException {
         for (int fieldNumber = meta.readInt(); fieldNumber != -1; fieldNumber = meta.readInt()) {
             final FieldInfo fieldInfo = fieldInfos.fieldInfo(fieldNumber); // read field number
-            JVectorWriter.VectorIndexFieldMetadata vectorIndexFieldMetadata = new JVectorWriter.VectorIndexFieldMetadata(meta);
+            JVectorWriter.VectorIndexFieldMetadata vectorIndexFieldMetadata = new JVectorWriter.VectorIndexFieldMetadata(meta, version);
             assert fieldInfo.number == vectorIndexFieldMetadata.getFieldNumber();
             fieldEntryMap.put(fieldInfo.name, new FieldEntry(fieldInfo, vectorIndexFieldMetadata));
         }
@@ -295,16 +305,18 @@ public class JVectorReader extends KnnVectorsReader {
         private final int dimension;
         private final long vectorIndexOffset;
         private final long vectorIndexLength;
-        private final long pqCodebooksAndVectorsLength;
-        private final long pqCodebooksAndVectorsOffset;
+        private final long compressedVectorsLength;
+        private final long compressedVectorsOffset;
         private final String vectorIndexFieldDataFileName;
         private final String neighborsScoreCacheIndexFieldFileName;
         private final GraphNodeIdToDocMap graphNodeIdToDocMap;
         private final ReaderSupplier indexReaderSupplier;
-        private final ReaderSupplier pqCodebooksReaderSupplier;
+        private final ReaderSupplier compressedVectorsReaderSupplier;
         private final ReaderSupplier neighborsScoreCacheIndexReaderSupplier;
         private final OnDiskGraphIndex index;
-        private final PQVectors pqVectors; // The product quantized vectors with their codebooks
+        private final PQVectors pqVectors; // non-null when a PQ blob is present (PQ-only or NVQ+PQ)
+        // NVQuantization extracted from the graph when NVQ is stored inline; null otherwise
+        private final NVQuantization nvqInlineQuantization;
 
         public FieldEntry(FieldInfo fieldInfo, JVectorWriter.VectorIndexFieldMetadata vectorIndexFieldMetadata) throws IOException {
             this.fieldInfo = fieldInfo;
@@ -314,8 +326,8 @@ public class JVectorReader extends KnnVectorsReader {
             this.vectorEncoding = vectorIndexFieldMetadata.getVectorEncoding();
             this.vectorIndexOffset = vectorIndexFieldMetadata.getVectorIndexOffset();
             this.vectorIndexLength = vectorIndexFieldMetadata.getVectorIndexLength();
-            this.pqCodebooksAndVectorsLength = vectorIndexFieldMetadata.getPqCodebooksAndVectorsLength();
-            this.pqCodebooksAndVectorsOffset = vectorIndexFieldMetadata.getPqCodebooksAndVectorsOffset();
+            this.compressedVectorsLength = vectorIndexFieldMetadata.getCompressedVectorsLength();
+            this.compressedVectorsOffset = vectorIndexFieldMetadata.getCompressedVectorsOffset();
             this.dimension = vectorIndexFieldMetadata.getVectorDimension();
             this.graphNodeIdToDocMap = vectorIndexFieldMetadata.getGraphNodeIdToDocMap();
 
@@ -340,28 +352,46 @@ public class JVectorReader extends KnnVectorsReader {
             );
             this.index = OnDiskGraphIndex.load(indexReaderSupplier, vectorIndexOffset);
 
-            // If quantized load the compressed product quantized vectors with their codebooks
-            if (pqCodebooksAndVectorsLength > 0) {
-                assert pqCodebooksAndVectorsOffset > 0;
-                if (pqCodebooksAndVectorsOffset < vectorIndexOffset) {
-                    throw new IllegalArgumentException("pqCodebooksAndVectorsOffset must be greater than vectorIndexOffset");
+            // Load compressed vectors if present
+            final byte qType = vectorIndexFieldMetadata.getQuantizationType();
+            if (qType == JVectorWriter.QUANTIZATION_TYPE_NVQ_INLINE) {
+                log.debug("NVQ vectors stored inline in graph for field {}", fieldInfo.name);
+                this.nvqInlineQuantization = extractNVQuantizationFromGraph(this.index);
+                if (compressedVectorsLength > 0) {
+                    // PQ blob alongside NVQ inline graph — used for approximate search traversal
+                    assert compressedVectorsOffset > 0;
+                    log.debug("Loading auxiliary PQ blob for NVQ field {}", fieldInfo.name);
+                    this.compressedVectorsReaderSupplier = new JVectorRandomAccessReader.Supplier(
+                        directory.openInput(vectorIndexFieldDataFileName, IOContext.READONCE),
+                        compressedVectorsOffset,
+                        compressedVectorsLength
+                    );
+                    try (final var randomAccessReader = compressedVectorsReaderSupplier.get()) {
+                        this.pqVectors = PQVectors.load(randomAccessReader);
+                    }
+                } else {
+                    this.compressedVectorsReaderSupplier = null;
+                    this.pqVectors = null;
                 }
-                this.pqCodebooksReaderSupplier = new JVectorRandomAccessReader.Supplier(
+            } else if (compressedVectorsLength > 0) {
+                assert compressedVectorsOffset > 0;
+                if (compressedVectorsOffset < vectorIndexOffset) {
+                    throw new IllegalArgumentException("compressedVectorsOffset must be greater than vectorIndexOffset");
+                }
+                log.debug("Loading PQ codebooks and vectors for field {}", fieldInfo.name);
+                this.compressedVectorsReaderSupplier = new JVectorRandomAccessReader.Supplier(
                     directory.openInput(vectorIndexFieldDataFileName, IOContext.READONCE),
-                    pqCodebooksAndVectorsOffset,
-                    pqCodebooksAndVectorsLength
+                    compressedVectorsOffset,
+                    compressedVectorsLength
                 );
-                log.debug(
-                    "Loading PQ codebooks and vectors for field {}, with numbers of vectors: {}",
-                    fieldInfo.name,
-                    state.segmentInfo.maxDoc()
-                );
-                try (final var randomAccessReader = pqCodebooksReaderSupplier.get()) {
+                try (final var randomAccessReader = compressedVectorsReaderSupplier.get()) {
                     this.pqVectors = PQVectors.load(randomAccessReader);
                 }
+                this.nvqInlineQuantization = null;
             } else {
-                this.pqCodebooksReaderSupplier = null;
+                this.compressedVectorsReaderSupplier = null;
                 this.pqVectors = null;
+                this.nvqInlineQuantization = null;
             }
 
             final IndexInput indexInput = directory.openInput(neighborsScoreCacheIndexFieldFileName, state.context);
@@ -370,13 +400,35 @@ public class JVectorReader extends KnnVectorsReader {
             this.neighborsScoreCacheIndexReaderSupplier = new JVectorRandomAccessReader.Supplier(indexInput);
         }
 
+        /**
+         * Extracts the {@link NVQuantization} object from the private {@code nvq} field of
+         * the {@link NVQ} feature stored in the given graph index.  This is needed so that
+         * the merge path can dequantize NVQ-inline vectors back to float.
+         *
+         * The jVector {@link NVQ} class does not expose a public getter for its internal
+         * {@link NVQuantization}; reflection is the only alternative to modifying the library.
+         */
+        private static NVQuantization extractNVQuantizationFromGraph(OnDiskGraphIndex index) throws IOException {
+            NVQ nvqFeature = (NVQ) index.getFeatures().get(FeatureId.NVQ_VECTORS);
+            if (nvqFeature == null) {
+                return null;
+            }
+            try {
+                Field nvqField = NVQ.class.getDeclaredField("nvq");
+                nvqField.setAccessible(true);
+                return (NVQuantization) nvqField.get(nvqFeature);
+            } catch (NoSuchFieldException | IllegalAccessException e) {
+                throw new IOException("Unable to extract NVQuantization from NVQ feature via reflection", e);
+            }
+        }
+
         @Override
         public void close() throws IOException {
             if (indexReaderSupplier != null) {
                 IOUtils.close(indexReaderSupplier::close);
             }
-            if (pqCodebooksReaderSupplier != null) {
-                IOUtils.close(pqCodebooksReaderSupplier::close);
+            if (compressedVectorsReaderSupplier != null) {
+                IOUtils.close(compressedVectorsReaderSupplier::close);
             }
             if (neighborsScoreCacheIndexReaderSupplier != null) {
                 IOUtils.close(neighborsScoreCacheIndexReaderSupplier::close);
