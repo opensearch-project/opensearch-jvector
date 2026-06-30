@@ -31,6 +31,8 @@ import org.apache.lucene.index.*;
 import org.apache.lucene.search.DocIdSetIterator;
 import org.apache.lucene.store.*;
 import org.apache.lucene.util.Bits;
+import org.apache.lucene.util.IORunnable;
+
 import io.github.jbellis.jvector.util.FixedBitSet;
 import org.apache.lucene.util.IOUtils;
 import org.apache.lucene.util.RamUsageEstimator;
@@ -186,7 +188,7 @@ public class JVectorWriter extends KnnVectorsWriter {
     }
 
     @Override
-    public void mergeOneField(FieldInfo fieldInfo, MergeState mergeState) throws IOException {
+    public IORunnable mergeOneField(FieldInfo fieldInfo, MergeState mergeState) throws IOException {
         log.info("Merging field {} into segment {}", fieldInfo.name, segmentWriteState.segmentInfo.name);
         try {
             final long mergeStart = Clock.systemDefaultZone().millis();
@@ -202,6 +204,7 @@ public class JVectorWriter extends KnnVectorsWriter {
             final long mergeTime = mergeEnd - mergeStart;
             KNNCounter.KNN_GRAPH_MERGE_TIME.add(mergeTime);
             log.info("Completed Merge field {} into segment {}", fieldInfo.name, segmentWriteState.segmentInfo.name);
+            return null;
         } catch (Exception e) {
             log.error("Error merging field {} into segment {}", fieldInfo.name, segmentWriteState.segmentInfo.name, e);
             throw e;
