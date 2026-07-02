@@ -188,7 +188,7 @@ public class KNNQueryBuilderTests extends KNNTestCase {
         assertTrue(
             query.toString()
                 .contains(
-                    "traversalSimilarity="
+                    "decay="
                         + org.opensearch.knn.common.KNNConstants.DEFAULT_LUCENE_RADIAL_SEARCH_TRAVERSAL_SIMILARITY_RATIO * resultSimilarity
                 )
         );
