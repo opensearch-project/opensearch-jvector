@@ -525,7 +525,7 @@ public class LuceneEngineIT extends KNNRestTestCase {
             addKnnDoc(INDEX_NAME, Integer.toString(j + 1), FIELD_NAME, TEST_INNER_PRODUCT_INDEX_VECTORS[j]);
         }
 
-        final float score = 2f;
+        final float score = 1f;
         final int[] expectedResults = { 1, 1, 1 };
 
         validateRadiusSearchResults(TEST_QUERY_VECTORS, null, score, SpaceType.INNER_PRODUCT, expectedResults, null, null, null);
