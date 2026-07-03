@@ -6,7 +6,7 @@ This document contains a list of maintainers in this repo. See [opensearch-proje
 
 | Maintainer      | GitHub ID                                             | Affiliation |
 |-----------------|-------------------------------------------------------|-------------|
-| Samuel Herman   | [sam-herman](https://github.com/sam-herman)           | IBM         |
+| Samuel Herman   | [sam-herman](https://github.com/sam-herman)           | Oracle      |
 | Jim Dickinson   | [jimdickinson](https://github.com/jimdickinson)       | IBM         |
 | Chris Mills     | [sandoichi](https://github.com/sandoichi)             | IBM         |
 | Akash Shankaran | [akash-shankaran](https://github.com/akash-shankaran) | IBM         |
