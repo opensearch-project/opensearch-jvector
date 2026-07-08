@@ -100,22 +100,7 @@ public class JVectorReader extends KnnVectorsReader {
 
     @Override
     public FloatVectorValues getFloatVectorValues(String field) throws IOException {
-        final FieldEntry fieldEntry = fieldEntryMap.get(field);
-        if (fieldEntry.nvqInlineQuantization != null) {
-            return new JVectorQuantizedNvqVectorValues(
-                fieldEntry.index,
-                fieldEntry.similarityFunction,
-                fieldEntry.graphNodeIdToDocMap,
-                fieldEntry.nvqInlineQuantization
-            );
-        } else {
-            return new JVectorFloatVectorValues(
-                fieldEntry.index,
-                fieldEntry.similarityFunction,
-                fieldEntry.fieldInfo.getVectorSimilarityFunction(),
-                fieldEntry.graphNodeIdToDocMap
-            );
-        }
+        return fieldEntryMap.get(field).floatVectorValues();
     }
 
     @Override
@@ -164,29 +149,11 @@ public class JVectorReader extends KnnVectorsReader {
 
         // search for a random vector using a GraphSearcher and SearchScoreProvider
         VectorFloat<?> q = VECTOR_TYPE_SUPPORT.createFloatVector(target);
-        final SearchScoreProvider ssp;
-
-        // Get the Lucene similarity function to check if we need to transform scores
         final FieldEntry fieldEntry = fieldEntryMap.get(field);
-        final org.apache.lucene.index.VectorSimilarityFunction luceneSimilarityFunction = fieldEntry.fieldInfo
-            .getVectorSimilarityFunction();
-        final VectorSimilarityFunction vectorSimilarityFunction = fieldEntry.similarityFunction;
 
         try (var view = index.getView()) {
             final long graphSearchStart = System.currentTimeMillis();
-            final FieldEntry fe = fieldEntryMap.get(field);
-            if (fe.pqVectors != null) {
-                // PQ blob as approximate first pass; reranker reads inline vectors (NVQ or full-precision)
-                ScoreFunction.ApproximateScoreFunction asf = fe.pqVectors.precomputedScoreFunctionFor(q, fe.similarityFunction);
-                ScoreFunction.ExactScoreFunction reranker = view.rerankerFor(q, fe.similarityFunction);
-                ssp = new DefaultSearchScoreProvider(asf, reranker);
-            } else if (fieldEntry.nvqInlineQuantization != null) { // NVQ inline without PQ blob
-                ssp = new DefaultSearchScoreProvider(view.rerankerFor(q, vectorSimilarityFunction));
-            } else { // Not quantized, used typical searcher
-                ScoreFunction.ExactScoreFunction esf = DefaultSearchScoreProvider.exact(q, vectorSimilarityFunction, view)
-                    .exactScoreFunction();
-                ssp = new DefaultSearchScoreProvider(wrapExactScoreFunction(esf, luceneSimilarityFunction, vectorSimilarityFunction));
-            }
+            final SearchScoreProvider ssp = fieldEntry.buildSSP(q, view);
             final GraphNodeIdToDocMap jvectorLuceneDocMap = fieldEntry.graphNodeIdToDocMap;
             // Convert the acceptDocs bitmap from Lucene to jVector ordinal bitmap filter
             // Logic works as follows: if acceptDocs is null, we accept all ordinals. Otherwise, we check if the jVector ordinal has a
@@ -400,13 +367,37 @@ public class JVectorReader extends KnnVectorsReader {
             this.neighborsScoreCacheIndexReaderSupplier = new JVectorRandomAccessReader.Supplier(indexInput);
         }
 
+        FloatVectorValues floatVectorValues() throws IOException {
+            if (nvqInlineQuantization != null) {
+                return new JVectorQuantizedNvqVectorValues(index, similarityFunction, graphNodeIdToDocMap, nvqInlineQuantization);
+            } else {
+                return new JVectorFloatVectorValues(
+                    index,
+                    similarityFunction,
+                    fieldInfo.getVectorSimilarityFunction(),
+                    graphNodeIdToDocMap
+                );
+            }
+        }
+
+        SearchScoreProvider buildSSP(VectorFloat<?> q, OnDiskGraphIndex.View view) {
+            if (pqVectors != null) {
+                ScoreFunction.ApproximateScoreFunction asf = pqVectors.precomputedScoreFunctionFor(q, similarityFunction);
+                ScoreFunction.ExactScoreFunction reranker = view.rerankerFor(q, similarityFunction);
+                return new DefaultSearchScoreProvider(asf, reranker);
+            } else if (nvqInlineQuantization != null) {
+                return new DefaultSearchScoreProvider(view.rerankerFor(q, similarityFunction));
+            } else {
+                ScoreFunction.ExactScoreFunction esf = DefaultSearchScoreProvider.exact(q, similarityFunction, view).exactScoreFunction();
+                return new DefaultSearchScoreProvider(
+                    wrapExactScoreFunction(esf, fieldInfo.getVectorSimilarityFunction(), similarityFunction)
+                );
+            }
+        }
+
         /**
-         * Extracts the {@link NVQuantization} object from the private {@code nvq} field of
-         * the {@link NVQ} feature stored in the given graph index.  This is needed so that
-         * the merge path can dequantize NVQ-inline vectors back to float.
-         *
-         * The jVector {@link NVQ} class does not expose a public getter for its internal
-         * {@link NVQuantization}; reflection is the only alternative to modifying the library.
+         * Extracts the {@link NVQuantization} object from the {@link NVQ} feature stored in the given graph index.
+         * This is needed so that the merge path can dequantize NVQ-inline vectors back to float.
          */
         private static NVQuantization extractNVQuantizationFromGraph(OnDiskGraphIndex index) throws IOException {
             NVQ nvqFeature = (NVQ) index.getFeatures().get(FeatureId.NVQ_VECTORS);

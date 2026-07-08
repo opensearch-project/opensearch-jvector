@@ -243,14 +243,13 @@ public class JVectorWriter extends KnnVectorsWriter {
                 segmentWriteState.segmentInfo.name,
                 simdPoolFlush
             );
-            writeField(
-                field.fieldInfo,
-                randomAccessVectorValues,
-                quantizationResult.compressedVectors,
-                quantizationResult.auxiliaryPqVectors,
-                graphNodeIdToDocMap,
-                graph
-            );
+            if (quantizationResult.compressedVectors instanceof NVQVectors nvqVectors) {
+                writeField(field.fieldInfo, randomAccessVectorValues, nvqVectors, quantizationResult.auxiliaryPqVectors, graphNodeIdToDocMap, graph);
+            } else if (quantizationResult.compressedVectors instanceof PQVectors pqVectors) {
+                writeField(field.fieldInfo, randomAccessVectorValues, pqVectors, graphNodeIdToDocMap, graph);
+            } else {
+                writeField(field.fieldInfo, randomAccessVectorValues, graphNodeIdToDocMap, graph);
+            }
 
         }
     }
@@ -308,7 +307,7 @@ public class JVectorWriter extends KnnVectorsWriter {
     private void writeField(
         FieldInfo fieldInfo,
         RandomAccessVectorValues randomAccessVectorValues,
-        CompressedVectors compressedVectors,
+        NVQVectors nvqVectors,
         PQVectors auxiliaryPqVectors,
         GraphNodeIdToDocMap graphNodeIdToDocMap,
         OnHeapGraphIndex graph
@@ -319,19 +318,48 @@ public class JVectorWriter extends KnnVectorsWriter {
             randomAccessVectorValues.size(),
             segmentWriteState.segmentInfo.name
         );
-        final var vectorIndexFieldMetadata = writeGraph(
-            graph,
-            randomAccessVectorValues,
-            fieldInfo,
-            compressedVectors,
-            auxiliaryPqVectors,
-            graphNodeIdToDocMap
+        meta.writeInt(fieldInfo.number);
+        writeGraph(graph, randomAccessVectorValues, fieldInfo, nvqVectors, auxiliaryPqVectors, graphNodeIdToDocMap).toOutput(meta);
+        writeScoreCacheFile(fieldInfo, graph);
+    }
+
+    private void writeField(
+        FieldInfo fieldInfo,
+        RandomAccessVectorValues randomAccessVectorValues,
+        PQVectors pqVectors,
+        GraphNodeIdToDocMap graphNodeIdToDocMap,
+        OnHeapGraphIndex graph
+    ) throws IOException {
+        log.info(
+            "Writing field {} with vector count: {}, for segment: {}",
+            fieldInfo.name,
+            randomAccessVectorValues.size(),
+            segmentWriteState.segmentInfo.name
         );
         meta.writeInt(fieldInfo.number);
-        vectorIndexFieldMetadata.toOutput(meta);
+        writeGraph(graph, randomAccessVectorValues, fieldInfo, pqVectors, null, graphNodeIdToDocMap).toOutput(meta);
+        writeScoreCacheFile(fieldInfo, graph);
+    }
 
+    private void writeField(
+        FieldInfo fieldInfo,
+        RandomAccessVectorValues randomAccessVectorValues,
+        GraphNodeIdToDocMap graphNodeIdToDocMap,
+        OnHeapGraphIndex graph
+    ) throws IOException {
+        log.info(
+            "Writing field {} with vector count: {}, for segment: {}",
+            fieldInfo.name,
+            randomAccessVectorValues.size(),
+            segmentWriteState.segmentInfo.name
+        );
+        meta.writeInt(fieldInfo.number);
+        writeGraph(graph, randomAccessVectorValues, fieldInfo, null, null, graphNodeIdToDocMap).toOutput(meta);
+        writeScoreCacheFile(fieldInfo, graph);
+    }
+
+    private void writeScoreCacheFile(FieldInfo fieldInfo, OnHeapGraphIndex graph) throws IOException {
         log.info("Writing neighbors score cache for field {}", fieldInfo.name);
-        // field data file, which contains the graph
         final String neighborsScoreCacheIndexFieldFileName = baseDataFileName
             + "_"
             + fieldInfo.name
@@ -1200,7 +1228,7 @@ public class JVectorWriter extends KnnVectorsWriter {
                     );
                     var bsp = BuildScoreProvider.randomAccessScoreProvider(compactRavv, getVectorSimilarityFunction(fieldInfo));
                     var graph = getGraph(bsp, compactRavv, fieldInfo, segmentWriteState.segmentInfo.name, simdPoolMerge);
-                    writeField(fieldInfo, compactRavv, (CompressedVectors) null, null, compactOrdToDocMap, graph);
+                    writeField(fieldInfo, compactRavv, compactOrdToDocMap, graph);
                 }
             } else {
                 log.info("PQ codebooks found, building graph from scratch with PQ vectors");
@@ -1209,7 +1237,7 @@ public class JVectorWriter extends KnnVectorsWriter {
                 // Pre-init the diversity provider here to avoid doing it lazily (as it could block the SIMD threads)
                 buildScoreProvider.diversityProviderFor(0);
                 var graph = getGraph(buildScoreProvider, compactRavv, fieldInfo, segmentWriteState.segmentInfo.name, simdPoolMerge);
-                writeField(fieldInfo, compactRavv, compactPqVectors, null, compactOrdToDocMap, graph);
+                writeField(fieldInfo, compactRavv, compactPqVectors, compactOrdToDocMap, graph);
             }
         }
 
@@ -1396,7 +1424,7 @@ public class JVectorWriter extends KnnVectorsWriter {
                     // Note that the ordinals for the OnDiskGraphIndex will automatically be compacted
                     // But the OnHeapGraphIndex will not
                     var finalOrdToDocMap = new GraphNodeIdToDocMap(finalOrdToDocId);
-                    writeField(fieldInfo, heapRavv, (CompressedVectors) null, null, finalOrdToDocMap, graph);
+                    writeField(fieldInfo, heapRavv, finalOrdToDocMap, graph);
                     return true;
                 }
             }

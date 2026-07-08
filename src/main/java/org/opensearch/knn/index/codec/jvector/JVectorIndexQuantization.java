@@ -25,7 +25,7 @@ import org.opensearch.knn.common.KNNConstants;
  * 1. PQ + full-precision vectors
  * 2. PQ + NVQ
  */
-public sealed abstract class JVectorIndexQuantization {
+public sealed interface JVectorIndexQuantization {
 
     static final VectorTypeSupport VECTOR_TYPE_SUPPORT = VectorizationProvider.getInstance().getVectorTypeSupport();
 
@@ -42,7 +42,7 @@ public sealed abstract class JVectorIndexQuantization {
     // NVQ implementation
     // -----------------------------------------------------------------------
 
-    public static final class NVQ extends JVectorIndexQuantization {
+    public static final class NVQ implements JVectorIndexQuantization {
         private final int numSubvectors;
         // Bound only when this instance is used to read back (dequantize) stored vectors; null at write/config time.
         private final NVQuantization trainedQuantizer;
@@ -177,7 +177,7 @@ public sealed abstract class JVectorIndexQuantization {
     // PQ implementation
     // -----------------------------------------------------------------------
 
-    public static final class PQ extends JVectorIndexQuantization {
+    public static final class PQ implements JVectorIndexQuantization {
         private final Function<Integer, Integer> numSubspacesSupplier;
 
         public PQ(Function<Integer, Integer> numSubspacesSupplier) {
