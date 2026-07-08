@@ -21,7 +21,7 @@ def awssdk_version="2.46.21"
 configurations.all {
     resolutionStrategy {
         force 'org.apache.commons:commons-math3:3.6.1'  // Force the newer version
-        force 'org.ow2.asm:asm:9.7.1'  // Force the newer ASM version
+        force 'org.ow2.asm:asm:9.10.1'  // Force the newer ASM version
     }
 }
 
