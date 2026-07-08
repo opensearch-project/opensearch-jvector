@@ -128,7 +128,7 @@ public class JVectorWriterMergeTests extends LuceneTestCase {
         // Path indexPath = createTempDir();
         IndexWriterConfig iwc = LuceneTestCase.newIndexWriterConfig();
         iwc.setUseCompoundFile(false);
-        iwc.setCodec(getCodec(scenario.minPqThreshold, scenario.leadingSegmentMergeDisabled, mergePool));
+        iwc.setCodec(getCodec(scenario.minPqThreshold, scenario.leadingSegmentMergeDisabled, random().nextBoolean(), mergePool));
         iwc.setMergePolicy(new ForceMergesOnlyMergePolicy(false));
         iwc.setMaxBufferedDocs(-1);
 
