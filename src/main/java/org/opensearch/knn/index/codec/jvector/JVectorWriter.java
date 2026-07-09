@@ -244,7 +244,14 @@ public class JVectorWriter extends KnnVectorsWriter {
                 simdPoolFlush
             );
             if (quantizationResult.compressedVectors instanceof NVQVectors nvqVectors) {
-                writeField(field.fieldInfo, randomAccessVectorValues, nvqVectors, quantizationResult.auxiliaryPqVectors, graphNodeIdToDocMap, graph);
+                writeField(
+                    field.fieldInfo,
+                    randomAccessVectorValues,
+                    nvqVectors,
+                    quantizationResult.auxiliaryPqVectors,
+                    graphNodeIdToDocMap,
+                    graph
+                );
             } else if (quantizationResult.compressedVectors instanceof PQVectors pqVectors) {
                 writeField(field.fieldInfo, randomAccessVectorValues, pqVectors, graphNodeIdToDocMap, graph);
             } else {
@@ -482,7 +489,7 @@ public class JVectorWriter extends KnnVectorsWriter {
                 resultBuilder.compressedVectorsOffset(0);
                 resultBuilder.compressedVectorsLength(0);
             }
-            resultBuilder.quantizationType(QUANTIZATION_TYPE_NVQ_INLINE);
+            resultBuilder.quantizationType(JVectorIndexQuantization.QUANTIZATION_TYPE_NVQ);
             CodecUtil.writeFooter(indexOutput);
         }
     }
@@ -521,11 +528,11 @@ public class JVectorWriter extends KnnVectorsWriter {
                 resultBuilder.compressedVectorsOffset(endGraphOffset);
                 compressedVectors.write(jVectorIndexWriter);
                 resultBuilder.compressedVectorsLength(jVectorIndexWriter.position() - endGraphOffset);
-                resultBuilder.quantizationType(QUANTIZATION_TYPE_PQ);
+                resultBuilder.quantizationType(JVectorIndexQuantization.QUANTIZATION_TYPE_PQ);
             } else {
                 resultBuilder.compressedVectorsOffset(0);
                 resultBuilder.compressedVectorsLength(0);
-                resultBuilder.quantizationType(QUANTIZATION_TYPE_NONE);
+                resultBuilder.quantizationType(JVectorIndexQuantization.QUANTIZATION_TYPE_NONE);
             }
             CodecUtil.writeFooter(indexOutput);
         }
@@ -579,11 +586,6 @@ public class JVectorWriter extends KnnVectorsWriter {
         );
         return pqVectors;
     }
-
-    // quantizationType byte values stored in VectorIndexFieldMetadata
-    static final byte QUANTIZATION_TYPE_NONE = 0;
-    static final byte QUANTIZATION_TYPE_PQ = 1;
-    static final byte QUANTIZATION_TYPE_NVQ_INLINE = 2;
 
     private boolean isNVQ() {
         return quantization instanceof JVectorIndexQuantization.NVQ;
@@ -652,7 +654,9 @@ public class JVectorWriter extends KnnVectorsWriter {
                 this.quantizationType = in.readByte();
             } else {
                 // v0 segments: infer type — PQ if compressed vectors present, none otherwise
-                this.quantizationType = this.compressedVectorsLength > 0 ? QUANTIZATION_TYPE_PQ : QUANTIZATION_TYPE_NONE;
+                this.quantizationType = this.compressedVectorsLength > 0
+                    ? JVectorIndexQuantization.QUANTIZATION_TYPE_PQ
+                    : JVectorIndexQuantization.QUANTIZATION_TYPE_NONE;
             }
             this.degreeOverflow = Float.intBitsToFloat(in.readInt());
             this.graphNodeIdToDocMap = new GraphNodeIdToDocMap(in);

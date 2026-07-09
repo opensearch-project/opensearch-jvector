@@ -5,14 +5,19 @@
 
 package org.opensearch.knn.index.codec.jvector;
 
+import io.github.jbellis.jvector.disk.ReaderSupplier;
 import io.github.jbellis.jvector.graph.disk.OnDiskGraphIndex;
 import io.github.jbellis.jvector.graph.disk.feature.FeatureId;
 import io.github.jbellis.jvector.quantization.NVQuantization;
+import io.github.jbellis.jvector.quantization.PQVectors;
 import io.github.jbellis.jvector.vector.VectorizationProvider;
 import io.github.jbellis.jvector.vector.types.VectorFloat;
 import io.github.jbellis.jvector.vector.types.VectorTypeSupport;
+import io.github.jbellis.jvector.graph.disk.feature.NVQ;
 import java.io.IOException;
 import java.util.function.Function;
+import org.apache.lucene.store.Directory;
+import org.apache.lucene.store.IOContext;
 import org.opensearch.knn.common.KNNConstants;
 
 /**
@@ -29,8 +34,110 @@ public sealed interface JVectorIndexQuantization {
 
     static final VectorTypeSupport VECTOR_TYPE_SUPPORT = VectorizationProvider.getInstance().getVectorTypeSupport();
 
+    // On-disk quantization type bytes written into VectorIndexFieldMetadata
+    byte QUANTIZATION_TYPE_NONE = 0;
+    byte QUANTIZATION_TYPE_PQ = 1;
+    byte QUANTIZATION_TYPE_NVQ = 2;
+
+    /** Holds the quantization objects loaded from disk for a single field. */
+    record LoadedState(NVQuantization nvqInlineQuantization, PQVectors pqVectors, ReaderSupplier compressedVectorsReaderSupplier) {
+    }
+
+    /**
+     * Loads the quantization state for a field from disk, dispatching on the on-disk {@code qType} byte.
+     * For NVQ, the {@link NVQuantization} is extracted from the graph and an optional auxiliary PQ blob is loaded.
+     * For PQ-only, the PQ blob is loaded from the field data file.
+     */
+    static LoadedState loadQuantizationState(
+        byte qType,
+        OnDiskGraphIndex index,
+        Directory directory,
+        String fieldDataFileName,
+        long compressedVectorsOffset,
+        long compressedVectorsLength,
+        long vectorIndexOffset
+    ) throws IOException {
+        return switch (qType) {
+            case QUANTIZATION_TYPE_NVQ -> loadNVQState(
+                index,
+                directory,
+                fieldDataFileName,
+                compressedVectorsOffset,
+                compressedVectorsLength
+            );
+            default -> compressedVectorsLength > 0
+                ? loadPQState(directory, fieldDataFileName, compressedVectorsOffset, compressedVectorsLength, vectorIndexOffset)
+                : new LoadedState(null, null, null);
+        };
+    }
+
+    private static LoadedState loadNVQState(
+        OnDiskGraphIndex index,
+        Directory directory,
+        String fieldDataFileName,
+        long compressedVectorsOffset,
+        long compressedVectorsLength
+    ) throws IOException {
+        NVQuantization nvq = nvqFromGraph(index);
+        if (compressedVectorsLength == 0) {
+            return new LoadedState(nvq, null, null);
+        }
+        assert compressedVectorsOffset > 0;
+        ReaderSupplier supplier = new JVectorRandomAccessReader.Supplier(
+            directory.openInput(fieldDataFileName, IOContext.READONCE),
+            compressedVectorsOffset,
+            compressedVectorsLength
+        );
+        PQVectors pqVectors;
+        try (var reader = supplier.get()) {
+            pqVectors = PQVectors.load(reader);
+        }
+        return new LoadedState(nvq, pqVectors, supplier);
+    }
+
+    private static LoadedState loadPQState(
+        Directory directory,
+        String fieldDataFileName,
+        long compressedVectorsOffset,
+        long compressedVectorsLength,
+        long vectorIndexOffset
+    ) throws IOException {
+        if (compressedVectorsOffset < vectorIndexOffset) {
+            throw new IllegalArgumentException("compressedVectorsOffset must be greater than vectorIndexOffset");
+        }
+        ReaderSupplier supplier = new JVectorRandomAccessReader.Supplier(
+            directory.openInput(fieldDataFileName, IOContext.READONCE),
+            compressedVectorsOffset,
+            compressedVectorsLength
+        );
+        PQVectors pqVectors;
+        try (var reader = supplier.get()) {
+            pqVectors = PQVectors.load(reader);
+        }
+        return new LoadedState(null, pqVectors, supplier);
+    }
+
+    // TODO: replace reflection with nvqFeature.getNVQuantization() once jvector exposes it publicly in the released jar
+    private static NVQuantization nvqFromGraph(OnDiskGraphIndex index) throws IOException {
+        io.github.jbellis.jvector.graph.disk.feature.NVQ nvqFeature = (io.github.jbellis.jvector.graph.disk.feature.NVQ) index.getFeatures()
+            .get(FeatureId.NVQ_VECTORS);
+        if (nvqFeature == null) {
+            return null;
+        }
+        try {
+            java.lang.reflect.Field nvqField = io.github.jbellis.jvector.graph.disk.feature.NVQ.class.getDeclaredField("nvq");
+            nvqField.setAccessible(true);
+            return (NVQuantization) nvqField.get(nvqFeature);
+        } catch (NoSuchFieldException | IllegalAccessException e) {
+            throw new IOException("Unable to extract NVQuantization from NVQ feature via reflection", e);
+        }
+    }
+
     /** String identifier used in REST params and on-disk serialization. */
     public abstract String getType();
+
+    /** Returns the byte value written to the segment metadata to identify this quantization type. */
+    public abstract byte quantizationType();
 
     /** Returns the number of subspaces/subvectors to use for a vector of the given dimension. */
     public abstract int numSubspaces(int dimension);
@@ -71,6 +178,11 @@ public sealed interface JVectorIndexQuantization {
         @Override
         public String getType() {
             return KNNConstants.QUANTIZATION_TYPE_NVQ;
+        }
+
+        @Override
+        public byte quantizationType() {
+            return QUANTIZATION_TYPE_NVQ;
         }
 
         @Override
@@ -201,6 +313,11 @@ public sealed interface JVectorIndexQuantization {
         @Override
         public String getType() {
             return KNNConstants.QUANTIZATION_TYPE_PQ;
+        }
+
+        @Override
+        public byte quantizationType() {
+            return QUANTIZATION_TYPE_PQ;
         }
 
         @Override
