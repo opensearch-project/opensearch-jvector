@@ -53,6 +53,7 @@ import static org.opensearch.knn.common.KNNConstants.VECTOR_DATA_TYPE_FIELD;
 import static org.opensearch.knn.index.KNNSettings.KNN_INDEX;
 import static org.opensearch.knn.common.KNNConstants.DEFAULT_LEADING_SEGMENT_MERGE_DISABLED;
 import static org.opensearch.knn.common.KNNConstants.DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION;
+import static org.opensearch.knn.common.KNNConstants.DEFAULT_HIERARCHY_ENABLED;
 
 public class CommonTestUtils {
     private static final NamedXContentRegistry DEFAULT_NAMED_X_CONTENT_REGISTRY = new NamedXContentRegistry(
@@ -107,7 +108,8 @@ public class CommonTestUtils {
             .build();
     }
 
-    public static String createIndexMapping(int dimension, SpaceType spaceType, VectorDataType vectorDataType) throws IOException {
+    public static String createIndexMapping(int dimension, SpaceType spaceType, VectorDataType vectorDataType, boolean hierarchical)
+        throws IOException {
         XContentBuilder builder = jsonBuilder().startObject()
             .startObject(PROPERTIES_FIELD_NAME)
             .startObject(FIELD_NAME)
@@ -121,6 +123,7 @@ public class CommonTestUtils {
             .startObject(KNNConstants.PARAMETERS)
             .field(KNNConstants.METHOD_PARAMETER_M, M)
             .field(KNNConstants.METHOD_PARAMETER_EF_CONSTRUCTION, EF_CONSTRUCTION)
+            .field(KNNConstants.METHOD_PARAMETER_HIERARCHY_ENABLED, hierarchical)
             .endObject()
             .endObject()
             .endObject()
@@ -131,48 +134,49 @@ public class CommonTestUtils {
     }
 
     public static Codec getCodec() {
-        return getCodec(DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION, DEFAULT_LEADING_SEGMENT_MERGE_DISABLED);
+        return getCodec(DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION, DEFAULT_LEADING_SEGMENT_MERGE_DISABLED, DEFAULT_HIERARCHY_ENABLED);
     }
 
-    public static Codec getCodec(int minBatchSizeForQuantization) {
-        return getCodec(minBatchSizeForQuantization, DEFAULT_LEADING_SEGMENT_MERGE_DISABLED);
+    public static Codec getCodec(boolean hierarchical) {
+        return getCodec(DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION, DEFAULT_LEADING_SEGMENT_MERGE_DISABLED, hierarchical);
     }
 
-    public static Codec getCodec(int minBatchSizeForQuantization, boolean leadingSegmentMergeDisabled) {
-        return getCodec(minBatchSizeForQuantization, leadingSegmentMergeDisabled, null);
+    public static Codec getCodec(int minBatchSizeForQuantization, boolean hierarchical) {
+        return getCodec(minBatchSizeForQuantization, DEFAULT_LEADING_SEGMENT_MERGE_DISABLED, hierarchical);
     }
 
-    public static Codec getCodec(int minBatchSizeForQuantization, boolean leadingSegmentMergeDisabled, ForkJoinPool graphMergePool) {
-        return getCodec(minBatchSizeForQuantization, leadingSegmentMergeDisabled, graphMergePool, new JVectorIndexQuantization.PQ());
+    public static Codec getCodec(int minBatchSizeForQuantization, boolean leadingSegmentMergeDisabled, boolean hierarchical) {
+        return new FilterCodec(KNNCodecVersion.V_10_04_0.getCodecName(), new Lucene104Codec()) {
+            @Override
+            public KnnVectorsFormat knnVectorsFormat() {
+                return new PerFieldKnnVectorsFormat() {
+
+                    @Override
+                    public KnnVectorsFormat getKnnVectorsFormatForField(String field) {
+                        return new JVectorFormat(
+                            JVectorFormat.DEFAULT_MAX_CONN,
+                            JVectorFormat.DEFAULT_BEAM_WIDTH,
+                            KNNConstants.DEFAULT_NEIGHBOR_OVERFLOW_VALUE.floatValue(),
+                            KNNConstants.DEFAULT_ALPHA_VALUE.floatValue(),
+                            quantization,
+                            minBatchSizeForQuantization,
+                            hierarchical,
+                            leadingSegmentMergeDisabled
+                        );
+                    }
+                };
+            }
+        };
     }
 
     public static Codec getCodec(
         int minBatchSizeForQuantization,
         boolean leadingSegmentMergeDisabled,
-        ForkJoinPool graphMergePool,
-        JVectorIndexQuantization quantization
+        boolean hierarchical,
+        ForkJoinPool graphMergePool
     ) {
         if (graphMergePool == null) {
-            return new FilterCodec(KNNCodecVersion.V_10_04_0.getCodecName(), new Lucene104Codec()) {
-                @Override
-                public KnnVectorsFormat knnVectorsFormat() {
-                    return new PerFieldKnnVectorsFormat() {
-                        @Override
-                        public KnnVectorsFormat getKnnVectorsFormatForField(String field) {
-                            return new JVectorFormat(
-                                JVectorFormat.DEFAULT_MAX_CONN,
-                                JVectorFormat.DEFAULT_BEAM_WIDTH,
-                                KNNConstants.DEFAULT_NEIGHBOR_OVERFLOW_VALUE.floatValue(),
-                                KNNConstants.DEFAULT_ALPHA_VALUE.floatValue(),
-                                quantization,
-                                minBatchSizeForQuantization,
-                                KNNConstants.DEFAULT_HIERARCHY_ENABLED,
-                                leadingSegmentMergeDisabled
-                            );
-                        }
-                    };
-                }
-            };
+            return getCodec(minBatchSizeForQuantization, leadingSegmentMergeDisabled, hierarchical);
         } else {
             return new FilterCodec(KNNCodecVersion.V_10_04_0.getCodecName(), new Lucene104Codec()) {
                 @Override
@@ -188,7 +192,7 @@ public class CommonTestUtils {
                                 KNNConstants.DEFAULT_ALPHA_VALUE.floatValue(),
                                 quantization,
                                 minBatchSizeForQuantization,
-                                KNNConstants.DEFAULT_HIERARCHY_ENABLED,
+                                hierarchical,
                                 leadingSegmentMergeDisabled,
                                 graphMergePool,
                                 graphMergePool,
