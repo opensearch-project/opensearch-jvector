@@ -6,19 +6,32 @@
 package org.opensearch.knn.index.codec.jvector;
 
 import io.github.jbellis.jvector.disk.ReaderSupplier;
+import io.github.jbellis.jvector.graph.RandomAccessVectorValues;
 import io.github.jbellis.jvector.graph.disk.OnDiskGraphIndex;
 import io.github.jbellis.jvector.graph.disk.feature.FeatureId;
+import io.github.jbellis.jvector.graph.similarity.BuildScoreProvider;
+import io.github.jbellis.jvector.quantization.CompressedVectors;
+import io.github.jbellis.jvector.quantization.NVQVectors;
 import io.github.jbellis.jvector.quantization.NVQuantization;
 import io.github.jbellis.jvector.quantization.PQVectors;
+import io.github.jbellis.jvector.quantization.ProductQuantization;
 import io.github.jbellis.jvector.vector.VectorizationProvider;
+import io.github.jbellis.jvector.vector.VectorSimilarityFunction;
 import io.github.jbellis.jvector.vector.types.VectorFloat;
 import io.github.jbellis.jvector.vector.types.VectorTypeSupport;
 import io.github.jbellis.jvector.graph.disk.feature.NVQ;
 import java.io.IOException;
+import java.time.Clock;
+import java.util.concurrent.ForkJoinPool;
 import java.util.function.Function;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.IOContext;
 import org.opensearch.knn.common.KNNConstants;
+import org.opensearch.knn.plugin.stats.KNNCounter;
+
+import static io.github.jbellis.jvector.quantization.KMeansPlusPlusClusterer.UNWEIGHTED;
 
 /**
  * Encapsulates the quantization strategy used when writing a jVector segment.
@@ -32,15 +45,20 @@ import org.opensearch.knn.common.KNNConstants;
  */
 public sealed interface JVectorIndexQuantization {
 
+    Logger log = LogManager.getLogger(JVectorIndexQuantization.class);
     static final VectorTypeSupport VECTOR_TYPE_SUPPORT = VectorizationProvider.getInstance().getVectorTypeSupport();
 
     // On-disk quantization type bytes written into VectorIndexFieldMetadata
     byte QUANTIZATION_TYPE_NONE = 0;
     byte QUANTIZATION_TYPE_PQ = 1;
-    byte QUANTIZATION_TYPE_NVQ = 2;
+    byte QUANTIZATION_TYPE_NVQ_INLINE = 2;
 
     /** Holds the quantization objects loaded from disk for a single field. */
     record LoadedState(NVQuantization nvqInlineQuantization, PQVectors pqVectors, ReaderSupplier compressedVectorsReaderSupplier) {
+    }
+
+    /** Result of quantizing a set of vectors ahead of graph construction. */
+    record QuantizationResult(CompressedVectors compressedVectors, PQVectors auxiliaryPqVectors, BuildScoreProvider buildScoreProvider) {
     }
 
     /**
@@ -58,7 +76,7 @@ public sealed interface JVectorIndexQuantization {
         long vectorIndexOffset
     ) throws IOException {
         return switch (qType) {
-            case QUANTIZATION_TYPE_NVQ -> loadNVQState(
+            case QUANTIZATION_TYPE_NVQ_INLINE -> loadNVQState(
                 index,
                 directory,
                 fieldDataFileName,
@@ -69,6 +87,57 @@ public sealed interface JVectorIndexQuantization {
                 ? loadPQState(directory, fieldDataFileName, compressedVectorsOffset, compressedVectorsLength, vectorIndexOffset)
                 : new LoadedState(null, null, null);
         };
+    }
+
+    /**
+     * Compute NVQ vectors from raw float vectors.
+     * Called by {@link JVectorIndexQuantization.NVQ#quantize} and directly from the merge path.
+     */
+    static NVQVectors computeNvqVectors(int numSubvectors, RandomAccessVectorValues ravv, ForkJoinPool computePool) throws IOException {
+        log.info("Computing NVQ parameters for {} vectors", ravv.size());
+        final long start = Clock.systemDefaultZone().millis();
+        NVQuantization nvq = NVQuantization.compute(ravv, numSubvectors);
+        KNNCounter.KNN_QUANTIZATION_TRAINING_TIME.add(Clock.systemDefaultZone().millis() - start);
+        log.info("Encoding NVQ vectors for {} vectors", ravv.size());
+        NVQVectors nvqVectors = nvq.encodeAll(ravv, computePool);
+        log.info(
+            "Encoded NVQ vectors, original size: {} bytes, compressed size: {} bytes",
+            nvqVectors.getOriginalSize(),
+            nvqVectors.getCompressedSize()
+        );
+        return nvqVectors;
+    }
+
+    /**
+     * Compute PQ vectors from raw float vectors with the given subspace count.
+     * Called by {@link #quantize} implementations and directly from the merge path.
+     */
+    static PQVectors computePqVectors(
+        RandomAccessVectorValues ravv,
+        VectorSimilarityFunction vsf,
+        int numSubspaces,
+        ForkJoinPool computePool
+    ) throws IOException {
+        log.info("Computing PQ codebooks for {} vectors", ravv.size());
+        final long start = Clock.systemDefaultZone().millis();
+        final int clusters = Math.min(256, ravv.size());
+        ProductQuantization pq = ProductQuantization.compute(
+            ravv,
+            numSubspaces,
+            clusters,
+            vsf == VectorSimilarityFunction.EUCLIDEAN,
+            UNWEIGHTED,
+            computePool,
+            ForkJoinPool.commonPool()
+        );
+        KNNCounter.KNN_QUANTIZATION_TRAINING_TIME.add(Clock.systemDefaultZone().millis() - start);
+        PQVectors pqVectors = PQVectors.encodeAndBuild(pq, ravv.size(), ravv, computePool);
+        log.info(
+            "Encoded PQ vectors, original size: {} bytes, compressed size: {} bytes",
+            pqVectors.getOriginalSize(),
+            pqVectors.getCompressedSize()
+        );
+        return pqVectors;
     }
 
     private static LoadedState loadNVQState(
@@ -145,6 +214,13 @@ public sealed interface JVectorIndexQuantization {
     /** Reads back (and, for lossy schemes, dequantizes) the float vector stored for {@code ord} in {@code view}. */
     public abstract VectorFloat<?> vectorFloatValue(OnDiskGraphIndex.View view, int ord);
 
+    /**
+     * Compute compressed vectors and a build score provider from raw float vectors.
+     * Dispatches to the NVQ or PQ implementation based on the concrete type.
+     */
+    public abstract QuantizationResult quantize(RandomAccessVectorValues ravv, VectorSimilarityFunction vsf, ForkJoinPool computePool)
+        throws IOException;
+
     // -----------------------------------------------------------------------
     // NVQ implementation
     // -----------------------------------------------------------------------
@@ -182,12 +258,20 @@ public sealed interface JVectorIndexQuantization {
 
         @Override
         public byte quantizationType() {
-            return QUANTIZATION_TYPE_NVQ;
+            return QUANTIZATION_TYPE_NVQ_INLINE;
         }
 
         @Override
         public int numSubspaces(int dimension) {
             return numSubvectors;
+        }
+
+        @Override
+        public QuantizationResult quantize(RandomAccessVectorValues ravv, VectorSimilarityFunction vsf, ForkJoinPool computePool)
+            throws IOException {
+            NVQVectors nvqVectors = computeNvqVectors(numSubvectors, ravv, computePool);
+            PQVectors auxPqVectors = computePqVectors(ravv, vsf, PQ.defaultNumSubspaces(ravv.dimension()), computePool);
+            return new QuantizationResult(nvqVectors, auxPqVectors, BuildScoreProvider.pqBuildScoreProvider(vsf, auxPqVectors));
         }
 
         /**
@@ -323,6 +407,13 @@ public sealed interface JVectorIndexQuantization {
         @Override
         public int numSubspaces(int dimension) {
             return numSubspacesSupplier.apply(dimension);
+        }
+
+        @Override
+        public QuantizationResult quantize(RandomAccessVectorValues ravv, VectorSimilarityFunction vsf, ForkJoinPool computePool)
+            throws IOException {
+            PQVectors pqVectors = computePqVectors(ravv, vsf, numSubspaces(ravv.dimension()), computePool);
+            return new QuantizationResult(pqVectors, null, BuildScoreProvider.pqBuildScoreProvider(vsf, pqVectors));
         }
 
         /** PQ does not quantize the inline graph vectors; they are read back at full precision. */

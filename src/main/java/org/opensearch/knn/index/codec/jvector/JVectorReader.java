@@ -150,7 +150,7 @@ public class JVectorReader extends KnnVectorsReader {
 
         try (var view = index.getView()) {
             final long graphSearchStart = System.currentTimeMillis();
-            final SearchScoreProvider ssp = fieldEntry.buildSSP(q, view);
+            final SearchScoreProvider ssp = fieldEntry.buildScoreFunctionProvider(q, view);
             final GraphNodeIdToDocMap jvectorLuceneDocMap = fieldEntry.graphNodeIdToDocMap;
             // Convert the acceptDocs bitmap from Lucene to jVector ordinal bitmap filter
             // Logic works as follows: if acceptDocs is null, we accept all ordinals. Otherwise, we check if the jVector ordinal has a
@@ -350,7 +350,7 @@ public class JVectorReader extends KnnVectorsReader {
             }
         }
 
-        SearchScoreProvider buildSSP(VectorFloat<?> q, OnDiskGraphIndex.View view) {
+        SearchScoreProvider buildScoreFunctionProvider(VectorFloat<?> q, OnDiskGraphIndex.View view) {
             if (pqVectors != null) {
                 ScoreFunction.ApproximateScoreFunction asf = pqVectors.precomputedScoreFunctionFor(q, similarityFunction);
                 ScoreFunction.ExactScoreFunction reranker = view.rerankerFor(q, similarityFunction);
