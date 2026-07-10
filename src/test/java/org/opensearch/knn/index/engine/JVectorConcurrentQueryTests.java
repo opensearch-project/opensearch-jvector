@@ -218,7 +218,7 @@ public class JVectorConcurrentQueryTests extends OpenSearchIntegTestCase {
 
     private void createKnnIndexMappingWithJVectorEngine(int dimension, SpaceType spaceType, VectorDataType vectorDataType)
         throws Exception {
-        String mapping = CommonTestUtils.createIndexMapping(dimension, spaceType, vectorDataType);
+        String mapping = CommonTestUtils.createIndexMapping(dimension, spaceType, vectorDataType, randomBoolean());
         Settings indexSettings = CommonTestUtils.getDefaultIndexSettings();
         // indexSettings = Settings.builder().put(indexSettings).put(INDEX_USE_COMPOUND_FILE.getKey(), false).build();
 

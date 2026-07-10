@@ -76,6 +76,7 @@ public class Lucene99RWHnswScalarQuantizedVectorsFormat extends Lucene99HnswScal
             state,
             maxConn,
             beamWidth,
+            flatVectorsFormat,
             flatVectorsFormat.fieldsWriter(state),
             numMergeThreads,
             executorService

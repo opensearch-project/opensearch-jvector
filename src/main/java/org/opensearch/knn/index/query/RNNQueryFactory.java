@@ -101,8 +101,8 @@ public class RNNQueryFactory extends BaseQueryFactory {
         return new FloatVectorSimilarityQuery(
             fieldName,
             floatVector,
-            DEFAULT_LUCENE_RADIAL_SEARCH_TRAVERSAL_SIMILARITY_RATIO * resultSimilarity,
             resultSimilarity,
+            DEFAULT_LUCENE_RADIAL_SEARCH_TRAVERSAL_SIMILARITY_RATIO * resultSimilarity, /* decay */
             filterQuery
         );
     }
@@ -120,8 +120,8 @@ public class RNNQueryFactory extends BaseQueryFactory {
         return new ByteVectorSimilarityQuery(
             fieldName,
             byteVector,
-            DEFAULT_LUCENE_RADIAL_SEARCH_TRAVERSAL_SIMILARITY_RATIO * resultSimilarity,
             resultSimilarity,
+            DEFAULT_LUCENE_RADIAL_SEARCH_TRAVERSAL_SIMILARITY_RATIO * resultSimilarity, /* decay */
             filterQuery
         );
     }
