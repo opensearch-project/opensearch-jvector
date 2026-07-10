@@ -18,6 +18,7 @@ import org.apache.lucene.index.FloatVectorValues;
 import org.apache.lucene.index.KnnVectorValues;
 import org.apache.lucene.index.LeafReader;
 import org.apache.lucene.index.MergeState;
+import org.apache.lucene.index.SegmentReader;
 import org.apache.lucene.index.VectorEncoding;
 import org.apache.lucene.search.DocIdSetIterator;
 import org.opensearch.knn.common.FieldInfoExtractor;
@@ -44,6 +45,64 @@ public final class KNNVectorValuesFactory {
      */
     public static <T> KNNVectorValues<T> getVectorValues(final VectorDataType vectorDataType, final KnnVectorValues knnVectorValues) {
         return getVectorValues(vectorDataType, new KNNVectorValuesIterator.DocIdsIteratorValues(knnVectorValues));
+    }
+
+    /**
+         * Returns a {@link KNNVectorValues} for the given {@link FieldInfo} and {@link LeafReader}
+     *
+             * @param fieldInfo {@link FieldInfo}
+     * @param leafReader {@link LeafReader}
+     * @return {@link KNNVectorValues}
+     */
+    public static <T> KNNVectorValues<T> getVectorValues(final FieldInfo fieldInfo, final SegmentReader leafReader) throws IOException {
+        return getVectorValues(fieldInfo, leafReader, false);
+    }
+
+    /**
+     * Returns a {@link KNNVectorValues} for the given {@link FieldInfo} and {@link LeafReader}.
+     * When shouldRetrieveQuantizedVectors is true, retrieves quantized byte vectors for FLOAT32 encoded fields.
+     *
+     * @param fieldInfo {@link FieldInfo}
+     * @param leafReader {@link LeafReader}
+     * @param shouldRetrieveQuantizedVectors if true, retrieves quantized byte vectors for FLOAT32 fields
+     * @return {@link KNNVectorValues}
+     * @throws IOException if an I/O error occurs
+     */
+    public static <T> KNNVectorValues<T> getVectorValues(
+        final FieldInfo fieldInfo,
+        final SegmentReader leafReader,
+        boolean shouldRetrieveQuantizedVectors
+    ) throws IOException {
+        if (!fieldInfo.hasVectorValues()) {
+            final DocIdSetIterator docIdSetIterator = DocValues.getBinary(leafReader, fieldInfo.getName());
+            final KNNVectorValuesIterator vectorValuesIterator = new KNNVectorValuesIterator.DocIdsIteratorValues(docIdSetIterator);
+            return getVectorValues(FieldInfoExtractor.extractVectorDataType(fieldInfo), vectorValuesIterator);
+        }
+        if (fieldInfo.getVectorEncoding() == VectorEncoding.BYTE) {
+            return getVectorValues(
+                FieldInfoExtractor.extractVectorDataType(fieldInfo),
+                new KNNVectorValuesIterator.DocIdsIteratorValues(leafReader.getByteVectorValues(fieldInfo.getName()))
+            );
+        } else if (fieldInfo.getVectorEncoding() == VectorEncoding.FLOAT32) {
+            final FloatVectorValues floatVectorValues = leafReader.getFloatVectorValues(fieldInfo.getName());
+            // Quantized search path: retrieve quantized byte vectors from codec.
+            if (shouldRetrieveQuantizedVectors) {
+                // Bypasses leafReader.getByteVectorValues() which enforces BYTE encoding check.
+                // This will call getByteVectorValues from NativeEngines990KnnVectorsReader at the end.
+                final ByteVectorValues byteVectorValues = leafReader.getVectorReader().getByteVectorValues(fieldInfo.getName());
+                return getVectorValues(
+                    VectorDataType.BINARY,  // retrieve binary data from reader
+                    new KNNVectorValuesIterator.DocIdsIteratorValues(floatVectorValues.iterator(), byteVectorValues)
+                );
+            }
+            return getVectorValues(
+                FieldInfoExtractor.extractVectorDataType(fieldInfo),
+                new KNNVectorValuesIterator.DocIdsIteratorValues(floatVectorValues)
+            );
+
+        } else {
+            throw new IllegalArgumentException("Invalid Vector encoding provided, hence cannot return VectorValues");
+        }
     }
 
     /**
