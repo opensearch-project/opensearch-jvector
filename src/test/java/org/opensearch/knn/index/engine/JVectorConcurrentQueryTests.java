@@ -168,20 +168,41 @@ public class JVectorConcurrentQueryTests extends OpenSearchIntegTestCase {
         // Verify result count
         assertEquals("Number of results doesn't match", expectedResults.size(), actualResults.size());
 
+        String threadName = Thread.currentThread().getName();
+
         // Verify each result's distance
         for (int i = 0; i < actualResults.size(); i++) {
             KNNResult actual = actualResults.get(i);
+            KNNResult expected = expectedResults.get(i);
+            float actualDist = TestUtils.computeDistFromSpaceType(SPACE_TYPE, actual.getVector(), queryVector);
+            float expectedDist = TestUtils.computeDistFromSpaceType(SPACE_TYPE, expected.getVector(), queryVector);
 
-            // Calculate actual distance
-            float[] actualVector = actual.getVector();
-            float actualDistance = TestUtils.computeDistFromSpaceType(SPACE_TYPE, actualVector, queryVector);
+            logger.info(
+                "[{}] pos={} actual(doc={}, score={}, dist={}) expected(doc={}, score={}, dist={})",
+                threadName,
+                i,
+                actual.getDocId(),
+                actual.getScore(),
+                actualDist,
+                expected.getDocId(),
+                expected.getScore(),
+                expectedDist
+            );
 
-            // Calculate expected distance
-            float[] expectedVector = expectedResults.get(i).getVector();
-            float expectedDistance = TestUtils.computeDistFromSpaceType(SPACE_TYPE, expectedVector, queryVector);
-
-            // Allow for minor floating point differences
-            assertEquals("Distance mismatch at position " + i, expectedDistance, actualDistance, 0.02);
+            assertEquals(
+                String.format(
+                    "[%s] Distance mismatch at position %d: actual(doc=%s, dist=%.7f) expected(doc=%s, dist=%.7f)",
+                    threadName,
+                    i,
+                    actual.getDocId(),
+                    actualDist,
+                    expected.getDocId(),
+                    expectedDist
+                ),
+                (double) expectedDist,
+                (double) actualDist,
+                0.02
+            );
         }
     }
 
