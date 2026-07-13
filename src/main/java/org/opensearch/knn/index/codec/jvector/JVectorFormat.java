@@ -16,7 +16,6 @@ import org.opensearch.knn.common.KNNConstants;
 import java.io.IOException;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinWorkerThread;
-import java.util.function.Function;
 
 @Log4j2
 public class JVectorFormat extends KnnVectorsFormat {
@@ -30,7 +29,8 @@ public class JVectorFormat extends KnnVectorsFormat {
     public static final String NEIGHBORS_SCORE_CACHE_EXTENSION = "neighbors-score-cache-" + JVECTOR_FILES_SUFFIX;
 
     public static final int VERSION_START = 0;
-    public static final int VERSION_CURRENT = VERSION_START;
+    public static final int VERSION_WITH_QUANTIZATION_TYPE = 1;
+    public static final int VERSION_CURRENT = VERSION_WITH_QUANTIZATION_TYPE;
     public static final int DEFAULT_MAX_CONN = 32;
     public static final int DEFAULT_BEAM_WIDTH = 100;
     // Unfortunately, this can't be managed yet by the OpenSearch ThreadPool because it's not supporting {@link ForkJoinPool} types
@@ -40,7 +40,7 @@ public class JVectorFormat extends KnnVectorsFormat {
 
     private final int maxConn;
     private final int beamWidth;
-    private final Function<Integer, Integer> numberOfSubspacesPerVectorSupplier; // as a function of the original dimension
+    private final JVectorIndexQuantization quantization;
     private final int minBatchSizeForQuantization;
     private final float alpha;
     private final float neighborOverflow;
@@ -57,7 +57,7 @@ public class JVectorFormat extends KnnVectorsFormat {
             DEFAULT_BEAM_WIDTH,
             KNNConstants.DEFAULT_NEIGHBOR_OVERFLOW_VALUE.floatValue(),
             KNNConstants.DEFAULT_ALPHA_VALUE.floatValue(),
-            JVectorFormat::getDefaultNumberOfSubspacesPerVector,
+            new JVectorIndexQuantization.PQ(),
             KNNConstants.DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION,
             KNNConstants.DEFAULT_HIERARCHY_ENABLED,
             KNNConstants.DEFAULT_LEADING_SEGMENT_MERGE_DISABLED,
@@ -78,7 +78,7 @@ public class JVectorFormat extends KnnVectorsFormat {
             DEFAULT_BEAM_WIDTH,
             KNNConstants.DEFAULT_NEIGHBOR_OVERFLOW_VALUE.floatValue(),
             KNNConstants.DEFAULT_ALPHA_VALUE.floatValue(),
-            JVectorFormat::getDefaultNumberOfSubspacesPerVector,
+            new JVectorIndexQuantization.PQ(),
             minBatchSizeForQuantization,
             KNNConstants.DEFAULT_HIERARCHY_ENABLED,
             leadingSegmentMergeDisabled,
@@ -101,7 +101,7 @@ public class JVectorFormat extends KnnVectorsFormat {
             DEFAULT_BEAM_WIDTH,
             KNNConstants.DEFAULT_NEIGHBOR_OVERFLOW_VALUE.floatValue(),
             KNNConstants.DEFAULT_ALPHA_VALUE.floatValue(),
-            JVectorFormat::getDefaultNumberOfSubspacesPerVector,
+            new JVectorIndexQuantization.PQ(),
             minBatchSizeForQuantization,
             KNNConstants.DEFAULT_HIERARCHY_ENABLED,
             leadingSegmentMergeDisabled,
@@ -116,7 +116,7 @@ public class JVectorFormat extends KnnVectorsFormat {
         int beamWidth,
         float neighborOverflow,
         float alpha,
-        Function<Integer, Integer> numberOfSubspacesPerVectorSupplier,
+        JVectorIndexQuantization quantization,
         int minBatchSizeForQuantization,
         boolean hierarchyEnabled,
         boolean leadingSegmentMergeDisabled
@@ -127,7 +127,7 @@ public class JVectorFormat extends KnnVectorsFormat {
             beamWidth,
             neighborOverflow,
             alpha,
-            numberOfSubspacesPerVectorSupplier,
+            quantization,
             minBatchSizeForQuantization,
             hierarchyEnabled,
             leadingSegmentMergeDisabled,
@@ -143,7 +143,7 @@ public class JVectorFormat extends KnnVectorsFormat {
         int beamWidth,
         float neighborOverflow,
         float alpha,
-        Function<Integer, Integer> numberOfSubspacesPerVectorSupplier,
+        JVectorIndexQuantization quantization,
         int minBatchSizeForQuantization,
         boolean hierarchyEnabled,
         boolean leadingSegmentMergeDisabled,
@@ -154,7 +154,7 @@ public class JVectorFormat extends KnnVectorsFormat {
         super(name);
         this.maxConn = maxConn;
         this.beamWidth = beamWidth;
-        this.numberOfSubspacesPerVectorSupplier = numberOfSubspacesPerVectorSupplier;
+        this.quantization = quantization;
         this.minBatchSizeForQuantization = minBatchSizeForQuantization;
         this.alpha = alpha;
         this.neighborOverflow = neighborOverflow;
@@ -173,7 +173,7 @@ public class JVectorFormat extends KnnVectorsFormat {
             beamWidth,
             neighborOverflow,
             alpha,
-            numberOfSubspacesPerVectorSupplier,
+            quantization,
             minBatchSizeForQuantization,
             hierarchyEnabled,
             leadingSegmentMergeDisabled,
@@ -192,46 +192,6 @@ public class JVectorFormat extends KnnVectorsFormat {
     public int getMaxDimensions(String s) {
         // Not a hard limit, but a reasonable default
         return 8192;
-    }
-
-    /**
-     * This method returns the default number of subspaces per vector for a given original dimension.
-     * Should be used as a default value for the number of subspaces per vector in case no value is provided.
-     *
-     * @param originalDimension original vector dimension
-     * @return default number of subspaces per vector
-     */
-    public static int getDefaultNumberOfSubspacesPerVector(int originalDimension) {
-        // the idea here is that higher dimensions compress well, but not so well that we should use fewer bits
-        // than a lower-dimension vector, which is what you could get with cutoff points to switch between (e.g.)
-        // D*0.5 and D*0.25. Thus, the following ensures that bytes per vector is strictly increasing with D.
-        int compressedBytes;
-        if (originalDimension <= 32) {
-            // We are compressing from 4-byte floats to single-byte codebook indexes,
-            // so this represents compression of 4x
-            // * GloVe-25 needs 25 BPV to achieve good recall
-            compressedBytes = originalDimension;
-        } else if (originalDimension <= 64) {
-            // * GloVe-50 performs fine at 25
-            compressedBytes = 32;
-        } else if (originalDimension <= 200) {
-            // * GloVe-100 and -200 perform well at 50 and 100 BPV, respectively
-            compressedBytes = (int) (originalDimension * 0.5);
-        } else if (originalDimension <= 400) {
-            // * NYTimes-256 actually performs fine at 64 BPV but we'll be conservative
-            // since we don't want BPV to decrease
-            compressedBytes = 100;
-        } else if (originalDimension <= 768) {
-            // allow BPV to increase linearly up to 192
-            compressedBytes = (int) (originalDimension * 0.25);
-        } else if (originalDimension <= 1536) {
-            // * ada002 vectors have good recall even at 192 BPV = compression of 32x
-            compressedBytes = 192;
-        } else {
-            // We have not tested recall with larger vectors than this, let's let it increase linearly
-            compressedBytes = (int) (originalDimension * 0.125);
-        }
-        return compressedBytes;
     }
 
     public static ForkJoinPool getPhysicalCoreExecutor() {
