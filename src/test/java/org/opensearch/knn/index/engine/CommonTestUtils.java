@@ -31,6 +31,7 @@ import org.opensearch.knn.index.SpaceType;
 import org.opensearch.knn.index.VectorDataType;
 import org.opensearch.knn.index.codec.KNNCodecVersion;
 import org.opensearch.knn.index.codec.jvector.JVectorFormat;
+import org.opensearch.knn.index.codec.jvector.JVectorIndexQuantization;
 import org.opensearch.knn.index.query.KNNQueryBuilder;
 import org.opensearch.knn.plugin.JVectorKNNPlugin;
 
@@ -145,27 +146,7 @@ public class CommonTestUtils {
     }
 
     public static Codec getCodec(int minBatchSizeForQuantization, boolean leadingSegmentMergeDisabled, boolean hierarchical) {
-        return new FilterCodec(KNNCodecVersion.V_10_04_0.getCodecName(), new Lucene104Codec()) {
-            @Override
-            public KnnVectorsFormat knnVectorsFormat() {
-                return new PerFieldKnnVectorsFormat() {
-
-                    @Override
-                    public KnnVectorsFormat getKnnVectorsFormatForField(String field) {
-                        return new JVectorFormat(
-                            JVectorFormat.DEFAULT_MAX_CONN,
-                            JVectorFormat.DEFAULT_BEAM_WIDTH,
-                            KNNConstants.DEFAULT_NEIGHBOR_OVERFLOW_VALUE.floatValue(),
-                            KNNConstants.DEFAULT_ALPHA_VALUE.floatValue(),
-                            JVectorFormat::getDefaultNumberOfSubspacesPerVector,
-                            minBatchSizeForQuantization,
-                            hierarchical,
-                            leadingSegmentMergeDisabled
-                        );
-                    }
-                };
-            }
-        };
+        return getCodec(minBatchSizeForQuantization, leadingSegmentMergeDisabled, hierarchical, null, new JVectorIndexQuantization.PQ());
     }
 
     public static Codec getCodec(
@@ -174,14 +155,57 @@ public class CommonTestUtils {
         boolean hierarchical,
         ForkJoinPool graphMergePool
     ) {
+        return getCodec(
+            minBatchSizeForQuantization,
+            leadingSegmentMergeDisabled,
+            hierarchical,
+            graphMergePool,
+            new JVectorIndexQuantization.PQ()
+        );
+    }
+
+    public static Codec getCodec(
+        int minBatchSizeForQuantization,
+        boolean leadingSegmentMergeDisabled,
+        ForkJoinPool graphMergePool,
+        JVectorIndexQuantization quantization
+    ) {
+        return getCodec(minBatchSizeForQuantization, leadingSegmentMergeDisabled, DEFAULT_HIERARCHY_ENABLED, graphMergePool, quantization);
+    }
+
+    public static Codec getCodec(
+        int minBatchSizeForQuantization,
+        boolean leadingSegmentMergeDisabled,
+        boolean hierarchical,
+        ForkJoinPool graphMergePool,
+        JVectorIndexQuantization quantization
+    ) {
         if (graphMergePool == null) {
-            return getCodec(minBatchSizeForQuantization, leadingSegmentMergeDisabled, hierarchical);
+            return new FilterCodec(KNNCodecVersion.V_10_04_0.getCodecName(), new Lucene104Codec()) {
+                @Override
+                public KnnVectorsFormat knnVectorsFormat() {
+                    return new PerFieldKnnVectorsFormat() {
+                        @Override
+                        public KnnVectorsFormat getKnnVectorsFormatForField(String field) {
+                            return new JVectorFormat(
+                                JVectorFormat.DEFAULT_MAX_CONN,
+                                JVectorFormat.DEFAULT_BEAM_WIDTH,
+                                KNNConstants.DEFAULT_NEIGHBOR_OVERFLOW_VALUE.floatValue(),
+                                KNNConstants.DEFAULT_ALPHA_VALUE.floatValue(),
+                                quantization,
+                                minBatchSizeForQuantization,
+                                hierarchical,
+                                leadingSegmentMergeDisabled
+                            );
+                        }
+                    };
+                }
+            };
         } else {
             return new FilterCodec(KNNCodecVersion.V_10_04_0.getCodecName(), new Lucene104Codec()) {
                 @Override
                 public KnnVectorsFormat knnVectorsFormat() {
                     return new PerFieldKnnVectorsFormat() {
-
                         @Override
                         public KnnVectorsFormat getKnnVectorsFormatForField(String field) {
                             return new JVectorFormat(
@@ -190,7 +214,7 @@ public class CommonTestUtils {
                                 JVectorFormat.DEFAULT_BEAM_WIDTH,
                                 KNNConstants.DEFAULT_NEIGHBOR_OVERFLOW_VALUE.floatValue(),
                                 KNNConstants.DEFAULT_ALPHA_VALUE.floatValue(),
-                                JVectorFormat::getDefaultNumberOfSubspacesPerVector,
+                                quantization,
                                 minBatchSizeForQuantization,
                                 hierarchical,
                                 leadingSegmentMergeDisabled,
