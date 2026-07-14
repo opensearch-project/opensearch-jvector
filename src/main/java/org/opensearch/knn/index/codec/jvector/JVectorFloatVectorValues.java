@@ -17,7 +17,7 @@ import org.apache.lucene.search.VectorScorer;
 
 public class JVectorFloatVectorValues extends FloatVectorValues {
     public static final int NO_VECTOR = -1;
-    private static final VectorTypeSupport VECTOR_TYPE_SUPPORT = VectorizationProvider.getInstance().getVectorTypeSupport();
+    static final VectorTypeSupport VECTOR_TYPE_SUPPORT = VectorizationProvider.getInstance().getVectorTypeSupport();
 
     private final OnDiskGraphIndex.View view;
     private final VectorSimilarityFunction similarityFunction;
@@ -25,6 +25,7 @@ public class JVectorFloatVectorValues extends FloatVectorValues {
     private final int dimension;
     private final int size;
     private final GraphNodeIdToDocMap graphNodeIdToDocMap;
+    private final JVectorIndexQuantization quantization;
 
     public JVectorFloatVectorValues(
         OnDiskGraphIndex onDiskGraphIndex,
@@ -32,12 +33,23 @@ public class JVectorFloatVectorValues extends FloatVectorValues {
         org.apache.lucene.index.VectorSimilarityFunction luceneSimilarityFunction,
         GraphNodeIdToDocMap graphNodeIdToDocMap
     ) throws IOException {
+        this(onDiskGraphIndex, similarityFunction, luceneSimilarityFunction, graphNodeIdToDocMap, new JVectorIndexQuantization.PQ());
+    }
+
+    protected JVectorFloatVectorValues(
+        OnDiskGraphIndex onDiskGraphIndex,
+        VectorSimilarityFunction similarityFunction,
+        org.apache.lucene.index.VectorSimilarityFunction luceneSimilarityFunction,
+        GraphNodeIdToDocMap graphNodeIdToDocMap,
+        JVectorIndexQuantization quantization
+    ) throws IOException {
         this.view = onDiskGraphIndex.getView();
         this.dimension = view.dimension();
         this.size = view.size();
         this.similarityFunction = similarityFunction;
         this.luceneSimilarityFunction = luceneSimilarityFunction;
         this.graphNodeIdToDocMap = graphNodeIdToDocMap;
+        this.quantization = quantization;
     }
 
     @Override
@@ -50,9 +62,8 @@ public class JVectorFloatVectorValues extends FloatVectorValues {
         return size;
     }
 
-    // This allows us to access the vector without copying it to float[]
     public VectorFloat<?> vectorFloatValue(int ord) {
-        return view.getVector(ord);
+        return quantization.vectorFloatValue(view, ord);
     }
 
     public DocIndexIterator iterator() {
