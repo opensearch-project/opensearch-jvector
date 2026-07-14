@@ -10,6 +10,8 @@ import io.github.jbellis.jvector.disk.ReaderSupplier;
 import lombok.extern.log4j.Log4j2;
 import org.apache.lucene.store.IndexInput;
 import org.apache.lucene.util.IOUtils;
+import org.apache.lucene.store.Directory;
+import org.apache.lucene.store.IOContext;
 
 import java.io.EOFException;
 import java.io.IOException;
@@ -20,10 +22,16 @@ import java.nio.FloatBuffer;
 public class JVectorRandomAccessReader implements RandomAccessReader {
     private final byte[] internalBuffer = new byte[Long.BYTES];
     private final IndexInput indexInputDelegate;
+    private final boolean ownsDelegate;
     private volatile boolean closed = false;
 
     public JVectorRandomAccessReader(IndexInput indexInputDelegate) {
+        this(indexInputDelegate, false);
+    }
+
+    public JVectorRandomAccessReader(IndexInput indexInputDelegate, boolean ownsDelegate) {
         this.indexInputDelegate = indexInputDelegate;
+        this.ownsDelegate = ownsDelegate;
     }
 
     @Override
@@ -112,7 +120,13 @@ public class JVectorRandomAccessReader implements RandomAccessReader {
         }
         log.debug("Closing JVectorRandomAccessReader for file: {}", indexInputDelegate);
         this.closed = true;
-        // no need to really close the index input delegate since it is a clone
+
+        // Only close the delegate when this reader owns it.
+        // In other case, no need to really close the index input delegate since it is a clone
+        if (ownsDelegate) {
+            IOUtils.closeWhileHandlingException(indexInputDelegate);
+        }
+
         log.debug("Closed JVectorRandomAccessReader for file: {}", indexInputDelegate);
     }
 
@@ -155,6 +169,40 @@ public class JVectorRandomAccessReader implements RandomAccessReader {
         @Override
         public void close() throws IOException {
             IOUtils.closeWhileHandlingException(currentInput);
+        }
+    }
+
+    /**
+     * Supplies readers that can support concurrent usages.
+     * Every search request calls index.getView() which calls get().
+     * It opens a fresh IndexInput per get() call, giving each concurrent search
+     * its own independent file position cursor with no shared mutable state.
+     * The caller is responsible for closing each reader. Close method
+     * on this supplier is a no-op because no shared resource is held.
+     */
+    public static class IndependentSupplier implements ReaderSupplier {
+        private final Directory directory;
+        private final String fileName;
+        private final IOContext context;
+        private final long sliceLength;
+
+        public IndependentSupplier(Directory directory, String fileName, IOContext context, long sliceLength) {
+            this.directory = directory;
+            this.fileName = fileName;
+            this.context = context;
+            this.sliceLength = sliceLength;
+        }
+
+        @Override
+        public RandomAccessReader get() throws IOException {
+            final IndexInput input = directory.openInput(fileName, context).slice("jVector graph index slice", 0, sliceLength);
+            // Setting `ownsDelegate=true` this reader is only responsible for closing this IndexInputd
+            return new JVectorRandomAccessReader(input, true);
+        }
+
+        @Override
+        public void close() {
+            // Nothing to close — this supplier holds no shared resource.
         }
     }
 }

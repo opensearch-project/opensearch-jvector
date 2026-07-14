@@ -333,9 +333,10 @@ public class JVectorReader extends KnnVectorsReader {
                 state.segmentSuffix
             );
             // Load the graph index
-            this.indexReaderSupplier = new JVectorRandomAccessReader.Supplier(
-                directory.openInput(vectorIndexFieldDataFileName, state.context),
-                0,
+            this.indexReaderSupplier = new JVectorRandomAccessReader.IndependentSupplier(
+                directory,
+                vectorIndexFieldDataFileName,
+                state.context,
                 sliceLength
             );
             this.index = OnDiskGraphIndex.load(indexReaderSupplier, vectorIndexOffset);
