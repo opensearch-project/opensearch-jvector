@@ -917,6 +917,10 @@ public class JVectorWriter extends KnnVectorsWriter {
             // The merged segments ends up with no vectors (empty graph), nothing to merge there
             if (compactRavv.size() == 0) {
                 log.info("No vectors for field {} in segment {}", fieldName, mergeState.segmentInfo.name);
+                var bsp = BuildScoreProvider.randomAccessScoreProvider(compactRavv, getVectorSimilarityFunction(fieldInfo));
+                var graph = getGraph(bsp, compactRavv, fieldInfo, segmentWriteState.segmentInfo.name, simdPoolMerge);
+                graph.setAllMutationsCompleted();
+                writeField(fieldInfo, compactRavv, null, compactOrdToDocMap, graph);
                 return;
             }
 
