@@ -14,7 +14,6 @@ import org.apache.lucene.index.MergeState;
 import org.apache.lucene.index.SegmentInfo;
 import org.apache.lucene.index.StoredFieldDataInput;
 import org.apache.lucene.util.BytesRef;
-import org.opensearch.OpenSearchParseException;
 import org.opensearch.common.collect.Tuple;
 import org.opensearch.common.io.stream.BytesStreamOutput;
 import org.opensearch.common.xcontent.XContentHelper;
@@ -232,26 +231,21 @@ public class KNN10010DerivedSourceStoredFieldsWriter extends StoredFieldsWriter 
         // merge). This may be overly cautious and we can remove/optimize it in the future. For now, its a safety net.
         Tuple<? extends MediaType, Map<String, Object>> mapTuple;
         try {
+            // Use null for auto-detection so CBOR/SMILE sources are handled correctly.
+            // Passing a fixed MediaType (e.g. JSON) causes OpenSearchParseException when the
+            // source was serialized in a different format, and storing those raw bytes then
+            // breaks the read path. Auto-detection lets the parser match the actual format and
+            // only throws NotXContentException for truly non-XContent bytes.
             mapTuple = XContentHelper.convertToMap(
                 BytesReference.fromByteBuffer(ByteBuffer.wrap(bytesRef.bytes, bytesRef.offset, bytesRef.length)),
                 true,
-                MediaTypeRegistry.JSON
+                null
             );
         } catch (NotXContentException e) {
-            // If the content is not XContent, fall back to writing the raw bytes unmasked.
-            // Derived source can only mask vector fields after parsing XContent, so preserve
-            // non-XContent part in _source.
+            // Bytes are not any known XContent format (e.g. a plain error string). Fall back to
+            // writing the raw bytes unmasked so the _source is preserved rather than dropped.
             log.warn(
                 "Encountered NotXContent while deserializing _source field. Instead found String: [{}]",
-                new String(bytesRef.bytes, bytesRef.offset, Math.min(bytesRef.length, 512)),
-                e
-            );
-            delegate.writeField(fieldInfo, bytesRef);
-            return;
-        } catch (OpenSearchParseException e) {
-            // Catch any other parsing exceptions (e.g., OpenSearchParseException for invalid JSON)
-            log.warn(
-                "Failed to parse _source field as XContent. Instead found bytes: [{}]",
                 new String(bytesRef.bytes, bytesRef.offset, Math.min(bytesRef.length, 512)),
                 e
             );

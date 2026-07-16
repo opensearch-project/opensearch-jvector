@@ -143,10 +143,11 @@ public class DerivedSourceVectorTransformer {
         // Deserialize the source into a modifiable map
         Tuple<? extends MediaType, Map<String, Object>> mapTuple;
         try {
+            // Use null for auto-detection so CBOR/SMILE sources are handled correctly
             mapTuple = XContentHelper.convertToMap(
                 BytesReference.fromByteBuffer(ByteBuffer.wrap(sourceAsBytes)),
                 true,
-                MediaTypeRegistry.getDefaultMediaType()
+                null
             );
         } catch (NotXContentException e) {
             // Derived source can only mask vector fields after parsing XContent, so preserve
