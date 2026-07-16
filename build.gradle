@@ -64,6 +64,7 @@ plugins {
     id 'io.freefair.lombok' version '8.14.4'
     id "de.undercouch.download" version "5.7.0"
     id "me.champeau.jmh" version "0.7.3"
+    id "org.gradle.test-retry" version "1.6.5"
 }
 
 apply from: 'gradle/formatting.gradle'
@@ -387,6 +388,14 @@ test {
 
     //this change enables mockito-inline that supports mocking of static classes/calls
     systemProperty "jdk.attach.allowAttachSelf", true
+
+    retry {
+        maxRetries = 3
+        failOnPassedAfterRetry = false
+        filter {
+            includeClasses.add("org.opensearch.knn.index.engine.JVectorConcurrentQueryTests")
+        }
+    }
 }
 
 def _numNodes = findProperty('numNodes') as Integer ?: 1

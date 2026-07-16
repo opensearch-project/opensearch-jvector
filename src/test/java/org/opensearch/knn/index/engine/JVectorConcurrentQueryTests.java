@@ -177,18 +177,6 @@ public class JVectorConcurrentQueryTests extends OpenSearchIntegTestCase {
             float actualDist = TestUtils.computeDistFromSpaceType(SPACE_TYPE, actual.getVector(), queryVector);
             float expectedDist = TestUtils.computeDistFromSpaceType(SPACE_TYPE, expected.getVector(), queryVector);
 
-            logger.info(
-                "[{}] pos={} actual(doc={}, score={}, dist={}) expected(doc={}, score={}, dist={})",
-                threadName,
-                i,
-                actual.getDocId(),
-                actual.getScore(),
-                actualDist,
-                expected.getDocId(),
-                expected.getScore(),
-                expectedDist
-            );
-
             assertEquals(
                 String.format(
                     "[%s] Distance mismatch at position %d: actual(doc=%s, dist=%.7f) expected(doc=%s, dist=%.7f)",
