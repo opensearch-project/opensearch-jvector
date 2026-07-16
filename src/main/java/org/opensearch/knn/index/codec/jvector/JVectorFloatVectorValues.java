@@ -160,7 +160,7 @@ public class JVectorFloatVectorValues extends FloatVectorValues {
     public float[] vectorValue(int i) throws IOException {
         try {
             final VectorFloat<?> vector = vectorFloatValue(i);
-            return (float[]) vector.get();
+            return vector.toArray();
         } catch (Throwable e) {
             throw new RuntimeException(e);
         }
