@@ -238,13 +238,14 @@ public class KNN10010DerivedSourceStoredFieldsWriter extends StoredFieldsWriter 
                 MediaTypeRegistry.JSON
             );
         } catch (NotXContentException e) {
-            // If the content is not XContent, skip writing altogether. See:
+            // If the content is not XContent, fall back to writing the raw bytes unmasked. See:
             // https://github.com/opensearch-project/k-NN/issues/2880
             log.warn(
                 "Encountered NotXContent while deserializing _source field. Instead found String: [{}]",
-                new String(bytesRef.bytes, 0, Math.min(bytesRef.bytes.length, 512)),
+                new String(bytesRef.bytes, bytesRef.offset, Math.min(bytesRef.length, 512)),
                 e
             );
+            delegate.writeField(fieldInfo, bytesRef);
             return;
         } catch (OpenSearchParseException e) {
             // Catch any other parsing exceptions (e.g., OpenSearchParseException for invalid JSON)
@@ -253,6 +254,7 @@ public class KNN10010DerivedSourceStoredFieldsWriter extends StoredFieldsWriter 
                 new String(bytesRef.bytes, bytesRef.offset, Math.min(bytesRef.length, 512)),
                 e
             );
+            delegate.writeField(fieldInfo, bytesRef);
             return;
         }
         // Apply mask on vector fields in parsed source (idempotent - safe to apply even if already masked)
