@@ -149,6 +149,8 @@ public class DerivedSourceVectorTransformer {
                 MediaTypeRegistry.getDefaultMediaType()
             );
         } catch (NotXContentException e) {
+            // Derived source can only mask vector fields after parsing XContent, so preserve
+            // non-XContent part in _source.
             log.warn("Encountered NotXContent while deserializing _source for vector injection; returning source unchanged", e);
             return sourceAsBytes;
         }

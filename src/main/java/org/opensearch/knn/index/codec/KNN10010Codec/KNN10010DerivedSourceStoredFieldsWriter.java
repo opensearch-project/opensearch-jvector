@@ -238,8 +238,9 @@ public class KNN10010DerivedSourceStoredFieldsWriter extends StoredFieldsWriter 
                 MediaTypeRegistry.JSON
             );
         } catch (NotXContentException e) {
-            // If the content is not XContent, fall back to writing the raw bytes unmasked. See:
-            // https://github.com/opensearch-project/k-NN/issues/2880
+            // If the content is not XContent, fall back to writing the raw bytes unmasked.
+            // Derived source can only mask vector fields after parsing XContent, so preserve
+            // non-XContent part in _source.
             log.warn(
                 "Encountered NotXContent while deserializing _source field. Instead found String: [{}]",
                 new String(bytesRef.bytes, bytesRef.offset, Math.min(bytesRef.length, 512)),
