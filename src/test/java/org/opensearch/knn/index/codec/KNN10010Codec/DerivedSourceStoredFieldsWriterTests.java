@@ -18,7 +18,9 @@ import org.opensearch.knn.index.codec.KNNCodecTestUtil;
 import java.util.List;
 import java.util.Map;
 
+import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 public class DerivedSourceStoredFieldsWriterTests extends KNNTestCase {
 
@@ -42,5 +44,22 @@ public class DerivedSourceStoredFieldsWriterTests extends KNNTestCase {
         byte[] shiftedBytes = new byte[originalBytes.length + 2];
         System.arraycopy(originalBytes, 0, shiftedBytes, 1, originalBytes.length);
         derivedSourceStoredFieldsWriter.writeField(fieldInfo, new BytesRef(shiftedBytes, 1, originalBytes.length));
+        derivedSourceStoredFieldsWriter.close();
+    }
+
+    @SneakyThrows
+    public void testWriteFieldPreservesNonXContentSource() {
+        StoredFieldsWriter delegate = mock(StoredFieldsWriter.class);
+        FieldInfo fieldInfo = KNNCodecTestUtil.FieldInfoBuilder.builder("_source").build();
+        BytesRef rawSource = new BytesRef("filling gaps");
+        KNN10010DerivedSourceStoredFieldsWriter derivedSourceStoredFieldsWriter = new KNN10010DerivedSourceStoredFieldsWriter(
+            "mock-codec",
+            delegate,
+            List.of("my_vector")
+        );
+
+        derivedSourceStoredFieldsWriter.writeField(fieldInfo, rawSource);
+
+        verify(delegate).writeField(same(fieldInfo), same(rawSource));
     }
 }
