@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Features
 ### Enhancements
 ### Bug Fixes
+- Preserve non-XContent `_source` fields when derived source is enabled [623] (https://github.com/opensearch-project/opensearch-jvector/pull/623)
 ### Infrastructure
 ### Documentation
 ### Documentation
