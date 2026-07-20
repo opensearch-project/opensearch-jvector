@@ -15,6 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Fix dynamic template and mixed cases [538](https://github.com/opensearch-project/opensearch-jvector/pull/538)
 - Fix flaky testMixedBatchSizesForQuantization test case [564](https://github.com/opensearch-project/opensearch-jvector/pull/564)
 - Fix flaky testJVectorKnnIndex_simpleCase_maxInnerProduct test case [569](https://github.com/opensearch-project/opensearch-jvector/pull/569)
+- Preserve non-XContent `_source` fields when derived source is enabled [624] (https://github.com/opensearch-project/opensearch-jvector/pull/624)
 
 ### Infrastructure
 ### Documentation
