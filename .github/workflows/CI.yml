@@ -37,6 +37,7 @@ jobs:
     strategy:
       matrix:
         java: [21, 25]
+        provider: [non_native, native]
 
     env:
        CC: gcc10-gcc
@@ -71,23 +72,30 @@ jobs:
         run: |
           ulimit -n 65536
           chown -R 1000:1000 `pwd`
+          if [ "${{ matrix.provider }}" = "native" ]
+          then
+            OPENSEARCH_JAVA_OPTS="-Djvector.experimental.enable_native_vectorization=true"
+          else
+            OPENSEARCH_JAVA_OPTS="-Djvector.experimental.enable_native_vectorization=false"
+          fi
+          
           if lscpu  | grep -i avx512f | grep -i avx512cd | grep -i avx512vl | grep -i avx512dq | grep -i avx512bw          
           then
             if lscpu | grep -q "GenuineIntel" && lscpu | grep -i avx512_fp16 | grep -i avx512_bf16 | grep -i avx512_vpopcntdq
             then
               echo "the system is an Intel(R) Sapphire Rapids or a newer-generation processor"
-              su `id -un 1000` -c "whoami && java -version && ./gradlew build -Davx512_spr.enabled=true -Dnproc.count=`nproc`"
+              su `id -un 1000` -c "whoami && java -version && ./gradlew build -Davx512_spr.enabled=true -Dnproc.count=`nproc` $OPENSEARCH_JAVA_OPTS"
             else
               echo "avx512 available on system"
-              su `id -un 1000` -c "whoami && java -version && ./gradlew build -Davx512_spr.enabled=false -Dnproc.count=`nproc`"
+              su `id -un 1000` -c "whoami && java -version && ./gradlew build -Davx512_spr.enabled=false -Dnproc.count=`nproc` $OPENSEARCH_JAVA_OPTS"
             fi
           elif lscpu  | grep -i avx2
           then
             echo "avx2 available on system"
-            su `id -un 1000` -c "whoami && java -version && ./gradlew build -Davx512.enabled=false -Davx512_spr.enabled=false -Dnproc.count=`nproc`"
+            su `id -un 1000` -c "whoami && java -version && ./gradlew build -Davx512.enabled=false -Davx512_spr.enabled=false -Dnproc.count=`nproc` $OPENSEARCH_JAVA_OPTS"
           else
             echo "avx512 and avx2 not available on system"
-            su `id -un 1000` -c "whoami && java -version && ./gradlew build -Davx2.enabled=false -Davx512.enabled=false -Davx512_spr.enabled=false -Dnproc.count=`nproc`"
+            su `id -un 1000` -c "whoami && java -version && ./gradlew build -Davx2.enabled=false -Davx512.enabled=false -Davx512_spr.enabled=false -Dnproc.count=`nproc` $OPENSEARCH_JAVA_OPTS"
           fi
 
       - name: Upload Coverage Report
