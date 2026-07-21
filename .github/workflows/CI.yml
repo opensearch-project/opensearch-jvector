@@ -90,6 +90,14 @@ jobs:
             su `id -un 1000` -c "whoami && java -version && ./gradlew build -Davx2.enabled=false -Davx512.enabled=false -Davx512_spr.enabled=false -Dnproc.count=`nproc`"
           fi
 
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always()
+        with:
+          name: ${{ matrix.java }}-linux-reports
+          path: |
+            ./build/reports/
+            ./build/testclusters/*/logs
+
       - name: Upload Coverage Report
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
         with:
@@ -117,6 +125,14 @@ jobs:
       - name: Run build
         run: |
           ./gradlew build
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always()
+        with:
+          name: ${{ matrix.java }}-macos-reports
+          path: |
+            ./build/reports/
+            ./build/testclusters/*/logs
 
   Build-k-NN-Windows:
     strategy:
@@ -152,3 +168,11 @@ jobs:
       - name: Run build
         run: |
           ./gradlew.bat build
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always()
+        with:
+          name: ${{ matrix.java }}-windows-reports
+          path: |
+            ./build/reports/
+            ./build/testclusters/*/logs
