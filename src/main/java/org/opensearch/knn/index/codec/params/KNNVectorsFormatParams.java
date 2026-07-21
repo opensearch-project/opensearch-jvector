@@ -6,18 +6,17 @@
 package org.opensearch.knn.index.codec.params;
 
 import lombok.Getter;
-import lombok.extern.log4j.Log4j2;
 import org.opensearch.knn.common.KNNConstants;
 import org.opensearch.knn.index.SpaceType;
-import org.opensearch.knn.index.codec.jvector.JVectorIndexQuantization;
+import org.opensearch.knn.index.codec.jvector.JVectorFormat;
 
 import java.util.Map;
+import java.util.function.Function;
 
 /**
  * Class provides params for LuceneHNSWVectorsFormat
  */
 @Getter
-@Log4j2
 public class KNNVectorsFormatParams {
     private int maxConnections;
     private int beamWidth;
@@ -25,7 +24,7 @@ public class KNNVectorsFormatParams {
     private float neighborOverflow;
     private int minBatchSizeForQuantization;
     private boolean hierarchyEnabled;
-    private JVectorIndexQuantization quantization;
+    private Function<Integer, Integer> numberOfSubspacesPerVectorSupplier;
     private final SpaceType spaceType;
     private boolean leadingSegmentMergeDisabled;
 
@@ -58,9 +57,9 @@ public class KNNVectorsFormatParams {
         initNeighborOverflow(params, defaultNeighborOverflow);
         initMinBatchSizeForQuantization(params, defaultMinBatchSizeForQuantization);
         initHierarchyEnabled(params, defaultHierarchyEnabled);
+        initNumberOfSubspacesPerVectorSupplier(params);
         this.spaceType = spaceType;
         initLeadingSegmentMergeDisabled(params, KNNConstants.DEFAULT_LEADING_SEGMENT_MERGE_DISABLED);
-        initQuantization(params);
     }
 
     public boolean validate(final Map<String, Object> params) {
@@ -115,6 +114,15 @@ public class KNNVectorsFormatParams {
         this.hierarchyEnabled = defaultHierarchyEnabled;
     }
 
+    private void initNumberOfSubspacesPerVectorSupplier(final Map<String, Object> params) {
+        if (params != null && params.containsKey(KNNConstants.METHOD_PARAMETER_NUM_PQ_SUBSPACES)) {
+            int numPQSubspaces = (int) params.get(KNNConstants.METHOD_PARAMETER_NUM_PQ_SUBSPACES);
+            this.numberOfSubspacesPerVectorSupplier = (originalDimension) -> numPQSubspaces;
+            return;
+        }
+        this.numberOfSubspacesPerVectorSupplier = JVectorFormat::getDefaultNumberOfSubspacesPerVector;
+    }
+
     private void initLeadingSegmentMergeDisabled(final Map<String, Object> params, boolean defaultLsmDisabled) {
         if (params != null && params.containsKey(KNNConstants.METHOD_PARAMETER_LEADING_SEGMENT_MERGE_DISABLED)) {
             this.leadingSegmentMergeDisabled = (boolean) params.get(KNNConstants.METHOD_PARAMETER_LEADING_SEGMENT_MERGE_DISABLED);
@@ -122,30 +130,4 @@ public class KNNVectorsFormatParams {
         }
         this.leadingSegmentMergeDisabled = defaultLsmDisabled;
     }
-
-    private void initQuantization(final Map<String, Object> params) {
-        String type = (params != null && params.containsKey(KNNConstants.METHOD_PARAMETER_QUANTIZATION_TYPE))
-            ? (String) params.get(KNNConstants.METHOD_PARAMETER_QUANTIZATION_TYPE)
-            : KNNConstants.DEFAULT_QUANTIZATION_TYPE;
-
-        if (KNNConstants.QUANTIZATION_TYPE_NVQ.equals(type)) {
-            int numSubvectors = KNNConstants.DEFAULT_NUM_NVQ_SUBVECTORS;
-            if (params != null && params.containsKey(KNNConstants.METHOD_PARAMETER_NUM_NVQ_SUBVECTORS)) {
-                numSubvectors = (int) params.get(KNNConstants.METHOD_PARAMETER_NUM_NVQ_SUBVECTORS);
-                log.info("NVQ quantization: {} set to {}", KNNConstants.METHOD_PARAMETER_NUM_NVQ_SUBVECTORS, numSubvectors);
-            } else {
-                log.info("NVQ quantization: {} not set; defaulting to {}", KNNConstants.METHOD_PARAMETER_NUM_NVQ_SUBVECTORS, numSubvectors);
-                numSubvectors = JVectorIndexQuantization.NVQ.defaultNumSubvectors();
-            }
-            this.quantization = new JVectorIndexQuantization.NVQ(numSubvectors);
-        } else {
-            if (params != null && params.containsKey(KNNConstants.METHOD_PARAMETER_NUM_PQ_SUBSPACES)) {
-                int numSubspaces = (int) params.get(KNNConstants.METHOD_PARAMETER_NUM_PQ_SUBSPACES);
-                this.quantization = new JVectorIndexQuantization.PQ(numSubspaces);
-            } else {
-                this.quantization = new JVectorIndexQuantization.PQ();
-            }
-        }
-    }
-
 }

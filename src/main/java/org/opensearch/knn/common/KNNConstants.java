@@ -98,13 +98,6 @@ public class KNNConstants {
     public static final String METHOD_PARAMETER_MIN_BATCH_SIZE_FOR_QUANTIZATION = "advanced.min_batch_size_for_quantization";
     public static final String METHOD_PARAMETER_HIERARCHY_ENABLED = "advanced.hierarchy_enabled";
     public static final String METHOD_PARAMETER_NUM_PQ_SUBSPACES = "advanced.num_pq_subspaces";
-    public static final String METHOD_PARAMETER_QUANTIZATION_TYPE = "advanced.quantization_type";
-    public static final String METHOD_PARAMETER_NUM_NVQ_SUBVECTORS = "advanced.nvq.num_subvectors";
-    public static final String QUANTIZATION_TYPE_PQ = "pq";
-    // When NVQ is enabled, PQ blob is also used. There is no option to use NVQ without PQ presently.
-    public static final String QUANTIZATION_TYPE_NVQ = "nvq+pq";
-    public static final String DEFAULT_QUANTIZATION_TYPE = QUANTIZATION_TYPE_PQ;
-    public static final int DEFAULT_NUM_NVQ_SUBVECTORS = 2;
     public static final Double DEFAULT_ALPHA_VALUE = 1.2;
     public static final Double DEFAULT_NEIGHBOR_OVERFLOW_VALUE = 1.2;
     public static final int DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION = 1024; // above this batch size we will trigger quantization by
