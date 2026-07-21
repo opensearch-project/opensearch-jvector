@@ -2034,10 +2034,31 @@ public class KNNRestTestCase extends ODFERestTestCase {
     }
 
     protected void refreshIndex(final String index) throws IOException {
-        Request request = new Request("POST", "/" + index + "/_refresh");
+        try {
+            Request request = new Request("POST", "/" + index + "/_refresh");
+            Response response = client().performRequest(request);
+            assertEquals(request.getEndpoint() + ": failed", RestStatus.OK, RestStatus.fromCode(response.getStatusLine().getStatusCode()));
+        } catch (java.net.SocketTimeoutException ex) {
+            Request request = new Request("GET", "/_nodes/hot_threads");
+            request.addParameter("ignore_idle_threads", "false");
+            request.addParameter("threads", "200");
+            Response response = client().performRequest(request);
 
-        Response response = client().performRequest(request);
-        assertEquals(request.getEndpoint() + ": failed", RestStatus.OK, RestStatus.fromCode(response.getStatusLine().getStatusCode()));
+            try {
+                log.error(EntityUtils.toString(response.getEntity()));
+                assertEquals(
+                    request.getEndpoint() + ": failed",
+                    RestStatus.OK,
+                    RestStatus.fromCode(response.getStatusLine().getStatusCode())
+                );
+            } catch (ParseException e) {
+                final IOException exception = new IOException(e);
+                exception.addSuppressed(ex);
+                throw exception;
+            }
+
+            throw ex;
+        }
     }
 
     protected void flushIndex(final String index) throws IOException {
