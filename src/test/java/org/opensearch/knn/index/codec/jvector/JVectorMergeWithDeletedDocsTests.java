@@ -524,7 +524,7 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
 
     /**
      * Reproducer for https://github.com/opensearch-project/opensearch-jvector/issues/600
-     * Merge segment with empty graph, and segment with PQ codebooks. 
+     * Merge segment with empty graph, and segment with PQ codebooks.
      *
      * The test requires a single merge whose:
      *   - leading reader already has pre-existing PQ codebooks (so the refine() branch is taken), and
@@ -541,10 +541,10 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
         final Path mainIndexPath = createTempDir();
 
         // 1) Build an "empty graph" segment for TEST_FIELD in its own directory.
-        //    It has TEST_FIELD in its FieldInfos (a doc with a vector was added) but zero live vectors
-        //    (that doc is deleted). It is retained across the merge because it still has a live doc that
-        //    has no vector field. The resulting merged segment therefore has getFloatVectorValues(TEST_FIELD)
-        //    != null with size() == 0.
+        // It has TEST_FIELD in its FieldInfos (a doc with a vector was added) but zero live vectors
+        // (that doc is deleted). It is retained across the merge because it still has a live doc that
+        // has no vector field. The resulting merged segment therefore has getFloatVectorValues(TEST_FIELD)
+        // != null with size() == 0.
         try (
             FSDirectory emptyGraphDir = FSDirectory.open(emptyGraphIndexPath);
             IndexWriter emptyGraphWriter = newEmptyGraphWriter(emptyGraphDir, minBatch, hierarchical)
@@ -590,15 +590,15 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
             mainWriter.forceMerge(1);
 
             // 3) Pull in the empty-graph segment verbatim (no merge yet), so the main index now has two
-            //    pre-existing segments: the PQ-codebook one and the empty-graph one.
+            // pre-existing segments: the PQ-codebook one and the empty-graph one.
             try (FSDirectory emptyGraphDir = FSDirectory.open(emptyGraphIndexPath)) {
                 mainWriter.addIndexes(emptyGraphDir);
             }
             mainWriter.commit();
 
             // 4) Final merge: leading reader has PQ codebooks -> refine() branch, and the empty-graph
-            //    reader (size 0) is a non-leading reader. Before the fix this throws
-            //    ArrayIndexOutOfBoundsException from ProductQuantization.refine.
+            // reader (size 0) is a non-leading reader. Before the fix this throws
+            // ArrayIndexOutOfBoundsException from ProductQuantization.refine.
             mainWriter.forceMerge(1);
             mainWriter.commit();
         }

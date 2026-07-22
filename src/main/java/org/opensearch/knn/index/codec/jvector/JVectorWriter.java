@@ -1123,7 +1123,7 @@ public class JVectorWriter extends KnnVectorsWriter {
                         continue;
                     }
                     final FloatVectorValues values = readers[i].getFloatVectorValues(fieldName);
-                    // Skip calling refine on empty-graph segments (field present in FieldInfos but contain no vectors). 
+                    // Skip calling refine on empty-graph segments (field present in FieldInfos but contain no vectors).
                     if (values.size() == 0) {
                         continue;
                     }
