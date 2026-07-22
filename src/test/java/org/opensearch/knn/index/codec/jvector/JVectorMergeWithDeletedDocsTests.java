@@ -523,6 +523,111 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
     }
 
     /**
+     * Reproducer for https://github.com/opensearch-project/opensearch-jvector/issues/600
+     * Merge segment with empty graph, and segment with PQ codebooks. 
+     *
+     * The test requires a single merge whose:
+     *   - leading reader already has pre-existing PQ codebooks (so the refine() branch is taken), and
+     *   - a non-leading reader is an empty-graph segment (size() == 0) for the same field
+     */
+    @Test
+    public void testMergeRefineWithEmptyReaderReproducesIssue600() throws IOException {
+        final int dimension = 16;
+        // minBatch == 1 => PQ codebooks are always computed on merge
+        final int minBatch = 1;
+        final boolean hierarchical = random().nextBoolean();
+
+        final Path emptyGraphIndexPath = createTempDir();
+        final Path mainIndexPath = createTempDir();
+
+        // 1) Build an "empty graph" segment for TEST_FIELD in its own directory.
+        //    It has TEST_FIELD in its FieldInfos (a doc with a vector was added) but zero live vectors
+        //    (that doc is deleted). It is retained across the merge because it still has a live doc that
+        //    has no vector field. The resulting merged segment therefore has getFloatVectorValues(TEST_FIELD)
+        //    != null with size() == 0.
+        try (
+            FSDirectory emptyGraphDir = FSDirectory.open(emptyGraphIndexPath);
+            IndexWriter emptyGraphWriter = newEmptyGraphWriter(emptyGraphDir, minBatch, hierarchical)
+        ) {
+            // doc with a vector, will be deleted
+            Document vectorDoc = new Document();
+            float[] vector = new float[dimension];
+            Arrays.fill(vector, 0.42f);
+            vectorDoc.add(new KnnFloatVectorField(TEST_FIELD, vector, VectorSimilarityFunction.EUCLIDEAN));
+            vectorDoc.add(new StringField(TEST_ID_FIELD, "empty-vec", Field.Store.YES));
+            emptyGraphWriter.addDocument(vectorDoc);
+
+            // doc without a vector, keeps the segment alive after the delete below
+            Document noVectorDoc = new Document();
+            noVectorDoc.add(new StringField(TEST_ID_FIELD, "empty-keepalive", Field.Store.YES));
+            emptyGraphWriter.addDocument(noVectorDoc);
+            emptyGraphWriter.commit();
+
+            emptyGraphWriter.deleteDocuments(new Term(TEST_ID_FIELD, "empty-vec"));
+            emptyGraphWriter.commit();
+
+            // Merge into a single empty-graph segment for TEST_FIELD.
+            emptyGraphWriter.forceMerge(1);
+        }
+
+        // 2) Build the main index with a segment that has PQ codebooks for TEST_FIELD.
+        try (
+            FSDirectory mainDir = FSDirectory.open(mainIndexPath);
+            IndexWriter mainWriter = newEmptyGraphWriter(mainDir, minBatch, hierarchical)
+        ) {
+            final int numLeadingVectors = 64;
+            for (int i = 0; i < numLeadingVectors; i++) {
+                Document doc = new Document();
+                float[] vector = new float[dimension];
+                Arrays.fill(vector, (i + 1) * 0.01f);
+                doc.add(new KnnFloatVectorField(TEST_FIELD, vector, VectorSimilarityFunction.EUCLIDEAN));
+                doc.add(new StringField(TEST_ID_FIELD, "lead-" + i, Field.Store.YES));
+                mainWriter.addDocument(doc);
+            }
+            mainWriter.commit();
+
+            // Merge to produce the leading segment with pre-existing PQ codebooks.
+            mainWriter.forceMerge(1);
+
+            // 3) Pull in the empty-graph segment verbatim (no merge yet), so the main index now has two
+            //    pre-existing segments: the PQ-codebook one and the empty-graph one.
+            try (FSDirectory emptyGraphDir = FSDirectory.open(emptyGraphIndexPath)) {
+                mainWriter.addIndexes(emptyGraphDir);
+            }
+            mainWriter.commit();
+
+            // 4) Final merge: leading reader has PQ codebooks -> refine() branch, and the empty-graph
+            //    reader (size 0) is a non-leading reader. Before the fix this throws
+            //    ArrayIndexOutOfBoundsException from ProductQuantization.refine.
+            mainWriter.forceMerge(1);
+            mainWriter.commit();
+        }
+
+        // If we get here, the empty reader was handled gracefully during refine.
+        try (FSDirectory mainDir = FSDirectory.open(mainIndexPath); IndexReader reader = DirectoryReader.open(mainDir)) {
+            Assert.assertEquals("Should have 1 segment after final merge", 1, reader.getContext().leaves().size());
+            // 64 leading vector docs + 1 live keep-alive doc from the empty-graph segment.
+            Assert.assertEquals("Should have correct number of live docs", 65, reader.numDocs());
+
+            final float[] target = new float[dimension];
+            Arrays.fill(target, 0.1f);
+            final IndexSearcher searcher = newSearcher(reader);
+            JVectorKnnFloatVectorQuery query = getJVectorKnnFloatVectorQuery(TEST_FIELD, target, 10, new MatchAllDocsQuery());
+            TopDocs topDocs = searcher.search(query, 10);
+            Assert.assertEquals("Should return 10 results", 10, topDocs.totalHits.value());
+        }
+    }
+
+    private static IndexWriter newEmptyGraphWriter(FSDirectory dir, int minBatch, boolean hierarchical) throws IOException {
+        IndexWriterConfig config = newIndexWriterConfig();
+        config.setUseCompoundFile(false);
+        config.setCodec(getCodec(minBatch, hierarchical));
+        config.setMergePolicy(new ForceMergesOnlyMergePolicy());
+        config.setMergeScheduler(new SerialMergeScheduler());
+        return new IndexWriter(dir, config);
+    }
+
+    /**
      * Comprehensive test combining merges and deletes with documents that
      * have no vector fields populated.
      */
