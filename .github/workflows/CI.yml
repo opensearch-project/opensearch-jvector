@@ -33,26 +33,6 @@ jobs:
     with:
       product: opensearch
 
-  Detect-Native-Support:
-    runs-on: ubuntu-latest
-    outputs:
-      supports_native: ${{ steps.check.outputs.supports_native }}
-    steps:
-      - id: check
-        # Native provider (without Google Highway requires "avx512f", "avx512cd", "avx512dq", "avx512bw" and "avx512vl")
-        run: |
-          echo "hostname: $(hostname)"
-          echo "machine-id: $(cat /etc/machine-id)"
-          echo "runner name: $RUNNER_NAME"
-          echo "kernel/boot: $(cat /proc/sys/kernel/random/boot_id)"
-          if lscpu  | grep -i avx512f | grep -i avx512cd | grep -i avx512vl | grep -i avx512dq | grep -i avx512bw; then
-            echo "avx512 available on system"
-            echo "supports_native=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "avx512 not available on system"
-            echo "supports_native=false" >> "$GITHUB_OUTPUT"
-          fi
-
   Build-k-NN-Linux:
     strategy:
       matrix:
@@ -130,7 +110,7 @@ jobs:
 
     name: Build and Test jVector k-NN Plugin on Linux (Native)
     runs-on: ubuntu-latest
-    needs: [Get-CI-Image-Tag, Detect-Native-Support]
+    needs: Get-CI-Image-Tag
     container:
       # using the same image which is used by opensearch-build team to build the OpenSearch Distribution
       # this image tag is subject to change as more dependencies and updates will arrive over time
@@ -153,12 +133,8 @@ jobs:
       - name: Run build
         # switching the user, as OpenSearch cluster can only be started as root/Administrator on linux-deb/linux-rpm/windows-zip.
         run: |
-          echo "hostname: $(hostname)"
-          echo "machine-id: $(cat /etc/machine-id)"
-          echo "runner name: $RUNNER_NAME"
-          echo "kernel/boot: $(cat /proc/sys/kernel/random/boot_id)"
-          
           if lscpu  | grep -i avx512f | grep -i avx512cd | grep -i avx512vl | grep -i avx512dq | grep -i avx512bw; then
+            echo "avx512 available on system"
             ulimit -n 65536
             chown -R 1000:1000 `pwd`      
             su `id -un 1000` -c "whoami && java -version && ./gradlew build -Davx512_spr.enabled=true -Dnproc.count=`nproc` -Djvector.experimental.enable_native_vectorization=true"
