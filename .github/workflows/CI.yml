@@ -41,6 +41,10 @@ jobs:
       - id: check
         # Native provider (without Google Highway requires "avx512f", "avx512cd", "avx512dq", "avx512bw" and "avx512vl")
         run: |
+          echo "hostname: $(hostname)"
+          echo "machine-id: $(cat /etc/machine-id)"
+          echo "runner name: $RUNNER_NAME"
+          echo "kernel/boot: $(cat /proc/sys/kernel/random/boot_id)"
           if lscpu  | grep -i avx512f | grep -i avx512cd | grep -i avx512vl | grep -i avx512dq | grep -i avx512bw; then
             echo "avx512 available on system"
             echo "supports_native=true" >> "$GITHUB_OUTPUT"
@@ -150,9 +154,19 @@ jobs:
       - name: Run build
         # switching the user, as OpenSearch cluster can only be started as root/Administrator on linux-deb/linux-rpm/windows-zip.
         run: |
-          ulimit -n 65536
-          chown -R 1000:1000 `pwd`      
-          su `id -un 1000` -c "whoami && java -version && ./gradlew build -Davx512_spr.enabled=true -Dnproc.count=`nproc` -Djvector.experimental.enable_native_vectorization=true"
+          echo "hostname: $(hostname)"
+          echo "machine-id: $(cat /etc/machine-id)"
+          echo "runner name: $RUNNER_NAME"
+          echo "kernel/boot: $(cat /proc/sys/kernel/random/boot_id)"
+          
+          if lscpu  | grep -i avx512f | grep -i avx512cd | grep -i avx512vl | grep -i avx512dq | grep -i avx512bw; then
+            ulimit -n 65536
+            chown -R 1000:1000 `pwd`      
+            su `id -un 1000` -c "whoami && java -version && ./gradlew build -Davx512_spr.enabled=true -Dnproc.count=`nproc` -Djvector.experimental.enable_native_vectorization=true"
+          else
+            echo "avx512 not available on system"
+            exit 0
+          fi
 
       - name: Upload Coverage Report
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
