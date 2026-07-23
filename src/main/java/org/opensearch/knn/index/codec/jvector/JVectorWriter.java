@@ -1115,16 +1115,14 @@ public class JVectorWriter extends KnnVectorsWriter {
                 );
                 final long start = Clock.systemDefaultZone().millis();
                 ProductQuantization leadingCompressor = leadingReader.getProductQuantizationForField(fieldName).get();
-                // Refine the leadingCompressor with the remaining vectors in the merge, we skip the leading reader since it's already been
-                // used to create the leadingCompressor
-                // We assume the leading reader is ALWAYS the first one in the readers array
-                for (int i = LEADING_READER_IDX + 1; i < readers.length; i++) {
-                    if (readers[i] == null || readers[i].getFloatVectorValues(fieldName) == null) {
-                        continue;
-                    }
-                    final FloatVectorValues values = readers[i].getFloatVectorValues(fieldName);
-                    final RandomAccessVectorValues randomAccessVectorValues = new RandomAccessVectorValuesOverVectorValues(values);
-                    leadingCompressor.refine(randomAccessVectorValues);
+                // Refine the leadingCompressor with the FULL merged live set (compactRavv). refine() returns a NEW
+                // ProductQuantization fine-tuned only on the vectors in the RAVV it is given (seeded from the current
+                // codebooks).
+                //
+                // NOTE: refining once per non-leading reader and chaining the result overfits the codebooks to the
+                // last (often tiny) reader and collapses recall, so we refine a single time over all live vectors.
+                if (compactRavv.size() > 0) {
+                    leadingCompressor = leadingCompressor.refine(compactRavv);
                 }
                 final long end = Clock.systemDefaultZone().millis();
                 final long trainingTime = end - start;
