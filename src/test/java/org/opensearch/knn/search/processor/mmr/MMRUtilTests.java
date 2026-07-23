@@ -612,7 +612,7 @@ public class MMRUtilTests extends MMRTestCase {
         searchSourceBuilder.ext(Collections.singletonList(new MMRSearchExtBuilder.Builder().build()));
         searchRequest.source(searchSourceBuilder);
 
-        ProcessorGenerationContext ctx = new ProcessorGenerationContext(searchRequest);
+        ProcessorGenerationContext ctx = new ProcessorGenerationContext(searchRequest, null);
 
         assertTrue(MMRUtil.shouldGenerateMMRProcessor(ctx));
     }
@@ -620,7 +620,7 @@ public class MMRUtilTests extends MMRTestCase {
     public void testShouldGenerateMMRProcessor_whenNoExt_thenReturnFalse() {
         SearchRequest searchRequest = new SearchRequest();
 
-        ProcessorGenerationContext ctx = new ProcessorGenerationContext(searchRequest);
+        ProcessorGenerationContext ctx = new ProcessorGenerationContext(searchRequest, null);
 
         assertFalse(MMRUtil.shouldGenerateMMRProcessor(ctx));
     }
