@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Features
 - Add NVQ Quantization [#539](https://github.com/opensearch-project/opensearch-jvector/pull/539) 
 - Added capability to retrieve float, binary and byte data types vectors using doc_values [#538](https://github.com/opensearch-project/opensearch-jvector/pull/538)
+- Enable native vectorization provider [622](https://github.com/opensearch-project/opensearch-jvector/pull/622)
 
 ### Enhancements
 ### Bug Fixes
