@@ -131,7 +131,6 @@ jobs:
     name: Build and Test jVector k-NN Plugin on Linux (Native)
     runs-on: ubuntu-latest
     needs: [Get-CI-Image-Tag, Detect-Native-Support]
-    if: needs.Detect-Native-Support.outputs.supports_native == 'true'
     container:
       # using the same image which is used by opensearch-build team to build the OpenSearch Distribution
       # this image tag is subject to change as more dependencies and updates will arrive over time
