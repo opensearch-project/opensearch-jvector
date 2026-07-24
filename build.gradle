@@ -367,6 +367,9 @@ dependencies {
     zipArchive group: 'org.opensearch.plugin', name:'opensearch-custom-codecs', version: "${opensearch_build}"
 }
 
+var avx512_spr = System.getProperty("avx512_spr.enabled")
+var avx512 = System.getProperty("avx512.enabled")
+
 test {
     systemProperty 'tests.security.manager', 'false'
     systemProperty 'opensearch.set.netty.runtime.available.processors', 'false'
@@ -385,6 +388,9 @@ test {
             "-javaagent:${configurations.mockitoAgent.asPath}"
     ]
 
+    if ("true".equals(avx512_spr) || "true".equals(avx512)) {
+        jvmArgs += [ '-XX:UseAVX=2' /* only AVX2, disable AVX512 */ ]
+    }
 
     //this change enables mockito-inline that supports mocking of static classes/calls
     systemProperty "jdk.attach.allowAttachSelf", true
@@ -446,6 +452,10 @@ integTest {
                 '-Dio.netty.tryReflectionSetAccessible=true',
                 '--enable-preview'
         ]
+
+        if ("true".equals(avx512_spr) || "true".equals(avx512)) {
+            jvmArgs += [ '-XX:UseAVX=2' /* only AVX2, disable AVX512 */ ]
+        }
 
         // There seems to be an issue when running multi node run or integ tasks with unicast_hosts
         // not being written, the waitForAllConditions ensures it's written
