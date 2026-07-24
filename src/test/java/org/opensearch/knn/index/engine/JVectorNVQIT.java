@@ -406,9 +406,8 @@ public class JVectorNVQIT extends KNNRestTestCase {
                 RECALL_K
             );
 
-            // Storage
-            int nvqBytes = indexSizeInBytes(INDEX_NAME);
-            int pqBytes = indexSizeInBytes(pqIndex);
+            long nvqBytes = liveSegmentsSizeInBytes(INDEX_NAME);
+            long pqBytes = liveSegmentsSizeInBytes(pqIndex);
             double sizeRatio = (double) nvqBytes / pqBytes;
 
             logger.info(
