@@ -551,6 +551,13 @@ testClusters.integTest { cluster ->
             debugPort += 1
         }
     }
+
+    if ("true".equals(avx512_spr) || "true".equals(avx512)) {
+        nodes.forEach { node ->
+            node.jvmArgs("-XX:UseAVX=2" /* only AVX2, disable AVX512 */)
+        }
+    }
+
     systemProperty propertyKeys.breaker.useRealMemory, getBreakerSetting()
     systemProperty 'jdk.incubator.vector.VECTOR_ACCESS_OOB_CHECK', "0"
     setting 'path.repo', "${buildDir}/testSnapshotFolder"
