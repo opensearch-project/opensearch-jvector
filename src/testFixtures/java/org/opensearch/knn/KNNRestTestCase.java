@@ -1078,6 +1078,47 @@ public class KNNRestTestCase extends ODFERestTestCase {
         return sizeInBytes;
     }
 
+    /**
+     * Sums the on-disk size of the index's live primary-shard segments.
+     */
+    @SneakyThrows
+    @SuppressWarnings("unchecked")
+    protected long liveSegmentsSizeInBytes(String indexName) throws IOException {
+        Request request = new Request("GET", indexName + "/_segments");
+        Response response = client().performRequest(request);
+        assertEquals(RestStatus.OK, RestStatus.fromCode(response.getStatusLine().getStatusCode()));
+        String responseBody = EntityUtils.toString(response.getEntity());
+
+        Map<String, Object> root = createParser(MediaTypeRegistry.getDefaultMediaType().xContent(), responseBody).map();
+        Map<String, Object> indices = (Map<String, Object>) root.get("indices");
+
+        long totalBytes = 0L;
+        for (Object indexValue : indices.values()) {
+            Map<String, Object> shards = (Map<String, Object>) ((Map<String, Object>) indexValue).get("shards");
+            for (Object shardValue : shards.values()) {
+                // Each shard entry is a list of shard copies (primary + replicas); count primaries only.
+                for (Object shardCopy : (List<Object>) shardValue) {
+                    Map<String, Object> shardCopyMap = (Map<String, Object>) shardCopy;
+                    Map<String, Object> routing = (Map<String, Object>) shardCopyMap.get("routing");
+                    if (routing == null || !Boolean.TRUE.equals(routing.get("primary"))) {
+                        continue;
+                    }
+                    Map<String, Object> segments = (Map<String, Object>) shardCopyMap.get("segments");
+                    if (segments == null) {
+                        continue;
+                    }
+                    for (Object segment : segments.values()) {
+                        Number size = (Number) ((Map<String, Object>) segment).get("size_in_bytes");
+                        if (size != null) {
+                            totalBytes += size.longValue();
+                        }
+                    }
+                }
+            }
+        }
+        return totalBytes;
+    }
+
     @SneakyThrows
     protected void doKnnWarmup(List<String> indices) {
         Response response = knnWarmup(indices);
