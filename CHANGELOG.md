@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Enable native vectorization provider [622](https://github.com/opensearch-project/opensearch-jvector/pull/622)
 
 ### Enhancements
+- Implement resume() functionality to improve result quality for filtered searches ([#173](https://github.com/opensearch-project/opensearch-jvector/issues/173))
 ### Bug Fixes
 - Fix dynamic template and mixed cases [538](https://github.com/opensearch-project/opensearch-jvector/pull/538)
 - Fix flaky testMixedBatchSizesForQuantization test case [564](https://github.com/opensearch-project/opensearch-jvector/pull/564)

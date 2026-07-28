@@ -176,13 +176,45 @@ public class JVectorReader extends KnnVectorsReader {
                 for (SearchResult.NodeScore ns : searchResults.getNodes()) {
                     jvectorKnnCollector.collect(jvectorLuceneDocMap.getLuceneDocId(ns.node), ns.score);
                 }
+
+                // Resume search when filters are present to improve result quality
+                int resumeIterations = 0;
+                SearchResult lastResumeResults = searchResults;
+                final int maxResumeIterations = 3;
+                final int additionalK = jvectorKnnCollector.k() * jvectorKnnCollector.getOverQueryFactor();
+
+                if (acceptDocs != null && additionalK > 0) {
+                    while (resumeIterations < maxResumeIterations) {
+                        log.debug("Resume iteration {}: continuing search", resumeIterations + 1);
+
+                        lastResumeResults = graphSearcher.resume(additionalK, additionalK);
+
+                        int newResults = 0;
+                        for (SearchResult.NodeScore ns : lastResumeResults.getNodes()) {
+                            jvectorKnnCollector.collect(jvectorLuceneDocMap.getLuceneDocId(ns.node), ns.score);
+                            newResults++;
+                        }
+
+                        resumeIterations++;
+
+                        if (newResults == 0) {
+                            log.debug("Resume iteration {} found no new results, stopping", resumeIterations);
+                            break;
+                        }
+                    }
+
+                    if (resumeIterations > 0) {
+                        log.debug("Resume completed after {} iterations", resumeIterations);
+                    }
+                }
+
                 final long graphSearchEnd = System.currentTimeMillis();
                 final long searchTime = graphSearchEnd - graphSearchStart;
-                log.debug("Search (including acquiring view) took {} ms", searchTime);
+                log.debug("Search (including acquiring view and {} resume iterations) took {} ms", resumeIterations, searchTime);
 
                 // Collect the below metrics about the search and somehow wire this back to {@link @KNNStats}
-                final int visitedNodesCount = searchResults.getVisitedCount();
-                final int rerankedCount = searchResults.getRerankedCount();
+                final int visitedNodesCount = lastResumeResults.getVisitedCount();
+                final int rerankedCount = lastResumeResults.getRerankedCount();
 
                 final int expandedCount = searchResults.getExpandedCount();
                 final int expandedBaseLayerCount = searchResults.getExpandedCountBaseLayer();
@@ -193,7 +225,7 @@ public class JVectorReader extends KnnVectorsReader {
                 KNNCounter.KNN_QUERY_EXPANDED_BASE_LAYER_NODES.add(expandedBaseLayerCount);
                 KNNCounter.KNN_QUERY_GRAPH_SEARCH_TIME.add(searchTime);
                 log.debug(
-                    "rerankedCount: {}, visitedNodesCount: {}, expandedCount: {}, expandedBaseLayerCount: {}",
+                    "rerankedCount: {}, visitedNodesCount: {}, expandedCount: {}, expandedBaseLayerCount: {}, resumeIterations: {}",
                     rerankedCount,
                     visitedNodesCount,
                     expandedCount,
