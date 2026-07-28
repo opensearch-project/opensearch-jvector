@@ -7,8 +7,13 @@ package org.opensearch.knn.index.mapper;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
+
+import org.opensearch.Version;
 import org.opensearch.core.common.Strings;
+import org.opensearch.knn.index.engine.VectorSearchEngine;
 import org.opensearch.knn.index.query.rescore.RescoreContext;
+
+import com.google.common.annotations.VisibleForTesting;
 
 import java.util.Collections;
 import java.util.Locale;
@@ -90,6 +95,11 @@ public enum CompressionLevel {
         return compressionLevel != null && compressionLevel != NOT_CONFIGURED;
     }
 
+    @VisibleForTesting
+    RescoreContext getDefaultRescoreContext(Mode mode, int dimension) {
+        return getDefaultRescoreContext(mode, dimension, Version.CURRENT, false, false, null);
+    }
+
     /**
      * Returns the appropriate {@link RescoreContext} based on the given {@code mode} and {@code dimension}.
      *
@@ -109,8 +119,21 @@ public enum CompressionLevel {
      *                  or equal to 1000, the default {@link RescoreContext} if greater, or {@code null} if the mode
      *                  is invalid.
      */
-    public RescoreContext getDefaultRescoreContext(Mode mode, int dimension) {
+    public RescoreContext getDefaultRescoreContext(
+        Mode mode,
+        int dimension,
+        Version version,
+        boolean isFlatMethod,
+        boolean isSQOneBit,
+        VectorSearchEngine engine
+    ) {
         if (modesForRescore.contains(mode)) {
+            if (engine != null) {
+                final RescoreContext rescoreContext = engine.getRescoreContext(this, mode, dimension, version, isFlatMethod, isSQOneBit);
+                if (rescoreContext != null) {
+                    return rescoreContext;
+                }
+            }
             // Adjust RescoreContext based on dimension
             if (dimension <= RescoreContext.DIMENSION_THRESHOLD) {
                 // For dimensions <= 1000, return a RescoreContext with 5.0f oversample factor
