@@ -137,7 +137,7 @@ jobs:
             echo "avx512 available on system"
             ulimit -n 65536
             chown -R 1000:1000 `pwd`      
-            su `id -un 1000` -c "whoami && java -version && ./gradlew build -Davx512_spr.enabled=true -Dnproc.count=`nproc` -Djvector.experimental.enable_native_vectorization=true"
+            su `id -un 1000` -c "whoami && java -version && ./gradlew build -Davx512.enabled=true -Davx512_spr.enabled=true -Dnproc.count=`nproc` -Djvector.experimental.enable_native_vectorization=true"
           else
             echo "avx512 not available on system"
             exit 0
