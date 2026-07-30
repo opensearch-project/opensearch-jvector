@@ -377,6 +377,7 @@ test {
     systemProperty 'tests.security.manager', 'false'
     systemProperty 'opensearch.set.netty.runtime.available.processors', 'false'
     systemProperty 'log4j.configurationFile', "$rootDir/src/test/resources/log4j2.properties"
+    systemProperty 'jvector.experimental.enable_native_vectorization', getNativeVectorizationProviderFlag()
 
     // Enable preview features for Foreign Memory API
     jvmArgs = [
@@ -391,8 +392,11 @@ test {
             "-javaagent:${configurations.mockitoAgent.asPath}"
     ]
 
-    if ("true".equals(avx512_spr) || "true".equals(avx512)) {
-        jvmArgs += [ '-XX:UseAVX=2' /* only AVX2, disable AVX512 */ ]
+        // The current native vectorization provider in jvector relies on avx512 support 
+    if (getNativeVectorizationProviderFlag().equals('false')) {
+        if ("true".equals(avx512_spr) || "true".equals(avx512)) {
+            jvmArgs += [ '-XX:UseAVX=2' /* only AVX2, disable AVX512 */ ]
+        }
     }
 
     //this change enables mockito-inline that supports mocking of static classes/calls
@@ -457,8 +461,11 @@ integTest {
                 "-Djvector.experimental.enable_native_vectorization=${getNativeVectorizationProviderFlag()}"
         ]
 
-        if ("true".equals(avx512_spr) || "true".equals(avx512)) {
-            jvmArgs += [ '-XX:UseAVX=2' /* only AVX2, disable AVX512 */ ]
+        // The current native vectorization provider in jvector relies on avx512 support 
+        if (getNativeVectorizationProviderFlag().equals('false')) {
+            if ("true".equals(avx512_spr) || "true".equals(avx512)) {
+                jvmArgs += [ '-XX:UseAVX=2' /* only AVX2, disable AVX512 */ ]
+            }
         }
 
         // There seems to be an issue when running multi node run or integ tasks with unicast_hosts
@@ -552,9 +559,12 @@ testClusters.integTest { cluster ->
         }
     }
 
-    if ("true".equals(avx512_spr) || "true".equals(avx512)) {
-        nodes.forEach { node ->
-            node.jvmArgs("-XX:UseAVX=2" /* only AVX2, disable AVX512 */)
+    // The current native vectorization provider in jvector relies on avx512 support
+    if (getNativeVectorizationProviderFlag().equals('false')) {
+        if ("true".equals(avx512_spr) || "true".equals(avx512)) {
+            nodes.forEach { node ->
+                node.jvmArgs("-XX:UseAVX=2" /* only AVX2, disable AVX512 */)
+            }
         }
     }
 

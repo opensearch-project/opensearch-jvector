@@ -137,11 +137,19 @@ jobs:
             echo "avx512 available on system"
             ulimit -n 65536
             chown -R 1000:1000 `pwd`      
-            su `id -un 1000` -c "whoami && java -version && ./gradlew build -Davx512_spr.enabled=true -Dnproc.count=`nproc` -Djvector.experimental.enable_native_vectorization=true"
+            su `id -un 1000` -c "whoami && java -version && ./gradlew build -Davx512.enabled=true -Davx512_spr.enabled=true -Dnproc.count=`nproc` -Djvector.experimental.enable_native_vectorization=true"
           else
             echo "avx512 not available on system"
             exit 0
           fi
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always()
+        with:
+          name: ${{ matrix.java }}-linux-native-reports
+          path: |
+            ./build/reports/
+            ./build/testclusters/*/logs
 
       - name: Upload Coverage Report
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
