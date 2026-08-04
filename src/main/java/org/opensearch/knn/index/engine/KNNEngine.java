@@ -6,9 +6,14 @@
 package org.opensearch.knn.index.engine;
 
 import com.google.common.collect.ImmutableSet;
+
+import org.opensearch.Version;
 import org.opensearch.common.ValidationException;
 import org.opensearch.knn.index.SpaceType;
 import org.opensearch.knn.index.engine.lucene.Lucene;
+import org.opensearch.knn.index.mapper.CompressionLevel;
+import org.opensearch.knn.index.mapper.Mode;
+import org.opensearch.knn.index.query.rescore.RescoreContext;
 import org.opensearch.knn.index.codec.jvector.JVector;
 
 import java.util.Collections;
@@ -24,7 +29,7 @@ import static org.opensearch.knn.common.KNNConstants.JVECTOR_NAME;
  * KNNEngine provides the functionality to validate and transform user defined indices into information that can be
  * passed to the respective k-NN library's JNI layer.
  */
-public enum KNNEngine implements KNNLibrary {
+public enum KNNEngine implements KNNLibrary, VectorSearchEngine {
     LUCENE(LUCENE_NAME, Lucene.INSTANCE),
     JVECTOR(JVECTOR_NAME, JVector.INSTANCE);
 
@@ -189,5 +194,27 @@ public enum KNNEngine implements KNNLibrary {
         final SpaceType spaceType
     ) {
         return knnLibrary.resolveMethod(knnMethodContext, knnMethodConfigContext, shouldRequireTraining, spaceType);
+    }
+
+    @Override
+    public RescoreContext getRescoreContext(
+        CompressionLevel compression,
+        Mode mode,
+        int dimension,
+        Version version,
+        boolean isFlatMethod,
+        boolean isSQOneBit
+    ) {
+
+        // Special handling for Lucene Scalar Quantizer (x32 compression)
+        // Engine check is temporary until binary scalar quantizer is finalized for FAISS as well
+        if (compression == CompressionLevel.x32 && this == LUCENE && version.onOrAfter(Version.V_3_6_0)) {
+            return RescoreContext.builder()
+                .oversampleFactor(RescoreContext.OVERSAMPLE_FACTOR_DEFAULT_FOR_LUCENE_SCALAR_QUANTIZER_AFTER_V360)
+                .userProvided(false)
+                .build();
+        } else {
+            return null;
+        }
     }
 }

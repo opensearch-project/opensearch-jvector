@@ -105,7 +105,7 @@ jobs:
             ./gradlew :qa:restart-upgrade:testRestartUpgrade -Dtests.bwc.version=$BWC_VERSION_RESTART_UPGRADE -Dnproc.count=`nproc` -Davx512_spr.enabled=true
           else
             echo "avx512 available on system"
-            ./gradlew :qa:restart-upgrade:testRestartUpgrade -Dtests.bwc.version=$BWC_VERSION_RESTART_UPGRADE -Dnproc.count=`nproc` -Davx512_spr.enabled=false
+            ./gradlew :qa:restart-upgrade:testRestartUpgrade -Dtests.bwc.version=$BWC_VERSION_RESTART_UPGRADE -Dnproc.count=`nproc` -Davx512.enabled=true
           fi
           elif lscpu  | grep -i avx2
           then
