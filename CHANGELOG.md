@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Bug Fixes
 - Fix flaky testJVectorKnnIndex_filter_maxInnerProduct test case [681](https://github.com/opensearch-project/opensearch-jvector/pull/681)
+- Fix flaky testJVectorKnnIndex_simpleCase  test case [692](https://github.com/opensearch-project/opensearch-jvector/pull/692)
 
 ### Infrastructure
 ### Documentation
