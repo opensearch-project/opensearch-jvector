@@ -400,7 +400,7 @@ test {
                 jvmArgs += [ '-XX:UseAVX=2' /* only AVX2, disable AVX512 */ ]
             } else {
                 // See please https://bugs.openjdk.org/browse/JDK-8318562
-                jvmArgs += [ '-XX:UseAVX=0' /* disable AVX2 / AVX512 */ ]
+                jvmArgs += [ '-XX:UseAVX=1' /* disable AVX2 / AVX512 */ ]
             }
         }
     }
@@ -474,7 +474,7 @@ integTest {
                     jvmArgs += [ '-XX:UseAVX=2' /* only AVX2, disable AVX512 */ ]
                 } else {
                     // See please https://bugs.openjdk.org/browse/JDK-8318562
-                    jvmArgs += [ '-XX:UseAVX=0' /* disable AVX2 / AVX512 */ ]
+                    jvmArgs += [ '-XX:UseAVX=1' /* disable AVX2 / AVX512 */ ]
                 }
             }
         }
@@ -578,7 +578,7 @@ testClusters.integTest { cluster ->
                     node.jvmArgs("-XX:UseAVX=2" /* only AVX2, disable AVX512 */ )
                 } else {
                     // See please https://bugs.openjdk.org/browse/JDK-8318562
-                    node.jvmArgs("-XX:UseAVX=0" /* disable AVX2 / AVX512 */ )
+                    node.jvmArgs("-XX:UseAVX=1" /* disable AVX2 / AVX512 */ )
                 }
             }
         }
