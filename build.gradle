@@ -73,6 +73,7 @@ apply plugin: 'opensearch.rest-test'
 apply plugin: 'opensearch.pluginzip'
 apply plugin: 'opensearch.repositories'
 
+def runtimeJavaVersion = org.opensearch.gradle.info.BuildParams.getRuntimeJavaVersion();
 def opensearch_tmp_dir = rootProject.file('build/private/opensearch_tmp').absoluteFile
 opensearch_tmp_dir.mkdirs()
 
@@ -395,7 +396,12 @@ test {
         // The current native vectorization provider in jvector relies on avx512 support 
     if (getNativeVectorizationProviderFlag().equals('false')) {
         if ("true".equals(avx512_spr) || "true".equals(avx512)) {
-            jvmArgs += [ '-XX:UseAVX=2' /* only AVX2, disable AVX512 */ ]
+            if (runtimeJavaVersion > JavaVersion.VERSION_21) {
+                jvmArgs += [ '-XX:UseAVX=2' /* only AVX2, disable AVX512 */ ]
+            } else {
+                // See please https://bugs.openjdk.org/browse/JDK-8318562
+                jvmArgs += [ '-XX:UseAVX=0' /* disable AVX2 / AVX512 */ ]
+            }
         }
     }
 
@@ -464,7 +470,12 @@ integTest {
         // The current native vectorization provider in jvector relies on avx512 support 
         if (getNativeVectorizationProviderFlag().equals('false')) {
             if ("true".equals(avx512_spr) || "true".equals(avx512)) {
-                jvmArgs += [ '-XX:UseAVX=2' /* only AVX2, disable AVX512 */ ]
+                if (runtimeJavaVersion > JavaVersion.VERSION_21) {
+                    jvmArgs += [ '-XX:UseAVX=2' /* only AVX2, disable AVX512 */ ]
+                } else {
+                    // See please https://bugs.openjdk.org/browse/JDK-8318562
+                    jvmArgs += [ '-XX:UseAVX=0' /* disable AVX2 / AVX512 */ ]
+                }
             }
         }
 
@@ -563,7 +574,12 @@ testClusters.integTest { cluster ->
     if (getNativeVectorizationProviderFlag().equals('false')) {
         if ("true".equals(avx512_spr) || "true".equals(avx512)) {
             nodes.forEach { node ->
-                node.jvmArgs("-XX:UseAVX=2" /* only AVX2, disable AVX512 */)
+            if (runtimeJavaVersion > JavaVersion.VERSION_21) {
+                    node.jvmArgs("-XX:UseAVX=2" /* only AVX2, disable AVX512 */ )
+                } else {
+                    // See please https://bugs.openjdk.org/browse/JDK-8318562
+                    node.jvmArgs("-XX:UseAVX=0" /* disable AVX2 / AVX512 */ )
+                }
             }
         }
     }
