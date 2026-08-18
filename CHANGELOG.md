@@ -16,4 +16,5 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Documentation
 - Update release procedure [690](https://github.com/opensearch-project/opensearch-jvector/pull/690)
 ### Maintenance
+- Remove deprecated use_pruning features [670](https://github.com/opensearch-project/opensearch-jvector/pull/670)
 ### Refactoring

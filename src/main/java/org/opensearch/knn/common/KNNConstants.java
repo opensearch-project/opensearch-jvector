@@ -86,11 +86,9 @@ public class KNNConstants {
     public static final String METHOD_PARAMETER_OVERQUERY_FACTOR = "overquery_factor";
     public static final String METHOD_PARAMETER_THRESHOLD = "advanced.threshold";
     public static final String METHOD_PARAMETER_RERANK_FLOOR = "advanced.rerank_floor";
-    public static final String METHOD_PARAMETER_USE_PRUNING = "advanced.use_pruning"; // TODO: wire this after jvector upgrade
     public static final int DEFAULT_OVER_QUERY_FACTOR = 5; // We will query 5x more than topKFor reranking
     public static final Double DEFAULT_QUERY_SIMILARITY_THRESHOLD = 0.0;
     public static final Double DEFAULT_QUERY_RERANK_FLOOR = 0.0;
-    public static final Boolean DEFAULT_QUERY_USE_PRUNING = false; // TODO: wire this after jvector upgrade
 
     // Construction related params
     public static final String METHOD_PARAMETER_ALPHA = "advanced.alpha";

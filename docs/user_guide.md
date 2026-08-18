@@ -728,7 +728,6 @@ curl -X POST "http://localhost:9200/my-vectors/_search" \
 | `overquery_factor` | `5` | Internal candidate list = `k × overquery_factor`. Higher values improve recall at the cost of latency. |
 | `advanced.threshold` | `0.0` | Minimum similarity score for a candidate to enter the result set. |
 | `advanced.rerank_floor` | `0.0` | Minimum score for a candidate to be re-ranked with full-precision vectors. |
-| `advanced.use_pruning` | `false` | Enable graph traversal pruning to reduce nodes visited. |
 
 **Guidelines:**
 - Start with `overquery_factor=5` (default)
