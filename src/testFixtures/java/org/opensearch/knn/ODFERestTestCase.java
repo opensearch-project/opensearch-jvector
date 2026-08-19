@@ -58,6 +58,11 @@ public abstract class ODFERestTestCase extends OpenSearchRestTestCase {
     }
 
     @Override
+    protected Settings restClientSettings() {
+        return Settings.builder().put(super.restClientSettings()).put(CLIENT_SOCKET_TIMEOUT, "90s").build();
+    }
+
+    @Override
     protected RestClient buildClient(Settings settings, HttpHost[] hosts) throws IOException {
         RestClientBuilder builder = RestClient.builder(hosts);
         if (isHttps()) {
