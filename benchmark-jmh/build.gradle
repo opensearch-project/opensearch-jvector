@@ -97,7 +97,7 @@ dependencies {
     /*** End of transitive dependencies of awssdk ***/
 
 
-    implementation platform('com.kohlschutter.junixsocket:junixsocket-core:2.10.1')
+    implementation platform('com.kohlschutter.junixsocket:junixsocket-core:2.11.0')
 }
 
 jmh {
