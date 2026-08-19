@@ -55,3 +55,35 @@ git push origin <tag-name>
 5. Once the above release workflow is successful, it creates a GitHub issue requesting maintainers to manually publish the pre-release to release on GitHub.
 6. Bump [build.gradle](./build.gradle), update [release-notes](./release-notes/), and clean up entries from [CHANGELOG.md](./CHANGELOG.md) via a PR.
 
+## Current Release Process (as of Aug 2026)
+
+### 1. Cut release branch off `main` branch
+  - As per new rules, creating branch is not permitted even for maintainers. Please create an issue in [OS Github](https://github.com/opensearch-project/.github/issues) requesting for the release branch to be created.
+  - [Sample issue](https://github.com/opensearch-project/.github/issues/615)
+
+### 2. Increment version in `main`
+  - When opensearch-build begins release process, it auto creates PR to bump version in main branch. Merge this PR after step 1 is completed.
+  - [Sample PR](https://github.com/opensearch-project/opensearch-jvector/pull/672)
+
+### 3. Create release notes
+  - Move all the changes from `CHANGELOG.md` to `release-notes/opensearch-jvector.release-notes-<release_version>.md`
+  - Create and merge PR to the **`release branch`** created in step 1.
+  - [Sample PR](https://github.com/opensearch-project/opensearch-jvector/pull/683/changes)
+
+### 4. Create release tag
+  - Similar to branches, creating release tags is also no longer permitted.
+  - Create an issue [OS Github](https://github.com/opensearch-project/.github/issues) requesting for the tag to be created. Provide exact branch name, tag name, and commit SHA.
+  - [Sample request](https://github.com/opensearch-project/.github/issues/619)
+
+### 5. Approve the release issue
+  - Completion of step 4 auto-creates [this issue](https://github.com/opensearch-project/opensearch-jvector/issues/686)
+  - A maintainer must `approve/reject` it by commenting in the issue
+
+### 6. Publish release
+  - Completion of step 5 auto-creates [this issue](https://github.com/opensearch-project/opensearch-jvector/issues/687) along with a `pre-release`.
+  - Verify the pre-release and publish the release
+
+### Sanity Checks on Releases
+1. Verify release notes are appropriate
+2. Compare release sizes for sanity
+3. Download artifacts and verify version

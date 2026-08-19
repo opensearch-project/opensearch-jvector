@@ -94,7 +94,7 @@ public class KNNJVectorTests extends LuceneTestCase {
             try (IndexReader reader = DirectoryReader.open(w)) {
                 int expectedNumOfSegments = indexWriterConfig.getMaxBufferedDocs() < 0 ? 1
                     : totalNumberOfDocs > indexWriterConfig.getMaxBufferedDocs()
-                        ? totalNumberOfDocs / indexWriterConfig.getMaxBufferedDocs() + 1
+                        ? Math.ceilDiv(totalNumberOfDocs, indexWriterConfig.getMaxBufferedDocs())
                     : 1;
                 log.info("We should now have a {} segment(s) with 10 documents", expectedNumOfSegments);
                 Assert.assertEquals(expectedNumOfSegments, reader.getContext().leaves().size());
@@ -216,6 +216,7 @@ public class KNNJVectorTests extends LuceneTestCase {
         indexWriterConfig.setUseCompoundFile(false);
         indexWriterConfig.setCodec(getCodec(random().nextBoolean()));
         indexWriterConfig.setMergePolicy(new ForceMergesOnlyMergePolicy());
+        indexWriterConfig.setMaxBufferedDocs(totalNumberOfDocs);
         final Path indexPath = createTempDir();
         log.info("Index path: {}", indexPath);
         try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter w = new IndexWriter(dir, indexWriterConfig)) {
@@ -231,7 +232,8 @@ public class KNNJVectorTests extends LuceneTestCase {
             w.commit();
 
             try (IndexReader reader = DirectoryReader.open(w)) {
-                log.info("We should now have a single segment with 10 documents");
+                log.info("We should now have a single segment with {} documents", totalNumberOfDocs);
+
                 Assert.assertEquals(1, reader.getContext().leaves().size());
                 Assert.assertEquals(totalNumberOfDocs, reader.numDocs());
 

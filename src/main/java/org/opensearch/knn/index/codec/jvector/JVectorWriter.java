@@ -1115,21 +1115,8 @@ public class JVectorWriter extends KnnVectorsWriter {
                 );
                 final long start = Clock.systemDefaultZone().millis();
                 ProductQuantization leadingCompressor = leadingReader.getProductQuantizationForField(fieldName).get();
-                // Refine the leadingCompressor with the remaining vectors in the merge, we skip the leading reader since it's already been
-                // used to create the leadingCompressor
-                // We assume the leading reader is ALWAYS the first one in the readers array
-                for (int i = LEADING_READER_IDX + 1; i < readers.length; i++) {
-                    if (readers[i] == null || readers[i].getFloatVectorValues(fieldName) == null) {
-                        continue;
-                    }
-                    final FloatVectorValues values = readers[i].getFloatVectorValues(fieldName);
-                    // Skip calling refine on empty-graph segments (field present in FieldInfos but contain no vectors).
-                    if (values.size() == 0) {
-                        continue;
-                    }
-                    final RandomAccessVectorValues randomAccessVectorValues = new RandomAccessVectorValuesOverVectorValues(values);
-                    leadingCompressor.refine(randomAccessVectorValues);
-                }
+                // We are not refining PQ codes on merge presently.
+                // See https://github.com/opensearch-project/opensearch-jvector/issues/661
                 final long end = Clock.systemDefaultZone().millis();
                 final long trainingTime = end - start;
                 log.info("Refined PQ codebooks for field {}, in {} millis", fieldName, trainingTime);
