@@ -1,0 +1,1173 @@
+
+> Configure project :
+Project root directory: /Users/zhujiaxi/amazonworks/sourcecodes/peterzhuamazon/opensearch-jvector
+The number of nodes is: 1
+=======================================
+OpenSearch Build Hamster says Hello!
+  Gradle Version        : 8.14.3
+  OS Info               : Mac OS X 15.7.1 (aarch64)
+  JDK Version           : 21 (Eclipse Temurin JDK)
+  JAVA_HOME             : /opt/java/openjdk-21/Contents/Home
+  Random Testing Seed   : DD7B8CD75FB112E5
+  Crypto Standard       : any-supported
+=======================================
+
+> Task :dependencies
+
+------------------------------------------------------------
+Root project 'opensearch-jvector-plugin' - OpenSearch jVector plugin
+------------------------------------------------------------
+
+annotationProcessor - Annotation processors and their dependencies for source set 'main'.
+\--- org.projectlombok:lombok:1.18.38
+
+api - API dependencies for the 'main' feature. (n)
++--- org.opensearch:opensearch:3.2.0-SNAPSHOT (n)
++--- com.google.guava:failureaccess:1.0.1 (n)
++--- com.google.guava:guava:32.1.3-jre (n)
+\--- commons-lang:commons-lang:2.6 (n)
+
+apiElements - API elements for the 'main' feature. (n)
+No dependencies
+
+compileClasspath - Compile classpath for source set 'main'.
++--- org.opensearch:opensearch:3.2.0-SNAPSHOT
+|    +--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    +--- org.opensearch:opensearch-core:3.2.0-SNAPSHOT
+|    |    +--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    |    +--- com.fasterxml.jackson.core:jackson-core:2.18.2
+|    |    +--- org.apache.lucene:lucene-core:10.2.2
+|    |    \--- org.apache.logging.log4j:log4j-api:2.21.0
+|    +--- org.opensearch:opensearch-compress:3.2.0-SNAPSHOT
+|    |    +--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    |    +--- org.opensearch:opensearch-core:3.2.0-SNAPSHOT (*)
+|    |    \--- com.github.luben:zstd-jni:1.5.6-1
+|    +--- org.opensearch:opensearch-secure-sm:3.2.0-SNAPSHOT
+|    |    \--- org.opensearch:opensearch-agent-policy:3.2.0-SNAPSHOT
+|    +--- org.opensearch:opensearch-x-content:3.2.0-SNAPSHOT
+|    |    +--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    |    +--- org.opensearch:opensearch-core:3.2.0-SNAPSHOT (*)
+|    |    +--- org.yaml:snakeyaml:2.1
+|    |    +--- com.fasterxml.jackson.core:jackson-core:2.18.2
+|    |    +--- com.fasterxml.jackson.dataformat:jackson-dataformat-smile:2.18.2
+|    |    +--- com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.18.2
+|    |    \--- com.fasterxml.jackson.dataformat:jackson-dataformat-cbor:2.18.2
+|    +--- org.opensearch:opensearch-geo:3.2.0-SNAPSHOT
+|    +--- org.opensearch:opensearch-telemetry:3.2.0-SNAPSHOT
+|    |    \--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    +--- org.opensearch:opensearch-task-commons:3.2.0-SNAPSHOT
+|    |    \--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    +--- org.apache.lucene:lucene-core:10.2.2
+|    +--- org.apache.lucene:lucene-analysis-common:10.2.2
+|    +--- org.apache.lucene:lucene-backward-codecs:10.2.2
+|    +--- org.apache.lucene:lucene-grouping:10.2.2
+|    +--- org.apache.lucene:lucene-highlighter:10.2.2
+|    +--- org.apache.lucene:lucene-join:10.2.2
+|    +--- org.apache.lucene:lucene-memory:10.2.2
+|    +--- org.apache.lucene:lucene-misc:10.2.2
+|    +--- org.apache.lucene:lucene-queries:10.2.2
+|    +--- org.apache.lucene:lucene-queryparser:10.2.2
+|    +--- org.apache.lucene:lucene-sandbox:10.2.2
+|    +--- org.apache.lucene:lucene-spatial-extras:10.2.2
+|    +--- org.apache.lucene:lucene-spatial3d:10.2.2
+|    +--- org.apache.lucene:lucene-suggest:10.2.2
+|    +--- org.opensearch:opensearch-cli:3.2.0-SNAPSHOT
+|    |    +--- net.sf.jopt-simple:jopt-simple:5.0.4
+|    |    \--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    +--- joda-time:joda-time:2.12.7
+|    +--- com.tdunning:t-digest:3.3
+|    +--- org.hdrhistogram:HdrHistogram:2.2.2
+|    +--- org.locationtech.spatial4j:spatial4j:0.7
+|    +--- org.locationtech.jts:jts-core:1.15.0
+|    +--- org.apache.logging.log4j:log4j-api:2.21.0
+|    +--- org.apache.logging.log4j:log4j-jul:2.21.0
+|    +--- org.apache.logging.log4j:log4j-core:2.21.0
+|    +--- net.java.dev.jna:jna:5.16.0
+|    +--- com.jcraft:jzlib:1.1.3
+|    +--- io.projectreactor:reactor-core:3.7.5
+|    +--- org.reactivestreams:reactive-streams:1.0.4
+|    +--- com.google.protobuf:protobuf-java:3.25.5
+|    +--- jakarta.annotation:jakarta.annotation-api:1.3.5
+|    \--- org.roaringbitmap:RoaringBitmap:1.3.0
++--- com.google.guava:failureaccess:1.0.1
++--- com.google.guava:guava:32.1.3-jre
++--- commons-lang:commons-lang:2.6
++--- org.locationtech.spatial4j:spatial4j:0.7
++--- org.locationtech.jts:jts-core:1.15.0
++--- org.apache.logging.log4j:log4j-api:2.21.0
++--- org.apache.logging.log4j:log4j-core:2.21.0
++--- net.java.dev.jna:jna:5.16.0
++--- org.opensearch.plugin:opensearch-scripting-painless-spi:3.2.0-SNAPSHOT
+|    \--- org.opensearch:opensearch:3.2.0-SNAPSHOT (*)
++--- com.github.oshi:oshi-core:6.4.13
++--- io.github.jbellis:jvector:4.0.0-rc.4
++--- org.agrona:agrona:1.20.0
++--- org.slf4j:slf4j-api:1.7.36
++--- org.apache.logging.log4j:log4j-slf4j2-impl:2.21.0
+\--- org.projectlombok:lombok:1.18.38
+
+compileOnly - Compile-only dependencies for the 'main' feature. (n)
++--- org.opensearch:opensearch:3.2.0-SNAPSHOT (n)
++--- org.locationtech.spatial4j:spatial4j:0.7 (n)
++--- org.locationtech.jts:jts-core:1.15.0 (n)
++--- org.apache.logging.log4j:log4j-api:2.21.0 (n)
++--- org.apache.logging.log4j:log4j-core:2.21.0 (n)
++--- net.java.dev.jna:jna:5.16.0 (n)
+\--- org.opensearch.plugin:opensearch-scripting-painless-spi:3.2.0-SNAPSHOT (n)
+
+compileOnlyApi - Compile-only API dependencies for the 'main' feature. (n)
+No dependencies
+
+default - Configuration for default artifacts. (n)
+No dependencies
+
+forbiddenApisCliJar
+\--- de.thetaphi:forbiddenapis:3.8
+
+implementation - Implementation dependencies for the 'main' feature. (n)
++--- com.github.oshi:oshi-core:6.4.13 (n)
++--- io.github.jbellis:jvector:4.0.0-rc.4 (n)
++--- org.agrona:agrona:1.20.0 (n)
++--- org.slf4j:slf4j-api:1.7.36 (n)
+\--- org.apache.logging.log4j:log4j-slf4j2-impl:2.21.0 (n)
+
+jacocoAgent - The Jacoco agent to use to get coverage data.
+\--- org.jacoco:org.jacoco.agent:0.8.13
+
+jacocoAnt - The Jacoco ant tasks to use to get execute Gradle tasks.
+\--- org.jacoco:org.jacoco.ant:0.8.13
+     +--- org.jacoco:org.jacoco.core:0.8.13
+     |    +--- org.ow2.asm:asm:9.8
+     |    +--- org.ow2.asm:asm-commons:9.8
+     |    |    +--- org.ow2.asm:asm:9.8
+     |    |    \--- org.ow2.asm:asm-tree:9.8
+     |    |         \--- org.ow2.asm:asm:9.8
+     |    \--- org.ow2.asm:asm-tree:9.8 (*)
+     +--- org.jacoco:org.jacoco.report:0.8.13
+     |    \--- org.jacoco:org.jacoco.core:0.8.13 (*)
+     \--- org.jacoco:org.jacoco.agent:0.8.13
+
+jarHell
+No dependencies
+
+jdkJarHell
+No dependencies
+
+jmh
++--- org.openjdk.jmh:jmh-core:1.36
+|    +--- net.sf.jopt-simple:jopt-simple:5.0.4
+|    \--- org.apache.commons:commons-math3:3.2
+\--- org.openjdk.jmh:jmh-generator-bytecode:1.36
+     +--- org.openjdk.jmh:jmh-core:1.36 (*)
+     +--- org.openjdk.jmh:jmh-generator-reflection:1.36
+     |    \--- org.openjdk.jmh:jmh-core:1.36 (*)
+     \--- org.openjdk.jmh:jmh-generator-asm:1.36
+          +--- org.openjdk.jmh:jmh-core:1.36 (*)
+          +--- org.openjdk.jmh:jmh-generator-reflection:1.36 (*)
+          \--- org.ow2.asm:asm:9.0
+
+jmhAnnotationProcessor - Annotation processors and their dependencies for source set 'jmh'.
+\--- org.projectlombok:lombok:1.18.38
+
+jmhCompileClasspath - Compile classpath for source set 'jmh'.
++--- org.opensearch:opensearch:3.2.0-SNAPSHOT
+|    +--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    +--- org.opensearch:opensearch-core:3.2.0-SNAPSHOT
+|    |    +--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    |    +--- com.fasterxml.jackson.core:jackson-core:2.18.2
+|    |    +--- org.apache.lucene:lucene-core:10.2.2
+|    |    \--- org.apache.logging.log4j:log4j-api:2.21.0
+|    +--- org.opensearch:opensearch-compress:3.2.0-SNAPSHOT
+|    |    +--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    |    +--- org.opensearch:opensearch-core:3.2.0-SNAPSHOT (*)
+|    |    \--- com.github.luben:zstd-jni:1.5.6-1
+|    +--- org.opensearch:opensearch-secure-sm:3.2.0-SNAPSHOT
+|    |    \--- org.opensearch:opensearch-agent-policy:3.2.0-SNAPSHOT
+|    +--- org.opensearch:opensearch-x-content:3.2.0-SNAPSHOT
+|    |    +--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    |    +--- org.opensearch:opensearch-core:3.2.0-SNAPSHOT (*)
+|    |    +--- org.yaml:snakeyaml:2.1
+|    |    +--- com.fasterxml.jackson.core:jackson-core:2.18.2
+|    |    +--- com.fasterxml.jackson.dataformat:jackson-dataformat-smile:2.18.2
+|    |    +--- com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.18.2
+|    |    \--- com.fasterxml.jackson.dataformat:jackson-dataformat-cbor:2.18.2
+|    +--- org.opensearch:opensearch-geo:3.2.0-SNAPSHOT
+|    +--- org.opensearch:opensearch-telemetry:3.2.0-SNAPSHOT
+|    |    \--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    +--- org.opensearch:opensearch-task-commons:3.2.0-SNAPSHOT
+|    |    \--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    +--- org.apache.lucene:lucene-core:10.2.2
+|    +--- org.apache.lucene:lucene-analysis-common:10.2.2
+|    +--- org.apache.lucene:lucene-backward-codecs:10.2.2
+|    +--- org.apache.lucene:lucene-grouping:10.2.2
+|    +--- org.apache.lucene:lucene-highlighter:10.2.2
+|    +--- org.apache.lucene:lucene-join:10.2.2
+|    +--- org.apache.lucene:lucene-memory:10.2.2
+|    +--- org.apache.lucene:lucene-misc:10.2.2
+|    +--- org.apache.lucene:lucene-queries:10.2.2
+|    +--- org.apache.lucene:lucene-queryparser:10.2.2
+|    +--- org.apache.lucene:lucene-sandbox:10.2.2
+|    +--- org.apache.lucene:lucene-spatial-extras:10.2.2
+|    +--- org.apache.lucene:lucene-spatial3d:10.2.2
+|    +--- org.apache.lucene:lucene-suggest:10.2.2
+|    +--- org.opensearch:opensearch-cli:3.2.0-SNAPSHOT
+|    |    +--- net.sf.jopt-simple:jopt-simple:5.0.4
+|    |    \--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    +--- joda-time:joda-time:2.12.7
+|    +--- com.tdunning:t-digest:3.3
+|    +--- org.hdrhistogram:HdrHistogram:2.2.2
+|    +--- org.locationtech.spatial4j:spatial4j:0.7
+|    +--- org.locationtech.jts:jts-core:1.15.0
+|    +--- org.apache.logging.log4j:log4j-api:2.21.0
+|    +--- org.apache.logging.log4j:log4j-jul:2.21.0
+|    +--- org.apache.logging.log4j:log4j-core:2.21.0
+|    +--- net.java.dev.jna:jna:5.16.0
+|    +--- com.jcraft:jzlib:1.1.3
+|    +--- io.projectreactor:reactor-core:3.7.5
+|    +--- org.reactivestreams:reactive-streams:1.0.4
+|    +--- com.google.protobuf:protobuf-java:3.25.5
+|    +--- jakarta.annotation:jakarta.annotation-api:1.3.5
+|    \--- org.roaringbitmap:RoaringBitmap:1.3.0
++--- com.google.guava:failureaccess:1.0.1
++--- com.google.guava:guava:32.1.3-jre
++--- commons-lang:commons-lang:2.6
++--- org.locationtech.spatial4j:spatial4j:0.7
++--- org.locationtech.jts:jts-core:1.15.0
++--- org.apache.logging.log4j:log4j-api:2.21.0
++--- org.apache.logging.log4j:log4j-core:2.21.0
++--- net.java.dev.jna:jna:5.16.0
++--- org.opensearch.plugin:opensearch-scripting-painless-spi:3.2.0-SNAPSHOT
+|    \--- org.opensearch:opensearch:3.2.0-SNAPSHOT (*)
++--- com.github.oshi:oshi-core:6.4.13
++--- io.github.jbellis:jvector:4.0.0-rc.4
++--- org.agrona:agrona:1.20.0
++--- org.slf4j:slf4j-api:1.7.36
++--- org.apache.logging.log4j:log4j-slf4j2-impl:2.21.0
++--- org.openjdk.jmh:jmh-core:1.36
+|    +--- net.sf.jopt-simple:jopt-simple:5.0.4
+|    \--- org.apache.commons:commons-math3:3.2
++--- org.openjdk.jmh:jmh-generator-bytecode:1.36
+|    +--- org.openjdk.jmh:jmh-core:1.36 (*)
+|    +--- org.openjdk.jmh:jmh-generator-reflection:1.36
+|    |    \--- org.openjdk.jmh:jmh-core:1.36 (*)
+|    \--- org.openjdk.jmh:jmh-generator-asm:1.36
+|         +--- org.openjdk.jmh:jmh-core:1.36 (*)
+|         +--- org.openjdk.jmh:jmh-generator-reflection:1.36 (*)
+|         \--- org.ow2.asm:asm:9.0
+\--- org.projectlombok:lombok:1.18.38
+
+jmhCompileOnly - Compile only dependencies for source set 'jmh'. (n)
+No dependencies
+
+jmhImplementation - Implementation only dependencies for source set 'jmh'. (n)
+No dependencies
+
+jmhRuntimeClasspath - Runtime classpath of source set 'jmh'.
++--- org.opensearch:opensearch:3.2.0-SNAPSHOT
+|    +--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    +--- org.opensearch:opensearch-core:3.2.0-SNAPSHOT
+|    |    +--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    |    +--- com.fasterxml.jackson.core:jackson-core:2.18.2
+|    |    +--- org.apache.lucene:lucene-core:10.2.2
+|    |    \--- org.apache.logging.log4j:log4j-api:2.21.0
+|    +--- org.opensearch:opensearch-compress:3.2.0-SNAPSHOT
+|    |    +--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    |    +--- org.opensearch:opensearch-core:3.2.0-SNAPSHOT (*)
+|    |    \--- com.github.luben:zstd-jni:1.5.6-1
+|    +--- org.opensearch:opensearch-secure-sm:3.2.0-SNAPSHOT
+|    |    \--- org.opensearch:opensearch-agent-policy:3.2.0-SNAPSHOT
+|    +--- org.opensearch:opensearch-x-content:3.2.0-SNAPSHOT
+|    |    +--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    |    +--- org.opensearch:opensearch-core:3.2.0-SNAPSHOT (*)
+|    |    +--- org.yaml:snakeyaml:2.1
+|    |    +--- com.fasterxml.jackson.core:jackson-core:2.18.2
+|    |    +--- com.fasterxml.jackson.dataformat:jackson-dataformat-smile:2.18.2
+|    |    +--- com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.18.2
+|    |    \--- com.fasterxml.jackson.dataformat:jackson-dataformat-cbor:2.18.2
+|    +--- org.opensearch:opensearch-geo:3.2.0-SNAPSHOT
+|    +--- org.opensearch:opensearch-telemetry:3.2.0-SNAPSHOT
+|    |    \--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    +--- org.opensearch:opensearch-task-commons:3.2.0-SNAPSHOT
+|    |    \--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    +--- org.apache.lucene:lucene-core:10.2.2
+|    +--- org.apache.lucene:lucene-analysis-common:10.2.2
+|    +--- org.apache.lucene:lucene-backward-codecs:10.2.2
+|    +--- org.apache.lucene:lucene-grouping:10.2.2
+|    +--- org.apache.lucene:lucene-highlighter:10.2.2
+|    +--- org.apache.lucene:lucene-join:10.2.2
+|    +--- org.apache.lucene:lucene-memory:10.2.2
+|    +--- org.apache.lucene:lucene-misc:10.2.2
+|    +--- org.apache.lucene:lucene-queries:10.2.2
+|    +--- org.apache.lucene:lucene-queryparser:10.2.2
+|    +--- org.apache.lucene:lucene-sandbox:10.2.2
+|    +--- org.apache.lucene:lucene-spatial-extras:10.2.2
+|    +--- org.apache.lucene:lucene-spatial3d:10.2.2
+|    +--- org.apache.lucene:lucene-suggest:10.2.2
+|    +--- org.opensearch:opensearch-cli:3.2.0-SNAPSHOT
+|    |    +--- net.sf.jopt-simple:jopt-simple:5.0.4
+|    |    \--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    +--- joda-time:joda-time:2.12.7
+|    +--- com.tdunning:t-digest:3.3
+|    +--- org.hdrhistogram:HdrHistogram:2.2.2
+|    +--- org.locationtech.spatial4j:spatial4j:0.7
+|    +--- org.locationtech.jts:jts-core:1.15.0
+|    +--- org.apache.logging.log4j:log4j-api:2.21.0
+|    +--- org.apache.logging.log4j:log4j-jul:2.21.0
+|    +--- org.apache.logging.log4j:log4j-core:2.21.0
+|    +--- net.java.dev.jna:jna:5.16.0
+|    +--- com.jcraft:jzlib:1.1.3
+|    +--- io.projectreactor:reactor-core:3.7.5
+|    +--- org.reactivestreams:reactive-streams:1.0.4
+|    +--- com.google.protobuf:protobuf-java:3.25.5
+|    +--- jakarta.annotation:jakarta.annotation-api:1.3.5
+|    \--- org.roaringbitmap:RoaringBitmap:1.3.0
++--- com.google.guava:failureaccess:1.0.1
++--- com.google.guava:guava:32.1.3-jre
++--- commons-lang:commons-lang:2.6
++--- org.locationtech.spatial4j:spatial4j:0.7
++--- org.locationtech.jts:jts-core:1.15.0
++--- org.apache.logging.log4j:log4j-api:2.21.0
++--- org.apache.logging.log4j:log4j-core:2.21.0
++--- net.java.dev.jna:jna:5.16.0
++--- org.opensearch.plugin:opensearch-scripting-painless-spi:3.2.0-SNAPSHOT
+|    \--- org.opensearch:opensearch:3.2.0-SNAPSHOT (*)
++--- com.github.oshi:oshi-core:6.4.13
++--- io.github.jbellis:jvector:4.0.0-rc.4
++--- org.agrona:agrona:1.20.0
++--- org.slf4j:slf4j-api:1.7.36
++--- org.apache.logging.log4j:log4j-slf4j2-impl:2.21.0
++--- org.openjdk.jmh:jmh-core:1.36
+|    +--- net.sf.jopt-simple:jopt-simple:5.0.4
+|    \--- org.apache.commons:commons-math3:3.2
++--- org.openjdk.jmh:jmh-generator-bytecode:1.36
+|    +--- org.openjdk.jmh:jmh-core:1.36 (*)
+|    +--- org.openjdk.jmh:jmh-generator-reflection:1.36
+|    |    \--- org.openjdk.jmh:jmh-core:1.36 (*)
+|    \--- org.openjdk.jmh:jmh-generator-asm:1.36
+|         +--- org.openjdk.jmh:jmh-core:1.36 (*)
+|         +--- org.openjdk.jmh:jmh-generator-reflection:1.36 (*)
+|         \--- org.ow2.asm:asm:9.0 FAILED
++--- org.projectlombok:lombok:1.18.38
++--- root project : (*)
++--- org.opensearch.test:framework:3.2.0-SNAPSHOT
+|    +--- org.opensearch.client:opensearch-rest-client:3.2.0-SNAPSHOT
+|    |    +--- org.apache.httpcomponents.client5:httpclient5:5.4.4
+|    |    +--- org.apache.httpcomponents.core5:httpcore5:5.3.4
+|    |    +--- org.apache.httpcomponents.core5:httpcore5-h2:5.3.4
+|    |    +--- org.apache.httpcomponents.core5:httpcore5-reactive:5.3.4
+|    |    +--- commons-codec:commons-codec:1.16.1
+|    |    +--- commons-logging:commons-logging:1.2
+|    |    +--- org.slf4j:slf4j-api:1.7.36
+|    |    +--- io.projectreactor:reactor-core:3.7.5
+|    |    \--- org.reactivestreams:reactive-streams:1.0.4
+|    +--- org.opensearch.client:opensearch-rest-client-sniffer:3.2.0-SNAPSHOT
+|    |    +--- org.opensearch.client:opensearch-rest-client:3.2.0-SNAPSHOT (*)
+|    |    +--- org.apache.httpcomponents.client5:httpclient5:5.4.4
+|    |    +--- org.apache.httpcomponents.core5:httpcore5:5.3.4
+|    |    +--- commons-codec:commons-codec:1.16.1
+|    |    +--- commons-logging:commons-logging:1.2
+|    |    \--- com.fasterxml.jackson.core:jackson-core:2.18.2
+|    +--- org.opensearch:opensearch-nio:3.2.0-SNAPSHOT
+|    |    \--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    +--- org.opensearch:opensearch:3.2.0-SNAPSHOT (*)
+|    +--- org.opensearch:opensearch-cli:3.2.0-SNAPSHOT (*)
+|    +--- org.opensearch:opensearch-telemetry:3.2.0-SNAPSHOT (*)
+|    +--- org.opensearch.test:telemetry:3.2.0-SNAPSHOT
+|    |    +--- org.opensearch:opensearch-core:3.2.0-SNAPSHOT (*)
+|    |    +--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    |    \--- org.opensearch:opensearch-telemetry:3.2.0-SNAPSHOT (*)
+|    +--- com.carrotsearch.randomizedtesting:randomizedtesting-runner:2.7.1
+|    +--- junit:junit:4.13.2
+|    +--- org.hamcrest:hamcrest:2.1
+|    +--- org.apache.lucene:lucene-test-framework:10.2.2
+|    +--- org.apache.lucene:lucene-codecs:10.2.2
+|    +--- commons-logging:commons-logging:1.2
+|    +--- commons-codec:commons-codec:1.16.1
+|    +--- org.mockito:mockito-core:5.16.1
+|    +--- net.bytebuddy:byte-buddy:1.17.5
+|    \--- org.objenesis:objenesis:3.3
++--- org.opensearch.client:opensearch-rest-high-level-client:3.2.0-SNAPSHOT
+|    +--- org.opensearch:opensearch:3.2.0-SNAPSHOT (*)
+|    +--- org.opensearch.client:opensearch-rest-client:3.2.0-SNAPSHOT (*)
+|    +--- org.opensearch.plugin:mapper-extras-client:3.2.0-SNAPSHOT
+|    +--- org.opensearch.plugin:parent-join-client:3.2.0-SNAPSHOT
+|    +--- org.opensearch.plugin:aggs-matrix-stats-client:3.2.0-SNAPSHOT
+|    +--- org.opensearch.plugin:rank-eval-client:3.2.0-SNAPSHOT
+|    \--- org.opensearch.plugin:lang-mustache-client:3.2.0-SNAPSHOT
+|         \--- com.github.spullara.mustache.java:compiler:0.9.14
++--- org.opensearch.plugin:transport-netty4-client:3.2.0-SNAPSHOT
+|    +--- io.netty:netty-buffer:4.1.124.Final
+|    +--- io.netty:netty-codec:4.1.124.Final
+|    +--- io.netty:netty-codec-http:4.1.124.Final
+|    +--- io.netty:netty-codec-http2:4.1.124.Final
+|    +--- io.netty:netty-common:4.1.124.Final
+|    +--- io.netty:netty-handler:4.1.124.Final
+|    +--- io.netty:netty-resolver:4.1.124.Final
+|    +--- io.netty:netty-transport:4.1.124.Final
+|    \--- io.netty:netty-transport-native-unix-common:4.1.124.Final
++--- root project : (*)
++--- com.jayway.jsonpath:json-path:2.9.0
++--- net.minidev:json-smart:2.5.2
+|    \--- net.minidev:accessors-smart:2.5.2
+|         \--- org.ow2.asm:asm:9.7.1 FAILED
+\--- org.opensearch:common-utils:3.2.0.0-SNAPSHOT
+
+jmhRuntimeOnly - Runtime only dependencies for source set 'jmh'. (n)
+No dependencies
+
+loggerUsagePlugin
+\--- org.opensearch.test:logger-usage:3.2.0-SNAPSHOT FAILED
+
+lombok
+\--- org.projectlombok:lombok:1.18.38
+
+mainSourceElements - List of source directories contained in the Main SourceSet. (n)
+No dependencies
+
+opensearch_distro_extracted_testclusters--integTest-0-3.2.0-SNAPSHOT-
+\--- opensearch-distribution-snapshot:opensearch:3.2.0-SNAPSHOT
+
+opensearch_distro_extracted_testclusters--integTestRemote-0-3.2.0-SNAPSHOT-
+\--- org.opensearch.distribution.integ-test-zip:opensearch:3.2.0-SNAPSHOT
+
+opensearch_distro_file_testclusters--integTest-0-3.2.0-SNAPSHOT-
+\--- opensearch-distribution-snapshot:opensearch:3.2.0-SNAPSHOT
+
+opensearch_distro_file_testclusters--integTestRemote-0-3.2.0-SNAPSHOT-
+\--- org.opensearch.distribution.integ-test-zip:opensearch:3.2.0-SNAPSHOT
+
+resolveableCompileOnly
++--- org.opensearch:opensearch:3.2.0-SNAPSHOT
+|    +--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    +--- org.opensearch:opensearch-core:3.2.0-SNAPSHOT
+|    |    +--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    |    +--- com.fasterxml.jackson.core:jackson-core:2.18.2
+|    |    +--- org.apache.lucene:lucene-core:10.2.2
+|    |    \--- org.apache.logging.log4j:log4j-api:2.21.0
+|    +--- org.opensearch:opensearch-compress:3.2.0-SNAPSHOT
+|    |    +--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    |    +--- org.opensearch:opensearch-core:3.2.0-SNAPSHOT (*)
+|    |    \--- com.github.luben:zstd-jni:1.5.6-1
+|    +--- org.opensearch:opensearch-secure-sm:3.2.0-SNAPSHOT
+|    |    \--- org.opensearch:opensearch-agent-policy:3.2.0-SNAPSHOT
+|    +--- org.opensearch:opensearch-x-content:3.2.0-SNAPSHOT
+|    |    +--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    |    +--- org.opensearch:opensearch-core:3.2.0-SNAPSHOT (*)
+|    |    +--- org.yaml:snakeyaml:2.1
+|    |    +--- com.fasterxml.jackson.core:jackson-core:2.18.2
+|    |    +--- com.fasterxml.jackson.dataformat:jackson-dataformat-smile:2.18.2
+|    |    +--- com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.18.2
+|    |    \--- com.fasterxml.jackson.dataformat:jackson-dataformat-cbor:2.18.2
+|    +--- org.opensearch:opensearch-geo:3.2.0-SNAPSHOT
+|    +--- org.opensearch:opensearch-telemetry:3.2.0-SNAPSHOT
+|    |    \--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    +--- org.opensearch:opensearch-task-commons:3.2.0-SNAPSHOT
+|    |    \--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    +--- org.apache.lucene:lucene-core:10.2.2
+|    +--- org.apache.lucene:lucene-analysis-common:10.2.2
+|    +--- org.apache.lucene:lucene-backward-codecs:10.2.2
+|    +--- org.apache.lucene:lucene-grouping:10.2.2
+|    +--- org.apache.lucene:lucene-highlighter:10.2.2
+|    +--- org.apache.lucene:lucene-join:10.2.2
+|    +--- org.apache.lucene:lucene-memory:10.2.2
+|    +--- org.apache.lucene:lucene-misc:10.2.2
+|    +--- org.apache.lucene:lucene-queries:10.2.2
+|    +--- org.apache.lucene:lucene-queryparser:10.2.2
+|    +--- org.apache.lucene:lucene-sandbox:10.2.2
+|    +--- org.apache.lucene:lucene-spatial-extras:10.2.2
+|    +--- org.apache.lucene:lucene-spatial3d:10.2.2
+|    +--- org.apache.lucene:lucene-suggest:10.2.2
+|    +--- org.opensearch:opensearch-cli:3.2.0-SNAPSHOT
+|    |    +--- net.sf.jopt-simple:jopt-simple:5.0.4
+|    |    \--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    +--- joda-time:joda-time:2.12.7
+|    +--- com.tdunning:t-digest:3.3
+|    +--- org.hdrhistogram:HdrHistogram:2.2.2
+|    +--- org.locationtech.spatial4j:spatial4j:0.7
+|    +--- org.locationtech.jts:jts-core:1.15.0
+|    +--- org.apache.logging.log4j:log4j-api:2.21.0
+|    +--- org.apache.logging.log4j:log4j-jul:2.21.0
+|    +--- org.apache.logging.log4j:log4j-core:2.21.0
+|    +--- net.java.dev.jna:jna:5.16.0
+|    +--- com.jcraft:jzlib:1.1.3
+|    +--- io.projectreactor:reactor-core:3.7.5
+|    +--- org.reactivestreams:reactive-streams:1.0.4
+|    +--- com.google.protobuf:protobuf-java:3.25.5
+|    +--- jakarta.annotation:jakarta.annotation-api:1.3.5
+|    \--- org.roaringbitmap:RoaringBitmap:1.3.0
++--- org.locationtech.spatial4j:spatial4j:0.7
++--- org.locationtech.jts:jts-core:1.15.0
++--- org.apache.logging.log4j:log4j-api:2.21.0
++--- org.apache.logging.log4j:log4j-core:2.21.0
++--- net.java.dev.jna:jna:5.16.0
++--- org.opensearch.plugin:opensearch-scripting-painless-spi:3.2.0-SNAPSHOT
+|    \--- org.opensearch:opensearch:3.2.0-SNAPSHOT (*)
+\--- org.projectlombok:lombok:1.18.38
+
+runtimeClasspath - Runtime classpath of source set 'main'.
++--- org.opensearch:opensearch:3.2.0-SNAPSHOT
+|    +--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    +--- org.opensearch:opensearch-core:3.2.0-SNAPSHOT
+|    |    +--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    |    +--- com.fasterxml.jackson.core:jackson-core:2.18.2
+|    |    +--- org.apache.lucene:lucene-core:10.2.2
+|    |    \--- org.apache.logging.log4j:log4j-api:2.21.0
+|    +--- org.opensearch:opensearch-compress:3.2.0-SNAPSHOT
+|    |    +--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    |    +--- org.opensearch:opensearch-core:3.2.0-SNAPSHOT (*)
+|    |    \--- com.github.luben:zstd-jni:1.5.6-1
+|    +--- org.opensearch:opensearch-secure-sm:3.2.0-SNAPSHOT
+|    |    \--- org.opensearch:opensearch-agent-policy:3.2.0-SNAPSHOT
+|    +--- org.opensearch:opensearch-x-content:3.2.0-SNAPSHOT
+|    |    +--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    |    +--- org.opensearch:opensearch-core:3.2.0-SNAPSHOT (*)
+|    |    +--- org.yaml:snakeyaml:2.1
+|    |    +--- com.fasterxml.jackson.core:jackson-core:2.18.2
+|    |    +--- com.fasterxml.jackson.dataformat:jackson-dataformat-smile:2.18.2
+|    |    +--- com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.18.2
+|    |    \--- com.fasterxml.jackson.dataformat:jackson-dataformat-cbor:2.18.2
+|    +--- org.opensearch:opensearch-geo:3.2.0-SNAPSHOT
+|    +--- org.opensearch:opensearch-telemetry:3.2.0-SNAPSHOT
+|    |    \--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    +--- org.opensearch:opensearch-task-commons:3.2.0-SNAPSHOT
+|    |    \--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    +--- org.apache.lucene:lucene-core:10.2.2
+|    +--- org.apache.lucene:lucene-analysis-common:10.2.2
+|    +--- org.apache.lucene:lucene-backward-codecs:10.2.2
+|    +--- org.apache.lucene:lucene-grouping:10.2.2
+|    +--- org.apache.lucene:lucene-highlighter:10.2.2
+|    +--- org.apache.lucene:lucene-join:10.2.2
+|    +--- org.apache.lucene:lucene-memory:10.2.2
+|    +--- org.apache.lucene:lucene-misc:10.2.2
+|    +--- org.apache.lucene:lucene-queries:10.2.2
+|    +--- org.apache.lucene:lucene-queryparser:10.2.2
+|    +--- org.apache.lucene:lucene-sandbox:10.2.2
+|    +--- org.apache.lucene:lucene-spatial-extras:10.2.2
+|    +--- org.apache.lucene:lucene-spatial3d:10.2.2
+|    +--- org.apache.lucene:lucene-suggest:10.2.2
+|    +--- org.opensearch:opensearch-cli:3.2.0-SNAPSHOT
+|    |    +--- net.sf.jopt-simple:jopt-simple:5.0.4
+|    |    \--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    +--- joda-time:joda-time:2.12.7
+|    +--- com.tdunning:t-digest:3.3
+|    +--- org.hdrhistogram:HdrHistogram:2.2.2
+|    +--- org.locationtech.spatial4j:spatial4j:0.7
+|    +--- org.locationtech.jts:jts-core:1.15.0
+|    +--- org.apache.logging.log4j:log4j-api:2.21.0
+|    +--- org.apache.logging.log4j:log4j-jul:2.21.0
+|    +--- org.apache.logging.log4j:log4j-core:2.21.0
+|    +--- net.java.dev.jna:jna:5.16.0
+|    +--- com.jcraft:jzlib:1.1.3
+|    +--- io.projectreactor:reactor-core:3.7.5
+|    +--- org.reactivestreams:reactive-streams:1.0.4
+|    +--- com.google.protobuf:protobuf-java:3.25.5
+|    +--- jakarta.annotation:jakarta.annotation-api:1.3.5
+|    \--- org.roaringbitmap:RoaringBitmap:1.3.0
++--- com.google.guava:failureaccess:1.0.1
++--- com.google.guava:guava:32.1.3-jre
++--- commons-lang:commons-lang:2.6
++--- com.github.oshi:oshi-core:6.4.13
++--- io.github.jbellis:jvector:4.0.0-rc.4
++--- org.agrona:agrona:1.20.0
++--- org.slf4j:slf4j-api:1.7.36
+\--- org.apache.logging.log4j:log4j-slf4j2-impl:2.21.0
+
+runtimeElements - Runtime elements for the 'main' feature. (n)
+No dependencies
+
+runtimeOnly - Runtime-only dependencies for the 'main' feature. (n)
+No dependencies
+
+spotless-1420877240 - [dev.equo.ide:solstice:1.7.4, com.diffplug.durian:durian-swt.os:4.2.0, org.apache.felix:org.apache.felix.scr:2.2.6, org.eclipse.platform:org.eclipse.core.commands:3.11.100, org.eclipse.platform:org.eclipse.core.contenttype:3.9.100, org.eclipse.platform:org.eclipse.core.expressions:3.9.100, org.eclipse.platform:org.eclipse.core.filesystem:1.10.100, org.eclipse.platform:org.eclipse.core.jobs:3.15.0, org.eclipse.platform:org.eclipse.core.resources:3.19.100, org.eclipse.platform:org.eclipse.core.runtime:3.29.0, org.eclipse.platform:org.eclipse.equinox.app:1.6.300, org.eclipse.platform:org.eclipse.equinox.common:3.18.100, org.eclipse.platform:org.eclipse.equinox.event:1.6.200, org.eclipse.platform:org.eclipse.equinox.preferences:3.10.300, org.eclipse.platform:org.eclipse.equinox.registry:3.11.300, org.eclipse.platform:org.eclipse.equinox.supplement:1.10.700, org.eclipse.jdt:org.eclipse.jdt.core:3.35.0, org.eclipse.jdt:ecj:3.35.0, org.eclipse.platform:org.eclipse.osgi:3.18.500, org.eclipse.platform:org.eclipse.text:3.13.100, org.osgi:org.osgi.service.cm:1.6.1, org.osgi:org.osgi.service.component:1.5.1, org.osgi:org.osgi.service.event:1.4.1, org.osgi:org.osgi.service.metatype:1.4.1, org.osgi:org.osgi.service.prefs:1.1.2, org.osgi:org.osgi.util.function:1.2.0, org.osgi:org.osgi.util.promise:1.3.0]
++--- dev.equo.ide:solstice:1.7.4
++--- com.diffplug.durian:durian-swt.os:4.2.0
++--- org.apache.felix:org.apache.felix.scr:2.2.6
++--- org.eclipse.platform:org.eclipse.core.commands:3.11.100
++--- org.eclipse.platform:org.eclipse.core.contenttype:3.9.100
++--- org.eclipse.platform:org.eclipse.core.expressions:3.9.100
++--- org.eclipse.platform:org.eclipse.core.filesystem:1.10.100
++--- org.eclipse.platform:org.eclipse.core.jobs:3.15.0
++--- org.eclipse.platform:org.eclipse.core.resources:3.19.100
++--- org.eclipse.platform:org.eclipse.core.runtime:3.29.0
++--- org.eclipse.platform:org.eclipse.equinox.app:1.6.300
++--- org.eclipse.platform:org.eclipse.equinox.common:3.18.100
++--- org.eclipse.platform:org.eclipse.equinox.event:1.6.200
++--- org.eclipse.platform:org.eclipse.equinox.preferences:3.10.300
++--- org.eclipse.platform:org.eclipse.equinox.registry:3.11.300
++--- org.eclipse.platform:org.eclipse.equinox.supplement:1.10.700
++--- org.eclipse.jdt:org.eclipse.jdt.core:3.35.0
++--- org.eclipse.jdt:ecj:3.35.0
++--- org.eclipse.platform:org.eclipse.osgi:3.18.500
++--- org.eclipse.platform:org.eclipse.text:3.13.100
++--- org.osgi:org.osgi.service.cm:1.6.1
++--- org.osgi:org.osgi.service.component:1.5.1
++--- org.osgi:org.osgi.service.event:1.4.1
++--- org.osgi:org.osgi.service.metatype:1.4.1
++--- org.osgi:org.osgi.service.prefs:1.1.2
++--- org.osgi:org.osgi.util.function:1.2.0
+\--- org.osgi:org.osgi.util.promise:1.3.0
+
+spotless865459188 - [com.google.googlejavaformat:google-java-format:1.19.2]
+\--- com.google.googlejavaformat:google-java-format:1.19.2
+     \--- com.google.guava:guava:32.1.3-jre
+          +--- com.google.guava:failureaccess:1.0.1
+          +--- com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava
+          +--- com.google.code.findbugs:jsr305:3.0.2
+          +--- org.checkerframework:checker-qual:3.37.0
+          \--- com.google.errorprone:error_prone_annotations:2.21.1
+
+testAnnotationProcessor - Annotation processors and their dependencies for source set 'test'.
+\--- org.projectlombok:lombok:1.18.38
+
+testCompileClasspath - Compile classpath for source set 'test'.
++--- org.opensearch:opensearch:3.2.0-SNAPSHOT
+|    +--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    +--- org.opensearch:opensearch-core:3.2.0-SNAPSHOT
+|    |    +--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    |    +--- com.fasterxml.jackson.core:jackson-core:2.18.2
+|    |    +--- org.apache.lucene:lucene-core:10.2.2
+|    |    \--- org.apache.logging.log4j:log4j-api:2.21.0
+|    +--- org.opensearch:opensearch-compress:3.2.0-SNAPSHOT
+|    |    +--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    |    +--- org.opensearch:opensearch-core:3.2.0-SNAPSHOT (*)
+|    |    \--- com.github.luben:zstd-jni:1.5.6-1
+|    +--- org.opensearch:opensearch-secure-sm:3.2.0-SNAPSHOT
+|    |    \--- org.opensearch:opensearch-agent-policy:3.2.0-SNAPSHOT
+|    +--- org.opensearch:opensearch-x-content:3.2.0-SNAPSHOT
+|    |    +--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    |    +--- org.opensearch:opensearch-core:3.2.0-SNAPSHOT (*)
+|    |    +--- org.yaml:snakeyaml:2.1
+|    |    +--- com.fasterxml.jackson.core:jackson-core:2.18.2
+|    |    +--- com.fasterxml.jackson.dataformat:jackson-dataformat-smile:2.18.2
+|    |    +--- com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.18.2
+|    |    \--- com.fasterxml.jackson.dataformat:jackson-dataformat-cbor:2.18.2
+|    +--- org.opensearch:opensearch-geo:3.2.0-SNAPSHOT
+|    +--- org.opensearch:opensearch-telemetry:3.2.0-SNAPSHOT
+|    |    \--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    +--- org.opensearch:opensearch-task-commons:3.2.0-SNAPSHOT
+|    |    \--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    +--- org.apache.lucene:lucene-core:10.2.2
+|    +--- org.apache.lucene:lucene-analysis-common:10.2.2
+|    +--- org.apache.lucene:lucene-backward-codecs:10.2.2
+|    +--- org.apache.lucene:lucene-grouping:10.2.2
+|    +--- org.apache.lucene:lucene-highlighter:10.2.2
+|    +--- org.apache.lucene:lucene-join:10.2.2
+|    +--- org.apache.lucene:lucene-memory:10.2.2
+|    +--- org.apache.lucene:lucene-misc:10.2.2
+|    +--- org.apache.lucene:lucene-queries:10.2.2
+|    +--- org.apache.lucene:lucene-queryparser:10.2.2
+|    +--- org.apache.lucene:lucene-sandbox:10.2.2
+|    +--- org.apache.lucene:lucene-spatial-extras:10.2.2
+|    +--- org.apache.lucene:lucene-spatial3d:10.2.2
+|    +--- org.apache.lucene:lucene-suggest:10.2.2
+|    +--- org.opensearch:opensearch-cli:3.2.0-SNAPSHOT
+|    |    +--- net.sf.jopt-simple:jopt-simple:5.0.4
+|    |    \--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    +--- joda-time:joda-time:2.12.7
+|    +--- com.tdunning:t-digest:3.3
+|    +--- org.hdrhistogram:HdrHistogram:2.2.2
+|    +--- org.locationtech.spatial4j:spatial4j:0.7
+|    +--- org.locationtech.jts:jts-core:1.15.0
+|    +--- org.apache.logging.log4j:log4j-api:2.21.0
+|    +--- org.apache.logging.log4j:log4j-jul:2.21.0
+|    +--- org.apache.logging.log4j:log4j-core:2.21.0
+|    +--- net.java.dev.jna:jna:5.16.0
+|    +--- com.jcraft:jzlib:1.1.3
+|    +--- io.projectreactor:reactor-core:3.7.5
+|    +--- org.reactivestreams:reactive-streams:1.0.4
+|    +--- com.google.protobuf:protobuf-java:3.25.5
+|    +--- jakarta.annotation:jakarta.annotation-api:1.3.5
+|    \--- org.roaringbitmap:RoaringBitmap:1.3.0
++--- com.google.guava:failureaccess:1.0.1
++--- com.google.guava:guava:32.1.3-jre
++--- commons-lang:commons-lang:2.6
++--- org.locationtech.spatial4j:spatial4j:0.7
++--- org.locationtech.jts:jts-core:1.15.0
++--- org.apache.logging.log4j:log4j-api:2.21.0
++--- org.apache.logging.log4j:log4j-core:2.21.0
++--- net.java.dev.jna:jna:5.16.0
++--- org.opensearch.plugin:opensearch-scripting-painless-spi:3.2.0-SNAPSHOT
+|    \--- org.opensearch:opensearch:3.2.0-SNAPSHOT (*)
++--- com.github.oshi:oshi-core:6.4.13
++--- io.github.jbellis:jvector:4.0.0-rc.4
++--- org.agrona:agrona:1.20.0
++--- org.slf4j:slf4j-api:1.7.36
++--- org.apache.logging.log4j:log4j-slf4j2-impl:2.21.0
++--- org.projectlombok:lombok:1.18.38
++--- root project : (*)
++--- org.opensearch.test:framework:3.2.0-SNAPSHOT
+|    +--- org.opensearch.client:opensearch-rest-client:3.2.0-SNAPSHOT
+|    |    +--- org.apache.httpcomponents.client5:httpclient5:5.4.4
+|    |    +--- org.apache.httpcomponents.core5:httpcore5:5.3.4
+|    |    +--- org.apache.httpcomponents.core5:httpcore5-h2:5.3.4
+|    |    +--- org.apache.httpcomponents.core5:httpcore5-reactive:5.3.4
+|    |    +--- commons-codec:commons-codec:1.16.1
+|    |    +--- commons-logging:commons-logging:1.2
+|    |    +--- org.slf4j:slf4j-api:1.7.36
+|    |    +--- io.projectreactor:reactor-core:3.7.5
+|    |    \--- org.reactivestreams:reactive-streams:1.0.4
+|    +--- org.opensearch.client:opensearch-rest-client-sniffer:3.2.0-SNAPSHOT
+|    |    +--- org.opensearch.client:opensearch-rest-client:3.2.0-SNAPSHOT (*)
+|    |    +--- org.apache.httpcomponents.client5:httpclient5:5.4.4
+|    |    +--- org.apache.httpcomponents.core5:httpcore5:5.3.4
+|    |    +--- commons-codec:commons-codec:1.16.1
+|    |    +--- commons-logging:commons-logging:1.2
+|    |    \--- com.fasterxml.jackson.core:jackson-core:2.18.2
+|    +--- org.opensearch:opensearch-nio:3.2.0-SNAPSHOT
+|    |    \--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    +--- org.opensearch:opensearch:3.2.0-SNAPSHOT (*)
+|    +--- org.opensearch:opensearch-cli:3.2.0-SNAPSHOT (*)
+|    +--- org.opensearch:opensearch-telemetry:3.2.0-SNAPSHOT (*)
+|    +--- org.opensearch.test:telemetry:3.2.0-SNAPSHOT
+|    |    +--- org.opensearch:opensearch-core:3.2.0-SNAPSHOT (*)
+|    |    +--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    |    \--- org.opensearch:opensearch-telemetry:3.2.0-SNAPSHOT (*)
+|    +--- com.carrotsearch.randomizedtesting:randomizedtesting-runner:2.7.1
+|    +--- junit:junit:4.13.2
+|    +--- org.hamcrest:hamcrest:2.1
+|    +--- org.apache.lucene:lucene-test-framework:10.2.2
+|    +--- org.apache.lucene:lucene-codecs:10.2.2
+|    +--- commons-logging:commons-logging:1.2
+|    +--- commons-codec:commons-codec:1.16.1
+|    +--- org.mockito:mockito-core:5.16.1
+|    +--- net.bytebuddy:byte-buddy:1.17.5
+|    \--- org.objenesis:objenesis:3.3
++--- org.opensearch.client:opensearch-rest-high-level-client:3.2.0-SNAPSHOT
+|    +--- org.opensearch:opensearch:3.2.0-SNAPSHOT (*)
+|    +--- org.opensearch.client:opensearch-rest-client:3.2.0-SNAPSHOT (*)
+|    +--- org.opensearch.plugin:mapper-extras-client:3.2.0-SNAPSHOT
+|    +--- org.opensearch.plugin:parent-join-client:3.2.0-SNAPSHOT
+|    +--- org.opensearch.plugin:aggs-matrix-stats-client:3.2.0-SNAPSHOT
+|    +--- org.opensearch.plugin:rank-eval-client:3.2.0-SNAPSHOT
+|    \--- org.opensearch.plugin:lang-mustache-client:3.2.0-SNAPSHOT
+|         \--- com.github.spullara.mustache.java:compiler:0.9.14
++--- org.opensearch.plugin:transport-netty4-client:3.2.0-SNAPSHOT
+|    +--- io.netty:netty-buffer:4.1.124.Final
+|    +--- io.netty:netty-codec:4.1.124.Final
+|    +--- io.netty:netty-codec-http:4.1.124.Final
+|    +--- io.netty:netty-codec-http2:4.1.124.Final
+|    +--- io.netty:netty-common:4.1.124.Final
+|    +--- io.netty:netty-handler:4.1.124.Final
+|    +--- io.netty:netty-resolver:4.1.124.Final
+|    +--- io.netty:netty-transport:4.1.124.Final
+|    \--- io.netty:netty-transport-native-unix-common:4.1.124.Final
+\--- root project : (*)
+
+testCompileOnly - Compile only dependencies for source set 'test'. (n)
+No dependencies
+
+testFixturesAnnotationProcessor - Annotation processors and their dependencies for source set 'test fixtures'.
+\--- org.projectlombok:lombok:1.18.38
+
+testFixturesApi - API dependencies for the 'testFixtures' feature. (n)
+\--- project opensearch-jvector-plugin (n)
+
+testFixturesApiElements - API elements for the 'testFixtures' feature. (n)
+No dependencies
+
+testFixturesCompileClasspath - Compile classpath for source set 'test fixtures'.
++--- org.projectlombok:lombok:1.18.38
++--- root project : (*)
++--- org.opensearch.test:framework:3.2.0-SNAPSHOT
+|    +--- org.opensearch.client:opensearch-rest-client:3.2.0-SNAPSHOT
+|    |    +--- org.apache.httpcomponents.client5:httpclient5:5.4.4
+|    |    +--- org.apache.httpcomponents.core5:httpcore5:5.3.4
+|    |    +--- org.apache.httpcomponents.core5:httpcore5-h2:5.3.4
+|    |    +--- org.apache.httpcomponents.core5:httpcore5-reactive:5.3.4
+|    |    +--- commons-codec:commons-codec:1.16.1
+|    |    +--- commons-logging:commons-logging:1.2
+|    |    +--- org.slf4j:slf4j-api:1.7.36
+|    |    +--- io.projectreactor:reactor-core:3.7.5
+|    |    \--- org.reactivestreams:reactive-streams:1.0.4
+|    +--- org.opensearch.client:opensearch-rest-client-sniffer:3.2.0-SNAPSHOT
+|    |    +--- org.opensearch.client:opensearch-rest-client:3.2.0-SNAPSHOT (*)
+|    |    +--- org.apache.httpcomponents.client5:httpclient5:5.4.4
+|    |    +--- org.apache.httpcomponents.core5:httpcore5:5.3.4
+|    |    +--- commons-codec:commons-codec:1.16.1
+|    |    +--- commons-logging:commons-logging:1.2
+|    |    \--- com.fasterxml.jackson.core:jackson-core:2.18.2
+|    +--- org.opensearch:opensearch-nio:3.2.0-SNAPSHOT
+|    |    \--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    +--- org.opensearch:opensearch:3.2.0-SNAPSHOT
+|    |    +--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    |    +--- org.opensearch:opensearch-core:3.2.0-SNAPSHOT
+|    |    |    +--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    |    |    +--- com.fasterxml.jackson.core:jackson-core:2.18.2
+|    |    |    +--- org.apache.lucene:lucene-core:10.2.2
+|    |    |    \--- org.apache.logging.log4j:log4j-api:2.21.0
+|    |    +--- org.opensearch:opensearch-compress:3.2.0-SNAPSHOT
+|    |    |    +--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    |    |    +--- org.opensearch:opensearch-core:3.2.0-SNAPSHOT (*)
+|    |    |    \--- com.github.luben:zstd-jni:1.5.6-1
+|    |    +--- org.opensearch:opensearch-secure-sm:3.2.0-SNAPSHOT
+|    |    |    \--- org.opensearch:opensearch-agent-policy:3.2.0-SNAPSHOT
+|    |    +--- org.opensearch:opensearch-x-content:3.2.0-SNAPSHOT
+|    |    |    +--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    |    |    +--- org.opensearch:opensearch-core:3.2.0-SNAPSHOT (*)
+|    |    |    +--- org.yaml:snakeyaml:2.1
+|    |    |    +--- com.fasterxml.jackson.core:jackson-core:2.18.2
+|    |    |    +--- com.fasterxml.jackson.dataformat:jackson-dataformat-smile:2.18.2
+|    |    |    +--- com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.18.2
+|    |    |    \--- com.fasterxml.jackson.dataformat:jackson-dataformat-cbor:2.18.2
+|    |    +--- org.opensearch:opensearch-geo:3.2.0-SNAPSHOT
+|    |    +--- org.opensearch:opensearch-telemetry:3.2.0-SNAPSHOT
+|    |    |    \--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    |    +--- org.opensearch:opensearch-task-commons:3.2.0-SNAPSHOT
+|    |    |    \--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    |    +--- org.apache.lucene:lucene-core:10.2.2
+|    |    +--- org.apache.lucene:lucene-analysis-common:10.2.2
+|    |    +--- org.apache.lucene:lucene-backward-codecs:10.2.2
+|    |    +--- org.apache.lucene:lucene-grouping:10.2.2
+|    |    +--- org.apache.lucene:lucene-highlighter:10.2.2
+|    |    +--- org.apache.lucene:lucene-join:10.2.2
+|    |    +--- org.apache.lucene:lucene-memory:10.2.2
+|    |    +--- org.apache.lucene:lucene-misc:10.2.2
+|    |    +--- org.apache.lucene:lucene-queries:10.2.2
+|    |    +--- org.apache.lucene:lucene-queryparser:10.2.2
+|    |    +--- org.apache.lucene:lucene-sandbox:10.2.2
+|    |    +--- org.apache.lucene:lucene-spatial-extras:10.2.2
+|    |    +--- org.apache.lucene:lucene-spatial3d:10.2.2
+|    |    +--- org.apache.lucene:lucene-suggest:10.2.2
+|    |    +--- org.opensearch:opensearch-cli:3.2.0-SNAPSHOT
+|    |    |    +--- net.sf.jopt-simple:jopt-simple:5.0.4
+|    |    |    \--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    |    +--- joda-time:joda-time:2.12.7
+|    |    +--- com.tdunning:t-digest:3.3
+|    |    +--- org.hdrhistogram:HdrHistogram:2.2.2
+|    |    +--- org.locationtech.spatial4j:spatial4j:0.7
+|    |    +--- org.locationtech.jts:jts-core:1.15.0
+|    |    +--- org.apache.logging.log4j:log4j-api:2.21.0
+|    |    +--- org.apache.logging.log4j:log4j-jul:2.21.0
+|    |    +--- org.apache.logging.log4j:log4j-core:2.21.0
+|    |    +--- net.java.dev.jna:jna:5.16.0
+|    |    +--- com.jcraft:jzlib:1.1.3
+|    |    +--- io.projectreactor:reactor-core:3.7.5
+|    |    +--- org.reactivestreams:reactive-streams:1.0.4
+|    |    +--- com.google.protobuf:protobuf-java:3.25.5
+|    |    +--- jakarta.annotation:jakarta.annotation-api:1.3.5
+|    |    \--- org.roaringbitmap:RoaringBitmap:1.3.0
+|    +--- org.opensearch:opensearch-cli:3.2.0-SNAPSHOT (*)
+|    +--- org.opensearch:opensearch-telemetry:3.2.0-SNAPSHOT (*)
+|    +--- org.opensearch.test:telemetry:3.2.0-SNAPSHOT
+|    |    +--- org.opensearch:opensearch-core:3.2.0-SNAPSHOT (*)
+|    |    +--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    |    \--- org.opensearch:opensearch-telemetry:3.2.0-SNAPSHOT (*)
+|    +--- com.carrotsearch.randomizedtesting:randomizedtesting-runner:2.7.1
+|    +--- junit:junit:4.13.2
+|    +--- org.hamcrest:hamcrest:2.1
+|    +--- org.apache.lucene:lucene-test-framework:10.2.2
+|    +--- org.apache.lucene:lucene-codecs:10.2.2
+|    +--- commons-logging:commons-logging:1.2
+|    +--- commons-codec:commons-codec:1.16.1
+|    +--- org.mockito:mockito-core:5.16.1
+|    +--- net.bytebuddy:byte-buddy:1.17.5
+|    \--- org.objenesis:objenesis:3.3
++--- com.jayway.jsonpath:json-path:2.9.0
++--- net.minidev:json-smart:2.5.2
+|    \--- net.minidev:accessors-smart:2.5.2
+|         \--- org.ow2.asm:asm:9.7.1
++--- org.opensearch:common-utils:3.2.0.0-SNAPSHOT
++--- org.opensearch:opensearch:3.2.0-SNAPSHOT (*)
++--- com.google.guava:failureaccess:1.0.1
++--- com.google.guava:guava:32.1.3-jre
+\--- commons-lang:commons-lang:2.6
+
+testFixturesCompileOnly - Compile-only dependencies for the 'testFixtures' feature. (n)
+No dependencies
+
+testFixturesCompileOnlyApi - Compile-only API dependencies for the 'testFixtures' feature. (n)
+No dependencies
+
+testFixturesImplementation - Implementation dependencies for the 'testFixtures' feature. (n)
++--- org.opensearch.test:framework:3.2.0-SNAPSHOT (n)
++--- com.jayway.jsonpath:json-path:2.9.0 (n)
++--- net.minidev:json-smart:2.5.2 (n)
+\--- org.opensearch:common-utils:3.2.0.0-SNAPSHOT (n)
+
+testFixturesRuntimeClasspath - Runtime classpath of source set 'test fixtures'.
++--- root project : (*)
++--- org.opensearch.test:framework:3.2.0-SNAPSHOT
+|    +--- org.opensearch.client:opensearch-rest-client:3.2.0-SNAPSHOT
+|    |    +--- org.apache.httpcomponents.client5:httpclient5:5.4.4
+|    |    +--- org.apache.httpcomponents.core5:httpcore5:5.3.4
+|    |    +--- org.apache.httpcomponents.core5:httpcore5-h2:5.3.4
+|    |    +--- org.apache.httpcomponents.core5:httpcore5-reactive:5.3.4
+|    |    +--- commons-codec:commons-codec:1.16.1
+|    |    +--- commons-logging:commons-logging:1.2
+|    |    +--- org.slf4j:slf4j-api:1.7.36
+|    |    +--- io.projectreactor:reactor-core:3.7.5
+|    |    \--- org.reactivestreams:reactive-streams:1.0.4
+|    +--- org.opensearch.client:opensearch-rest-client-sniffer:3.2.0-SNAPSHOT
+|    |    +--- org.opensearch.client:opensearch-rest-client:3.2.0-SNAPSHOT (*)
+|    |    +--- org.apache.httpcomponents.client5:httpclient5:5.4.4
+|    |    +--- org.apache.httpcomponents.core5:httpcore5:5.3.4
+|    |    +--- commons-codec:commons-codec:1.16.1
+|    |    +--- commons-logging:commons-logging:1.2
+|    |    \--- com.fasterxml.jackson.core:jackson-core:2.18.2
+|    +--- org.opensearch:opensearch-nio:3.2.0-SNAPSHOT
+|    |    \--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    +--- org.opensearch:opensearch:3.2.0-SNAPSHOT
+|    |    +--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    |    +--- org.opensearch:opensearch-core:3.2.0-SNAPSHOT
+|    |    |    +--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    |    |    +--- com.fasterxml.jackson.core:jackson-core:2.18.2
+|    |    |    +--- org.apache.lucene:lucene-core:10.2.2
+|    |    |    \--- org.apache.logging.log4j:log4j-api:2.21.0
+|    |    +--- org.opensearch:opensearch-compress:3.2.0-SNAPSHOT
+|    |    |    +--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    |    |    +--- org.opensearch:opensearch-core:3.2.0-SNAPSHOT (*)
+|    |    |    \--- com.github.luben:zstd-jni:1.5.6-1
+|    |    +--- org.opensearch:opensearch-secure-sm:3.2.0-SNAPSHOT
+|    |    |    \--- org.opensearch:opensearch-agent-policy:3.2.0-SNAPSHOT
+|    |    +--- org.opensearch:opensearch-x-content:3.2.0-SNAPSHOT
+|    |    |    +--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    |    |    +--- org.opensearch:opensearch-core:3.2.0-SNAPSHOT (*)
+|    |    |    +--- org.yaml:snakeyaml:2.1
+|    |    |    +--- com.fasterxml.jackson.core:jackson-core:2.18.2
+|    |    |    +--- com.fasterxml.jackson.dataformat:jackson-dataformat-smile:2.18.2
+|    |    |    +--- com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.18.2
+|    |    |    \--- com.fasterxml.jackson.dataformat:jackson-dataformat-cbor:2.18.2
+|    |    +--- org.opensearch:opensearch-geo:3.2.0-SNAPSHOT
+|    |    +--- org.opensearch:opensearch-telemetry:3.2.0-SNAPSHOT
+|    |    |    \--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    |    +--- org.opensearch:opensearch-task-commons:3.2.0-SNAPSHOT
+|    |    |    \--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    |    +--- org.apache.lucene:lucene-core:10.2.2
+|    |    +--- org.apache.lucene:lucene-analysis-common:10.2.2
+|    |    +--- org.apache.lucene:lucene-backward-codecs:10.2.2
+|    |    +--- org.apache.lucene:lucene-grouping:10.2.2
+|    |    +--- org.apache.lucene:lucene-highlighter:10.2.2
+|    |    +--- org.apache.lucene:lucene-join:10.2.2
+|    |    +--- org.apache.lucene:lucene-memory:10.2.2
+|    |    +--- org.apache.lucene:lucene-misc:10.2.2
+|    |    +--- org.apache.lucene:lucene-queries:10.2.2
+|    |    +--- org.apache.lucene:lucene-queryparser:10.2.2
+|    |    +--- org.apache.lucene:lucene-sandbox:10.2.2
+|    |    +--- org.apache.lucene:lucene-spatial-extras:10.2.2
+|    |    +--- org.apache.lucene:lucene-spatial3d:10.2.2
+|    |    +--- org.apache.lucene:lucene-suggest:10.2.2
+|    |    +--- org.opensearch:opensearch-cli:3.2.0-SNAPSHOT
+|    |    |    +--- net.sf.jopt-simple:jopt-simple:5.0.4
+|    |    |    \--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    |    +--- joda-time:joda-time:2.12.7
+|    |    +--- com.tdunning:t-digest:3.3
+|    |    +--- org.hdrhistogram:HdrHistogram:2.2.2
+|    |    +--- org.locationtech.spatial4j:spatial4j:0.7
+|    |    +--- org.locationtech.jts:jts-core:1.15.0
+|    |    +--- org.apache.logging.log4j:log4j-api:2.21.0
+|    |    +--- org.apache.logging.log4j:log4j-jul:2.21.0
+|    |    +--- org.apache.logging.log4j:log4j-core:2.21.0
+|    |    +--- net.java.dev.jna:jna:5.16.0
+|    |    +--- com.jcraft:jzlib:1.1.3
+|    |    +--- io.projectreactor:reactor-core:3.7.5
+|    |    +--- org.reactivestreams:reactive-streams:1.0.4
+|    |    +--- com.google.protobuf:protobuf-java:3.25.5
+|    |    +--- jakarta.annotation:jakarta.annotation-api:1.3.5
+|    |    \--- org.roaringbitmap:RoaringBitmap:1.3.0
+|    +--- org.opensearch:opensearch-cli:3.2.0-SNAPSHOT (*)
+|    +--- org.opensearch:opensearch-telemetry:3.2.0-SNAPSHOT (*)
+|    +--- org.opensearch.test:telemetry:3.2.0-SNAPSHOT
+|    |    +--- org.opensearch:opensearch-core:3.2.0-SNAPSHOT (*)
+|    |    +--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    |    \--- org.opensearch:opensearch-telemetry:3.2.0-SNAPSHOT (*)
+|    +--- com.carrotsearch.randomizedtesting:randomizedtesting-runner:2.7.1
+|    +--- junit:junit:4.13.2
+|    +--- org.hamcrest:hamcrest:2.1
+|    +--- org.apache.lucene:lucene-test-framework:10.2.2
+|    +--- org.apache.lucene:lucene-codecs:10.2.2
+|    +--- commons-logging:commons-logging:1.2
+|    +--- commons-codec:commons-codec:1.16.1
+|    +--- org.mockito:mockito-core:5.16.1
+|    +--- net.bytebuddy:byte-buddy:1.17.5
+|    \--- org.objenesis:objenesis:3.3
++--- com.jayway.jsonpath:json-path:2.9.0
++--- net.minidev:json-smart:2.5.2
+|    \--- net.minidev:accessors-smart:2.5.2
+|         \--- org.ow2.asm:asm:9.7.1
++--- org.opensearch:common-utils:3.2.0.0-SNAPSHOT
++--- org.opensearch:opensearch:3.2.0-SNAPSHOT (*)
++--- com.google.guava:failureaccess:1.0.1
++--- com.google.guava:guava:32.1.3-jre
++--- commons-lang:commons-lang:2.6
++--- com.github.oshi:oshi-core:6.4.13
++--- io.github.jbellis:jvector:4.0.0-rc.4
++--- org.agrona:agrona:1.20.0
++--- org.slf4j:slf4j-api:1.7.36
+\--- org.apache.logging.log4j:log4j-slf4j2-impl:2.21.0
+
+testFixturesRuntimeElements - Runtime elements for the 'testFixtures' feature. (n)
+No dependencies
+
+testFixturesRuntimeOnly - Runtime-only dependencies for the 'testFixtures' feature. (n)
+No dependencies
+
+testImplementation - Implementation only dependencies for source set 'test'. (n)
++--- project opensearch-jvector-plugin (n)
++--- org.opensearch.test:framework:3.2.0-SNAPSHOT (n)
++--- org.opensearch.client:opensearch-rest-high-level-client:3.2.0-SNAPSHOT (n)
+\--- org.opensearch.plugin:transport-netty4-client:3.2.0-SNAPSHOT (n)
+
+testRuntimeClasspath - Runtime classpath of source set 'test'.
++--- org.opensearch:opensearch:3.2.0-SNAPSHOT
+|    +--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    +--- org.opensearch:opensearch-core:3.2.0-SNAPSHOT
+|    |    +--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    |    +--- com.fasterxml.jackson.core:jackson-core:2.18.2
+|    |    +--- org.apache.lucene:lucene-core:10.2.2
+|    |    \--- org.apache.logging.log4j:log4j-api:2.21.0
+|    +--- org.opensearch:opensearch-compress:3.2.0-SNAPSHOT
+|    |    +--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    |    +--- org.opensearch:opensearch-core:3.2.0-SNAPSHOT (*)
+|    |    \--- com.github.luben:zstd-jni:1.5.6-1
+|    +--- org.opensearch:opensearch-secure-sm:3.2.0-SNAPSHOT
+|    |    \--- org.opensearch:opensearch-agent-policy:3.2.0-SNAPSHOT
+|    +--- org.opensearch:opensearch-x-content:3.2.0-SNAPSHOT
+|    |    +--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    |    +--- org.opensearch:opensearch-core:3.2.0-SNAPSHOT (*)
+|    |    +--- org.yaml:snakeyaml:2.1
+|    |    +--- com.fasterxml.jackson.core:jackson-core:2.18.2
+|    |    +--- com.fasterxml.jackson.dataformat:jackson-dataformat-smile:2.18.2
+|    |    +--- com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.18.2
+|    |    \--- com.fasterxml.jackson.dataformat:jackson-dataformat-cbor:2.18.2
+|    +--- org.opensearch:opensearch-geo:3.2.0-SNAPSHOT
+|    +--- org.opensearch:opensearch-telemetry:3.2.0-SNAPSHOT
+|    |    \--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    +--- org.opensearch:opensearch-task-commons:3.2.0-SNAPSHOT
+|    |    \--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    +--- org.apache.lucene:lucene-core:10.2.2
+|    +--- org.apache.lucene:lucene-analysis-common:10.2.2
+|    +--- org.apache.lucene:lucene-backward-codecs:10.2.2
+|    +--- org.apache.lucene:lucene-grouping:10.2.2
+|    +--- org.apache.lucene:lucene-highlighter:10.2.2
+|    +--- org.apache.lucene:lucene-join:10.2.2
+|    +--- org.apache.lucene:lucene-memory:10.2.2
+|    +--- org.apache.lucene:lucene-misc:10.2.2
+|    +--- org.apache.lucene:lucene-queries:10.2.2
+|    +--- org.apache.lucene:lucene-queryparser:10.2.2
+|    +--- org.apache.lucene:lucene-sandbox:10.2.2
+|    +--- org.apache.lucene:lucene-spatial-extras:10.2.2
+|    +--- org.apache.lucene:lucene-spatial3d:10.2.2
+|    +--- org.apache.lucene:lucene-suggest:10.2.2
+|    +--- org.opensearch:opensearch-cli:3.2.0-SNAPSHOT
+|    |    +--- net.sf.jopt-simple:jopt-simple:5.0.4
+|    |    \--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    +--- joda-time:joda-time:2.12.7
+|    +--- com.tdunning:t-digest:3.3
+|    +--- org.hdrhistogram:HdrHistogram:2.2.2
+|    +--- org.locationtech.spatial4j:spatial4j:0.7
+|    +--- org.locationtech.jts:jts-core:1.15.0
+|    +--- org.apache.logging.log4j:log4j-api:2.21.0
+|    +--- org.apache.logging.log4j:log4j-jul:2.21.0
+|    +--- org.apache.logging.log4j:log4j-core:2.21.0
+|    +--- net.java.dev.jna:jna:5.16.0
+|    +--- com.jcraft:jzlib:1.1.3
+|    +--- io.projectreactor:reactor-core:3.7.5
+|    +--- org.reactivestreams:reactive-streams:1.0.4
+|    +--- com.google.protobuf:protobuf-java:3.25.5
+|    +--- jakarta.annotation:jakarta.annotation-api:1.3.5
+|    \--- org.roaringbitmap:RoaringBitmap:1.3.0
++--- com.google.guava:failureaccess:1.0.1
++--- com.google.guava:guava:32.1.3-jre
++--- commons-lang:commons-lang:2.6
++--- org.locationtech.spatial4j:spatial4j:0.7
++--- org.locationtech.jts:jts-core:1.15.0
++--- org.apache.logging.log4j:log4j-api:2.21.0
++--- org.apache.logging.log4j:log4j-core:2.21.0
++--- net.java.dev.jna:jna:5.16.0
++--- org.opensearch.plugin:opensearch-scripting-painless-spi:3.2.0-SNAPSHOT
+|    \--- org.opensearch:opensearch:3.2.0-SNAPSHOT (*)
++--- com.github.oshi:oshi-core:6.4.13
++--- io.github.jbellis:jvector:4.0.0-rc.4
++--- org.agrona:agrona:1.20.0
++--- org.slf4j:slf4j-api:1.7.36
++--- org.apache.logging.log4j:log4j-slf4j2-impl:2.21.0
++--- org.projectlombok:lombok:1.18.38
++--- root project : (*)
++--- org.opensearch.test:framework:3.2.0-SNAPSHOT
+|    +--- org.opensearch.client:opensearch-rest-client:3.2.0-SNAPSHOT
+|    |    +--- org.apache.httpcomponents.client5:httpclient5:5.4.4
+|    |    +--- org.apache.httpcomponents.core5:httpcore5:5.3.4
+|    |    +--- org.apache.httpcomponents.core5:httpcore5-h2:5.3.4
+|    |    +--- org.apache.httpcomponents.core5:httpcore5-reactive:5.3.4
+|    |    +--- commons-codec:commons-codec:1.16.1
+|    |    +--- commons-logging:commons-logging:1.2
+|    |    +--- org.slf4j:slf4j-api:1.7.36
+|    |    +--- io.projectreactor:reactor-core:3.7.5
+|    |    \--- org.reactivestreams:reactive-streams:1.0.4
+|    +--- org.opensearch.client:opensearch-rest-client-sniffer:3.2.0-SNAPSHOT
+|    |    +--- org.opensearch.client:opensearch-rest-client:3.2.0-SNAPSHOT (*)
+|    |    +--- org.apache.httpcomponents.client5:httpclient5:5.4.4
+|    |    +--- org.apache.httpcomponents.core5:httpcore5:5.3.4
+|    |    +--- commons-codec:commons-codec:1.16.1
+|    |    +--- commons-logging:commons-logging:1.2
+|    |    \--- com.fasterxml.jackson.core:jackson-core:2.18.2
+|    +--- org.opensearch:opensearch-nio:3.2.0-SNAPSHOT
+|    |    \--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    +--- org.opensearch:opensearch:3.2.0-SNAPSHOT (*)
+|    +--- org.opensearch:opensearch-cli:3.2.0-SNAPSHOT (*)
+|    +--- org.opensearch:opensearch-telemetry:3.2.0-SNAPSHOT (*)
+|    +--- org.opensearch.test:telemetry:3.2.0-SNAPSHOT
+|    |    +--- org.opensearch:opensearch-core:3.2.0-SNAPSHOT (*)
+|    |    +--- org.opensearch:opensearch-common:3.2.0-SNAPSHOT
+|    |    \--- org.opensearch:opensearch-telemetry:3.2.0-SNAPSHOT (*)
+|    +--- com.carrotsearch.randomizedtesting:randomizedtesting-runner:2.7.1
+|    +--- junit:junit:4.13.2
+|    +--- org.hamcrest:hamcrest:2.1
+|    +--- org.apache.lucene:lucene-test-framework:10.2.2
+|    +--- org.apache.lucene:lucene-codecs:10.2.2
+|    +--- commons-logging:commons-logging:1.2
+|    +--- commons-codec:commons-codec:1.16.1
+|    +--- org.mockito:mockito-core:5.16.1
+|    +--- net.bytebuddy:byte-buddy:1.17.5
+|    \--- org.objenesis:objenesis:3.3
++--- org.opensearch.client:opensearch-rest-high-level-client:3.2.0-SNAPSHOT
+|    +--- org.opensearch:opensearch:3.2.0-SNAPSHOT (*)
+|    +--- org.opensearch.client:opensearch-rest-client:3.2.0-SNAPSHOT (*)
+|    +--- org.opensearch.plugin:mapper-extras-client:3.2.0-SNAPSHOT
+|    +--- org.opensearch.plugin:parent-join-client:3.2.0-SNAPSHOT
+|    +--- org.opensearch.plugin:aggs-matrix-stats-client:3.2.0-SNAPSHOT
+|    +--- org.opensearch.plugin:rank-eval-client:3.2.0-SNAPSHOT
+|    \--- org.opensearch.plugin:lang-mustache-client:3.2.0-SNAPSHOT
+|         \--- com.github.spullara.mustache.java:compiler:0.9.14
++--- org.opensearch.plugin:transport-netty4-client:3.2.0-SNAPSHOT
+|    +--- io.netty:netty-buffer:4.1.124.Final
+|    +--- io.netty:netty-codec:4.1.124.Final
+|    +--- io.netty:netty-codec-http:4.1.124.Final
+|    +--- io.netty:netty-codec-http2:4.1.124.Final
+|    +--- io.netty:netty-common:4.1.124.Final
+|    +--- io.netty:netty-handler:4.1.124.Final
+|    +--- io.netty:netty-resolver:4.1.124.Final
+|    +--- io.netty:netty-transport:4.1.124.Final
+|    \--- io.netty:netty-transport-native-unix-common:4.1.124.Final
++--- root project : (*)
++--- com.jayway.jsonpath:json-path:2.9.0
++--- net.minidev:json-smart:2.5.2
+|    \--- net.minidev:accessors-smart:2.5.2
+|         \--- org.ow2.asm:asm:9.7.1
+\--- org.opensearch:common-utils:3.2.0.0-SNAPSHOT
+
+testRuntimeOnly - Runtime only dependencies for source set 'test'. (n)
+No dependencies
+
+zip
+No dependencies
+
+zipArchive
+\--- org.opensearch.plugin:opensearch-security:3.2.0.0-SNAPSHOT FAILED
+
+(*) - Indicates repeated occurrences of a transitive dependency subtree. Gradle expands transitive dependency subtrees only once per project; repeat occurrences only display the root of the subtree, followed by this annotation.
+
+(n) - A dependency or dependency configuration that cannot be resolved.
+
+A web-based, searchable dependency report is available by adding the --scan option.
+
+[Incubating] Problems report is available at: file:///Users/zhujiaxi/amazonworks/sourcecodes/peterzhuamazon/opensearch-jvector/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/8.14.3/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 8s
+1 actionable task: 1 executed
