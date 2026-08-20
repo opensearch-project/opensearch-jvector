@@ -124,18 +124,7 @@ public enum MethodParameter {
             validationException.addValidationError(METHOD_PARAMETER_RERANK_FLOOR + " should be greater than or equal to 0");
             return validationException;
         }
-    },
-    USE_PRUNING(METHOD_PARAMETER_USE_PRUNING, Version.V_3_0_0, USE_PRUNING_FIELD) {
-        @Override
-        public Boolean parse(Object value) {
-            return parseBoolean(value, METHOD_PARAMETER_USE_PRUNING);
-        }
-
-        @Override
-        public ValidationException validate(Object value) {
-            return null;
-        }
-    },;
+    };
 
     private final String name;
     private final Version version;
