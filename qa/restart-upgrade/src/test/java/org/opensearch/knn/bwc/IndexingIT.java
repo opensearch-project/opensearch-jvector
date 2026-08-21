@@ -49,8 +49,6 @@ public class IndexingIT extends AbstractRestartUpgradeTestCase {
             createKnnIndex(testIndex, getKNNDefaultIndexSettings(), createKnnIndexMapping(TEST_FIELD, DIMENSIONS));
             addKNNDocs(testIndex, TEST_FIELD, DIMENSIONS, DOC_ID, NUM_DOCS);
         } else {
-            // update index setting to allow build graph always since we test graph count that are loaded into memory
-            updateIndexSettings(testIndex, Settings.builder().put(KNNSettings.INDEX_KNN_ADVANCED_APPROXIMATE_THRESHOLD, 0));
             validateKNNIndexingOnUpgrade(NUM_DOCS);
         }
     }
@@ -246,9 +244,6 @@ public class IndexingIT extends AbstractRestartUpgradeTestCase {
                 KNN_ALGO_PARAM_M_MIN_VALUE,
                 KNN_ALGO_PARAM_EF_CONSTRUCTION_MIN_VALUE
             );
-            if (isApproximateThresholdSupported(getBWCVersion())) {
-                indexMappingSettings.put(KNNSettings.INDEX_KNN_ADVANCED_APPROXIMATE_THRESHOLD, 0);
-            }
             createKnnIndex(testIndex, indexMappingSettings.build(), createKnnIndexMapping(TEST_FIELD, DIMENSIONS));
             addKNNDocs(testIndex, TEST_FIELD, DIMENSIONS, DOC_ID, NUM_DOCS);
         } else {
@@ -368,7 +363,6 @@ public class IndexingIT extends AbstractRestartUpgradeTestCase {
 
     // KNN indexing tests when the cluster is upgraded to latest version
     public void validateKNNIndexingOnUpgrade(int numOfDocs) throws Exception {
-        updateIndexSettings(testIndex, Settings.builder().put(KNNSettings.INDEX_KNN_ADVANCED_APPROXIMATE_THRESHOLD, 0));
         forceMergeKnnIndex(testIndex);
         QUERY_COUNT = numOfDocs;
         validateKNNSearch(testIndex, TEST_FIELD, DIMENSIONS, QUERY_COUNT, K);

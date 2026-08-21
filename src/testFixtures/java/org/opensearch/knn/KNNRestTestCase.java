@@ -102,7 +102,6 @@ import static org.opensearch.knn.TestUtils.QUERY_VALUE;
 import static org.opensearch.knn.TestUtils.computeGroundTruthValues;
 
 import static org.opensearch.knn.common.KNNConstants.VECTOR_DATA_TYPE_FIELD;
-import static org.opensearch.knn.index.KNNSettings.INDEX_KNN_ADVANCED_APPROXIMATE_THRESHOLD;
 import static org.opensearch.knn.index.KNNSettings.KNN_INDEX;
 import static org.opensearch.knn.index.SpaceType.L2;
 
@@ -1012,7 +1011,6 @@ public class KNNRestTestCase extends ODFERestTestCase {
             .put("number_of_replicas", 0)
             .put(KNN_INDEX, true)
             // .put(KNNSettings.KNN_DERIVED_SOURCE_ENABLED, true)
-            .put(INDEX_KNN_ADVANCED_APPROXIMATE_THRESHOLD, approximateThreshold)
             // .put("use_compound_file", false)
             .build();
     }

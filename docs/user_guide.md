@@ -1047,7 +1047,6 @@ For derived source configuration and version-specific behavior, see [docs/derive
 | Setting | Default | Description |
 |---|---|---|
 | `index.knn` | — | Set to `true` to enable the KNN plugin on the index (required) |
-| `index.knn.advanced.approximate_threshold` | `15000` | Minimum document count per segment before an approximate graph is built |
 | `index.knn.disk.vector.shard_level_rescoring_disabled` | `false` | Disable shard-level re-scoring for on-disk vectors |
 | `index.knn.derived_source.enabled` | `true` | Store vectors in derived source fields |
 
