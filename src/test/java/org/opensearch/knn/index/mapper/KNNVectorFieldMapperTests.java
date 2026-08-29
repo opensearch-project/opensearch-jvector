@@ -7,6 +7,8 @@ package org.opensearch.knn.index.mapper;
 
 import lombok.SneakyThrows;
 import lombok.extern.log4j.Log4j2;
+import org.apache.lucene.document.Field;
+import org.apache.lucene.index.DocValuesType;
 import org.opensearch.Version;
 import org.opensearch.cluster.metadata.IndexMetadata;
 import org.opensearch.common.ValidationException;
@@ -23,6 +25,7 @@ import org.opensearch.index.mapper.MapperService;
 import org.opensearch.index.mapper.ParseContext;
 import org.opensearch.knn.KNNTestCase;
 import org.opensearch.knn.common.KNNConstants;
+import org.opensearch.knn.index.DerivedKnnFloatVectorField;
 import org.opensearch.knn.index.SpaceType;
 import org.opensearch.knn.index.VectorDataType;
 import org.opensearch.knn.index.engine.KNNEngine;
@@ -123,6 +126,98 @@ public class KNNVectorFieldMapperTests extends KNNTestCase {
                 .getParameters()
                 .get(METHOD_PARAMETER_M)
         );
+    }
+
+    /**
+     * jVector keeps full-precision vectors inline in the graph and serves them via
+     * {@code JVectorReader#getFloatVectorValues}, so the extra binary doc values copy is never read. Only indices created
+     * on or after the cutoff may skip it — older ones already recorded the field as BINARY and should be unchanged.
+     */
+    public void testShouldWriteBinaryDocValues_jvectorSkipsOnlyForNewIndices() {
+        Version preCutoff = Version.V_3_8_0;
+        Version cutoff = KNNVectorFieldMapperUtil.SKIP_BINARY_DOC_VALUES_FOR_JVECTOR_VERSION;
+
+        assertFalse(KNNVectorFieldMapperUtil.shouldWriteBinaryDocValues(KNNEngine.JVECTOR, cutoff));
+        assertTrue(KNNVectorFieldMapperUtil.shouldWriteBinaryDocValues(KNNEngine.JVECTOR, preCutoff));
+        assertTrue(KNNVectorFieldMapperUtil.shouldWriteBinaryDocValues(KNNEngine.JVECTOR, Version.V_2_17_0));
+
+        // Engine scoping: every other engine keeps binary doc values regardless of version.
+        assertTrue(KNNVectorFieldMapperUtil.shouldWriteBinaryDocValues(KNNEngine.LUCENE, cutoff));
+        assertTrue(KNNVectorFieldMapperUtil.shouldWriteBinaryDocValues(KNNEngine.LUCENE, preCutoff));
+    }
+
+    public void testLuceneFieldMapper_jvector_newIndex_doesNotWriteBinaryDocValues() throws IOException {
+        KNNVectorFieldMapper mapper = buildLuceneBackedMapper(
+            KNNEngine.JVECTOR,
+            DISK_ANN,
+            KNNVectorFieldMapperUtil.SKIP_BINARY_DOC_VALUES_FOR_JVECTOR_VERSION
+        );
+        assertTrue(mapper instanceof LuceneFieldMapper);
+
+        List<Field> fields = mapper.getFieldsForFloatVector(new float[TEST_DIMENSION], false);
+
+        // The KnnVectorsFormat copy is still written ...
+        assertEquals(1, fields.size());
+        assertTrue(fields.get(0) instanceof DerivedKnnFloatVectorField);
+        // ... and the redundant fp32 copy in binary doc values is not.
+        assertTrue(fields.stream().noneMatch(field -> field.fieldType().docValuesType() == DocValuesType.BINARY));
+    }
+
+    /**
+     * A jVector index created before the cutoff already has the field as BINARY in its existing segments, so new segments
+     * must keep declaring BINARY or Lucene's FieldNumbers rejects the schema change on the next write after upgrade.
+     */
+    public void testLuceneFieldMapper_jvector_preExistingIndex_stillWritesBinaryDocValues() throws IOException {
+        KNNVectorFieldMapper mapper = buildLuceneBackedMapper(KNNEngine.JVECTOR, DISK_ANN, Version.V_3_8_0);
+        assertTrue(mapper instanceof LuceneFieldMapper);
+
+        List<Field> fields = mapper.getFieldsForFloatVector(new float[TEST_DIMENSION], false);
+
+        assertTrue(fields.stream().anyMatch(field -> field.fieldType().docValuesType() == DocValuesType.BINARY));
+    }
+
+    /**
+     * Guards the narrow scope of the jVector change: the Lucene engine shares {@link LuceneFieldMapper} and must keep
+     * writing binary doc values at any index version.
+     */
+    public void testLuceneFieldMapper_lucene_stillWritesBinaryDocValues() throws IOException {
+        KNNVectorFieldMapper mapper = buildLuceneBackedMapper(
+            KNNEngine.LUCENE,
+            METHOD_HNSW,
+            KNNVectorFieldMapperUtil.SKIP_BINARY_DOC_VALUES_FOR_JVECTOR_VERSION
+        );
+        assertTrue(mapper instanceof LuceneFieldMapper);
+
+        List<Field> fields = mapper.getFieldsForFloatVector(new float[TEST_DIMENSION], false);
+
+        assertTrue(fields.stream().anyMatch(field -> field.fieldType().docValuesType() == DocValuesType.BINARY));
+    }
+
+    private KNNVectorFieldMapper buildLuceneBackedMapper(
+        final KNNEngine knnEngine,
+        final String methodName,
+        final Version indexCreatedVersion
+    ) throws IOException {
+        XContentBuilder xContentBuilder = XContentFactory.jsonBuilder()
+            .startObject()
+            .field(TYPE_FIELD_NAME, KNN_VECTOR_TYPE)
+            .field(DIMENSION_FIELD_NAME, TEST_DIMENSION)
+            .startObject(KNN_METHOD)
+            .field(NAME, methodName)
+            .field(KNN_ENGINE, knnEngine.getName())
+            .field(METHOD_PARAMETER_SPACE_TYPE, SpaceType.L2.getValue())
+            .endObject()
+            .endObject();
+
+        Settings settings = Settings.builder().put(settings(indexCreatedVersion).build()).put(KNN_INDEX, true).build();
+        // buildParserContext pins the parser context to Version.CURRENT, but the whole point here is the index created
+        // version, which is what KNNMethodConfigContext#getVersionCreated ends up carrying into the mapper.
+        KNNVectorFieldMapper.Builder builder = (KNNVectorFieldMapper.Builder) new KNNVectorFieldMapper.TypeParser().parse(
+            TEST_FIELD_NAME,
+            xContentBuilderToMap(xContentBuilder),
+            dobuildParserContext(TEST_INDEX_NAME, settings, indexCreatedVersion)
+        );
+        return builder.build(new Mapper.BuilderContext(settings, new ContentPath()));
     }
 
     public void testTypeParser_parse_fromKnnMethodContext_invalidDimension() throws IOException {

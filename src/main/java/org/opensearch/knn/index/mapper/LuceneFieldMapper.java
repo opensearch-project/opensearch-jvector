@@ -107,7 +107,12 @@ public class LuceneFieldMapper extends KNNVectorFieldMapper {
 
         this.fieldType = vectorDataType.createKnnVectorFieldType(knnMappingConfig.getDimension(), knnVectorSimilarityFunction);
 
-        if (this.hasDocValues) {
+        // jVector keeps the full-precision vectors inline in the graph (.data-jvector) and serves them through
+        // JVectorReader#getFloatVectorValues. Binary doc values copy is never read.
+        // Skipping it removes one raw fp32 copy per document giving indexing/merge time improvements. Do this
+        // for new indices after v3.9.0.0.
+        if (this.hasDocValues
+            && KNNVectorFieldMapperUtil.shouldWriteBinaryDocValues(resolvedKnnMethodContext.getKnnEngine(), this.indexCreatedVersion)) {
             this.vectorFieldType = buildDocValuesFieldType(resolvedKnnMethodContext.getKnnEngine());
         } else {
             this.vectorFieldType = null;
