@@ -257,17 +257,20 @@ publishing {
 }
 
 /*** Setting up lombok in compiler args ***/
+tasks.withType(JavaCompile).configureEach {
+    options.release = java_release_version.toInteger()
+    sourceCompatibility = java_release_version
+    targetCompatibility = java_release_version
+}
+
 compileJava {
     options.compilerArgs.addAll(["-processor", 'lombok.launch.AnnotationProcessorHider$AnnotationProcessor'])
-    options.release = java_release_version.toInteger()
 }
 compileTestJava {
     options.compilerArgs.addAll(["-processor", 'lombok.launch.AnnotationProcessorHider$AnnotationProcessor'])
-    options.release = java_release_version.toInteger()
 }
 compileTestFixturesJava {
     options.compilerArgs.addAll(["-processor", 'lombok.launch.AnnotationProcessorHider$AnnotationProcessor'])
-    options.release = java_release_version.toInteger()
 }
 
 /*** End of lombok setup ***/
@@ -373,6 +376,28 @@ dependencies {
 var avx512_spr = System.getProperty("avx512_spr.enabled")
 var avx512 = System.getProperty("avx512.enabled")
 
+def nativeBuildDir = "${project.buildDir}/native"
+def nativeLibDir = "${nativeBuildDir}/_deps/faiss-build/c_api"
+
+tasks.register('cmakeFaiss', Exec) {
+    doFirst {
+        file(nativeBuildDir).mkdirs()
+    }
+    workingDir nativeBuildDir
+    commandLine 'cmake', "${projectDir}/native",
+            "-DFAISS_ENABLE_C_API=ON",
+            "-DFAISS_ENABLE_GPU=OFF",
+            "-DFAISS_ENABLE_PYTHON=OFF",
+            "-DBUILD_SHARED_LIBS=ON",
+            "-DBUILD_TESTING=OFF"
+}
+
+tasks.register('buildFaiss', Exec) {
+    dependsOn cmakeFaiss
+    workingDir nativeBuildDir
+    commandLine 'cmake', '--build', '.', '--target', 'faiss_c', '--parallel'
+}
+
 test {
     systemProperty 'tests.security.manager', 'false'
     systemProperty 'opensearch.set.netty.runtime.available.processors', 'false'
@@ -401,6 +426,7 @@ test {
 
     //this change enables mockito-inline that supports mocking of static classes/calls
     systemProperty "jdk.attach.allowAttachSelf", true
+    systemProperty "java.library.path", nativeLibDir
 
     retry {
         maxRetries = 3
@@ -449,6 +475,7 @@ integTest {
         systemProperty 'cluster.number_of_nodes', "${_numNodes}"
 
         systemProperty 'jdk.incubator.vector.VECTOR_ACCESS_OOB_CHECK', "0"
+        systemProperty "java.library.path", nativeLibDir
         jvmArgs = [
                 '--add-modules', 'jdk.incubator.vector',
                 '--add-opens', 'java.base/java.nio=ALL-UNNAMED',
@@ -518,6 +545,8 @@ testClusters.integTest { cluster ->
     systemProperty "java.security.policy", "file://${project.rootDir}/src/main/plugin-metadata/plugin-security.policy"
     systemProperty 'log4j.configurationFile', "${project.rootDir}/src/test/resources/log4j2.properties"
     systemProperty 'jvector.experimental.enable_native_vectorization', getNativeVectorizationProviderFlag()
+    systemProperty "java.library.path", nativeLibDir
+    jvmArgs "--enable-native-access=ALL-UNNAMED", "--enable-preview"
     // Enable gRPC transport module (following neural-search pattern)
     setting("aux.transport.types", "[transport-grpc]")
     // Bind gRPC to IPv4 loopback to avoid dual-stack port mismatch
@@ -528,7 +557,7 @@ testClusters.integTest { cluster ->
         configureSecurityPlugin(testClusters.integTest)
     } else {
         // Only install custom codecs plugin
-        configurations.zipArchive.asFileTree.filter(f -> f.name.contains("custom-codecs")).each {
+        configurations.zipArchive.asFileTree.filter { f -> f.name.contains("custom-codecs") }.each {
             cluster.plugin(provider(new Callable<RegularFile>() {
                 @Override
                 RegularFile call() throws Exception {
@@ -599,15 +628,19 @@ task integTestRemote(type: RestIntegTestTask) {
 }
 
 run {
+    dependsOn buildFaiss
     useCluster project.testClusters.integTest
 
-    // Set JVM arguments for memory
+    // Set JVM arguments for memory and native library access
     testClusters.integTest.nodes.each { node ->
+        node.systemProperty("java.library.path", nativeLibDir)
         node.jvmArgs(
                 '-Xms2g',  // Initial heap size
                 '-Xmx2g',   // Maximum heap size
                 '-XX:+UnlockDiagnosticVMOptions',
-                "-XX:CompilerDirectivesFile=${project.rootDir}/src/main/resources/hotspot_compiler"
+                "-XX:CompilerDirectivesFile=${project.rootDir}/src/main/resources/hotspot_compiler",
+                "--enable-native-access=ALL-UNNAMED",
+                "--enable-preview"
         )
     }
 

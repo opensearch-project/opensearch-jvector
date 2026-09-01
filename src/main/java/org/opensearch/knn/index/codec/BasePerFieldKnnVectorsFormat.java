@@ -112,6 +112,7 @@ public abstract class BasePerFieldKnnVectorsFormat extends PerFieldKnnVectorsFor
         switch (engine) {
             // All Java engines to use Lucene extensions directly
             case JVECTOR:
+            case FAISS:
                 knnVectorsFormatParams = new KNNVectorsFormatParams(
                     params,
                     defaultMaxConnections,

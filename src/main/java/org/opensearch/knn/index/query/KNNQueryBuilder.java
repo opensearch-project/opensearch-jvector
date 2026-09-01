@@ -540,6 +540,7 @@ public class KNNQueryBuilder extends AbstractQueryBuilder<KNNQueryBuilder> imple
             }
             switch (knnEngine) {
                 case LUCENE:
+                case FAISS:
                     if (byteVector.length > 0) {
                         byte[] target = getVectorForCreatingQueryRequest(vectorDataType, knnEngine, byteVector);
                         return new KnnByteVectorQuery(this.fieldName, target, k, filterQuery);

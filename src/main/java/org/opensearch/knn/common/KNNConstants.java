@@ -73,6 +73,7 @@ public class KNNConstants {
     public static final String HNSW_ALGO_EF_CONSTRUCTION = "efConstruction";
 
     // Faiss specific constants
+    public static final String FAISS_NAME = "faiss";
     public static final String METHOD_ENCODER_PARAMETER = "encoder";
     public static final String METHOD_PARAMETER_NPROBES = "nprobes";
     public static final String ENCODER_FLAT = "flat";
