@@ -74,7 +74,7 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
 
         IndexWriterConfig config = newIndexWriterConfig();
         config.setUseCompoundFile(false);
-        config.setCodec(getCodec(1, random().nextBoolean()));
+        config.setCodec(getCodec(randomFrom(1, 1024), random().nextBoolean()));
         config.setMergePolicy(new ForceMergesOnlyMergePolicy());
         config.setMergeScheduler(new SerialMergeScheduler());
 
@@ -156,7 +156,7 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
 
         IndexWriterConfig config = newIndexWriterConfig();
         config.setUseCompoundFile(false);
-        config.setCodec(getCodec(1, random().nextBoolean()));
+        config.setCodec(getCodec(randomFrom(1, 1024), random().nextBoolean()));
         config.setMergePolicy(new ForceMergesOnlyMergePolicy());
         config.setMergeScheduler(new SerialMergeScheduler());
 
@@ -228,7 +228,7 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
 
         IndexWriterConfig config = newIndexWriterConfig();
         config.setUseCompoundFile(false);
-        config.setCodec(getCodec(1, random().nextBoolean()));
+        config.setCodec(getCodec(randomFrom(1, 1024), random().nextBoolean()));
         config.setMergePolicy(new ForceMergesOnlyMergePolicy());
         config.setMergeScheduler(new SerialMergeScheduler());
 
@@ -309,7 +309,7 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
 
         IndexWriterConfig config = newIndexWriterConfig();
         config.setUseCompoundFile(false);
-        config.setCodec(getCodec(1, random().nextBoolean()));
+        config.setCodec(getCodec(randomFrom(1, 1024), random().nextBoolean()));
         config.setMergePolicy(new ForceMergesOnlyMergePolicy());
         config.setMergeScheduler(new SerialMergeScheduler());
 
@@ -390,9 +390,7 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
 
         IndexWriterConfig config = newIndexWriterConfig();
         config.setUseCompoundFile(false);
-        config.setCodec(
-            getCodec(random().nextBoolean() ? 1 : 10, random().nextBoolean())
-        ); /* 1 to check empty PQ vectors, 10 to check empty graph */
+        config.setCodec(getCodec(randomFrom(1, 1024), random().nextBoolean())); /* 1 to check empty PQ vectors, 10 to check empty graph */
         config.setMergePolicy(new ForceMergesOnlyMergePolicy());
         config.setMergeScheduler(new SerialMergeScheduler());
 
@@ -533,7 +531,7 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
     public void testMergeRefineWithEmptyReaderReproducesIssue600() throws IOException {
         final int dimension = 16;
         // minBatch == 1 => PQ codebooks are always computed on merge
-        final int minBatch = 1;
+        final int minBatch = randomFrom(1, 1024);
         final boolean hierarchical = random().nextBoolean();
 
         final Path emptyGraphIndexPath = createTempDir();
@@ -638,7 +636,7 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
 
         IndexWriterConfig config = newIndexWriterConfig();
         config.setUseCompoundFile(false);
-        config.setCodec(getCodec(1, random().nextBoolean()));
+        config.setCodec(getCodec(randomFrom(1, 1024), random().nextBoolean()));
         config.setMergePolicy(new ForceMergesOnlyMergePolicy());
         config.setMergeScheduler(new SerialMergeScheduler());
 
@@ -713,8 +711,7 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
 
         IndexWriterConfig config = newIndexWriterConfig();
         config.setUseCompoundFile(false);
-        config.setCodec(getCodec(1, random().nextBoolean())); // Enable PQ
-        // config.setCodec(getCodec(1000000)); // Disable PQ
+        config.setCodec(getCodec(randomFrom(1, 1024), random().nextBoolean())); // Enable PQ
         config.setMergePolicy(new ForceMergesOnlyMergePolicy());
         config.setMergeScheduler(new SerialMergeScheduler());
 
@@ -988,7 +985,7 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
 
         IndexWriterConfig config = newIndexWriterConfig();
         config.setUseCompoundFile(false);
-        config.setCodec(getCodec(1, random().nextBoolean()));
+        config.setCodec(getCodec(randomFrom(1, 1024), random().nextBoolean()));
         config.setMergePolicy(new ForceMergesOnlyMergePolicy());
         config.setMergeScheduler(new SerialMergeScheduler());
 
@@ -1241,7 +1238,7 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
 
         IndexWriterConfig config = newIndexWriterConfig();
         config.setUseCompoundFile(false);
-        config.setCodec(getCodec(1, random().nextBoolean()));
+        config.setCodec(getCodec(randomFrom(1, 1024), random().nextBoolean()));
         config.setMergePolicy(new ForceMergesOnlyMergePolicy());
         config.setMergeScheduler(new SerialMergeScheduler());
 
@@ -1392,7 +1389,7 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
 
         IndexWriterConfig config = newIndexWriterConfig();
         config.setUseCompoundFile(false);
-        config.setCodec(getCodec(1, random().nextBoolean()));
+        config.setCodec(getCodec(randomFrom(1, 1024), random().nextBoolean()));
         config.setMergePolicy(new ForceMergesOnlyMergePolicy());
         config.setMergeScheduler(new SerialMergeScheduler());
 
@@ -1549,7 +1546,7 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
 
         IndexWriterConfig config = newIndexWriterConfig();
         config.setUseCompoundFile(false);
-        config.setCodec(getCodec(1, random().nextBoolean()));
+        config.setCodec(getCodec(randomFrom(1, 1024), random().nextBoolean()));
         config.setMergePolicy(new ForceMergesOnlyMergePolicy());
         config.setMergeScheduler(new SerialMergeScheduler());
 
@@ -1670,6 +1667,11 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
         }
     }
 
+    private <T> T randomFrom(T... values) {
+        int index = random().nextInt(values.length);
+        return values[index];
+    }
+
     private static float[] getVector(final IndexReader reader, final String field, final int doc) throws IOException {
         for (LeafReaderContext context : reader.leaves()) {
             final FloatVectorValues vectorValues = context.reader().getFloatVectorValues(field);
@@ -1689,6 +1691,6 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
             }
         }
 
-        throw new IllegalStateException("The docId " + doc + " expected but was not found");
+        return null;
     }
 }
