@@ -697,6 +697,10 @@ public class JVectorWriter extends KnnVectorsWriter {
         // Ordinal sparsity has a memory cost (in terms map memory usage)
         // during leading segment merge.
         private static final double MIN_HEAP_GRAPH_ORDINAL_DENSITY = 0.4;
+        // a number in [0.0, 1.0] that indicates how much leading segment live vectors dominate
+        // over live vectors across all other segments, this is relevant when PQ is triggered since
+        // only leading segment vectors will be taken into account
+        private static final double MAX_PQ_LEADING_SEGMENT_LIVE_VECTOR_FACTOR = 0.1;
 
         // Array of sub-readers
         private final KnnVectorsReader[] readers;
@@ -1077,78 +1081,83 @@ public class JVectorWriter extends KnnVectorsWriter {
             PerFieldKnnVectorsFormat.FieldsReader fieldsReader = (PerFieldKnnVectorsFormat.FieldsReader) readers[LEADING_READER_IDX];
             JVectorReader leadingReader = (JVectorReader) fieldsReader.getFieldReader(fieldName);
 
-            // Check if the leading reader has pre-existing PQ codebooks and if so, refine them with the remaining vectors
-            if (leadingReader.getProductQuantizationForField(fieldInfo.name).isEmpty()) {
-                // No pre-existing codebooks, check if we have enough vectors to trigger quantization
-                log.info(
-                    "No Pre-existing PQ codebooks found in this merge for field {} in segment {}, will check if a new codebooks is necessary",
-                    fieldName,
-                    mergeState.segmentInfo.name
-                );
-                if (totalLiveVectorsCount >= minimumBatchSizeForQuantization) {
-                    log.info(
-                        "Calculating new codebooks and compressed vectors for field: {}, with totalVectorCount: {}, above minimumBatchSizeForQuantization: {}",
-                        fieldName,
-                        totalVectorsCount,
-                        minimumBatchSizeForQuantization
-                    );
-                    compactPqVectors = JVectorIndexQuantization.computePqVectors(
-                        compactRavv,
-                        getVectorSimilarityFunction(fieldInfo),
-                        quantization.numSubspaces(compactRavv.dimension()),
-                        simdPoolMerge
-                    );
-                } else {
-                    log.info(
-                        "Not enough vectors found for field: {}, totalVectorCount: {}, is below minimumBatchSizeForQuantization: {}",
-                        fieldName,
-                        totalVectorsCount,
-                        minimumBatchSizeForQuantization
-                    );
-                    compactPqVectors = null;
-                }
-            } else {
-                log.info(
-                    "Pre-existing PQ codebooks found in this merge for field {} in segment {}, will refine the codebooks from the leading reader with the remaining vectors",
-                    fieldName,
-                    mergeState.segmentInfo.name
-                );
+            final ProductQuantization leadingCompressor;
+            if (leadingReader.getProductQuantizationForField(fieldName).isEmpty() == false) {
                 final long start = Clock.systemDefaultZone().millis();
-                ProductQuantization leadingCompressor = leadingReader.getProductQuantizationForField(fieldName).get();
-                // We are not refining PQ codes on merge presently.
-                // See https://github.com/opensearch-project/opensearch-jvector/issues/661
+                leadingCompressor = leadingReader.getProductQuantizationForField(fieldName).get();
                 final long end = Clock.systemDefaultZone().millis();
                 final long trainingTime = end - start;
                 log.info("Refined PQ codebooks for field {}, in {} millis", fieldName, trainingTime);
                 KNNCounter.KNN_QUANTIZATION_TRAINING_TIME.add(trainingTime);
-                compactPqVectors = PQVectors.encodeAndBuild(leadingCompressor, compactRavv.size(), compactRavv, simdPoolMerge);
+            } else {
+                leadingCompressor = null;
             }
 
-            if (compactPqVectors == null) {
-                final String segmentName = segmentWriteState.segmentInfo.name;
-                log.info("No PQ codebooks found, will merge with full-precision vectors: field {} in segment {}", fieldName, segmentName);
+            boolean ok = tryLeadingSegmentMerge(leadingCompressor);
+            if (!ok) {
+                // Check if the leading reader has pre-existing PQ codebooks and if so, refine them with the remaining vectors
+                if (leadingCompressor == null) {
+                    // No pre-existing codebooks, check if we have enough vectors to trigger quantization
+                    log.info(
+                        "No Pre-existing PQ codebooks found in this merge for field {} in segment {}, will check if a new codebooks is necessary",
+                        fieldName,
+                        mergeState.segmentInfo.name
+                    );
+                    if (totalLiveVectorsCount >= minimumBatchSizeForQuantization) {
+                        log.info(
+                            "Calculating new codebooks and compressed vectors for field: {}, with totalVectorCount: {}, above minimumBatchSizeForQuantization: {}",
+                            fieldName,
+                            totalVectorsCount,
+                            minimumBatchSizeForQuantization
+                        );
+                        compactPqVectors = JVectorIndexQuantization.computePqVectors(
+                            compactRavv,
+                            getVectorSimilarityFunction(fieldInfo),
+                            quantization.numSubspaces(compactRavv.dimension()),
+                            simdPoolMerge
+                        );
+                    } else {
+                        log.info(
+                            "Not enough vectors found for field: {}, totalVectorCount: {}, is below minimumBatchSizeForQuantization: {}",
+                            fieldName,
+                            totalVectorsCount,
+                            minimumBatchSizeForQuantization
+                        );
+                        compactPqVectors = null;
+                    }
+                } else {
+                    log.info(
+                        "Pre-existing PQ codebooks found in this merge for field {} in segment {}, will refine the codebooks from the leading reader with the remaining vectors",
+                        fieldName,
+                        mergeState.segmentInfo.name
+                    );
+                    compactPqVectors = PQVectors.encodeAndBuild(leadingCompressor, compactRavv.size(), compactRavv, simdPoolMerge);
+                }
 
-                boolean ok = tryLeadingSegmentMerge();
-                if (!ok) {
+                if (compactPqVectors == null) {
                     // leading segment merge was skipped
                     log.info(
                         "Merging segments by building graph from scratch (skipping leading segment merge) for segment {}, on field {}",
-                        segmentName,
+                        segmentWriteState.segmentInfo.name,
                         fieldName
                     );
                     var bsp = BuildScoreProvider.randomAccessScoreProvider(compactRavv, getVectorSimilarityFunction(fieldInfo));
                     var graph = getGraph(bsp, compactRavv, fieldInfo, segmentWriteState.segmentInfo.name, simdPoolMerge);
                     writeField(fieldInfo, compactRavv, compactOrdToDocMap, graph);
+                } else {
+                    log.info("PQ codebooks found, building graph from scratch with PQ vectors");
+                    // We're building from scratch, so we can use the "compact" ordinal space directly
+                    var buildScoreProvider = BuildScoreProvider.pqBuildScoreProvider(
+                        getVectorSimilarityFunction(fieldInfo),
+                        compactPqVectors
+                    );
+                    // Pre-init the diversity provider here to avoid doing it lazily (as it could block the SIMD threads)
+                    buildScoreProvider.diversityProviderFor(0);
+                    var graph = getGraph(buildScoreProvider, compactRavv, fieldInfo, segmentWriteState.segmentInfo.name, simdPoolMerge);
+                    writeField(fieldInfo, compactRavv, compactPqVectors, compactOrdToDocMap, graph);
                 }
-            } else {
-                log.info("PQ codebooks found, building graph from scratch with PQ vectors");
-                // We're building from scratch, so we can use the "compact" ordinal space directly
-                var buildScoreProvider = BuildScoreProvider.pqBuildScoreProvider(getVectorSimilarityFunction(fieldInfo), compactPqVectors);
-                // Pre-init the diversity provider here to avoid doing it lazily (as it could block the SIMD threads)
-                buildScoreProvider.diversityProviderFor(0);
-                var graph = getGraph(buildScoreProvider, compactRavv, fieldInfo, segmentWriteState.segmentInfo.name, simdPoolMerge);
-                writeField(fieldInfo, compactRavv, compactPqVectors, compactOrdToDocMap, graph);
             }
+
         }
 
         /**
@@ -1163,7 +1172,7 @@ public class JVectorWriter extends KnnVectorsWriter {
          *
          * @return a boolean value indicating if leading segment merge was performed
          */
-        private boolean tryLeadingSegmentMerge() throws IOException {
+        private boolean tryLeadingSegmentMerge(ProductQuantization leadingCompressor) throws IOException {
             if (leadingSegmentMergeDisabled) {
                 log.info("Leading segment merge is disabled, skipping");
                 return false;
@@ -1219,6 +1228,20 @@ public class JVectorWriter extends KnnVectorsWriter {
                             heapOrdUpperBoundLong
                         );
                         return false;
+                    }
+
+                    if (leadingCompressor != null) {
+                        var leadingSegmentLiveVectorsFactor = totalLiveVectorsInOtherReaders / (double) totalLiveVectorsInLeadingReader;
+                        if (leadingSegmentLiveVectorsFactor > MAX_PQ_LEADING_SEGMENT_LIVE_VECTOR_FACTOR) {
+                            log.warn(
+                                "Leading segment does not contain sufficient live vectors to preserve the recall ({} / {}). "
+                                    + "Will skip leading segment merge. (totalLiveVectors={})",
+                                totalLiveVectorsInOtherReaders,
+                                totalLiveVectorsInLeadingReader,
+                                totalLiveVectorsCount
+                            );
+                            return false;
+                        }
                     }
 
                     log.info(
@@ -1285,9 +1308,46 @@ public class JVectorWriter extends KnnVectorsWriter {
                         throw new IllegalStateException("failed to fill one of the maps, this is a bug");
                     }
 
+                    PQVectors compactPqVectors = null;
+                    BuildScoreProvider leadingBsp = null;
                     var heapRavv = new RemappedRandomAccessVectorValues(this, heapToGlobalRavvOrds);
+                    if (leadingCompressor != null) {
+                        compactPqVectors = PQVectors.encodeAndBuild(leadingCompressor, heapRavv.size(), new RandomAccessVectorValues() {
+                            @Override
+                            public int size() {
+                                return heapRavv.size();
+                            }
 
-                    var leadingBsp = BuildScoreProvider.randomAccessScoreProvider(heapRavv, getVectorSimilarityFunction(fieldInfo));
+                            @Override
+                            public int dimension() {
+                                return heapRavv.dimension();
+                            }
+
+                            @Override
+                            public VectorFloat<?> getVector(int nodeId) {
+                                // PQVectors implementations does not deal with "holes" (deleted vectors)
+                                final int remapped = heapToGlobalRavvOrds[nodeId];
+                                if (remapped == GraphNodeIdToDocMap.NO_VECTOR_OR_DELETED_DOC) {
+                                    return null; /* no vector */
+                                } else {
+                                    return heapRavv.getVector(nodeId);
+                                }
+                            }
+
+                            @Override
+                            public boolean isValueShared() {
+                                return heapRavv.isValueShared();
+                            }
+
+                            @Override
+                            public RandomAccessVectorValues copy() {
+                                return heapRavv.copy();
+                            }
+                        }, simdPoolMerge);
+                        leadingBsp = BuildScoreProvider.pqBuildScoreProvider(getVectorSimilarityFunction(fieldInfo), compactPqVectors);
+                    } else {
+                        leadingBsp = BuildScoreProvider.randomAccessScoreProvider(heapRavv, getVectorSimilarityFunction(fieldInfo));
+                    }
 
                     // we left this uninitialized earlier, but we're ready to set it up now
                     // just in time to mutate the graph
@@ -1334,7 +1394,11 @@ public class JVectorWriter extends KnnVectorsWriter {
                     // Note that the ordinals for the OnDiskGraphIndex will automatically be compacted
                     // But the OnHeapGraphIndex will not
                     var finalOrdToDocMap = new GraphNodeIdToDocMap(finalOrdToDocId);
-                    writeField(fieldInfo, heapRavv, finalOrdToDocMap, graph);
+                    if (compactPqVectors != null) {
+                        writeField(fieldInfo, heapRavv, compactPqVectors, finalOrdToDocMap, graph);
+                    } else {
+                        writeField(fieldInfo, heapRavv, finalOrdToDocMap, graph);
+                    }
                     return true;
                 }
             }
