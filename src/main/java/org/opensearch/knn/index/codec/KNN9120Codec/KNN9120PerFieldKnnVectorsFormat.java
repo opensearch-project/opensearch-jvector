@@ -84,10 +84,7 @@ public class KNN9120PerFieldKnnVectorsFormat extends BasePerFieldKnnVectorsForma
                             "efConstruction=%d",
                             knnVectorsFormatParams.getBeamWidth()
                         );
-                        return new org.apache.lucene.sandbox.codecs.faiss.FaissKnnVectorsFormat(
-                            description,
-                            indexParams
-                        );
+                        return new FaissKnnVectorsFormatWrapper(description, indexParams);
                     default:
                         throw new IllegalArgumentException("Unsupported java engine: " + knnEngine);
                 }

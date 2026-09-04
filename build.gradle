@@ -366,6 +366,9 @@ dependencies {
     //api "io.github.jbellis:jvector-native:${jvector_version}"
     implementation 'org.agrona:agrona:1.23.1'
 
+    // Lucene sandbox v11 JAR
+    implementation files("${project.buildDir}/libs/lucene-sandbox-faiss-11.0.0-SNAPSHOT.jar")
+
     // Add this line for SLF4J 2.x compatibility
     implementation "org.apache.logging.log4j:log4j-slf4j2-impl:${versions.log4j}"
 
@@ -392,11 +395,30 @@ tasks.register('cmakeFaiss', Exec) {
             "-DBUILD_TESTING=OFF"
 }
 
+tasks.register('buildLuceneSandbox', Exec) {
+    workingDir "${project.rootDir}/lucene"
+    commandLine './gradlew', ':lucene:sandbox:jar'
+}
+
+tasks.register('repackageLuceneSandboxFaiss', Jar) {
+    dependsOn buildLuceneSandbox
+    archiveBaseName = 'lucene-sandbox-faiss'
+    archiveVersion = '11.0.0-SNAPSHOT'
+    destinationDirectory = file("${project.buildDir}/libs")
+
+    from(zipTree("${project.rootDir}/lucene/lucene/sandbox/build/libs/lucene-sandbox-11.0.0-SNAPSHOT.jar")) {
+        include 'org/apache/lucene/sandbox/codecs/faiss/**'
+        exclude 'META-INF/services/**'
+    }
+}
+
 tasks.register('buildFaiss', Exec) {
     dependsOn cmakeFaiss
     workingDir nativeBuildDir
     commandLine 'cmake', '--build', '.', '--target', 'faiss_c', '--parallel'
 }
+
+compileJava.dependsOn tasks.named('repackageLuceneSandboxFaiss')
 
 test {
     systemProperty 'tests.security.manager', 'false'
@@ -635,8 +657,8 @@ run {
     testClusters.integTest.nodes.each { node ->
         node.systemProperty("java.library.path", nativeLibDir)
         node.jvmArgs(
-                '-Xms2g',  // Initial heap size
-                '-Xmx2g',   // Maximum heap size
+                '-Xms8g',  // Initial heap size
+                '-Xmx8g',  // Maximum heap size
                 '-XX:+UnlockDiagnosticVMOptions',
                 "-XX:CompilerDirectivesFile=${project.rootDir}/src/main/resources/hotspot_compiler",
                 "--enable-native-access=ALL-UNNAMED",
