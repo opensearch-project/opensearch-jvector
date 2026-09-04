@@ -15,6 +15,7 @@ import org.opensearch.knn.index.mapper.CompressionLevel;
 import org.opensearch.knn.index.mapper.Mode;
 import org.opensearch.knn.index.query.rescore.RescoreContext;
 import org.opensearch.knn.index.codec.jvector.JVector;
+import org.opensearch.knn.index.engine.faiss.Faiss;
 
 import java.util.Collections;
 import java.util.List;
@@ -22,6 +23,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
+import static org.opensearch.knn.common.KNNConstants.FAISS_NAME;
 import static org.opensearch.knn.common.KNNConstants.LUCENE_NAME;
 import static org.opensearch.knn.common.KNNConstants.JVECTOR_NAME;
 
@@ -31,14 +33,19 @@ import static org.opensearch.knn.common.KNNConstants.JVECTOR_NAME;
  */
 public enum KNNEngine implements KNNLibrary, VectorSearchEngine {
     LUCENE(LUCENE_NAME, Lucene.INSTANCE),
-    JVECTOR(JVECTOR_NAME, JVector.INSTANCE);
+    JVECTOR(JVECTOR_NAME, JVector.INSTANCE),
+    FAISS(FAISS_NAME, Faiss.INSTANCE);
 
     public static final KNNEngine DEFAULT = JVECTOR;
 
-    private static final Set<KNNEngine> ENGINES_SUPPORTING_FILTERS = ImmutableSet.of(KNNEngine.LUCENE);
-    public static final Set<KNNEngine> ENGINES_SUPPORTING_RADIAL_SEARCH = ImmutableSet.of(KNNEngine.LUCENE);
+    private static final Set<KNNEngine> ENGINES_SUPPORTING_FILTERS = ImmutableSet.of(KNNEngine.LUCENE, KNNEngine.FAISS);
+    public static final Set<KNNEngine> ENGINES_SUPPORTING_RADIAL_SEARCH = ImmutableSet.of(KNNEngine.LUCENE, KNNEngine.FAISS);
 
-    private static Map<KNNEngine, Integer> MAX_DIMENSIONS_BY_ENGINE = Map.of(KNNEngine.LUCENE, 16_000, KNNEngine.JVECTOR, 16_000);
+    private static Map<KNNEngine, Integer> MAX_DIMENSIONS_BY_ENGINE = Map.of(
+        KNNEngine.LUCENE, 16_000,
+        KNNEngine.JVECTOR, 16_000,
+        KNNEngine.FAISS, 16_000
+    );
 
     /**
      * Constructor for KNNEngine
@@ -67,6 +74,10 @@ public enum KNNEngine implements KNNLibrary, VectorSearchEngine {
 
         if (JVECTOR.getName().equalsIgnoreCase(name)) {
             return JVECTOR;
+        }
+
+        if (FAISS.getName().equalsIgnoreCase(name)) {
+            return FAISS;
         }
 
         throw new IllegalArgumentException(String.format(Locale.ROOT, "Invalid engine type: %s", name));

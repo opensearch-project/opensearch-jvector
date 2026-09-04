@@ -263,7 +263,7 @@ public abstract class KNNVectorFieldMapper extends ParametrizedFieldMapper {
                 );
             }
             final KNNEngine knnEngine = originalParameters.getResolvedKnnMethodContext().getKnnEngine();
-            if (knnEngine == KNNEngine.LUCENE || knnEngine == KNNEngine.JVECTOR) {
+            if (knnEngine == KNNEngine.LUCENE || knnEngine == KNNEngine.JVECTOR || knnEngine == KNNEngine.FAISS) {
                 log.debug(String.format(Locale.ROOT, "Use [LuceneFieldMapper] mapper for field [%s]", name));
                 LuceneFieldMapper.CreateLuceneFieldMapperInput createLuceneFieldMapperInput = LuceneFieldMapper.CreateLuceneFieldMapperInput
                     .builder()

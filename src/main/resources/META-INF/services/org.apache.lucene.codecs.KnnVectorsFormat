@@ -11,3 +11,4 @@
 
 org.opensearch.knn.index.codec.KNN9120Codec.KNN9120HnswBinaryVectorsFormat
 org.opensearch.knn.index.codec.jvector.JVectorFormat
+org.opensearch.knn.index.codec.KNN9120Codec.FaissKnnVectorsFormatWrapper

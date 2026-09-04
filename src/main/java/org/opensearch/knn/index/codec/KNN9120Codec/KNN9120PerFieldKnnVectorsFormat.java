@@ -73,6 +73,18 @@ public class KNN9120PerFieldKnnVectorsFormat extends BasePerFieldKnnVectorsForma
                             knnVectorsFormatParams.isHierarchyEnabled(),
                             knnVectorsFormatParams.isLeadingSegmentMergeDisabled()
                         );
+                    case FAISS:
+                        String description = String.format(
+                            java.util.Locale.ROOT,
+                            "IDMap,HNSW%d",
+                            knnVectorsFormatParams.getMaxConnections()
+                        );
+                        String indexParams = String.format(
+                            java.util.Locale.ROOT,
+                            "efConstruction=%d",
+                            knnVectorsFormatParams.getBeamWidth()
+                        );
+                        return new FaissKnnVectorsFormatWrapper(description, indexParams);
                     default:
                         throw new IllegalArgumentException("Unsupported java engine: " + knnEngine);
                 }
