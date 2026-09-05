@@ -60,36 +60,6 @@ public class KNNVectorFieldMapperUtil {
     }
 
     /**
-     * index version after which jVector fields stop writing binary doc values copy of the vector as it is unused.
-     * Indices created before this keep writing it; see {@link #shouldWriteBinaryDocValues(KNNEngine, Version)}.
-     */
-    static final Version SKIP_BINARY_DOC_VALUES_FOR_JVECTOR_VERSION = Version.V_3_9_0;
-
-    /**
-     * Method to determine whether a vector field needs the extra binary doc values copy of the vector alongside
-     * the copy the {@link org.apache.lucene.codecs.KnnVectorsFormat} already writes.
-     * <p>
-     * jVector engine stores full-precision vectors inline in the graph and exposes them through
-     * {@code JVectorReader#getFloatVectorValues}. Every reader in this plugin — script doc values, {@code docvalue_fields},
-     * derived source, and merge — checks {@link org.apache.lucene.index.FieldInfo#hasVectorValues()} before falling back to
-     * binary doc values, and {@link KNNVectorFieldType} always reports {@code hasDocValues() == true} regardless of whether
-     * the physical field exists. The binary doc values copy for jvector engine is therefore unused costing one raw fp32 copy
-     * per document on disk, and adds to merge time.
-     * <p>
-     * Skip binary doc values storage for newly created indices after version SKIP_BINARY_DOC_VALUES_FOR_JVECTOR_VERSION.
-     *
-     * @param knnEngine KNNEngine backing the field
-     * @param indexCreatedVersion version the index was created on
-     * @return true if the binary doc values copy of the vector should be written
-     */
-    public static boolean shouldWriteBinaryDocValues(final KNNEngine knnEngine, final Version indexCreatedVersion) {
-        if (knnEngine != KNNEngine.JVECTOR) {
-            return true;
-        }
-        return indexCreatedVersion.before(SKIP_BINARY_DOC_VALUES_FOR_JVECTOR_VERSION);
-    }
-
-    /**
      * Creates a stored field for a byte vector
      *
      * @param name field name

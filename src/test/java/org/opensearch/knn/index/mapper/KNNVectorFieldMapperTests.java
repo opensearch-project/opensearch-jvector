@@ -52,6 +52,7 @@ public class KNNVectorFieldMapperTests extends KNNTestCase {
     private static final String DIMENSION_FIELD_NAME = "dimension";
     private static final String TEST_INDEX_NAME = "test-index-name";
     private static final String TEST_FIELD_NAME = "test-field-name";
+    private static final Version SKIP_BINARY_DOC_VALUES_FOR_JVECTOR_VERSION = Version.V_3_9_0;
 
     public void testBuilder_getParameters() {
         KNNVectorFieldMapper.Builder builder = new KNNVectorFieldMapper.Builder(TEST_FIELD_NAME, CURRENT, null, null);
@@ -135,23 +136,19 @@ public class KNNVectorFieldMapperTests extends KNNTestCase {
      */
     public void testShouldWriteBinaryDocValues_jvectorSkipsOnlyForNewIndices() {
         Version preCutoff = Version.V_3_8_0;
-        Version cutoff = KNNVectorFieldMapperUtil.SKIP_BINARY_DOC_VALUES_FOR_JVECTOR_VERSION;
+        Version cutoff = SKIP_BINARY_DOC_VALUES_FOR_JVECTOR_VERSION;
 
-        assertFalse(KNNVectorFieldMapperUtil.shouldWriteBinaryDocValues(KNNEngine.JVECTOR, cutoff));
-        assertTrue(KNNVectorFieldMapperUtil.shouldWriteBinaryDocValues(KNNEngine.JVECTOR, preCutoff));
-        assertTrue(KNNVectorFieldMapperUtil.shouldWriteBinaryDocValues(KNNEngine.JVECTOR, Version.V_2_17_0));
+        assertFalse(LuceneFieldMapper.shouldWriteBinaryDocValues(KNNEngine.JVECTOR, cutoff));
+        assertTrue(LuceneFieldMapper.shouldWriteBinaryDocValues(KNNEngine.JVECTOR, preCutoff));
+        assertTrue(LuceneFieldMapper.shouldWriteBinaryDocValues(KNNEngine.JVECTOR, Version.V_2_17_0));
 
         // Engine scoping: every other engine keeps binary doc values regardless of version.
-        assertTrue(KNNVectorFieldMapperUtil.shouldWriteBinaryDocValues(KNNEngine.LUCENE, cutoff));
-        assertTrue(KNNVectorFieldMapperUtil.shouldWriteBinaryDocValues(KNNEngine.LUCENE, preCutoff));
+        assertTrue(LuceneFieldMapper.shouldWriteBinaryDocValues(KNNEngine.LUCENE, cutoff));
+        assertTrue(LuceneFieldMapper.shouldWriteBinaryDocValues(KNNEngine.LUCENE, preCutoff));
     }
 
     public void testLuceneFieldMapper_jvector_newIndex_doesNotWriteBinaryDocValues() throws IOException {
-        KNNVectorFieldMapper mapper = buildLuceneBackedMapper(
-            KNNEngine.JVECTOR,
-            DISK_ANN,
-            KNNVectorFieldMapperUtil.SKIP_BINARY_DOC_VALUES_FOR_JVECTOR_VERSION
-        );
+        KNNVectorFieldMapper mapper = buildLuceneBackedMapper(KNNEngine.JVECTOR, DISK_ANN, SKIP_BINARY_DOC_VALUES_FOR_JVECTOR_VERSION);
         assertTrue(mapper instanceof LuceneFieldMapper);
 
         List<Field> fields = mapper.getFieldsForFloatVector(new float[TEST_DIMENSION], false);
@@ -181,11 +178,7 @@ public class KNNVectorFieldMapperTests extends KNNTestCase {
      * writing binary doc values at any index version.
      */
     public void testLuceneFieldMapper_lucene_stillWritesBinaryDocValues() throws IOException {
-        KNNVectorFieldMapper mapper = buildLuceneBackedMapper(
-            KNNEngine.LUCENE,
-            METHOD_HNSW,
-            KNNVectorFieldMapperUtil.SKIP_BINARY_DOC_VALUES_FOR_JVECTOR_VERSION
-        );
+        KNNVectorFieldMapper mapper = buildLuceneBackedMapper(KNNEngine.LUCENE, METHOD_HNSW, SKIP_BINARY_DOC_VALUES_FOR_JVECTOR_VERSION);
         assertTrue(mapper instanceof LuceneFieldMapper);
 
         List<Field> fields = mapper.getFieldsForFloatVector(new float[TEST_DIMENSION], false);
