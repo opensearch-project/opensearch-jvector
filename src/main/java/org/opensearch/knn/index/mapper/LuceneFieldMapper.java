@@ -107,7 +107,7 @@ public class LuceneFieldMapper extends KNNVectorFieldMapper {
 
         this.fieldType = vectorDataType.createKnnVectorFieldType(knnMappingConfig.getDimension(), knnVectorSimilarityFunction);
 
-        if (this.hasDocValues) {
+        if (this.hasDocValues && shouldWriteBinaryDocValues(resolvedKnnMethodContext.getKnnEngine(), indexCreatedVersion)) {
             this.vectorFieldType = buildDocValuesFieldType(resolvedKnnMethodContext.getKnnEngine());
         } else {
             this.vectorFieldType = null;
@@ -118,6 +118,22 @@ public class LuceneFieldMapper extends KNNVectorFieldMapper {
         this.perDimensionProcessor = knnLibraryIndexingContext.getPerDimensionProcessor();
         this.perDimensionValidator = knnLibraryIndexingContext.getPerDimensionValidator();
         this.vectorValidator = knnLibraryIndexingContext.getVectorValidator();
+    }
+
+    /**
+     * This mapper backs both {@link KNNEngine#LUCENE} and {@link KNNEngine#JVECTOR}, and this method does the following —
+     * For Lucene, keeps its binary doc values at every index version.     
+     * For JVector, Skip writing the doc values starting with v3.9.0 as none of the readers use them.
+     *
+     * @param knnEngine KNNEngine backing the field
+     * @param indexCreatedVersion version the index was created on
+     * @return true if the binary doc values copy of the vector should be written
+     */
+    static boolean shouldWriteBinaryDocValues(final KNNEngine knnEngine, final Version indexCreatedVersion) {
+        if (knnEngine != KNNEngine.JVECTOR) {
+            return true;
+        }
+        return indexCreatedVersion.before(Version.V_3_9_0);
     }
 
     @Override
