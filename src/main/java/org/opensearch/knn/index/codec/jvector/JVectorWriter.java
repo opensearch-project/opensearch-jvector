@@ -1113,14 +1113,7 @@ public class JVectorWriter extends KnnVectorsWriter {
                     fieldName,
                     mergeState.segmentInfo.name
                 );
-                final long start = Clock.systemDefaultZone().millis();
                 ProductQuantization leadingCompressor = leadingReader.getProductQuantizationForField(fieldName).get();
-                // We are not refining PQ codes on merge presently.
-                // See https://github.com/opensearch-project/opensearch-jvector/issues/661
-                final long end = Clock.systemDefaultZone().millis();
-                final long trainingTime = end - start;
-                log.info("Refined PQ codebooks for field {}, in {} millis", fieldName, trainingTime);
-                KNNCounter.KNN_QUANTIZATION_TRAINING_TIME.add(trainingTime);
                 compactPqVectors = PQVectors.encodeAndBuild(leadingCompressor, compactRavv.size(), compactRavv, simdPoolMerge);
             }
 
