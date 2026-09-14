@@ -1173,7 +1173,7 @@ public class JVectorWriter extends KnnVectorsWriter {
          *
          * @return a boolean value indicating if leading segment merge was performed
          */
-        private boolean tryLeadingSegmentMerge(ProductQuantization leadingCompressor) throws IOException {
+    private boolean tryLeadingSegmentMerge(ProductQuantization leadingCompressor) throws IOException {
             if (leadingSegmentMergeDisabled) {
                 log.info("Leading segment merge is disabled, skipping");
                 return false;
@@ -1315,11 +1315,11 @@ public class JVectorWriter extends KnnVectorsWriter {
                         throw new IllegalStateException("failed to fill one of the maps, this is a bug");
                     }
 
-                    PQVectors headPqVectors = null;
+                    PQVectors heapPqVectors = null;
                     BuildScoreProvider leadingBsp = null;
                     var heapRavv = new RemappedRandomAccessVectorValues(this, heapToGlobalRavvOrds);
                     if (leadingCompressor != null) {
-                        headPqVectors = PQVectors.encodeAndBuild(leadingCompressor, heapRavv.size(), new RandomAccessVectorValues() {
+                        heapPqVectors = PQVectors.encodeAndBuild(leadingCompressor, heapRavv.size(), new RandomAccessVectorValues() {
                             @Override
                             public int size() {
                                 return heapRavv.size();
@@ -1351,7 +1351,7 @@ public class JVectorWriter extends KnnVectorsWriter {
                                 return heapRavv.copy();
                             }
                         }, simdPoolMerge);
-                        leadingBsp = BuildScoreProvider.pqBuildScoreProvider(getVectorSimilarityFunction(fieldInfo), headPqVectors);
+                        leadingBsp = BuildScoreProvider.pqBuildScoreProvider(getVectorSimilarityFunction(fieldInfo), heapPqVectors);
                     } else {
                         leadingBsp = BuildScoreProvider.randomAccessScoreProvider(heapRavv, getVectorSimilarityFunction(fieldInfo));
                     }
@@ -1401,7 +1401,7 @@ public class JVectorWriter extends KnnVectorsWriter {
                     // Note that the ordinals for the OnDiskGraphIndex will automatically be compacted
                     // But the OnHeapGraphIndex will not
                     var finalOrdToDocMap = new GraphNodeIdToDocMap(finalOrdToDocId);
-                    if (headPqVectors != null) {
+                    if (heapPqVectors != null) {
                         // Build PQVectors in final-ordinal space (size = totalLiveVectorsCount, no holes == deleted vectors)
                         // using the ordinalsMapping overload. Avoids re-encoding vectors from scratch while producing a blob
                         // that is correctly indexed by the disk ordinals that OnDiskSequentialGraphIndexWriter assigns after
