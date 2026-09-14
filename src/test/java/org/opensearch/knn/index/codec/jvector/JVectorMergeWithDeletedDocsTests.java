@@ -1816,6 +1816,85 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
         }
     }
 
+    /**
+     * Comprehensive test combining merges with documents that
+     * have no vector fields populated, multiple segments where leading is not the first one.
+     */
+    @Test
+    public void testContinuousMergesWithLeadingSegmentAndDeletedDocs() throws IOException {
+        final Map<String, float[]> docs = new HashMap<>();
+        final int dimension = 64;
+        final int k = 11;
+
+        IndexWriterConfig config = newIndexWriterConfig();
+        config.setUseCompoundFile(false);
+        config.setCodec(getCodec(randomFrom(1, 1024), random().nextBoolean()));
+        config.setMergePolicy(new ForceMergesOnlyMergePolicy());
+        config.setMergeScheduler(new SerialMergeScheduler());
+
+        final Path indexPath = createTempDir();
+
+        try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter writer = new IndexWriter(dir, config)) {
+            int docId = 0;
+
+            // Segment 1: 11 documents
+            log.info("Creating segment 1: 11 docs");
+            for (int i = 0; i < 11; i++) {
+                Document doc = new Document();
+                float[] vector = new float[dimension];
+                Arrays.fill(vector, docId * random().nextFloat(1.0f));
+                doc.add(new KnnFloatVectorField(TEST_FIELD, vector, VectorSimilarityFunction.EUCLIDEAN));
+                doc.add(new StringField(TEST_ID_FIELD, String.valueOf(docId), Field.Store.YES));
+                docs.put(Integer.toString(docId), vector);
+                writer.addDocument(doc);
+                docId++;
+            }
+            writer.commit();
+
+            for (int iteration = 0; iteration < 10; ++iteration) {
+                // Segment N: 1 document
+                log.info("Creating segment N: 1 doc");
+
+                Document doc = new Document();
+                float[] vector = new float[dimension];
+                Arrays.fill(vector, docId * random().nextFloat(1.0f));
+                doc.add(new KnnFloatVectorField(TEST_FIELD, vector, VectorSimilarityFunction.EUCLIDEAN));
+                doc.add(new StringField(TEST_ID_FIELD, String.valueOf(docId), Field.Store.YES));
+                docs.put(Integer.toString(docId), vector);
+                writer.addDocument(doc);
+                docId++;
+
+                writer.commit();
+
+                // Segment N + 1: Delete 1 document
+                log.info("Creating segment 3: Delete 1 doc");
+                writer.deleteDocuments(new Term(TEST_ID_FIELD, String.valueOf(iteration)));
+                writer.commit();
+
+                log.info("Performing intermediate merge after segment 2");
+                writer.forceMerge(1);
+            }
+
+            // Verify the merged index
+            try (IndexReader reader = DirectoryReader.open(writer)) {
+                Assert.assertEquals("Should have 1 segment after merge", 1, reader.getContext().leaves().size());
+                Assert.assertEquals("Should have correct number of live docs", 11, reader.numDocs());
+
+                // Verify search works correctly
+                final IndexSearcher searcher = newSearcher(reader);
+                TopDocs topDocs = searcher.search(new MatchAllDocsQuery(), k);
+                Assert.assertEquals("Should return k results", k, topDocs.totalHits.value());
+
+                for (int i = 0; i < topDocs.scoreDocs.length; i++) {
+                    Document doc = reader.storedFields().document(topDocs.scoreDocs[i].doc);
+                    String id = doc.get(TEST_ID_FIELD);
+                    assertThat(getVector(reader, TEST_FIELD, topDocs.scoreDocs[i].doc), equalTo(docs.get(id)));
+                    log.info("Result {}: doc ID = {}", i, id);
+                }
+            }
+        }
+    }
+
     private <T> T randomFrom(T... values) {
         int index = random().nextInt(values.length);
         return values[index];
