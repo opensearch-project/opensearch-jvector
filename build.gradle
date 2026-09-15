@@ -64,7 +64,7 @@ plugins {
     id 'io.freefair.lombok' version '8.14.4'
     id "de.undercouch.download" version "5.7.0"
     id "me.champeau.jmh" version "0.7.3"
-    id "org.gradle.test-retry" version "1.6.5"
+    id "org.gradle.test-retry" version "1.6.6"
 }
 
 apply from: 'gradle/formatting.gradle'
