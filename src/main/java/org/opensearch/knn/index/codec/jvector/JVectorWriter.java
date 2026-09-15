@@ -14,11 +14,14 @@ import io.github.jbellis.jvector.graph.disk.feature.NVQ;
 import io.github.jbellis.jvector.graph.diversity.VamanaDiversityProvider;
 import io.github.jbellis.jvector.graph.similarity.BuildScoreProvider;
 import io.github.jbellis.jvector.quantization.CompressedVectors;
+import io.github.jbellis.jvector.quantization.ImmutablePQVectors;
 import io.github.jbellis.jvector.quantization.NVQVectors;
 import io.github.jbellis.jvector.quantization.NVQuantization;
 import io.github.jbellis.jvector.quantization.PQVectors;
+import io.github.jbellis.jvector.quantization.PQVectors.PQLayout;
 import io.github.jbellis.jvector.quantization.ProductQuantization;
 import io.github.jbellis.jvector.vector.VectorizationProvider;
+import io.github.jbellis.jvector.vector.types.ByteSequence;
 import io.github.jbellis.jvector.vector.types.VectorFloat;
 import io.github.jbellis.jvector.vector.types.VectorTypeSupport;
 import lombok.AllArgsConstructor;
@@ -47,6 +50,7 @@ import java.io.UnsupportedEncodingException;
 import java.time.Clock;
 import java.util.*;
 import java.util.concurrent.ForkJoinPool;
+import java.util.function.IntUnaryOperator;
 import java.util.stream.IntStream;
 
 import static org.apache.lucene.codecs.lucene99.Lucene99HnswVectorsReader.readVectorEncoding;
@@ -1173,7 +1177,7 @@ public class JVectorWriter extends KnnVectorsWriter {
          *
          * @return a boolean value indicating if leading segment merge was performed
          */
-    private boolean tryLeadingSegmentMerge(ProductQuantization leadingCompressor) throws IOException {
+        private boolean tryLeadingSegmentMerge(ProductQuantization leadingCompressor) throws IOException {
             if (leadingSegmentMergeDisabled) {
                 log.info("Leading segment merge is disabled, skipping");
                 return false;
@@ -1406,7 +1410,8 @@ public class JVectorWriter extends KnnVectorsWriter {
                         // using the ordinalsMapping overload. Avoids re-encoding vectors from scratch while producing a blob
                         // that is correctly indexed by the disk ordinals that OnDiskSequentialGraphIndexWriter assigns after
                         // sequentialRenumbering (which compacts heap ordinals in the same order as finalOrdToHeapOrd).
-                        final PQVectors compactPqVectors = PQVectors.encodeAndBuild(
+                        final PQVectors compactPqVectors = encodeAndBuild(
+                            RandomAccessVectorValuesOverVectorValues.VECTOR_TYPE_SUPPORT,
                             leadingCompressor,
                             totalLiveVectorsCount,
                             ord -> finalOrdToHeapOrd[ord],
@@ -1420,6 +1425,51 @@ public class JVectorWriter extends KnnVectorsWriter {
                     return true;
                 }
             }
+        }
+
+        private static ImmutablePQVectors encodeAndBuild(
+            VectorTypeSupport vectorTypeSupport,
+            ProductQuantization pq,
+            int vectorCount,
+            IntUnaryOperator ordinalsMapping,
+            RandomAccessVectorValues ravv,
+            ForkJoinPool simdExecutor
+        ) {
+            int compressedDimension = pq.compressedVectorSize();
+            PQLayout layout = new PQLayout(vectorCount, compressedDimension);
+            final ByteSequence<?>[] chunks = new ByteSequence<?>[layout.totalChunks];
+            for (int i = 0; i < layout.fullSizeChunks; i++) {
+                chunks[i] = vectorTypeSupport.createByteSequence(layout.fullChunkBytes);
+            }
+            if (layout.lastChunkVectors > 0) {
+                chunks[layout.fullSizeChunks] = vectorTypeSupport.createByteSequence(layout.lastChunkBytes);
+            }
+
+            // Encode the vectors in parallel into the compressed data chunks
+            // The changes are concurrent, but because they are coordinated and do not overlap, we can use parallel streams
+            // and then we are guaranteed safe publication because we join the thread after completion.
+            var ravvCopy = ravv.threadLocalSupplier();
+            simdExecutor.submit(() -> IntStream.range(0, vectorCount).parallel().forEach(ordinal -> {
+                // Retrieve the slice and mutate it.
+                var localRavv = ravvCopy.get();
+                ByteSequence<?> slice = get(chunks, ordinal, layout.fullChunkVectors, pq.getSubspaceCount());
+                var vector = localRavv.getVector(ordinalsMapping.applyAsInt(ordinal));
+                if (vector != null) pq.encodeTo(vector, slice);
+                else slice.zero();
+            })).join();
+
+            return new ImmutablePQVectors(pq, chunks, vectorCount, layout.fullChunkVectors);
+        }
+
+        private static ByteSequence<?> get(ByteSequence<?>[] chunks, int ordinal, int vectorsPerChunk, int subspaceCount) {
+            int vectorIndexInChunk = ordinal % vectorsPerChunk;
+            int start = vectorIndexInChunk * subspaceCount;
+            return getChunk(chunks, ordinal, vectorsPerChunk).slice(start, subspaceCount);
+        }
+
+        private static ByteSequence<?> getChunk(ByteSequence<?>[] chunks, int ordinal, int vectorsPerChunk) {
+            int chunkIndex = ordinal / vectorsPerChunk;
+            return chunks[chunkIndex];
         }
 
         @Override
@@ -1504,7 +1554,7 @@ public class JVectorWriter extends KnnVectorsWriter {
     }
 
     static class RandomAccessVectorValuesOverVectorValues implements RandomAccessVectorValues {
-        private final VectorTypeSupport VECTOR_TYPE_SUPPORT = VectorizationProvider.getInstance().getVectorTypeSupport();
+        private static final VectorTypeSupport VECTOR_TYPE_SUPPORT = VectorizationProvider.getInstance().getVectorTypeSupport();
         private final FloatVectorValues values;
 
         public RandomAccessVectorValuesOverVectorValues(FloatVectorValues values) {
@@ -1547,5 +1597,4 @@ public class JVectorWriter extends KnnVectorsWriter {
             throw new UnsupportedOperationException("Copy not supported");
         }
     }
-
 }
