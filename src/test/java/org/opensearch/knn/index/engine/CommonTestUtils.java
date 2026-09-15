@@ -176,9 +176,44 @@ public class CommonTestUtils {
     public static Codec getCodec(
         int minBatchSizeForQuantization,
         boolean leadingSegmentMergeDisabled,
+        ForkJoinPool graphMergePool,
+        JVectorIndexQuantization quantization,
+        boolean fusedPqEnabled
+    ) {
+        return getCodec(
+            minBatchSizeForQuantization,
+            leadingSegmentMergeDisabled,
+            DEFAULT_HIERARCHY_ENABLED,
+            graphMergePool,
+            quantization,
+            fusedPqEnabled
+        );
+    }
+
+    public static Codec getCodec(
+        int minBatchSizeForQuantization,
+        boolean leadingSegmentMergeDisabled,
         boolean hierarchical,
         ForkJoinPool graphMergePool,
         JVectorIndexQuantization quantization
+    ) {
+        return getCodec(
+            minBatchSizeForQuantization,
+            leadingSegmentMergeDisabled,
+            hierarchical,
+            graphMergePool,
+            quantization,
+            KNNConstants.DEFAULT_FUSED_PQ_ENABLED
+        );
+    }
+
+    public static Codec getCodec(
+        int minBatchSizeForQuantization,
+        boolean leadingSegmentMergeDisabled,
+        boolean hierarchical,
+        ForkJoinPool graphMergePool,
+        JVectorIndexQuantization quantization,
+        boolean fusedPqEnabled
     ) {
         if (graphMergePool == null) {
             return new FilterCodec(KNNCodecVersion.V_10_04_0.getCodecName(), new Lucene104Codec()) {
@@ -195,7 +230,8 @@ public class CommonTestUtils {
                                 quantization,
                                 minBatchSizeForQuantization,
                                 hierarchical,
-                                leadingSegmentMergeDisabled
+                                leadingSegmentMergeDisabled,
+                                fusedPqEnabled
                             );
                         }
                     };
@@ -218,6 +254,7 @@ public class CommonTestUtils {
                                 minBatchSizeForQuantization,
                                 hierarchical,
                                 leadingSegmentMergeDisabled,
+                                fusedPqEnabled,
                                 graphMergePool,
                                 graphMergePool,
                                 graphMergePool

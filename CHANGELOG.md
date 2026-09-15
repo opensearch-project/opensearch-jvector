@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased 3.8](https://github.com/opensearch-project/opensearch-jvector/compare/3.8...HEAD)
 ### Features
+- Add FusedPQ on-disk layout for jVector graph traversal codes [733](https://github.com/opensearch-project/opensearch-jvector/pull/733)
 
 ### Enhancements
 - [Storage perf] Stop writing the redundant binary doc values copy of the vector for jVector fields from 3.9.0 onwards. Preserve existing indices. [715] (https://github.com/opensearch-project/opensearch-jvector/pull/715) 

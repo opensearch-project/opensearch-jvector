@@ -52,6 +52,11 @@ public sealed interface JVectorIndexQuantization {
     byte QUANTIZATION_TYPE_PQ = 1;
     byte QUANTIZATION_TYPE_NVQ_INLINE = 2;
 
+    // On-disk quantization LAYOUT bytes. Orthogonal to the *_TYPE_* bytes above: the type byte says what the
+    // exact scorer / reranker reads, the layout byte says where the PQ codes used for graph traversal live.
+    byte QUANTIZATION_LAYOUT_SEPARATE = 0; // PQ blob appended after the graph (legacy / default)
+    byte QUANTIZATION_LAYOUT_FUSED_PQ = 1; // PQ codes stored inline per adjacency entry via FeatureId.FUSED_PQ
+
     /** Holds the quantization objects loaded from disk for a single field. */
     record LoadedState(NVQuantization nvqInlineQuantization, PQVectors pqVectors, ReaderSupplier compressedVectorsReaderSupplier) {
     }

@@ -109,6 +109,14 @@ public class JVectorDiskANNMethod extends AbstractKNNMethod {
                     (v, context) -> v != null && v > 0 && v <= context.getDimension()
                 )
             )
+            .addParameter(
+                METHOD_PARAMETER_FUSED_PQ_ENABLED,
+                new Parameter.BooleanParameter(
+                    METHOD_PARAMETER_FUSED_PQ_ENABLED,
+                    KNNConstants.DEFAULT_FUSED_PQ_ENABLED,
+                    (v, context) -> true
+                )
+            )
             .build();
     }
 

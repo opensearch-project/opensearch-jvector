@@ -108,6 +108,9 @@ public class KNNConstants {
     public static final int DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION = 1024; // above this batch size we will trigger quantization by
                                                                                 // default
     public static final Boolean DEFAULT_HIERARCHY_ENABLED = false;
+    // When enabled, PQ codes are stored inline with the graph adjacency lists (FusedPQ layout) instead of a separate blob.
+    public static final String METHOD_PARAMETER_FUSED_PQ_ENABLED = "advanced.fused_pq_enabled";
+    public static final Boolean DEFAULT_FUSED_PQ_ENABLED = false;
 
     // Parameters that only affect merge
     public static final String METHOD_PARAMETER_LEADING_SEGMENT_MERGE_DISABLED = "advanced.leading_segment_merge_disabled";

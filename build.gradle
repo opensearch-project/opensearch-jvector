@@ -381,6 +381,8 @@ test {
 
     // Enable preview features for Foreign Memory API
     jvmArgs = [
+            '-Xms8g',
+            '-Xmx8g',
             '--add-modules', 'jdk.incubator.vector',
             '--add-opens', 'java.base/java.nio=ALL-UNNAMED',
             '--add-opens', 'java.base/sun.nio.ch=ALL-UNNAMED',

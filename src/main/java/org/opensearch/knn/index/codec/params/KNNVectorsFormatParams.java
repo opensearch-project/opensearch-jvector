@@ -28,6 +28,9 @@ public class KNNVectorsFormatParams {
     private JVectorIndexQuantization quantization;
     private final SpaceType spaceType;
     private boolean leadingSegmentMergeDisabled;
+    // Orthogonal to {@link #quantization}: when true, PQ codes for graph traversal are stored inline
+    // with the adjacency lists (FusedPQ layout) rather than in a separate blob appended after the graph.
+    private boolean fusedPqEnabled;
 
     public KNNVectorsFormatParams(final Map<String, Object> params, int defaultMaxConnections, int defaultBeamWidth) {
         this(
@@ -60,6 +63,7 @@ public class KNNVectorsFormatParams {
         initHierarchyEnabled(params, defaultHierarchyEnabled);
         this.spaceType = spaceType;
         initLeadingSegmentMergeDisabled(params, KNNConstants.DEFAULT_LEADING_SEGMENT_MERGE_DISABLED);
+        initFusedPqEnabled(params, KNNConstants.DEFAULT_FUSED_PQ_ENABLED);
         initQuantization(params);
     }
 
@@ -121,6 +125,14 @@ public class KNNVectorsFormatParams {
             return;
         }
         this.leadingSegmentMergeDisabled = defaultLsmDisabled;
+    }
+
+    private void initFusedPqEnabled(final Map<String, Object> params, boolean defaultFusedPqEnabled) {
+        if (params != null && params.containsKey(KNNConstants.METHOD_PARAMETER_FUSED_PQ_ENABLED)) {
+            this.fusedPqEnabled = (boolean) params.get(KNNConstants.METHOD_PARAMETER_FUSED_PQ_ENABLED);
+            return;
+        }
+        this.fusedPqEnabled = defaultFusedPqEnabled;
     }
 
     private void initQuantization(final Map<String, Object> params) {
