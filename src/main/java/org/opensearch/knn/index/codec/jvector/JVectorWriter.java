@@ -1088,12 +1088,7 @@ public class JVectorWriter extends KnnVectorsWriter {
             final ProductQuantization leadingCompressor;
             final Optional<ProductQuantization> leadingCompressorOpt = leadingReader.getProductQuantizationForField(fieldName);
             if (leadingCompressorOpt.isEmpty() == false) {
-                final long start = Clock.systemDefaultZone().millis();
                 leadingCompressor = leadingCompressorOpt.get();
-                final long end = Clock.systemDefaultZone().millis();
-                final long trainingTime = end - start;
-                log.info("Refined PQ codebooks for field {}, in {} millis", fieldName, trainingTime);
-                KNNCounter.KNN_QUANTIZATION_TRAINING_TIME.add(trainingTime);
             } else {
                 leadingCompressor = null;
             }
