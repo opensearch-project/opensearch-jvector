@@ -1318,6 +1318,12 @@ public class JVectorWriter extends KnnVectorsWriter {
                     BuildScoreProvider leadingBsp = null;
                     var heapRavv = new RemappedRandomAccessVectorValues(this, heapToGlobalRavvOrds);
                     if (leadingCompressor != null) {
+                        log.info(
+                            "Encoding PQ vectors for leading segment merge for segment {} on field {}",
+                            segmentWriteState.segmentInfo.name,
+                            fieldInfo.name
+                        );
+
                         heapPqVectors = PQVectors.encodeAndBuild(leadingCompressor, heapRavv.size(), new RandomAccessVectorValues() {
                             @Override
                             public int size() {
@@ -1401,6 +1407,11 @@ public class JVectorWriter extends KnnVectorsWriter {
                     // But the OnHeapGraphIndex will not
                     var finalOrdToDocMap = new GraphNodeIdToDocMap(finalOrdToDocId);
                     if (heapPqVectors != null) {
+                        log.info(
+                            "Encoding compacted PQ vectors post leading segment merge for segment {} on field {}",
+                            segmentWriteState.segmentInfo.name,
+                            fieldInfo.name
+                        );
                         // Build PQVectors in final-ordinal space (size = totalLiveVectorsCount, no holes == deleted vectors)
                         // using the ordinalsMapping overload. Avoids re-encoding vectors from scratch while producing a blob
                         // that is correctly indexed by the disk ordinals that OnDiskSequentialGraphIndexWriter assigns after
