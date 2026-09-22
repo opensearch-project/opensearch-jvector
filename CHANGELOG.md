@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Features
 
 ### Enhancements
+- Update datastax/jvector library to 4.0.1 [745](https://github.com/opensearch-project/opensearch-jvector/pull/745)
 
 ### Bug Fixes
 
