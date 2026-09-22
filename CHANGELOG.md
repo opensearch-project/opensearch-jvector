@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Enhancements
 - [Storage perf] Stop writing the redundant binary doc values copy of the vector for jVector fields from 3.9.0 onwards. Preserve existing indices. [715] (https://github.com/opensearch-project/opensearch-jvector/pull/715) 
 - Remove training run measuments since refining was removed [734] (https://github.com/opensearch-project/opensearch-jvector/pull/734) 
+- Update datastax/jvector library to 4.0.1 [745](https://github.com/opensearch-project/opensearch-jvector/pull/745)
 
 ### Bug Fixes
 - Fix flaky testJVectorKnnIndex_filter_maxInnerProduct test case [681](https://github.com/opensearch-project/opensearch-jvector/pull/681)
