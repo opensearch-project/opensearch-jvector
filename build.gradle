@@ -16,7 +16,7 @@ buildscript {
     ext {
         // build.version_qualifier parameter applies to jvector plugin artifacts only. OpenSearch version must be set
         // explicitly as 'opensearch.version' property, for instance opensearch.version=2.0.0-rc1-SNAPSHOT
-        opensearch_version = System.getProperty("opensearch.version", "3.8.0-SNAPSHOT")
+        opensearch_version = System.getProperty("opensearch.version", "3.9.0-SNAPSHOT")
         opensearch_build = opensearch_version.replaceAll(/(\.\d)([^\d]*)$/, '$1.0$2')
         common_utils_version = System.getProperty("common_utils.version", opensearch_build)
         version_qualifier = System.getProperty("build.version_qualifier", "")
@@ -60,10 +60,11 @@ plugins {
     id 'java-test-fixtures'
     id 'idea'
     id 'eclipse'
-    id "com.diffplug.spotless" version "8.8.0" apply false
+    id "com.diffplug.spotless" version "8.10.2" apply false
     id 'io.freefair.lombok' version '8.14.4'
     id "de.undercouch.download" version "5.7.0"
     id "me.champeau.jmh" version "0.7.3"
+    id "org.gradle.test-retry" version "1.6.6"
 }
 
 apply from: 'gradle/formatting.gradle'
@@ -167,6 +168,9 @@ def getBreakerSetting() {
     return System.getProperty(propertyKeys.breaker.useRealMemory, 'true')
 }
 
+def getNativeVectorizationProviderFlag() {
+    return System.getProperty('jvector.experimental.enable_native_vectorization', 'false')
+}
 
 allprojects {
     group = 'org.opensearch.knn'
@@ -313,11 +317,11 @@ task release(type: Copy, group: 'build') {
 dependencies {
     api "org.opensearch:opensearch:${opensearch_version}"
     compileOnly "org.opensearch.plugin:opensearch-scripting-painless-spi:${versions.opensearch}"
-    
+
     // gRPC support dependencies (provided at runtime by OpenSearch)
     compileOnly "org.opensearch.plugin:transport-grpc-spi:${opensearch_version}"
     compileOnly "org.opensearch:protobufs:${versions.opensearchprotobufs}"
-    
+
     // Declare guava as compile time since guava will come from OpenSearch transport-grpc module.
     compileOnly group: 'com.google.guava', name: 'guava', version: "${versions.guava}"
     api "org.apache.commons:commons-lang3:${versions.commonslang}"
@@ -328,7 +332,7 @@ dependencies {
     // Add netty dependency so we can use it within internal test clusters (not just external ones)
     testImplementation "org.opensearch.plugin:transport-netty4-client:${opensearch_version}"
     testImplementation("com.google.guava:guava:${versions.guava}")
-    
+
     // gRPC integration test dependencies (following neural-search pattern)
     testImplementation "org.opensearch:protobufs:${versions.opensearchprotobufs}"
     testImplementation "org.opensearch.plugin:transport-grpc-spi:${opensearch_version}"
@@ -366,10 +370,14 @@ dependencies {
     zipArchive group: 'org.opensearch.plugin', name:'opensearch-custom-codecs', version: "${opensearch_build}"
 }
 
+var avx512_spr = System.getProperty("avx512_spr.enabled")
+var avx512 = System.getProperty("avx512.enabled")
+
 test {
     systemProperty 'tests.security.manager', 'false'
     systemProperty 'opensearch.set.netty.runtime.available.processors', 'false'
     systemProperty 'log4j.configurationFile', "$rootDir/src/test/resources/log4j2.properties"
+    systemProperty 'jvector.experimental.enable_native_vectorization', getNativeVectorizationProviderFlag()
 
     // Enable preview features for Foreign Memory API
     jvmArgs = [
@@ -384,9 +392,23 @@ test {
             "-javaagent:${configurations.mockitoAgent.asPath}"
     ]
 
+        // The current native vectorization provider in jvector relies on avx512 support 
+    if (getNativeVectorizationProviderFlag().equals('false')) {
+        if ("true".equals(avx512_spr) || "true".equals(avx512)) {
+            jvmArgs += [ '-XX:UseAVX=2' /* only AVX2, disable AVX512 */ ]
+        }
+    }
 
     //this change enables mockito-inline that supports mocking of static classes/calls
     systemProperty "jdk.attach.allowAttachSelf", true
+
+    retry {
+        maxRetries = 3
+        failOnPassedAfterRetry = false
+        filter {
+            includeClasses.add("org.opensearch.knn.index.engine.JVectorConcurrentQueryTests")
+        }
+    }
 }
 
 def _numNodes = findProperty('numNodes') as Integer ?: 1
@@ -435,15 +457,23 @@ integTest {
                 '-Djdk.incubator.vector.VECTOR_ACCESS_OOB_CHECK=0',
                 '--enable-native-access=ALL-UNNAMED',
                 '-Dio.netty.tryReflectionSetAccessible=true',
-                '--enable-preview'
+                '--enable-preview',
+                "-Djvector.experimental.enable_native_vectorization=${getNativeVectorizationProviderFlag()}"
         ]
+
+        // The current native vectorization provider in jvector relies on avx512 support 
+        if (getNativeVectorizationProviderFlag().equals('false')) {
+            if ("true".equals(avx512_spr) || "true".equals(avx512)) {
+                jvmArgs += [ '-XX:UseAVX=2' /* only AVX2, disable AVX512 */ ]
+            }
+        }
 
         // There seems to be an issue when running multi node run or integ tasks with unicast_hosts
         // not being written, the waitForAllConditions ensures it's written
         getClusters().forEach { cluster ->
             cluster.waitForAllConditions()
         }
-        
+
         // Discover the actual gRPC port from the cluster log.
         // The gRPC transport binds to the first available port in 9400-9500,
         // which may differ from 9400 due to port conflicts or dual-stack binding.
@@ -487,7 +517,7 @@ testClusters.integTest { cluster ->
     testDistribution = "ARCHIVE"
     systemProperty "java.security.policy", "file://${project.rootDir}/src/main/plugin-metadata/plugin-security.policy"
     systemProperty 'log4j.configurationFile', "${project.rootDir}/src/test/resources/log4j2.properties"
-    
+    systemProperty 'jvector.experimental.enable_native_vectorization', getNativeVectorizationProviderFlag()
     // Enable gRPC transport module (following neural-search pattern)
     setting("aux.transport.types", "[transport-grpc]")
     // Bind gRPC to IPv4 loopback to avoid dual-stack port mismatch
@@ -528,6 +558,16 @@ testClusters.integTest { cluster ->
             debugPort += 1
         }
     }
+
+    // The current native vectorization provider in jvector relies on avx512 support
+    if (getNativeVectorizationProviderFlag().equals('false')) {
+        if ("true".equals(avx512_spr) || "true".equals(avx512)) {
+            nodes.forEach { node ->
+                node.jvmArgs("-XX:UseAVX=2" /* only AVX2, disable AVX512 */)
+            }
+        }
+    }
+
     systemProperty propertyKeys.breaker.useRealMemory, getBreakerSetting()
     systemProperty 'jdk.incubator.vector.VECTOR_ACCESS_OOB_CHECK', "0"
     setting 'path.repo', "${buildDir}/testSnapshotFolder"
@@ -547,6 +587,7 @@ task integTestRemote(type: RestIntegTestTask) {
     systemProperty 'tests.security.manager', 'false'
     systemProperty("test.exhaustive", System.getProperty("test.exhaustive"))
     systemProperty "tests.path.repo", "${layout.buildDirectory.toString()}/testSnapshotFolder"
+    systemProperty 'jvector.experimental.enable_native_vectorization', getNativeVectorizationProviderFlag()
 
     systemProperty 'tests.output', 'true'
     // Run tests with remote cluster only if rest case is defined

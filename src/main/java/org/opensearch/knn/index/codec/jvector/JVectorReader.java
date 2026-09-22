@@ -138,8 +138,7 @@ public class JVectorReader extends KnnVectorsReader {
                 knnCollector,
                 KNNConstants.DEFAULT_QUERY_SIMILARITY_THRESHOLD.floatValue(),
                 KNNConstants.DEFAULT_QUERY_RERANK_FLOOR.floatValue(),
-                KNNConstants.DEFAULT_OVER_QUERY_FACTOR,
-                KNNConstants.DEFAULT_QUERY_USE_PRUNING
+                KNNConstants.DEFAULT_OVER_QUERY_FACTOR
             );
 
         }

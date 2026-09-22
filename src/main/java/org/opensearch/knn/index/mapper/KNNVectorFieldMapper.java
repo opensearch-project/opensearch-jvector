@@ -263,6 +263,18 @@ public abstract class KNNVectorFieldMapper extends ParametrizedFieldMapper {
                 );
             }
             final KNNEngine knnEngine = originalParameters.getResolvedKnnMethodContext().getKnnEngine();
+
+            /*
+             * Doc values behavior matrix:
+             * - Any engine other than jVector: default true, unchanged
+             * - jVector, index < 3.9.0: default true, unchanged
+             * - jVector, index >= 3.9.0, doc_values not configured: default false
+             * - doc_values explicitly configured: see the isConfigured() note below
+             */
+            if (knnEngine == KNNEngine.JVECTOR && indexCreatedVersion.onOrAfter(Version.V_3_9_0) && hasDocValues.isConfigured() == false) {
+                hasDocValues = Parameter.docValuesParam(m -> toType(m).hasDocValues, false);
+            }
+
             if (knnEngine == KNNEngine.LUCENE || knnEngine == KNNEngine.JVECTOR) {
                 log.debug(String.format(Locale.ROOT, "Use [LuceneFieldMapper] mapper for field [%s]", name));
                 LuceneFieldMapper.CreateLuceneFieldMapperInput createLuceneFieldMapperInput = LuceneFieldMapper.CreateLuceneFieldMapperInput

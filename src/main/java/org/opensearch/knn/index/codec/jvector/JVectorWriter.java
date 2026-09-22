@@ -1113,23 +1113,7 @@ public class JVectorWriter extends KnnVectorsWriter {
                     fieldName,
                     mergeState.segmentInfo.name
                 );
-                final long start = Clock.systemDefaultZone().millis();
                 ProductQuantization leadingCompressor = leadingReader.getProductQuantizationForField(fieldName).get();
-                // Refine the leadingCompressor with the remaining vectors in the merge, we skip the leading reader since it's already been
-                // used to create the leadingCompressor
-                // We assume the leading reader is ALWAYS the first one in the readers array
-                for (int i = LEADING_READER_IDX + 1; i < readers.length; i++) {
-                    if (readers[i] == null || readers[i].getFloatVectorValues(fieldName) == null) {
-                        continue;
-                    }
-                    final FloatVectorValues values = readers[i].getFloatVectorValues(fieldName);
-                    final RandomAccessVectorValues randomAccessVectorValues = new RandomAccessVectorValuesOverVectorValues(values);
-                    leadingCompressor.refine(randomAccessVectorValues);
-                }
-                final long end = Clock.systemDefaultZone().millis();
-                final long trainingTime = end - start;
-                log.info("Refined PQ codebooks for field {}, in {} millis", fieldName, trainingTime);
-                KNNCounter.KNN_QUANTIZATION_TRAINING_TIME.add(trainingTime);
                 compactPqVectors = PQVectors.encodeAndBuild(leadingCompressor, compactRavv.size(), compactRavv, simdPoolMerge);
             }
 

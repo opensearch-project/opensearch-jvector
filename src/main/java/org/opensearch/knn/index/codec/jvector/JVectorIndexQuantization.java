@@ -19,7 +19,6 @@ import io.github.jbellis.jvector.vector.VectorizationProvider;
 import io.github.jbellis.jvector.vector.VectorSimilarityFunction;
 import io.github.jbellis.jvector.vector.types.VectorFloat;
 import io.github.jbellis.jvector.vector.types.VectorTypeSupport;
-import io.github.jbellis.jvector.graph.disk.feature.NVQ;
 import java.io.IOException;
 import java.time.Clock;
 import java.util.concurrent.ForkJoinPool;
@@ -186,20 +185,13 @@ public sealed interface JVectorIndexQuantization {
         return new LoadedState(null, pqVectors, supplier);
     }
 
-    // TODO: replace reflection with nvqFeature.getNVQuantization() once jvector exposes it publicly in the released jar
-    private static NVQuantization nvqFromGraph(OnDiskGraphIndex index) throws IOException {
+    private static NVQuantization nvqFromGraph(OnDiskGraphIndex index) {
         io.github.jbellis.jvector.graph.disk.feature.NVQ nvqFeature = (io.github.jbellis.jvector.graph.disk.feature.NVQ) index.getFeatures()
             .get(FeatureId.NVQ_VECTORS);
         if (nvqFeature == null) {
             return null;
         }
-        try {
-            java.lang.reflect.Field nvqField = io.github.jbellis.jvector.graph.disk.feature.NVQ.class.getDeclaredField("nvq");
-            nvqField.setAccessible(true);
-            return (NVQuantization) nvqField.get(nvqFeature);
-        } catch (NoSuchFieldException | IllegalAccessException e) {
-            throw new IOException("Unable to extract NVQuantization from NVQ feature via reflection", e);
-        }
+        return nvqFeature.getNVQuantization();
     }
 
     /** String identifier used in REST params and on-disk serialization. */

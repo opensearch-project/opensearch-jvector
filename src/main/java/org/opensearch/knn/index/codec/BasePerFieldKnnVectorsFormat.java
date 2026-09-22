@@ -9,9 +9,7 @@ import lombok.AllArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.apache.lucene.codecs.KnnVectorsFormat;
 import org.apache.lucene.codecs.perfield.PerFieldKnnVectorsFormat;
-import org.opensearch.index.IndexSettings;
 import org.opensearch.index.mapper.MapperService;
-import org.opensearch.knn.index.KNNSettings;
 import org.opensearch.knn.index.codec.params.KNNScalarQuantizedVectorsFormatParams;
 import org.opensearch.knn.index.codec.params.KNNVectorsFormatParams;
 import org.opensearch.knn.index.engine.KNNEngine;
@@ -179,16 +177,6 @@ public abstract class BasePerFieldKnnVectorsFormat extends PerFieldKnnVectorsFor
             default:
                 throw new UnsupportedOperationException("Unsupported engine");
         }
-    }
-
-    private int getApproximateThresholdValue() {
-        // This is private method and mapperService is already checked for null or valid instance type before this call
-        // at caller, hence we don't need additional isPresent check here.
-        final IndexSettings indexSettings = mapperService.get().getIndexSettings();
-        final Integer approximateThresholdValue = indexSettings.getValue(KNNSettings.INDEX_KNN_ADVANCED_APPROXIMATE_THRESHOLD_SETTING);
-        return approximateThresholdValue != null
-            ? approximateThresholdValue
-            : KNNSettings.INDEX_KNN_ADVANCED_APPROXIMATE_THRESHOLD_DEFAULT_VALUE;
     }
 
     @Override

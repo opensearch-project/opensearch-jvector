@@ -728,7 +728,6 @@ curl -X POST "http://localhost:9200/my-vectors/_search" \
 | `overquery_factor` | `5` | Internal candidate list = `k × overquery_factor`. Higher values improve recall at the cost of latency. |
 | `advanced.threshold` | `0.0` | Minimum similarity score for a candidate to enter the result set. |
 | `advanced.rerank_floor` | `0.0` | Minimum score for a candidate to be re-ranked with full-precision vectors. |
-| `advanced.use_pruning` | `false` | Enable graph traversal pruning to reduce nodes visited. |
 
 **Guidelines:**
 - Start with `overquery_factor=5` (default)
@@ -1048,7 +1047,6 @@ For derived source configuration and version-specific behavior, see [docs/derive
 | Setting | Default | Description |
 |---|---|---|
 | `index.knn` | — | Set to `true` to enable the KNN plugin on the index (required) |
-| `index.knn.advanced.approximate_threshold` | `15000` | Minimum document count per segment before an approximate graph is built |
 | `index.knn.disk.vector.shard_level_rescoring_disabled` | `false` | Disable shard-level re-scoring for on-disk vectors |
 | `index.knn.derived_source.enabled` | `true` | Store vectors in derived source fields |
 

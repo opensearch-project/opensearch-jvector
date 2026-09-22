@@ -37,7 +37,6 @@ import static org.opensearch.knn.common.KNNConstants.NAME;
 import static org.opensearch.knn.common.KNNConstants.PARAMETERS;
 import static org.opensearch.knn.common.KNNConstants.TYPE;
 import static org.opensearch.knn.common.KNNConstants.TYPE_KNN_VECTOR;
-import static org.opensearch.knn.index.KNNSettings.INDEX_KNN_ADVANCED_APPROXIMATE_THRESHOLD;
 
 /**
  * Tests confirm that for the different supported configurations, recall is sound. The recall thresholds are
@@ -213,7 +212,6 @@ public class RecallTestsIT extends KNNRestTestCase {
             .put("number_of_shards", SHARD_COUNT)
             .put("number_of_replicas", REPLICA_COUNT)
             .put("index.knn", true)
-            .put(INDEX_KNN_ADVANCED_APPROXIMATE_THRESHOLD, 0)
             .build();
     }
 }

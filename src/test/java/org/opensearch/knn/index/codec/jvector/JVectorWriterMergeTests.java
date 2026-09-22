@@ -182,8 +182,7 @@ public class JVectorWriterMergeTests extends LuceneTestCase {
                             scenario.topK,
                             scenario.overqueryFactor,
                             0.0f,
-                            0.0f,
-                            false
+                            0.0f
                         );
                         var results = searcher.search(query, scenario.topK).scoreDocs;
 
