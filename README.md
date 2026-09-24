@@ -1,5 +1,5 @@
-[![Build and Test k-NN](https://github.com/opensearch-project/k-NN/actions/workflows/CI.yml/badge.svg)](https://github.com/opensearch-project/k-NN/actions/workflows/CI.yml)
-[![codecov](https://codecov.io/gh/opensearch-project/k-NN/branch/main/graph/badge.svg?token=PYQO2GW39S)](https://codecov.io/gh/opensearch-project/k-NN)
+[![Build and Test jVector](https://github.com/opensearch-project/opensearch-jvector/actions/workflows/CI.yml/badge.svg)](https://github.com/opensearch-project/opensearch-jvector/actions/workflows/CI.yml)
+[![codecov](https://codecov.io/gh/opensearch-project/opensearch-jvector/branch/main/graph/badge.svg)](https://codecov.io/gh/opensearch-project/opensearch-jvector)
 [![Documentation](https://img.shields.io/badge/doc-reference-blue)](https://opensearch.org/docs/search-plugins/knn/index/)
 [![Chat](https://img.shields.io/badge/chat-on%20forums-blue)](https://forum.opensearch.org/c/plugins/k-nn/48)
 ![PRs welcome!](https://img.shields.io/badge/PRs-welcome!-success)
