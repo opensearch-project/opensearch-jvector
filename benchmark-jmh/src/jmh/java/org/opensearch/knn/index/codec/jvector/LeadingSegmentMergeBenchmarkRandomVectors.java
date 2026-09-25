@@ -1,0 +1,181 @@
+/*
+ * Copyright OpenSearch Contributors
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package org.opensearch.knn.index.codec.jvector;
+
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import org.apache.lucene.document.Document;
+import org.apache.lucene.document.KnnFloatVectorField;
+import org.apache.lucene.index.DirectoryReader;
+import org.apache.lucene.index.IndexWriter;
+import org.apache.lucene.index.IndexWriterConfig;
+import org.apache.lucene.index.VectorSimilarityFunction;
+import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.search.KnnFloatVectorQuery;
+import org.apache.lucene.search.TopDocs;
+import org.apache.lucene.store.Directory;
+import org.apache.lucene.store.FSDirectory;
+import org.openjdk.jmh.annotations.*;
+import org.openjdk.jmh.infra.Blackhole;
+
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Random;
+import java.util.concurrent.TimeUnit;
+
+/**
+ * Benchmark to compare the performance of JVector and Lucene codecs with random vectors.
+ * The benchmark generates random vectors and indexes them using JVector and Lucene codecs.
+ * It then performs a search using a random query vector and measures the recall.
+ * Note: This benchmark is not meant to reproduce the already existing benchmarks of either Lucene or JVector.
+ * But rather it is more meant as a qualitative analysis of the relative performance of the codecs in the plugin for certain scenarios.
+ */
+@State(Scope.Thread)
+@BenchmarkMode(Mode.AverageTime)
+@OutputTimeUnit(TimeUnit.MILLISECONDS)
+@Warmup(iterations = 2)
+@Measurement(iterations = 5)
+@Fork(1)
+public class LeadingSegmentMergeBenchmarkRandomVectors {
+    private static final Logger log = LogManager.getLogger(FormatBenchmarkQueryWithRandomVectors.class);
+    private static final String JVECTOR_NOT_QUANTIZED = "jvector_not_quantized";
+    private static final String JVECTOR_QUANTIZED = "jvector_quantized";
+    private static final String FIELD_NAME = "vector_field";
+    private static final int K = 100;
+    private static final VectorSimilarityFunction SIMILARITY_FUNCTION = VectorSimilarityFunction.EUCLIDEAN;
+    @Param({ JVECTOR_NOT_QUANTIZED, JVECTOR_QUANTIZED })  // This will run the benchmark each codec type
+    private String codecType;
+    @Param({ "5000", "10000", "50000" })
+    private int numDocs;
+    @Param({ "768", "1024" })
+    private int dimension;
+    @Param({ "false", "true" })
+    private boolean leadingSegmentMergeDisabled;
+
+    private float[][] vectors;
+    private float[] queryVector;
+    private float expectedMinScoreInTopK;
+    private Directory directory;
+    private DirectoryReader directoryReader;
+    private Path indexDirectoryPath;
+    private IndexSearcher searcher;
+    private double totalRecall = 0.0;
+    private int recallCount = 0;
+
+    @Setup(Level.Iteration)
+    public void setup() throws IOException {
+        vectors = new float[numDocs][dimension];
+        queryVector = new float[dimension];
+        log.info("Generating {} random vectors of dimension {}", numDocs, dimension);
+        // Generate random vectors
+        Random random = new Random(42);
+        for (int i = 0; i < numDocs; i++) {
+            for (int j = 0; j < dimension; j++) {
+                vectors[i][j] = random.nextFloat();
+            }
+        }
+
+        for (int i = 0; i < dimension; i++) {
+            queryVector[i] = random.nextFloat();
+        }
+
+        expectedMinScoreInTopK = BenchmarkCommon.findExpectedKthMaxScore(queryVector, vectors, SIMILARITY_FUNCTION, K);
+
+        indexDirectoryPath = Files.createTempDirectory("jvector-benchmark");
+        log.info("Index path: {}", indexDirectoryPath);
+        directory = FSDirectory.open(indexDirectoryPath);
+
+        // Create index with JVectorFormat
+        IndexWriterConfig indexWriterConfig = new IndexWriterConfig();
+        indexWriterConfig.setCodec(BenchmarkCommon.getCodec(codecType, leadingSegmentMergeDisabled));
+        indexWriterConfig.setUseCompoundFile(true);
+        indexWriterConfig.setMergePolicy(new ForceMergesOnlyMergePolicy(true));
+
+        try (IndexWriter writer = new IndexWriter(directory, indexWriterConfig)) {
+            final int segment2docs = (int) (numDocs * 0.5d); // 5%
+            final int segment3docs = (int) (numDocs * 0.3d); // 3%
+            final int segment1docs = numDocs - segment2docs - segment3docs;
+
+            for (int i = 0; i < segment1docs; i++) {
+                Document doc = new Document();
+                doc.add(new KnnFloatVectorField(FIELD_NAME, vectors[i]));
+                writer.addDocument(doc);
+            }
+            writer.commit();
+
+            for (int i = segment1docs; i < segment1docs + segment2docs; i++) {
+                Document doc = new Document();
+                doc.add(new KnnFloatVectorField(FIELD_NAME, vectors[i]));
+                writer.addDocument(doc);
+            }
+            writer.commit();
+
+            for (int i = segment1docs + segment2docs; i < segment1docs + segment2docs + segment3docs; i++) {
+                Document doc = new Document();
+                doc.add(new KnnFloatVectorField(FIELD_NAME, vectors[i]));
+                writer.addDocument(doc);
+            }
+            writer.commit();
+        }
+
+        directoryReader = DirectoryReader.open(directory);
+        searcher = new IndexSearcher(directoryReader);
+    }
+
+    @TearDown
+    public void tearDown() throws IOException {
+        directoryReader.close();
+        directory.close();
+        // Cleanup previously created index directory
+        Files.walk(indexDirectoryPath)
+            .sorted((path1, path2) -> path2.compareTo(path1)) // Reverse order to delete files before directories
+            .forEach(path -> {
+                try {
+                    Files.delete(path);
+                } catch (IOException e) {
+                    throw new UncheckedIOException("Failed to delete " + path, e);
+                }
+            });
+    }
+
+    // Print average recall after each iteration
+    @TearDown(Level.Iteration)
+    public void printIterationStats() {
+        log.info("Average recall: {}", totalRecall / recallCount);
+    }
+
+    @TearDown(Level.Trial)
+    public void printFinalStats() {
+        log.info("=== Benchmark Results ===");
+        log.info("Total Iterations: {}", recallCount);
+        log.info("Average Recall: {}", totalRecall / recallCount);
+        log.info("=====================");
+    }
+
+    @Benchmark
+    public BenchmarkCommon.RecallResult benchmarkSearch(Blackhole blackhole) throws IOException {
+        // Create index with JVectorFormat
+        IndexWriterConfig indexWriterConfig = new IndexWriterConfig();
+        indexWriterConfig.setCodec(BenchmarkCommon.getCodec(codecType, leadingSegmentMergeDisabled));
+        indexWriterConfig.setUseCompoundFile(true);
+        indexWriterConfig.setMergePolicy(new ForceMergesOnlyMergePolicy(true));
+
+        try (IndexWriter writer = new IndexWriter(directory, indexWriterConfig)) {
+            writer.forceMerge(1);
+        }
+
+        KnnFloatVectorQuery query = new KnnFloatVectorQuery(FIELD_NAME, queryVector, K);
+        TopDocs topDocs = searcher.search(query, K);
+
+        // Calculate recall
+        float recall = BenchmarkCommon.calculateRecall(topDocs, expectedMinScoreInTopK);
+        totalRecall += recall;
+        recallCount++;
+        return new BenchmarkCommon.RecallResult(recall);
+    }
+}
