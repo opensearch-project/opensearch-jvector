@@ -1,6 +1,6 @@
 [![Build and Test jVector](https://github.com/opensearch-project/opensearch-jvector/actions/workflows/CI.yml/badge.svg)](https://github.com/opensearch-project/opensearch-jvector/actions/workflows/CI.yml)
 [![codecov](https://codecov.io/gh/opensearch-project/opensearch-jvector/branch/main/graph/badge.svg)](https://codecov.io/gh/opensearch-project/opensearch-jvector)
-[![Documentation](https://img.shields.io/badge/doc-reference-blue)](https://opensearch.org/docs/search-plugins/knn/index/)
+[![Documentation](https://img.shields.io/badge/doc-reference-blue)](https://docs.opensearch.org/latest/install-and-configure/additional-plugins/opensearch-jvector/)
 [![Chat](https://img.shields.io/badge/chat-on%20forums-blue)](https://forum.opensearch.org/c/plugins/k-nn/48)
 ![PRs welcome!](https://img.shields.io/badge/PRs-welcome!-success)
 
