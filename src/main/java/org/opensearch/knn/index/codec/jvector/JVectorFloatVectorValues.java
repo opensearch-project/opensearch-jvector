@@ -6,6 +6,7 @@
 package org.opensearch.knn.index.codec.jvector;
 
 import io.github.jbellis.jvector.graph.disk.OnDiskGraphIndex;
+import io.github.jbellis.jvector.vector.types.FloatArray;
 import io.github.jbellis.jvector.util.Bits;
 import io.github.jbellis.jvector.vector.VectorSimilarityFunction;
 import io.github.jbellis.jvector.vector.VectorizationProvider;
@@ -161,7 +162,9 @@ public class JVectorFloatVectorValues extends FloatVectorValues {
         try {
             final VectorFloat<?> vector = vectorFloatValue(i);
 
-            if (vector.get() instanceof float[] arr) {
+            if (vector instanceof FloatArray fa) {
+                return fa.array();
+            } else if (vector.get() instanceof float[] arr) {
                 return arr;
             }
 
