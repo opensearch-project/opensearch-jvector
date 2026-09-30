@@ -36,6 +36,7 @@ import org.apache.lucene.store.*;
 import org.apache.lucene.util.Bits;
 import org.apache.lucene.util.IOUtils;
 import org.opensearch.knn.common.KNNConstants;
+import org.opensearch.knn.index.codec.jvector.JVectorSegmentQuantizationCache.CloseableLoadedState;
 import org.opensearch.knn.plugin.stats.KNNCounter;
 
 @Log4j2
@@ -48,9 +49,11 @@ public class JVectorReader extends KnnVectorsReader {
     private final Map<String, FieldEntry> fieldEntryMap = new HashMap<>(1);
     private final Directory directory;
     private final SegmentReadState state;
+    private final JVectorSegmentQuantizationCache cache;
 
-    public JVectorReader(SegmentReadState state) throws IOException {
+    public JVectorReader(SegmentReadState state, JVectorSegmentQuantizationCache cache) throws IOException {
         this.state = state;
+        this.cache = cache;
         this.fieldInfos = state.fieldInfos;
         this.baseDataFileName = state.segmentInfo.name + "_" + state.segmentSuffix;
         final String metaFileName = IndexFileNames.segmentFileName(
@@ -274,12 +277,12 @@ public class JVectorReader extends KnnVectorsReader {
         private final String neighborsScoreCacheIndexFieldFileName;
         private final GraphNodeIdToDocMap graphNodeIdToDocMap;
         private final ReaderSupplier indexReaderSupplier;
-        private final ReaderSupplier compressedVectorsReaderSupplier;
         private final ReaderSupplier neighborsScoreCacheIndexReaderSupplier;
         private final OnDiskGraphIndex index;
         private final PQVectors pqVectors; // non-null when a PQ blob is present (PQ-only or NVQ+PQ)
         // NVQuantization extracted from the graph when NVQ is stored inline; null otherwise
         private final NVQuantization nvqInlineQuantization;
+        private final CloseableLoadedState quantizationState;
 
         public FieldEntry(FieldInfo fieldInfo, JVectorWriter.VectorIndexFieldMetadata vectorIndexFieldMetadata) throws IOException {
             this.fieldInfo = fieldInfo;
@@ -317,23 +320,33 @@ public class JVectorReader extends KnnVectorsReader {
 
             // Load compressed vectors if present
             final byte qType = vectorIndexFieldMetadata.getQuantizationType();
-            var qs = JVectorIndexQuantization.loadQuantizationState(
+            this.quantizationState = cache.load(
                 qType,
                 this.index,
                 directory,
+                state.segmentInfo.getId(),
                 vectorIndexFieldDataFileName,
                 compressedVectorsOffset,
                 compressedVectorsLength,
                 vectorIndexOffset
             );
-            this.nvqInlineQuantization = qs.nvqInlineQuantization();
-            this.pqVectors = qs.pqVectors();
-            this.compressedVectorsReaderSupplier = qs.compressedVectorsReaderSupplier();
+            this.nvqInlineQuantization = quantizationState.nvqInlineQuantization();
+            this.pqVectors = quantizationState.pqVectors();
 
-            final IndexInput indexInput = directory.openInput(neighborsScoreCacheIndexFieldFileName, state.context);
-            CodecUtil.readIndexHeader(indexInput);
+            try {
+                final IndexInput indexInput = directory.openInput(neighborsScoreCacheIndexFieldFileName, state.context);
+                CodecUtil.readIndexHeader(indexInput);
 
-            this.neighborsScoreCacheIndexReaderSupplier = new JVectorRandomAccessReader.Supplier(indexInput);
+                this.neighborsScoreCacheIndexReaderSupplier = new JVectorRandomAccessReader.Supplier(indexInput);
+            } catch (Throwable ex) {
+                if (quantizationState != null) {
+                    IOUtils.close(quantizationState::close);
+                }
+                if (indexReaderSupplier != null) {
+                    IOUtils.close(indexReaderSupplier::close);
+                }
+                throw ex;
+            }
         }
 
         FloatVectorValues floatVectorValues() throws IOException {
@@ -366,11 +379,11 @@ public class JVectorReader extends KnnVectorsReader {
 
         @Override
         public void close() throws IOException {
+            if (quantizationState != null) {
+                IOUtils.close(quantizationState::close);
+            }
             if (indexReaderSupplier != null) {
                 IOUtils.close(indexReaderSupplier::close);
-            }
-            if (compressedVectorsReaderSupplier != null) {
-                IOUtils.close(compressedVectorsReaderSupplier::close);
             }
             if (neighborsScoreCacheIndexReaderSupplier != null) {
                 IOUtils.close(neighborsScoreCacheIndexReaderSupplier::close);
