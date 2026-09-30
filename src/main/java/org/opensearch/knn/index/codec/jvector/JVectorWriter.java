@@ -41,7 +41,6 @@ import org.apache.lucene.util.IORunnable;
 import io.github.jbellis.jvector.util.FixedBitSet;
 import org.apache.lucene.util.IOUtils;
 import org.apache.lucene.util.RamUsageEstimator;
-import org.opensearch.knn.common.KNNConstants;
 import org.opensearch.knn.plugin.stats.KNNCounter;
 
 import java.io.IOException;
@@ -100,9 +99,6 @@ public class JVectorWriter extends KnnVectorsWriter {
     private final int minimumBatchSizeForQuantization; // Threshold for the vector count above which we will trigger PQ quantization
     private final boolean hierarchyEnabled;
     private final boolean leadingSegmentMergeDisabled;
-    // When true, PQ codes for graph traversal are written inline with the adjacency lists (FusedPQ layout)
-    // rather than as a separate blob appended after the graph. Orthogonal to {@link #quantization}.
-    private final boolean fusedPqEnabled;
 
     private final ForkJoinPool simdPoolMerge;
     private final ForkJoinPool simdPoolFlush;
@@ -120,7 +116,6 @@ public class JVectorWriter extends KnnVectorsWriter {
         int minimumBatchSizeForQuantization,
         boolean hierarchyEnabled,
         boolean leadingSegmentMergeDisabled,
-        boolean fusedPqEnabled,
         final ForkJoinPool simdPoolMerge,
         final ForkJoinPool simdPoolFlush,
         final ForkJoinPool parallelismPool
@@ -134,7 +129,6 @@ public class JVectorWriter extends KnnVectorsWriter {
         this.minimumBatchSizeForQuantization = minimumBatchSizeForQuantization;
         this.hierarchyEnabled = hierarchyEnabled;
         this.leadingSegmentMergeDisabled = leadingSegmentMergeDisabled;
-        this.fusedPqEnabled = fusedPqEnabled;
         this.simdPoolMerge = simdPoolMerge;
         this.simdPoolFlush = simdPoolFlush;
         this.parallelismPool = parallelismPool;
@@ -412,9 +406,6 @@ public class JVectorWriter extends KnnVectorsWriter {
                 .vectorDimension(randomAccessVectorValues.dimension())
                 .graphNodeIdToDocMap(graphNodeIdToDocMap);
 
-            // Default layout; the fused writers below override it to FUSED_PQ when they actually inline the codes.
-            resultBuilder.quantizationLayout(JVectorIndexQuantization.QUANTIZATION_LAYOUT_SEPARATE);
-
             if (compressedVectors instanceof NVQVectors nvqVectors) {
                 writeNVQGraph(
                     graph,
@@ -426,29 +417,32 @@ public class JVectorWriter extends KnnVectorsWriter {
                     startOffset,
                     resultBuilder
                 );
-            } else if (fusedPqEnabled && compressedVectors instanceof PQVectors pqVectors && fusedPqUsable(pqVectors, fieldInfo)) {
-                writeFusedPQGraph(
-                    graph,
-                    randomAccessVectorValues,
-                    fieldInfo,
-                    pqVectors,
-                    jVectorIndexWriter,
-                    indexOutput,
-                    startOffset,
-                    resultBuilder
-                );
-            } else {
-                writeFullPrecisionGraph(
-                    graph,
-                    randomAccessVectorValues,
-                    fieldInfo,
-                    compressedVectors,
-                    jVectorIndexWriter,
-                    indexOutput,
-                    startOffset,
-                    resultBuilder
-                );
-            }
+            } else if (quantization instanceof JVectorIndexQuantization.PQ pq
+                && pq.isFused()
+                && compressedVectors instanceof PQVectors pqVectors
+                && fusedPqUsable(pqVectors, fieldInfo)) {
+                    writeFusedPQGraph(
+                        graph,
+                        randomAccessVectorValues,
+                        fieldInfo,
+                        pqVectors,
+                        jVectorIndexWriter,
+                        indexOutput,
+                        startOffset,
+                        resultBuilder
+                    );
+                } else {
+                    writeFullPrecisionGraph(
+                        graph,
+                        randomAccessVectorValues,
+                        fieldInfo,
+                        compressedVectors,
+                        jVectorIndexWriter,
+                        indexOutput,
+                        startOffset,
+                        resultBuilder
+                    );
+                }
 
             return resultBuilder.build();
         }
@@ -466,16 +460,6 @@ public class JVectorWriter extends KnnVectorsWriter {
         VectorIndexFieldMetadata.VectorIndexFieldMetadataBuilder resultBuilder
     ) throws IOException {
         final NVQuantization nvQuantization = nvqVectors.getNVQuantization();
-        // FusedPQ is intentionally not supported in combination with NVQ reranking yet; the NVQ path always
-        // uses the separate PQ blob layout, regardless of fusedPqEnabled.
-        if (fusedPqEnabled) {
-            log.warn(
-                "FusedPQ is enabled ({}) but is not supported together with NVQ reranking for field {}; "
-                    + "falling back to the separate PQ blob layout",
-                KNNConstants.METHOD_PARAMETER_FUSED_PQ_ENABLED,
-                fieldInfo.name
-            );
-        }
         log.info("Writing NVQ vectors inline with graph nodes for field {}", fieldInfo.name);
 
         try (var writer = new OnDiskSequentialGraphIndexWriter.Builder(graph, jVectorIndexWriter).with(new NVQ(nvQuantization)).build()) {
@@ -494,7 +478,6 @@ public class JVectorWriter extends KnnVectorsWriter {
                 resultBuilder.compressedVectorsLength(0);
             }
             resultBuilder.quantizationType(JVectorIndexQuantization.QUANTIZATION_TYPE_NVQ_INLINE);
-            resultBuilder.quantizationLayout(JVectorIndexQuantization.QUANTIZATION_LAYOUT_SEPARATE);
             CodecUtil.writeFooter(indexOutput);
         }
     }
@@ -515,6 +498,7 @@ public class JVectorWriter extends KnnVectorsWriter {
             );
             return false;
         }
+        log.info("FusedPQ codebook has {} clusters for field {}; using the FusedPQ inline layout", clusterCount, fieldInfo.name);
         return true;
     }
 
@@ -549,8 +533,7 @@ public class JVectorWriter extends KnnVectorsWriter {
             // No separate PQ blob is written in the fused layout.
             resultBuilder.compressedVectorsOffset(0);
             resultBuilder.compressedVectorsLength(0);
-            resultBuilder.quantizationType(JVectorIndexQuantization.QUANTIZATION_TYPE_PQ);
-            resultBuilder.quantizationLayout(JVectorIndexQuantization.QUANTIZATION_LAYOUT_FUSED_PQ);
+            resultBuilder.quantizationType(JVectorIndexQuantization.QUANTIZATION_TYPE_FUSED_PQ);
             CodecUtil.writeFooter(indexOutput);
         }
     }
@@ -611,10 +594,9 @@ public class JVectorWriter extends KnnVectorsWriter {
         long vectorIndexLength;
         long compressedVectorsOffset;
         long compressedVectorsLength;
-        byte quantizationType; // QUANTIZATION_TYPE_NONE/PQ/NVQ; added in VERSION_WITH_QUANTIZATION_TYPE
-        // QUANTIZATION_LAYOUT_SEPARATE/FUSED_PQ; added in VERSION_WITH_FUSED_PQ. Orthogonal to quantizationType:
-        // where the PQ traversal codes are stored (separate blob vs inline with adjacency lists).
-        byte quantizationLayout;
+        // QUANTIZATION_TYPE_NONE/PQ/NVQ_INLINE/FUSED_PQ; added in VERSION_WITH_QUANTIZATION_TYPE, extended in
+        // VERSION_WITH_QUANTIZATION_FUSED_PQ
+        byte quantizationType;
         float degreeOverflow; // important when leveraging cache
         GraphNodeIdToDocMap graphNodeIdToDocMap;
 
@@ -628,7 +610,6 @@ public class JVectorWriter extends KnnVectorsWriter {
             out.writeVLong(compressedVectorsOffset);
             out.writeVLong(compressedVectorsLength);
             out.writeByte(quantizationType);
-            out.writeByte(quantizationLayout);
             out.writeInt(Float.floatToIntBits(degreeOverflow));
             graphNodeIdToDocMap.toOutput(out);
         }
@@ -649,12 +630,6 @@ public class JVectorWriter extends KnnVectorsWriter {
                 this.quantizationType = this.compressedVectorsLength > 0
                     ? JVectorIndexQuantization.QUANTIZATION_TYPE_PQ
                     : JVectorIndexQuantization.QUANTIZATION_TYPE_NONE;
-            }
-            if (version >= JVectorFormat.VERSION_WITH_FUSED_PQ) {
-                this.quantizationLayout = in.readByte();
-            } else {
-                // Pre-FusedPQ segments always used the separate PQ blob layout.
-                this.quantizationLayout = JVectorIndexQuantization.QUANTIZATION_LAYOUT_SEPARATE;
             }
             this.degreeOverflow = Float.intBitsToFloat(in.readInt());
             this.graphNodeIdToDocMap = new GraphNodeIdToDocMap(in);

@@ -64,8 +64,7 @@ import lombok.Singular;
  * <p>FusedPQ stores the PQ codes used for graph traversal inline per adjacency-list entry
  * ({@link FeatureId#FUSED_PQ}) instead of appending them as a separate blob that is loaded
  * into heap at segment open. Full-precision vectors are still kept inline for reranking
- * ({@link FeatureId#INLINE_VECTORS}). It is an on-disk <em>layout</em> flag
- * ({@code advanced.fused_pq_enabled}), orthogonal to the quantization type.
+ * ({@link FeatureId#INLINE_VECTORS}). Selected via {@code advanced.quantization_type: "fused_pq"}.
  *
  * <p>Coverage:
  * <ul>
@@ -158,9 +157,8 @@ public class JVectorFusedPQTests extends LuceneTestCase {
 
         IndexWriterConfig iwc = LuceneTestCase.newIndexWriterConfig();
         iwc.setUseCompoundFile(false);
-        // Quantization type stays plain PQ; the trailing flag enables the FusedPQ on-disk layout.
         iwc.setCodec(
-            getCodec(scenario.minFusedPqThreshold, scenario.leadingSegmentMergeDisabled, mergePool, new JVectorIndexQuantization.PQ(), true)
+            getCodec(scenario.minFusedPqThreshold, scenario.leadingSegmentMergeDisabled, mergePool, new JVectorIndexQuantization.PQ(true))
         );
         iwc.setMergePolicy(new ForceMergesOnlyMergePolicy(false));
         iwc.setMaxBufferedDocs(-1);
@@ -409,7 +407,7 @@ public class JVectorFusedPQTests extends LuceneTestCase {
 
         IndexWriterConfig iwc = LuceneTestCase.newIndexWriterConfig();
         iwc.setUseCompoundFile(false);
-        iwc.setCodec(getCodec(1, KNNConstants.DEFAULT_LEADING_SEGMENT_MERGE_DISABLED, null, new JVectorIndexQuantization.PQ(), true));
+        iwc.setCodec(getCodec(1, KNNConstants.DEFAULT_LEADING_SEGMENT_MERGE_DISABLED, null, new JVectorIndexQuantization.PQ(true)));
         iwc.setMergePolicy(new ForceMergesOnlyMergePolicy(false));
         iwc.setMaxBufferedDocs(-1);
 
@@ -455,7 +453,7 @@ public class JVectorFusedPQTests extends LuceneTestCase {
 
         IndexWriterConfig iwc = LuceneTestCase.newIndexWriterConfig();
         iwc.setUseCompoundFile(false);
-        iwc.setCodec(getCodec(1, KNNConstants.DEFAULT_LEADING_SEGMENT_MERGE_DISABLED, null, new JVectorIndexQuantization.PQ(), true));
+        iwc.setCodec(getCodec(1, KNNConstants.DEFAULT_LEADING_SEGMENT_MERGE_DISABLED, null, new JVectorIndexQuantization.PQ(true)));
         iwc.setMergePolicy(new ForceMergesOnlyMergePolicy(false));
         iwc.setMaxBufferedDocs(-1);
 

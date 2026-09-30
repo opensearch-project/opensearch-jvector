@@ -35,12 +35,14 @@ import static io.github.jbellis.jvector.quantization.KMeansPlusPlusClusterer.UNW
 /**
  * Encapsulates the quantization strategy used when writing a jVector segment.
  * <p>
- * Concrete subclasses are {@link NVQ} for Non-uniform Vector Quantization (stored inline
- * in the graph) and {@link PQ} for Product Quantization (stored as a separate blob).
- * PQ and NVQ quantize different portions of the graph. As a result,
- * the following combinations for quantization are possible today in the disk-ann graph:
+ * Concrete subclasses are {@link NVQ} for Non-uniform Vector Quantization (stored inline in the
+ * graph) and {@link PQ} for Product Quantization, stored as a separate blob or, when
+ * {@link PQ#isFused()}, inline per adjacency entry (FusedPQ layout).
+ * Supported combinations today:
  * 1. PQ + full-precision vectors
  * 2. PQ + NVQ
+ * 3. Fused PQ + full-precision vectors
+ * FusedPQ + NVQ is not yet supported.
  */
 public sealed interface JVectorIndexQuantization {
 
@@ -51,11 +53,8 @@ public sealed interface JVectorIndexQuantization {
     byte QUANTIZATION_TYPE_NONE = 0;
     byte QUANTIZATION_TYPE_PQ = 1;
     byte QUANTIZATION_TYPE_NVQ_INLINE = 2;
-
-    // On-disk quantization LAYOUT bytes. Orthogonal to the *_TYPE_* bytes above: the type byte says what the
-    // exact scorer / reranker reads, the layout byte says where the PQ codes used for graph traversal live.
-    byte QUANTIZATION_LAYOUT_SEPARATE = 0; // PQ blob appended after the graph (legacy / default)
-    byte QUANTIZATION_LAYOUT_FUSED_PQ = 1; // PQ codes stored inline per adjacency entry via FeatureId.FUSED_PQ
+    // PQ codes stored inline per adjacency entry (FeatureId.FUSED_PQ) instead of a separate blob.
+    byte QUANTIZATION_TYPE_FUSED_PQ = 3;
 
     /** Holds the quantization objects loaded from disk for a single field. */
     record LoadedState(NVQuantization nvqInlineQuantization, PQVectors pqVectors, ReaderSupplier compressedVectorsReaderSupplier) {
@@ -87,6 +86,8 @@ public sealed interface JVectorIndexQuantization {
                 compressedVectorsOffset,
                 compressedVectorsLength
             );
+            // FusedPQ codes live in the graph's FUSED_PQ feature, not a heap-loaded blob.
+            case QUANTIZATION_TYPE_FUSED_PQ -> new LoadedState(null, null, null);
             default -> compressedVectorsLength > 0
                 ? loadPQState(directory, fieldDataFileName, compressedVectorsOffset, compressedVectorsLength, vectorIndexOffset)
                 : new LoadedState(null, null, null);
@@ -372,33 +373,55 @@ public sealed interface JVectorIndexQuantization {
 
     public static final class PQ implements JVectorIndexQuantization {
         private final Function<Integer, Integer> numSubspacesSupplier;
+        // When true, PQ codes are stored inline per adjacency entry (FusedPQ layout) instead of a separate blob.
+        private final boolean fused;
+
+        public PQ(Function<Integer, Integer> numSubspacesSupplier, boolean fused) {
+            this.numSubspacesSupplier = numSubspacesSupplier;
+            this.fused = fused;
+        }
 
         public PQ(Function<Integer, Integer> numSubspacesSupplier) {
-            this.numSubspacesSupplier = numSubspacesSupplier;
+            this(numSubspacesSupplier, false);
         }
 
         /** PQ with a fixed (dimension-independent) subspace count. */
+        public PQ(int fixedNumSubspaces, boolean fused) {
+            this(ignored -> fixedNumSubspaces, fused);
+        }
+
+        /** PQ with a fixed (dimension-independent) subspace count, not fused. */
         public PQ(int fixedNumSubspaces) {
-            this(ignored -> fixedNumSubspaces);
+            this(fixedNumSubspaces, false);
         }
 
         /** PQ using the default dimension-adaptive subspace count. */
+        public PQ(boolean fused) {
+            this(PQ::defaultNumSubspaces, fused);
+        }
+
+        /** PQ using the default dimension-adaptive subspace count, not fused. */
         public PQ() {
-            this(PQ::defaultNumSubspaces);
+            this(false);
         }
 
         public Function<Integer, Integer> getNumSubspacesSupplier() {
             return numSubspacesSupplier;
         }
 
+        /** Whether PQ codes for graph traversal are stored inline (FusedPQ layout) rather than as a separate blob. */
+        public boolean isFused() {
+            return fused;
+        }
+
         @Override
         public String getType() {
-            return KNNConstants.QUANTIZATION_TYPE_PQ;
+            return fused ? KNNConstants.QUANTIZATION_TYPE_FUSED_PQ : KNNConstants.QUANTIZATION_TYPE_PQ;
         }
 
         @Override
         public byte quantizationType() {
-            return QUANTIZATION_TYPE_PQ;
+            return fused ? QUANTIZATION_TYPE_FUSED_PQ : QUANTIZATION_TYPE_PQ;
         }
 
         @Override

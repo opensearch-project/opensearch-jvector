@@ -10,7 +10,6 @@ import io.github.jbellis.jvector.disk.ReaderSupplier;
 import io.github.jbellis.jvector.graph.GraphSearcher;
 import io.github.jbellis.jvector.graph.SearchResult;
 import io.github.jbellis.jvector.graph.disk.OnDiskGraphIndex;
-import io.github.jbellis.jvector.graph.disk.feature.FeatureId;
 import io.github.jbellis.jvector.graph.similarity.DefaultSearchScoreProvider;
 import io.github.jbellis.jvector.graph.similarity.ScoreFunction;
 import io.github.jbellis.jvector.graph.similarity.SearchScoreProvider;
@@ -331,13 +330,7 @@ public class JVectorReader extends KnnVectorsReader {
             this.nvqInlineQuantization = qs.nvqInlineQuantization();
             this.pqVectors = qs.pqVectors();
             this.compressedVectorsReaderSupplier = qs.compressedVectorsReaderSupplier();
-            this.fusedPqPresent = vectorIndexFieldMetadata.getQuantizationLayout() == JVectorIndexQuantization.QUANTIZATION_LAYOUT_FUSED_PQ;
-            if (fusedPqPresent && !this.index.getFeatureSet().contains(FeatureId.FUSED_PQ)) {
-                throw new CorruptIndexException(
-                    "Segment metadata declares the FusedPQ layout but the graph has no FUSED_PQ feature",
-                    vectorIndexFieldDataFileName
-                );
-            }
+            this.fusedPqPresent = qType == JVectorIndexQuantization.QUANTIZATION_TYPE_FUSED_PQ;
 
             final IndexInput indexInput = directory.openInput(neighborsScoreCacheIndexFieldFileName, state.context);
             CodecUtil.readIndexHeader(indexInput);
