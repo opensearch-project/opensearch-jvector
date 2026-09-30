@@ -147,8 +147,9 @@ public class JVectorReader extends KnnVectorsReader {
         VectorFloat<?> q = VECTOR_TYPE_SUPPORT.createFloatVector(target);
         final FieldEntry fieldEntry = fieldEntryMap.get(field);
 
-        try (var view = index.getView()) {
+        try (var graphSearcher = new GraphSearcher(index)) {
             final long graphSearchStart = System.currentTimeMillis();
+            final OnDiskGraphIndex.View view = (OnDiskGraphIndex.View) graphSearcher.getView();
             final SearchScoreProvider ssp = fieldEntry.buildScoreFunctionProvider(q, view);
             final GraphNodeIdToDocMap jvectorLuceneDocMap = fieldEntry.graphNodeIdToDocMap;
             // Convert the acceptDocs bitmap from Lucene to jVector ordinal bitmap filter
@@ -162,49 +163,47 @@ public class JVectorReader extends KnnVectorsReader {
                     || (jvectorLuceneDocMap.getLuceneDocId(ord) != -1 && b.get(jvectorLuceneDocMap.getLuceneDocId(ord)));
             }
 
-            try (var graphSearcher = new GraphSearcher(index)) {
-                final var searchResults = graphSearcher.search(
-                    ssp,
-                    jvectorKnnCollector.k(),
-                    jvectorKnnCollector.k() * jvectorKnnCollector.getOverQueryFactor(),
-                    jvectorKnnCollector.getThreshold(),
-                    jvectorKnnCollector.getRerankFloor(),
-                    compatibleBits
-                );
+            final var searchResults = graphSearcher.search(
+                ssp,
+                jvectorKnnCollector.k(),
+                jvectorKnnCollector.k() * jvectorKnnCollector.getOverQueryFactor(),
+                jvectorKnnCollector.getThreshold(),
+                jvectorKnnCollector.getRerankFloor(),
+                compatibleBits
+            );
 
-                for (SearchResult.NodeScore ns : searchResults.getNodes()) {
-                    jvectorKnnCollector.collect(jvectorLuceneDocMap.getLuceneDocId(ns.node), ns.score);
-                }
-                final long graphSearchEnd = System.currentTimeMillis();
-                final long searchTime = graphSearchEnd - graphSearchStart;
-                log.debug("Search (including acquiring view) took {} ms", searchTime);
+            for (SearchResult.NodeScore ns : searchResults.getNodes()) {
+                jvectorKnnCollector.collect(jvectorLuceneDocMap.getLuceneDocId(ns.node), ns.score);
+            }
+            final long graphSearchEnd = System.currentTimeMillis();
+            final long searchTime = graphSearchEnd - graphSearchStart;
+            log.debug("Search (including acquiring view) took {} ms", searchTime);
 
-                // Collect the below metrics about the search and somehow wire this back to {@link @KNNStats}
-                final int visitedNodesCount = searchResults.getVisitedCount();
-                final int rerankedCount = searchResults.getRerankedCount();
+            // Collect the below metrics about the search and somehow wire this back to {@link @KNNStats}
+            final int visitedNodesCount = searchResults.getVisitedCount();
+            final int rerankedCount = searchResults.getRerankedCount();
 
-                final int expandedCount = searchResults.getExpandedCount();
-                final int expandedBaseLayerCount = searchResults.getExpandedCountBaseLayer();
+            final int expandedCount = searchResults.getExpandedCount();
+            final int expandedBaseLayerCount = searchResults.getExpandedCountBaseLayer();
 
-                KNNCounter.KNN_QUERY_VISITED_NODES.add(visitedNodesCount);
-                KNNCounter.KNN_QUERY_RERANKED_COUNT.add(rerankedCount);
-                KNNCounter.KNN_QUERY_EXPANDED_NODES.add(expandedCount);
-                KNNCounter.KNN_QUERY_EXPANDED_BASE_LAYER_NODES.add(expandedBaseLayerCount);
-                KNNCounter.KNN_QUERY_GRAPH_SEARCH_TIME.add(searchTime);
-                log.debug(
-                    "rerankedCount: {}, visitedNodesCount: {}, expandedCount: {}, expandedBaseLayerCount: {}",
-                    rerankedCount,
-                    visitedNodesCount,
-                    expandedCount,
-                    expandedBaseLayerCount
-                );
+            KNNCounter.KNN_QUERY_VISITED_NODES.add(visitedNodesCount);
+            KNNCounter.KNN_QUERY_RERANKED_COUNT.add(rerankedCount);
+            KNNCounter.KNN_QUERY_EXPANDED_NODES.add(expandedCount);
+            KNNCounter.KNN_QUERY_EXPANDED_BASE_LAYER_NODES.add(expandedBaseLayerCount);
+            KNNCounter.KNN_QUERY_GRAPH_SEARCH_TIME.add(searchTime);
+            log.debug(
+                "rerankedCount: {}, visitedNodesCount: {}, expandedCount: {}, expandedBaseLayerCount: {}",
+                rerankedCount,
+                visitedNodesCount,
+                expandedCount,
+                expandedBaseLayerCount
+            );
 
-                // Apache Lucene tracks visited counter so to validate scored docs/ total hits (
-                // see AbstractKnnVectorQuery please). The counter has to be updated manually.
-                final int visitedCount = visitedNodesCount + expandedCount;
-                if (visitedCount > 0) {
-                    jvectorKnnCollector.incVisitedCount(visitedCount);
-                }
+            // Apache Lucene tracks visited counter so to validate scored docs/ total hits (
+            // see AbstractKnnVectorQuery please). The counter has to be updated manually.
+            final int visitedCount = visitedNodesCount + expandedCount;
+            if (visitedCount > 0) {
+                jvectorKnnCollector.incVisitedCount(visitedCount);
             }
         }
     }
@@ -277,9 +276,11 @@ public class JVectorReader extends KnnVectorsReader {
         private final ReaderSupplier compressedVectorsReaderSupplier;
         private final ReaderSupplier neighborsScoreCacheIndexReaderSupplier;
         private final OnDiskGraphIndex index;
-        private final PQVectors pqVectors; // non-null when a PQ blob is present (PQ-only or NVQ+PQ)
+        private final PQVectors pqVectors; // non-null when a separate PQ blob is present (PQ-only or NVQ+PQ)
         // NVQuantization extracted from the graph when NVQ is stored inline; null otherwise
         private final NVQuantization nvqInlineQuantization;
+        // true when PQ traversal codes are stored inline with the adjacency lists (FusedPQ layout) instead of a blob
+        private final boolean fusedPqPresent;
 
         public FieldEntry(FieldInfo fieldInfo, JVectorWriter.VectorIndexFieldMetadata vectorIndexFieldMetadata) throws IOException {
             this.fieldInfo = fieldInfo;
@@ -329,6 +330,7 @@ public class JVectorReader extends KnnVectorsReader {
             this.nvqInlineQuantization = qs.nvqInlineQuantization();
             this.pqVectors = qs.pqVectors();
             this.compressedVectorsReaderSupplier = qs.compressedVectorsReaderSupplier();
+            this.fusedPqPresent = qType == JVectorIndexQuantization.QUANTIZATION_TYPE_FUSED_PQ;
 
             final IndexInput indexInput = directory.openInput(neighborsScoreCacheIndexFieldFileName, state.context);
             CodecUtil.readIndexHeader(indexInput);
@@ -350,7 +352,17 @@ public class JVectorReader extends KnnVectorsReader {
         }
 
         SearchScoreProvider buildScoreFunctionProvider(VectorFloat<?> q, OnDiskGraphIndex.View view) {
-            if (pqVectors != null) {
+            if (fusedPqPresent) {
+                // FusedPQ is only written for the plain-PQ path (never alongside NVQ), so reranking always uses
+                // the graph's INLINE_VECTORS feature here.
+                ScoreFunction.ApproximateScoreFunction asf = view.approximateScoreFunctionFor(q, similarityFunction);
+                ScoreFunction.ExactScoreFunction reranker = wrapExactScoreFunction(
+                    view.rerankerFor(q, similarityFunction),
+                    fieldInfo.getVectorSimilarityFunction(),
+                    similarityFunction
+                );
+                return new DefaultSearchScoreProvider(asf, reranker);
+            } else if (pqVectors != null) {
                 ScoreFunction.ApproximateScoreFunction asf = pqVectors.precomputedScoreFunctionFor(q, similarityFunction);
                 ScoreFunction.ExactScoreFunction reranker = view.rerankerFor(q, similarityFunction);
                 return new DefaultSearchScoreProvider(asf, reranker);

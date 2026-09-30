@@ -30,7 +30,9 @@ public class JVectorFormat extends KnnVectorsFormat {
 
     public static final int VERSION_START = 0;
     public static final int VERSION_WITH_QUANTIZATION_TYPE = 1;
-    public static final int VERSION_CURRENT = VERSION_WITH_QUANTIZATION_TYPE;
+    // Adds QUANTIZATION_TYPE_FUSED_PQ as a legal quantizationType value.
+    public static final int VERSION_WITH_QUANTIZATION_FUSED_PQ = 2;
+    public static final int VERSION_CURRENT = VERSION_WITH_QUANTIZATION_FUSED_PQ;
     public static final int DEFAULT_MAX_CONN = 32;
     public static final int DEFAULT_BEAM_WIDTH = 100;
     // Unfortunately, this can't be managed yet by the OpenSearch ThreadPool because it's not supporting {@link ForkJoinPool} types

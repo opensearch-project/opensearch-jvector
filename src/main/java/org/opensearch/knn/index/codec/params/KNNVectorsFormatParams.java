@@ -139,11 +139,12 @@ public class KNNVectorsFormatParams {
             }
             this.quantization = new JVectorIndexQuantization.NVQ(numSubvectors);
         } else {
+            boolean fused = KNNConstants.QUANTIZATION_TYPE_FUSED_PQ.equals(type);
             if (params != null && params.containsKey(KNNConstants.METHOD_PARAMETER_NUM_PQ_SUBSPACES)) {
                 int numSubspaces = (int) params.get(KNNConstants.METHOD_PARAMETER_NUM_PQ_SUBSPACES);
-                this.quantization = new JVectorIndexQuantization.PQ(numSubspaces);
+                this.quantization = new JVectorIndexQuantization.PQ(numSubspaces, fused);
             } else {
-                this.quantization = new JVectorIndexQuantization.PQ();
+                this.quantization = new JVectorIndexQuantization.PQ(fused);
             }
         }
     }
