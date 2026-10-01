@@ -13,6 +13,8 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import lombok.extern.log4j.Log4j2;
+
+import org.apache.lucene.codecs.Codec;
 import org.apache.lucene.document.*;
 import org.apache.lucene.index.*;
 import org.apache.lucene.search.*;
@@ -24,6 +26,7 @@ import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+import org.opensearch.common.util.io.IOUtils;
 import org.opensearch.knn.TestUtils;
 import org.opensearch.knn.common.KNNConstants;
 import static org.opensearch.knn.common.KNNConstants.DEFAULT_LEADING_SEGMENT_MERGE_DISABLED;
@@ -1399,6 +1402,55 @@ public class KNNJVectorTests extends LuceneTestCase {
                 Assert.assertEquals(1.0f, recall, 0.05f);
                 log.info("successfully completed search tests");
             }
+        }
+    }
+
+    /**
+     * Test the simple case of quantization where we open many readers over the same segment and
+     * ensure they all using the quantization cache to share PQ/NVQ compressed vectors.
+     */
+    @Test
+    public void testJVectorKnnIndex_withQuantization_cache() throws IOException {
+        int dimension = 1024;
+        int totalNumberOfDocs = DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION * 10;
+        final VectorSimilarityFunction vectorSimilarityFunction = VectorSimilarityFunction.EUCLIDEAN;
+        final Codec codec = getCodec(DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION, random().nextBoolean());
+
+        IndexWriterConfig indexWriterConfig = LuceneTestCase.newIndexWriterConfig();
+        indexWriterConfig.setUseCompoundFile(false);
+        indexWriterConfig.setCodec(codec);
+        indexWriterConfig.setMergePolicy(new ForceMergesOnlyMergePolicy());
+        // We set the below parameters to make sure no permature flush will occur, this way we can have a single segment, and we can force
+        // test the quantization case
+        indexWriterConfig.setMaxBufferedDocs(10000); // force flush every 10000 docs, this way we make sure that we only have a single
+                                                     // segment for a totalNumberOfDocs < 1000
+        indexWriterConfig.setRAMPerThreadHardLimitMB(1000); // 1000MB per thread, this way we make sure that no premature flush will occur
+        final Path indexPath = createTempDir();
+        log.info("Index path: {}", indexPath);
+        try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter w = new IndexWriter(dir, indexWriterConfig)) {
+            final float[][] vectors = TestUtils.generateRandomVectors(totalNumberOfDocs, dimension);
+            for (int i = 0; i < vectors.length; i++) {
+                final Document doc = new Document();
+                doc.add(new KnnFloatVectorField(TEST_FIELD, vectors[i], vectorSimilarityFunction));
+                doc.add(new IntField(TEST_ID_FIELD, i, Field.Store.YES));
+                w.addDocument(doc);
+            }
+
+            w.commit();
+            w.forceMerge(1);
+        }
+
+        final Collection<IndexReader> readers = new ArrayList<>();
+        try {
+            log.info("We should now have a single segment with {} documents", totalNumberOfDocs);
+            for (int i = 0; i < 200; ++i) {
+                IndexReader reader = DirectoryReader.open(FSDirectory.open(indexPath));
+                Assert.assertEquals(1, reader.getContext().leaves().size());
+                Assert.assertEquals(totalNumberOfDocs, reader.numDocs());
+                readers.add(reader);
+            }
+        } finally {
+            IOUtils.close(readers);
         }
     }
 
