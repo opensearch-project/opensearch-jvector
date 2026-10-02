@@ -6,12 +6,15 @@
 package org.opensearch.knn.index.codec.jvector;
 
 import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters;
+
+import java.io.Closeable;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+
 import lombok.extern.log4j.Log4j2;
 
 import org.apache.lucene.codecs.Codec;
@@ -20,8 +23,10 @@ import org.apache.lucene.index.*;
 import org.apache.lucene.search.*;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
+import org.apache.lucene.store.IOContext;
 import org.apache.lucene.tests.index.RandomIndexWriter;
 import org.apache.lucene.tests.util.LuceneTestCase;
+import org.apache.lucene.util.Version;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -32,8 +37,11 @@ import org.opensearch.knn.common.KNNConstants;
 import static org.opensearch.knn.common.KNNConstants.DEFAULT_LEADING_SEGMENT_MERGE_DISABLED;
 import static org.opensearch.knn.common.KNNConstants.DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION;
 import org.opensearch.knn.index.ThreadLeakFiltersForTests;
+
 import static org.opensearch.knn.index.engine.CommonTestUtils.getCodec;
 import org.opensearch.knn.plugin.stats.KNNCounter;
+
+import static org.hamcrest.CoreMatchers.equalTo;
 
 /**
  * Test used specifically for JVector
@@ -1412,7 +1420,7 @@ public class KNNJVectorTests extends LuceneTestCase {
     @Test
     public void testJVectorKnnIndex_withQuantization_cache() throws IOException {
         int dimension = 1024;
-        int totalNumberOfDocs = DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION * 10;
+        int totalNumberOfDocs = DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION * 5;
         final VectorSimilarityFunction vectorSimilarityFunction = VectorSimilarityFunction.EUCLIDEAN;
         final Codec codec = getCodec(DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION, random().nextBoolean());
 
@@ -1420,7 +1428,7 @@ public class KNNJVectorTests extends LuceneTestCase {
         indexWriterConfig.setUseCompoundFile(false);
         indexWriterConfig.setCodec(codec);
         indexWriterConfig.setMergePolicy(new ForceMergesOnlyMergePolicy());
-        // We set the below parameters to make sure no permature flush will occur, this way we can have a single segment, and we can force
+        // We set the below parameters to make sure no premature flush will occur, this way we can have a single segment, and we can force
         // test the quantization case
         indexWriterConfig.setMaxBufferedDocs(10000); // force flush every 10000 docs, this way we make sure that we only have a single
                                                      // segment for a totalNumberOfDocs < 1000
@@ -1440,17 +1448,43 @@ public class KNNJVectorTests extends LuceneTestCase {
             w.forceMerge(1);
         }
 
-        final Collection<IndexReader> readers = new ArrayList<>();
-        try {
-            log.info("We should now have a single segment with {} documents", totalNumberOfDocs);
-            for (int i = 0; i < 200; ++i) {
-                IndexReader reader = DirectoryReader.open(FSDirectory.open(indexPath));
-                Assert.assertEquals(1, reader.getContext().leaves().size());
-                Assert.assertEquals(totalNumberOfDocs, reader.numDocs());
-                readers.add(reader);
+        log.info("We should now have a single segment with {} documents", totalNumberOfDocs);
+        try (FSDirectory directory = FSDirectory.open(indexPath); DirectoryReader reader = DirectoryReader.open(directory)) {
+            SegmentInfos sis = SegmentInfos.readCommit(
+                directory,
+                reader.getIndexCommit().getSegmentsFileName(),
+                Version.MIN_SUPPORTED_MAJOR
+            );
+
+            assertThat(sis.size(), equalTo(1));
+            final SegmentCommitInfo si = sis.info(0);
+            final Codec c = si.info.getCodec();
+
+            final FieldInfos fieldInfos = c.fieldInfosFormat().read(directory, si.info, "", IOContext.READONCE);
+            final SegmentReadState segmentReadState = new SegmentReadState(
+                directory,
+                si.info,
+                fieldInfos,
+                IOContext.READONCE,
+                "JVectorFormat_0"
+            );
+
+            final JVectorSegmentQuantizationCache cache = new JVectorSegmentQuantizationCache();
+            assertThat(cache.size(), equalTo(0));
+
+            final Collection<Closeable> readers = new ArrayList<>();
+            // Create many readers, make sure PQ/NVQ state is cached and not loaded many times
+            for (int i = 0; i < 500; ++i) {
+                final JVectorReader r = new JVectorReader(segmentReadState, cache);
+                assertThat(cache.size(), equalTo(1));
+                readers.add(r);
             }
-        } finally {
+
+            Assert.assertEquals(1, reader.getContext().leaves().size());
+            Assert.assertEquals(totalNumberOfDocs, reader.numDocs());
+
             IOUtils.close(readers);
+            assertThat(cache.size(), equalTo(0));
         }
     }
 

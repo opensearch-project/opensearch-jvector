@@ -255,6 +255,10 @@ public class JVectorReader extends KnnVectorsReader {
         fieldEntryMap.clear();
     }
 
+    JVectorSegmentQuantizationCache getCache() {
+        return cache;
+    }
+
     private void readFields(ChecksumIndexInput meta, int version) throws IOException {
         for (int fieldNumber = meta.readInt(); fieldNumber != -1; fieldNumber = meta.readInt()) {
             final FieldInfo fieldInfo = fieldInfos.fieldInfo(fieldNumber); // read field number
