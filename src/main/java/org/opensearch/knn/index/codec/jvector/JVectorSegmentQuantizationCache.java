@@ -32,7 +32,7 @@ class JVectorSegmentQuantizationCache {
     /**
      * Closeable wrapper over {@link LoadedState}
      */
-    public record CloseableLoadedState(RefCount<LoadedState> state) implements Closeable {
+    record CloseableLoadedState(RefCount<LoadedState> state) implements Closeable {
         @Override
         public void close() throws IOException {
             if (state.getRefCount() > 0) {
@@ -40,11 +40,11 @@ class JVectorSegmentQuantizationCache {
             }
         }
 
-        public NVQuantization nvqInlineQuantization() {
+        NVQuantization nvqInlineQuantization() {
             return state.get().nvqInlineQuantization();
         }
 
-        public PQVectors pqVectors() {
+        PQVectors pqVectors() {
             return state.get().pqVectors();
         }
     }
@@ -119,6 +119,10 @@ class JVectorSegmentQuantizationCache {
         } catch (UncheckedIOException ex) {
             throw ex.getCause();
         }
+    }
+
+    int size() {
+        return cache.size();
     }
 
     private static String getCacheKey(
