@@ -32,6 +32,17 @@ public class BenchmarkCommon {
         };
     }
 
+    public static Codec getCodec(String codecType, boolean leadingSegmentMergeDisabled) {
+        return switch (codecType) {
+            case JVECTOR_NOT_QUANTIZED -> getFilterJvectorCodec(Integer.MAX_VALUE, leadingSegmentMergeDisabled);
+            case JVECTOR_QUANTIZED -> getFilterJvectorCodec(
+                KNNConstants.DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION,
+                leadingSegmentMergeDisabled
+            );
+            default -> throw new IllegalStateException("Unexpected codec type for leading segment: " + codecType);
+        };
+    }
+
     // Create a wrapper class for the result
     public static class RecallResult {
         public final float recall;
@@ -77,14 +88,18 @@ public class BenchmarkCommon {
     }
 
     private static Codec getFilterJvectorCodec(int minBatchSizeForQuantization) {
-        return new FilterCodec(KNNCodecVersion.V_10_01_0.getCodecName(), new Lucene101Codec()) {
+        return getFilterJvectorCodec(minBatchSizeForQuantization, KNNConstants.DEFAULT_LEADING_SEGMENT_MERGE_DISABLED);
+    }
+
+    private static Codec getFilterJvectorCodec(int minBatchSizeForQuantization, boolean leadingSegmentMergeDisabled) {
+        return new FilterCodec(KNNCodecVersion.V_10_04_0.getCodecName(), new Lucene101Codec()) {
             @Override
             public KnnVectorsFormat knnVectorsFormat() {
                 return new PerFieldKnnVectorsFormat() {
 
                     @Override
                     public KnnVectorsFormat getKnnVectorsFormatForField(String field) {
-                        return new JVectorFormat(minBatchSizeForQuantization);
+                        return new JVectorFormat(minBatchSizeForQuantization, leadingSegmentMergeDisabled);
                     }
                 };
             }
