@@ -101,6 +101,8 @@ public class KNNConstants {
     public static final String QUANTIZATION_TYPE_PQ = "pq";
     // When NVQ is enabled, PQ blob is also used. There is no option to use NVQ without PQ presently.
     public static final String QUANTIZATION_TYPE_NVQ = "nvq+pq";
+    // PQ codes stored inline with the adjacency lists instead of a separate blob (FusedPQ layout).
+    public static final String QUANTIZATION_TYPE_FUSED_PQ = "fused_pq";
     public static final String DEFAULT_QUANTIZATION_TYPE = QUANTIZATION_TYPE_PQ;
     public static final int DEFAULT_NUM_NVQ_SUBVECTORS = 2;
     public static final Double DEFAULT_ALPHA_VALUE = 1.2;

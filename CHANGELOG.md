@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased 3.10](https://github.com/opensearch-project/opensearch-jvector/compare/3.9...HEAD)
 ### Features
+- Add FusedPQ on-disk layout for jVector graph traversal codes [733](https://github.com/opensearch-project/opensearch-jvector/pull/733)
 
 ### Enhancements
 - Update datastax/jvector library to 4.0.1 [745](https://github.com/opensearch-project/opensearch-jvector/pull/745)
