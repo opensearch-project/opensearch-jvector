@@ -1342,8 +1342,8 @@ public class JVectorWriter extends KnnVectorsWriter {
                                     builder.addGraphNode(ord, vv.get().getVector(ord));
                                 })
                             ).join();
-                        } catch (UncheckedIOException uio) {
-                            throw uio.getCause();
+                        } catch (UncheckedIOException uncheckedIOException) {
+                            throw uncheckedIOException.getCause();
                         }
 
                         // mark deleted nodes
@@ -1449,8 +1449,8 @@ public class JVectorWriter extends KnnVectorsWriter {
                 }
                 graphIndexBuilder.addGraphNode(ord, vv.get().getVector(ord));
             })).join();
-        } catch (UncheckedIOException uio) {
-            throw uio.getCause();
+        } catch (UncheckedIOException uncheckedIOException) {
+            throw uncheckedIOException.getCause();
         }
         graphIndexBuilder.cleanup();
 
