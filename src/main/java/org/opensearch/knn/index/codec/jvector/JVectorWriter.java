@@ -99,6 +99,7 @@ import lombok.extern.log4j.Log4j2;
 @Log4j2
 public class JVectorWriter extends KnnVectorsWriter {
     private static final long SHALLOW_RAM_BYTES_USED = RamUsageEstimator.shallowSizeOfInstance(JVectorWriter.class);
+    private static final int MERGE_ABORT_CHECK_INTERVAL = 1000;
 
     private final List<FieldWriter<?>> fields = new ArrayList<>();
 
@@ -1334,11 +1335,7 @@ public class JVectorWriter extends KnnVectorsWriter {
                                 () -> IntStream.range(leadingGraph.getIdUpperBound(), heapRavv.size()).parallel().forEach(ord -> {
                                     assert heapToGlobalRavvOrds[ord] != GraphNodeIdToDocMap.NO_VECTOR_OR_DELETED_DOC
                                         : "Should be a valid graph node / vector";
-                                    try {
-                                        mergeState.checkAborted();
-                                    } catch (MergePolicy.MergeAbortedException e) {
-                                        throw new UncheckedIOException(e);
-                                    }
+                                    checkMergeAborted(mergeState, ord);
                                     builder.addGraphNode(ord, vv.get().getVector(ord));
                                 })
                             ).join();
@@ -1405,6 +1402,21 @@ public class JVectorWriter extends KnnVectorsWriter {
     }
 
     /**
+     * Checks whether merge was aborted based on following conditions:
+     * 1. Merge state is not null
+     * 2. MERGE_ABORT_CHECK_INTERVAL
+     */
+    static void checkMergeAborted(MergeState mergeState, int ord) throws UncheckedIOException {
+        if (mergeState != null && ord % MERGE_ABORT_CHECK_INTERVAL == 0) {
+            try {
+                mergeState.checkAborted();
+            } catch (MergePolicy.MergeAbortedException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+    }
+
+    /**
      * This method will return the graph index for the field
      * @return OnHeapGraphIndex
      */
@@ -1440,13 +1452,7 @@ public class JVectorWriter extends KnnVectorsWriter {
         // parallel graph construction from the merge documents Ids
         try {
             SIMD_POOL.submit(() -> IntStream.range(0, randomAccessVectorValues.size()).parallel().forEach(ord -> {
-                if (mergeState != null) {
-                    try {
-                        mergeState.checkAborted();
-                    } catch (MergePolicy.MergeAbortedException e) {
-                        throw new UncheckedIOException(e);
-                    }
-                }
+                checkMergeAborted(mergeState, ord);
                 graphIndexBuilder.addGraphNode(ord, vv.get().getVector(ord));
             })).join();
         } catch (UncheckedIOException uncheckedIOException) {

@@ -17,10 +17,17 @@ import org.apache.lucene.document.KnnFloatVectorField;
 import org.apache.lucene.document.StringField;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
+import org.apache.lucene.index.MergePolicy;
+import org.apache.lucene.index.MergeState;
 import org.apache.lucene.index.VectorSimilarityFunction;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.tests.util.LuceneTestCase;
 import org.junit.Test;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import org.opensearch.knn.index.ThreadLeakFiltersForTests;
 import static org.opensearch.knn.index.engine.CommonTestUtils.getCodec;
 
@@ -32,6 +39,53 @@ public class JVectorWriterAbortTests extends LuceneTestCase {
 
     private static final String VECTOR_FIELD = "test_vector";
     private static final int DIMENSION = 64;
+    private static final int INTERVAL = 1000;
+
+    // -----------------------------------------------------------------------
+    // checkMergeAborted
+    // -----------------------------------------------------------------------
+
+    /** Before the first interval boundary, checkAborted must never be called. */
+    @Test
+    public void testCheckMergeAbortedDoesNotFireBeforeInterval() throws Exception {
+        MergeState mergeState = mock(MergeState.class);
+        for (int ord = 1; ord < INTERVAL; ord++) {
+            JVectorWriter.checkMergeAborted(mergeState, ord);
+        }
+        verify(mergeState, never()).checkAborted();
+    }
+
+    /** checkAborted fires exactly at ord=0 and every subsequent multiple of the interval. */
+    @Test
+    public void testCheckMergeAbortedFiresOnlyAtIntervalMultiples() throws Exception {
+        MergeState mergeState = mock(MergeState.class);
+        JVectorWriter.checkMergeAborted(mergeState, 0);          // fires
+        JVectorWriter.checkMergeAborted(mergeState, INTERVAL);   // fires
+        JVectorWriter.checkMergeAborted(mergeState, INTERVAL + 1); // does not fire
+        JVectorWriter.checkMergeAborted(mergeState, 2 * INTERVAL); // fires
+        verify(mergeState, times(3)).checkAborted();
+    }
+
+    /** Abort triggered before an interval boundary is not detected — check hasn't fired yet. */
+    @Test
+    public void testCheckMergeAbortedDoesNotThrowBeforeInterval() throws Exception {
+        MergeState mergeState = mock(MergeState.class);
+        doThrow(new MergePolicy.MergeAbortedException("aborted")).when(mergeState).checkAborted();
+
+        // ord=1 is before the interval — no exception expected
+        JVectorWriter.checkMergeAborted(mergeState, 1);
+    }
+
+    /** null mergeState is always a no-op. */
+    @Test
+    public void testCheckMergeAbortedNullMergeStateIsNoop() {
+        JVectorWriter.checkMergeAborted(null, 0);
+        JVectorWriter.checkMergeAborted(null, INTERVAL);
+    }
+
+    // -----------------------------------------------------------------------
+    // Abort during live graph construction
+    // -----------------------------------------------------------------------
 
     private void createSegment(IndexWriter writer, int numDocs) throws IOException {
         for (int i = 0; i < numDocs; i++) {
@@ -49,10 +103,10 @@ public class JVectorWriterAbortTests extends LuceneTestCase {
 
     private void runAbortTest(Codec codec, int numSegments, int docsPerSegment) throws Exception {
         try (Directory dir = newDirectory()) {
-            IndexWriterConfig iwc = newIndexWriterConfig();
-            iwc.setCodec(codec);
+            IndexWriterConfig indexWriterConfig = new IndexWriterConfig();
+            indexWriterConfig.setCodec(codec);
 
-            IndexWriter writer = new IndexWriter(dir, iwc);
+            IndexWriter writer = new IndexWriter(dir, indexWriterConfig);
 
             // Create segments to build up a noticeable merge workload
             for (int s = 0; s < numSegments; s++) {
