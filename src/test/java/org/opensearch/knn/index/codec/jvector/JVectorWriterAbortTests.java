@@ -77,13 +77,6 @@ public class JVectorWriterAbortTests extends LuceneTestCase {
         JVectorWriter.checkMergeAborted(mergeState, 1);
     }
 
-    /** null mergeState is always a no-op. */
-    @Test
-    public void testCheckMergeAbortedNullMergeStateIsNoop() {
-        JVectorWriter.checkMergeAborted(null, 0);
-        JVectorWriter.checkMergeAborted(null, INTERVAL);
-    }
-
     // -----------------------------------------------------------------------
     // Abort during live graph construction
     // -----------------------------------------------------------------------

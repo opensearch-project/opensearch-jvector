@@ -1402,12 +1402,12 @@ public class JVectorWriter extends KnnVectorsWriter {
     }
 
     /**
-     * Checks whether merge was aborted based on following conditions:
-     * 1. Merge state is not null
-     * 2. MERGE_ABORT_CHECK_INTERVAL
+     * Checks whether the merge was aborted and throws if so.
+     * Mergestate is always non-null
+     * Fires every MERGE_ABORT_CHECK_INTERVAL ordinals
      */
     static void checkMergeAborted(MergeState mergeState, int ord) throws UncheckedIOException {
-        if (mergeState != null && (ord + 1) % MERGE_ABORT_CHECK_INTERVAL == 0) {
+        if ((ord + 1) % MERGE_ABORT_CHECK_INTERVAL == 0) {
             try {
                 mergeState.checkAborted();
             } catch (MergePolicy.MergeAbortedException e) {
@@ -1449,12 +1449,19 @@ public class JVectorWriter extends KnnVectorsWriter {
         var vv = randomAccessVectorValues.threadLocalSupplier();
 
         log.info("Building graph from merged float vector");
-        // parallel graph construction from the merge documents Ids
         try {
-            SIMD_POOL.submit(() -> IntStream.range(0, randomAccessVectorValues.size()).parallel().forEach(ord -> {
-                checkMergeAborted(mergeState, ord);
-                graphIndexBuilder.addGraphNode(ord, vv.get().getVector(ord));
-            })).join();
+            if (mergeState != null) {
+                // merge path
+                SIMD_POOL.submit(() -> IntStream.range(0, randomAccessVectorValues.size()).parallel().forEach(ord -> {
+                    checkMergeAborted(mergeState, ord);
+                    graphIndexBuilder.addGraphNode(ord, vv.get().getVector(ord));
+                })).join();
+            } else {
+                // flush path
+                SIMD_POOL.submit(() -> IntStream.range(0, randomAccessVectorValues.size()).parallel().forEach(ord -> {
+                    graphIndexBuilder.addGraphNode(ord, vv.get().getVector(ord));
+                })).join();
+            }
         } catch (UncheckedIOException uncheckedIOException) {
             throw uncheckedIOException.getCause();
         }
