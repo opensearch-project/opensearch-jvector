@@ -45,25 +45,26 @@ public class JVectorWriterAbortTests extends LuceneTestCase {
     // checkMergeAborted
     // -----------------------------------------------------------------------
 
-    /** Before the first interval boundary, checkAborted must never be called. */
+    /** Before the first interval boundary (ord=0..998), checkAborted must never be called. */
     @Test
     public void testCheckMergeAbortedDoesNotFireBeforeInterval() throws Exception {
         MergeState mergeState = mock(MergeState.class);
-        for (int ord = 1; ord < INTERVAL; ord++) {
+        // (ord+1) % 1000 == 0 first fires at ord=999; ords 0..998 must never trigger it
+        for (int ord = 0; ord < INTERVAL - 1; ord++) {
             JVectorWriter.checkMergeAborted(mergeState, ord);
         }
         verify(mergeState, never()).checkAborted();
     }
 
-    /** checkAborted fires exactly at ord=0 and every subsequent multiple of the interval. */
+    /** checkAborted fires at ord=999 (1000th node) and ord=1999 (2000th node), nowhere else. */
     @Test
     public void testCheckMergeAbortedFiresOnlyAtIntervalMultiples() throws Exception {
         MergeState mergeState = mock(MergeState.class);
-        JVectorWriter.checkMergeAborted(mergeState, 0);          // fires
-        JVectorWriter.checkMergeAborted(mergeState, INTERVAL);   // fires
-        JVectorWriter.checkMergeAborted(mergeState, INTERVAL + 1); // does not fire
-        JVectorWriter.checkMergeAborted(mergeState, 2 * INTERVAL); // fires
-        verify(mergeState, times(3)).checkAborted();
+        JVectorWriter.checkMergeAborted(mergeState, 0);                // does not fire (ord+1=1)
+        JVectorWriter.checkMergeAborted(mergeState, INTERVAL - 1);     // fires (ord+1=1000)
+        JVectorWriter.checkMergeAborted(mergeState, INTERVAL);         // does not fire (ord+1=1001)
+        JVectorWriter.checkMergeAborted(mergeState, 2 * INTERVAL - 1); // fires (ord+1=2000)
+        verify(mergeState, times(2)).checkAborted();
     }
 
     /** Abort triggered before an interval boundary is not detected — check hasn't fired yet. */

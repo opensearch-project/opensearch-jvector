@@ -1407,7 +1407,7 @@ public class JVectorWriter extends KnnVectorsWriter {
      * 2. MERGE_ABORT_CHECK_INTERVAL
      */
     static void checkMergeAborted(MergeState mergeState, int ord) throws UncheckedIOException {
-        if (mergeState != null && ord % MERGE_ABORT_CHECK_INTERVAL == 0) {
+        if (mergeState != null && (ord + 1) % MERGE_ABORT_CHECK_INTERVAL == 0) {
             try {
                 mergeState.checkAborted();
             } catch (MergePolicy.MergeAbortedException e) {
