@@ -15,6 +15,7 @@ import org.opensearch.knn.index.SpaceType;
 import org.opensearch.knn.index.codec.BasePerFieldKnnVectorsFormat;
 import org.opensearch.knn.index.codec.jvector.JVectorFormat;
 import org.opensearch.knn.index.engine.KNNEngine;
+import org.opensearch.knn.index.codec.params.KNNVectorsFormatParams;
 
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
@@ -74,15 +75,15 @@ public class KNN9120PerFieldKnnVectorsFormat extends BasePerFieldKnnVectorsForma
                             knnVectorsFormatParams.isLeadingSegmentMergeDisabled()
                         );
                     case FAISS:
-                        String description = String.format(
-                            java.util.Locale.ROOT,
-                            "IDMap,HNSW%d",
-                            knnVectorsFormatParams.getMaxConnections()
-                        );
+                        String description = buildFaissDescription(knnVectorsFormatParams);
+                        int efSearch = knnVectorsFormatParams.getFaissEfSearch() != null
+                            ? knnVectorsFormatParams.getFaissEfSearch()
+                            : KNNSettings.INDEX_KNN_DEFAULT_ALGO_PARAM_EF_SEARCH;
                         String indexParams = String.format(
                             java.util.Locale.ROOT,
-                            "efConstruction=%d",
-                            knnVectorsFormatParams.getBeamWidth()
+                            "efConstruction=%d,efSearch=%d",
+                            knnVectorsFormatParams.getBeamWidth(),
+                            efSearch
                         );
                         return new FaissKnnVectorsFormatWrapper(description, indexParams);
                     default:
@@ -115,6 +116,24 @@ public class KNN9120PerFieldKnnVectorsFormat extends BasePerFieldKnnVectorsForma
     @Override
     public int getMaxDimensions(String fieldName) {
         return KNNEngine.getMaxDimensionByEngine(KNNEngine.LUCENE);
+    }
+
+    private static String buildFaissDescription(KNNVectorsFormatParams params) {
+        String base = String.format(java.util.Locale.ROOT, "IDMap,HNSW%d", params.getMaxConnections());
+        String encoderType = params.getFaissEncoderType();
+        if (KNNConstants.ENCODER_SQ.equals(encoderType)) {
+            return base + ",SQ8";
+        }
+        if (KNNConstants.ENCODER_PQ.equals(encoderType)) {
+            Integer subspaces = params.getFaissPqSubspaces();
+            if (subspaces == null || subspaces <= 0) {
+                throw new IllegalArgumentException(
+                    "faiss.pq_subspaces must be set to a positive integer that divides the vector dimension when faiss.encoder_type is \"pq\""
+                );
+            }
+            return base + String.format(java.util.Locale.ROOT, ",PQ%d", subspaces);
+        }
+        return base;
     }
 
     private static Tuple<Integer, ExecutorService> getMergeThreadCountAndExecutorService() {

@@ -28,6 +28,12 @@ public class KNNVectorsFormatParams {
     private JVectorIndexQuantization quantization;
     private final SpaceType spaceType;
     private boolean leadingSegmentMergeDisabled;
+    /** Faiss encoder type: {@code "sq"} or {@code "pq"}, or {@code null} for plain HNSW. */
+    private String faissEncoderType;
+    /** Number of PQ subspaces; only meaningful when {@code faissEncoderType} is {@code "pq"}. */
+    private Integer faissPqSubspaces;
+    /** efSearch baked into the Faiss index at build time; {@code null} means use the Faiss default (=k). */
+    private Integer faissEfSearch;
 
     public KNNVectorsFormatParams(final Map<String, Object> params, int defaultMaxConnections, int defaultBeamWidth) {
         this(
@@ -61,6 +67,7 @@ public class KNNVectorsFormatParams {
         this.spaceType = spaceType;
         initLeadingSegmentMergeDisabled(params, KNNConstants.DEFAULT_LEADING_SEGMENT_MERGE_DISABLED);
         initQuantization(params);
+        initFaissEncoder(params);
     }
 
     public boolean validate(final Map<String, Object> params) {
@@ -121,6 +128,17 @@ public class KNNVectorsFormatParams {
             return;
         }
         this.leadingSegmentMergeDisabled = defaultLsmDisabled;
+    }
+
+    private void initFaissEncoder(final Map<String, Object> params) {
+        if (params == null) return;
+        this.faissEncoderType = (String) params.get(KNNConstants.FAISS_ENCODER_TYPE);
+        if (params.containsKey(KNNConstants.FAISS_PQ_SUBSPACES)) {
+            this.faissPqSubspaces = (Integer) params.get(KNNConstants.FAISS_PQ_SUBSPACES);
+        }
+        if (params.containsKey(KNNConstants.FAISS_EF_SEARCH)) {
+            this.faissEfSearch = (Integer) params.get(KNNConstants.FAISS_EF_SEARCH);
+        }
     }
 
     private void initQuantization(final Map<String, Object> params) {

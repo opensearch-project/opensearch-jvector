@@ -80,6 +80,13 @@ public class KNNConstants {
     public static final String ENCODER_PARAMETER_PQ_M = "m";
     public static final String ENCODER_PARAMETER_PQ_CODE_SIZE = "code_size";
     public static final String ENCODER_SQ = "sq";
+    public static final String ENCODER_PQ = "pq";
+    // Faiss encoder type exposed via method parameters (e.g. "faiss.encoder_type": "sq" or "pq")
+    public static final String FAISS_ENCODER_TYPE = "faiss.encoder_type";
+    // Number of PQ subspaces for Faiss HNSW PQ index (must divide dimension evenly)
+    public static final String FAISS_PQ_SUBSPACES = "faiss.pq_subspaces";
+    // efSearch baked into the Faiss index at build time (controls graph traversal breadth at query time)
+    public static final String FAISS_EF_SEARCH = "faiss.ef_search";
 
     /***** JVector specific constants *****/
     public static final String JVECTOR_NAME = "jvector";

@@ -18,12 +18,23 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 
+import static org.opensearch.knn.common.KNNConstants.ENCODER_PQ;
+import static org.opensearch.knn.common.KNNConstants.ENCODER_SQ;
+import static org.opensearch.knn.common.KNNConstants.FAISS_ENCODER_TYPE;
+import static org.opensearch.knn.common.KNNConstants.FAISS_EF_SEARCH;
+import static org.opensearch.knn.common.KNNConstants.FAISS_PQ_SUBSPACES;
 import static org.opensearch.knn.common.KNNConstants.METHOD_HNSW;
 import static org.opensearch.knn.common.KNNConstants.METHOD_PARAMETER_EF_CONSTRUCTION;
 import static org.opensearch.knn.common.KNNConstants.METHOD_PARAMETER_M;
 
 /**
  * Faiss HNSW method implementation for float vectors.
+ * Supports optional quantization via the {@code faiss.encoder_type} parameter:
+ * <ul>
+ *   <li>{@code "sq"} — Scalar Quantization (8-bit), appends {@code ,SQ8} to the Faiss factory string</li>
+ *   <li>{@code "pq"} — Product Quantization, appends {@code ,PQ<n>} to the Faiss factory string;
+ *       requires {@code faiss.pq_subspaces} to be set and to evenly divide the field dimension</li>
+ * </ul>
  */
 public class FaissHNSWMethod extends AbstractKNNMethod {
 
@@ -61,6 +72,30 @@ public class FaissHNSWMethod extends AbstractKNNMethod {
                     METHOD_PARAMETER_EF_CONSTRUCTION,
                     KNNSettings.INDEX_KNN_DEFAULT_ALGO_PARAM_EF_CONSTRUCTION,
                     (v, context) -> v > 0
+                )
+            )
+            .addParameter(
+                FAISS_ENCODER_TYPE,
+                new Parameter.StringParameter(
+                    FAISS_ENCODER_TYPE,
+                    null,
+                    (v, context) -> v == null || ENCODER_SQ.equals(v) || ENCODER_PQ.equals(v)
+                )
+            )
+            .addParameter(
+                FAISS_PQ_SUBSPACES,
+                new Parameter.IntegerParameter(
+                    FAISS_PQ_SUBSPACES,
+                    null,
+                    (v, context) -> v == null || (v > 0 && context.getDimension() % v == 0)
+                )
+            )
+            .addParameter(
+                FAISS_EF_SEARCH,
+                new Parameter.IntegerParameter(
+                    FAISS_EF_SEARCH,
+                    null,
+                    (v, context) -> v == null || v > 0
                 )
             )
             .build();
