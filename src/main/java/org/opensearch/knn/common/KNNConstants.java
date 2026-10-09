@@ -36,8 +36,6 @@ public class KNNConstants {
     public static final String MODEL_NODE_ASSIGNMENT = "training_node_assignment";
     public static final String MODEL_METHOD_COMPONENT_CONTEXT = "model_definition";
 
-    public static final String QFRAMEWORK_CONFIG = "qframe_config";
-
     public static final String VECTOR_DATA_TYPE_FIELD = "data_type";
     public static final String EXPAND_NESTED = "expand_nested_docs";
     public static final String MODEL_VECTOR_DATA_TYPE_KEY = VECTOR_DATA_TYPE_FIELD;
@@ -47,7 +45,6 @@ public class KNNConstants {
 
     public static final String RADIAL_SEARCH_KEY = "radial_search";
     public static final String MODEL_VERSION = "model_version";
-    public static final String QUANTIZATION_STATE_FILE_SUFFIX = "osknnqstate";
 
     // MMR (Maximal Marginal Relevance) constants
     public static final String MMR = "mmr";
