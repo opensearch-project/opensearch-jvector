@@ -99,7 +99,8 @@ import lombok.extern.log4j.Log4j2;
 @Log4j2
 public class JVectorWriter extends KnnVectorsWriter {
     private static final long SHALLOW_RAM_BYTES_USED = RamUsageEstimator.shallowSizeOfInstance(JVectorWriter.class);
-    private static final int MERGE_ABORT_CHECK_INTERVAL = 1000;
+    private static final int MERGE_ABORT_CHECK_NUM_ORDINALS = 1000;
+    private static final int MERGE_ABORT_CHECK_THRESHOLD_FOR_SMALL_GRAPHS = 5000;
 
     private final List<FieldWriter<?>> fields = new ArrayList<>();
 
@@ -1407,7 +1408,7 @@ public class JVectorWriter extends KnnVectorsWriter {
      * Fires every MERGE_ABORT_CHECK_INTERVAL ordinals
      */
     static void checkMergeAborted(MergeState mergeState, int ord) throws UncheckedIOException {
-        if ((ord + 1) % MERGE_ABORT_CHECK_INTERVAL == 0) {
+        if ((ord + 1) % MERGE_ABORT_CHECK_NUM_ORDINALS == 0) {
             try {
                 mergeState.checkAborted();
             } catch (MergePolicy.MergeAbortedException e) {
@@ -1450,7 +1451,7 @@ public class JVectorWriter extends KnnVectorsWriter {
 
         log.info("Building graph from merged float vector");
         try {
-            if (mergeState != null) {
+            if (mergeState != null && randomAccessVectorValues.size() > MERGE_ABORT_CHECK_THRESHOLD_FOR_SMALL_GRAPHS) {
                 // merge path
                 SIMD_POOL.submit(() -> IntStream.range(0, randomAccessVectorValues.size()).parallel().forEach(ord -> {
                     checkMergeAborted(mergeState, ord);

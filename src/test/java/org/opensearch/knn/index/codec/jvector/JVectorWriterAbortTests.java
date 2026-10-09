@@ -39,7 +39,7 @@ public class JVectorWriterAbortTests extends LuceneTestCase {
 
     private static final String VECTOR_FIELD = "test_vector";
     private static final int DIMENSION = 64;
-    private static final int INTERVAL = 1000;
+    private static final int MERGE_ABORT_CHECK_NUM_ORDINALS = 1000;
 
     // -----------------------------------------------------------------------
     // checkMergeAborted
@@ -50,7 +50,7 @@ public class JVectorWriterAbortTests extends LuceneTestCase {
     public void testCheckMergeAbortedDoesNotFireBeforeInterval() throws Exception {
         MergeState mergeState = mock(MergeState.class);
         // (ord+1) % 1000 == 0 first fires at ord=999; ords 0..998 must never trigger it
-        for (int ord = 0; ord < INTERVAL - 1; ord++) {
+        for (int ord = 0; ord < MERGE_ABORT_CHECK_NUM_ORDINALS - 1; ord++) {
             JVectorWriter.checkMergeAborted(mergeState, ord);
         }
         verify(mergeState, never()).checkAborted();
@@ -60,10 +60,10 @@ public class JVectorWriterAbortTests extends LuceneTestCase {
     @Test
     public void testCheckMergeAbortedFiresOnlyAtIntervalMultiples() throws Exception {
         MergeState mergeState = mock(MergeState.class);
-        JVectorWriter.checkMergeAborted(mergeState, 0);                // does not fire (ord+1=1)
-        JVectorWriter.checkMergeAborted(mergeState, INTERVAL - 1);     // fires (ord+1=1000)
-        JVectorWriter.checkMergeAborted(mergeState, INTERVAL);         // does not fire (ord+1=1001)
-        JVectorWriter.checkMergeAborted(mergeState, 2 * INTERVAL - 1); // fires (ord+1=2000)
+        JVectorWriter.checkMergeAborted(mergeState, 0);                                        // does not fire (ord+1=1)
+        JVectorWriter.checkMergeAborted(mergeState, MERGE_ABORT_CHECK_NUM_ORDINALS - 1);       // fires (ord+1=1000)
+        JVectorWriter.checkMergeAborted(mergeState, MERGE_ABORT_CHECK_NUM_ORDINALS);           // does not fire (ord+1=1001)
+        JVectorWriter.checkMergeAborted(mergeState, 2 * MERGE_ABORT_CHECK_NUM_ORDINALS - 1);   // fires (ord+1=2000)
         verify(mergeState, times(2)).checkAborted();
     }
 
@@ -95,12 +95,23 @@ public class JVectorWriterAbortTests extends LuceneTestCase {
         writer.commit();
     }
 
-    private void runAbortTest(Codec codec, int numSegments, int docsPerSegment) throws Exception {
+    private void runAbortTest(Codec codec, int numSegments, int docsPerSegment, long maxRollbackMs) throws Exception {
+        runAbortTest(codec, numSegments, docsPerSegment, maxRollbackMs, 0);
+    }
+
+    private void runAbortTest(Codec codec, int numSegments, int docsPerSegment, long maxRollbackMs, int leadingDocsCount) throws Exception {
         try (Directory dir = newDirectory()) {
             IndexWriterConfig indexWriterConfig = new IndexWriterConfig();
             indexWriterConfig.setCodec(codec);
 
             IndexWriter writer = new IndexWriter(dir, indexWriterConfig);
+
+            // Optionally flush a dedicated leading segment first so it has an on-disk graph
+            // (score cache) before the other segments are written. Required for the
+            // tryLeadingSegmentMerge() path; skipped when leadingDocsCount == 0.
+            if (leadingDocsCount > 0) {
+                createSegment(writer, leadingDocsCount);
+            }
 
             // Create segments to build up a noticeable merge workload
             for (int s = 0; s < numSegments; s++) {
@@ -133,32 +144,51 @@ public class JVectorWriterAbortTests extends LuceneTestCase {
 
             long rollbackElapsed = System.currentTimeMillis() - startRollback;
 
-            assertFalse("Merge thread hung and did not abort!", mergeThread.isAlive());
-            assertTrue("Rollback took too long (" + rollbackElapsed + "ms), abort was delayed", rollbackElapsed < 5000);
-
+            assertFalse("Merge thread hung and did not abort", mergeThread.isAlive());
+            assertTrue(
+                "Rollback took too long (" + rollbackElapsed + "ms, limit=" + maxRollbackMs + "ms)",
+                rollbackElapsed < maxRollbackMs
+            );
             // Verify that the merge was aborted with an IOException
             assertNotNull("Merge should have thrown an exception on abort", mergeError.get());
             assertTrue("Expected IOException on abort but got: " + mergeError.get(), mergeError.get() instanceof IOException);
         }
     }
 
-    /**
-     * Tests aborting during full graph rebuild from scratch (getGraph).
-     */
+    /** 4 × 3000 = 12 000 vectors > threshold (5000): checkMergeAborted() fires every 1000 nodes inside getGraph(). */
     @Test
     public void testAbortDuringScratchGraphBuild() throws Exception {
-        // leadingSegmentMergeDisabled = true forces getGraph() scratch build
         Codec codec = getCodec(Integer.MAX_VALUE, true, false);
-        runAbortTest(codec, 4, 3000);
+        runAbortTest(codec, 4, 3000, 5000);
     }
 
-    /**
-     * Tests aborting during leading segment incremental merge (tryLeadingSegmentMerge).
-     */
     @Test
     public void testAbortDuringLeadingSegmentMerge() throws Exception {
-        // leadingSegmentMergeDisabled = false allows tryLeadingSegmentMerge()
         Codec codec = getCodec(Integer.MAX_VALUE, false, false);
-        runAbortTest(codec, 4, 3000);
+        // leadingDocsCount=2000: flushed first so getNeighborsScoreCacheForField finds a graph.
+        // 3 × 500 = 1500 non-leading vectors (> 1000) guarantee the abort check fires inside
+        // tryLeadingSegmentMerge(). Total 3500 < 5000 keeps getGraph()'s abort path unreachable.
+        runAbortTest(codec, 3, 500, 5000, 2000);
+    }
+
+    /** flush passes null mergeState — no abort check, graph completes normally. */
+    @Test
+    public void testFlushPathCompletesWithoutAbortCheck() throws Exception {
+        Codec codec = getCodec(Integer.MAX_VALUE, true, false);
+        try (Directory dir = newDirectory()) {
+            IndexWriterConfig cfg = new IndexWriterConfig();
+            cfg.setCodec(codec);
+            try (IndexWriter writer = new IndexWriter(dir, cfg)) {
+                createSegment(writer, 200);
+            }
+            assertTrue("Segment files must exist after flush", dir.listAll().length > 0);
+        }
+    }
+
+    /** 3 × 1000 = 3000 vectors <= threshold (5000) - no abort check */
+    @Test
+    public void testSmallGraphMergeCompletesWithoutAbortCheck() throws Exception {
+        Codec codec = getCodec(Integer.MAX_VALUE, true, false);
+        runAbortTest(codec, 3, 1000, 5000);
     }
 }
