@@ -5,8 +5,49 @@
 
 package org.opensearch.knn.index.codec.jvector;
 
-import io.github.jbellis.jvector.graph.*;
-import io.github.jbellis.jvector.graph.disk.*;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.io.UnsupportedEncodingException;
+import java.time.Clock;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.ForkJoinPool;
+import java.util.stream.IntStream;
+
+import org.apache.lucene.codecs.CodecUtil;
+import org.apache.lucene.codecs.KnnFieldVectorsWriter;
+import org.apache.lucene.codecs.KnnVectorsReader;
+import org.apache.lucene.codecs.KnnVectorsWriter;
+import static org.apache.lucene.codecs.lucene99.Lucene99HnswVectorsReader.readVectorEncoding;
+import org.apache.lucene.codecs.perfield.PerFieldKnnVectorsFormat;
+import org.apache.lucene.index.FieldInfo;
+import org.apache.lucene.index.FieldInfos;
+import org.apache.lucene.index.FloatVectorValues;
+import org.apache.lucene.index.IndexFileNames;
+import org.apache.lucene.index.IndexWriter;
+import org.apache.lucene.index.KnnVectorValues;
+import org.apache.lucene.index.MergePolicy;
+import org.apache.lucene.index.MergeState;
+import org.apache.lucene.index.SegmentWriteState;
+import org.apache.lucene.index.Sorter;
+import org.apache.lucene.index.VectorEncoding;
+import org.apache.lucene.index.VectorSimilarityFunction;
+import org.apache.lucene.search.DocIdSetIterator;
+import org.apache.lucene.store.IndexInput;
+import org.apache.lucene.store.IndexOutput;
+import org.apache.lucene.util.Bits;
+import org.apache.lucene.util.IORunnable;
+import org.apache.lucene.util.IOUtils;
+import org.apache.lucene.util.RamUsageEstimator;
+import org.opensearch.knn.plugin.stats.KNNCounter;
+
+import io.github.jbellis.jvector.graph.GraphIndexBuilder;
+import io.github.jbellis.jvector.graph.ListRandomAccessVectorValues;
+import io.github.jbellis.jvector.graph.OnHeapGraphIndex;
+import io.github.jbellis.jvector.graph.RandomAccessVectorValues;
+import io.github.jbellis.jvector.graph.RemappedRandomAccessVectorValues;
+import io.github.jbellis.jvector.graph.disk.OnDiskSequentialGraphIndexWriter;
 import io.github.jbellis.jvector.graph.disk.feature.Feature;
 import io.github.jbellis.jvector.graph.disk.feature.FeatureId;
 import io.github.jbellis.jvector.graph.disk.feature.InlineVectors;
@@ -18,6 +59,7 @@ import io.github.jbellis.jvector.quantization.NVQVectors;
 import io.github.jbellis.jvector.quantization.NVQuantization;
 import io.github.jbellis.jvector.quantization.PQVectors;
 import io.github.jbellis.jvector.quantization.ProductQuantization;
+import io.github.jbellis.jvector.util.FixedBitSet;
 import io.github.jbellis.jvector.vector.VectorizationProvider;
 import io.github.jbellis.jvector.vector.types.VectorFloat;
 import io.github.jbellis.jvector.vector.types.VectorTypeSupport;
@@ -26,30 +68,6 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.Value;
 import lombok.extern.log4j.Log4j2;
-import org.apache.lucene.codecs.CodecUtil;
-import org.apache.lucene.codecs.KnnFieldVectorsWriter;
-import org.apache.lucene.codecs.KnnVectorsReader;
-import org.apache.lucene.codecs.KnnVectorsWriter;
-import org.apache.lucene.codecs.perfield.PerFieldKnnVectorsFormat;
-import org.apache.lucene.index.*;
-import org.apache.lucene.search.DocIdSetIterator;
-import org.apache.lucene.store.*;
-import org.apache.lucene.util.Bits;
-import org.apache.lucene.util.IORunnable;
-
-import io.github.jbellis.jvector.util.FixedBitSet;
-import org.apache.lucene.util.IOUtils;
-import org.apache.lucene.util.RamUsageEstimator;
-import org.opensearch.knn.plugin.stats.KNNCounter;
-
-import java.io.IOException;
-import java.io.UnsupportedEncodingException;
-import java.time.Clock;
-import java.util.*;
-import java.util.concurrent.ForkJoinPool;
-import java.util.stream.IntStream;
-
-import static org.apache.lucene.codecs.lucene99.Lucene99HnswVectorsReader.readVectorEncoding;
 
 /**
  * JVectorWriter is responsible for writing vector data into index segments using the JVector library.
@@ -81,6 +99,8 @@ import static org.apache.lucene.codecs.lucene99.Lucene99HnswVectorsReader.readVe
 @Log4j2
 public class JVectorWriter extends KnnVectorsWriter {
     private static final long SHALLOW_RAM_BYTES_USED = RamUsageEstimator.shallowSizeOfInstance(JVectorWriter.class);
+    private static final int MERGE_ABORT_CHECK_NUM_ORDINALS = 1000;
+    private static final int MERGE_ABORT_CHECK_THRESHOLD_FOR_SMALL_GRAPHS = 5000;
 
     private final List<FieldWriter<?>> fields = new ArrayList<>();
 
@@ -240,7 +260,8 @@ public class JVectorWriter extends KnnVectorsWriter {
                 randomAccessVectorValues,
                 fieldInfo,
                 segmentWriteState.segmentInfo.name,
-                simdPoolFlush
+                simdPoolFlush,
+                null
             );
             if (quantizationResult.compressedVectors() instanceof NVQVectors nvqVectors) {
                 writeField(
@@ -1014,7 +1035,7 @@ public class JVectorWriter extends KnnVectorsWriter {
             if (compactRavvEarly.size() == 0) {
                 log.info("No vectors for field {} in segment {}", fieldInfo.name, mergeState.segmentInfo.name);
                 var bsp = BuildScoreProvider.randomAccessScoreProvider(compactRavvEarly, getVectorSimilarityFunction(fieldInfo));
-                var graph = getGraph(bsp, compactRavvEarly, fieldInfo, segmentWriteState.segmentInfo.name, simdPoolMerge);
+                var graph = getGraph(bsp, compactRavvEarly, fieldInfo, segmentWriteState.segmentInfo.name, simdPoolMerge, mergeState);
                 graph.setAllMutationsCompleted();
                 writeField(fieldInfo, compactRavvEarly, null, compactOrdToDocMap, graph);
             } else if (quantization instanceof JVectorIndexQuantization.NVQ) {
@@ -1061,7 +1082,7 @@ public class JVectorWriter extends KnnVectorsWriter {
             } else {
                 bsp = BuildScoreProvider.randomAccessScoreProvider(compactRavvEarly, getVectorSimilarityFunction(fieldInfo));
             }
-            var graph = getGraph(bsp, compactRavvEarly, fieldInfo, segmentWriteState.segmentInfo.name, simdPoolMerge);
+            var graph = getGraph(bsp, compactRavvEarly, fieldInfo, segmentWriteState.segmentInfo.name, simdPoolMerge, mergeState);
             writeField(fieldInfo, compactRavvEarly, compactNvqVectors, compactNvqAuxPqVectors, compactOrdToDocMap, graph);
         }
 
@@ -1130,7 +1151,7 @@ public class JVectorWriter extends KnnVectorsWriter {
                         fieldName
                     );
                     var bsp = BuildScoreProvider.randomAccessScoreProvider(compactRavv, getVectorSimilarityFunction(fieldInfo));
-                    var graph = getGraph(bsp, compactRavv, fieldInfo, segmentWriteState.segmentInfo.name, simdPoolMerge);
+                    var graph = getGraph(bsp, compactRavv, fieldInfo, segmentWriteState.segmentInfo.name, simdPoolMerge, mergeState);
                     writeField(fieldInfo, compactRavv, compactOrdToDocMap, graph);
                 }
             } else {
@@ -1139,7 +1160,14 @@ public class JVectorWriter extends KnnVectorsWriter {
                 var buildScoreProvider = BuildScoreProvider.pqBuildScoreProvider(getVectorSimilarityFunction(fieldInfo), compactPqVectors);
                 // Pre-init the diversity provider here to avoid doing it lazily (as it could block the SIMD threads)
                 buildScoreProvider.diversityProviderFor(0);
-                var graph = getGraph(buildScoreProvider, compactRavv, fieldInfo, segmentWriteState.segmentInfo.name, simdPoolMerge);
+                var graph = getGraph(
+                    buildScoreProvider,
+                    compactRavv,
+                    fieldInfo,
+                    segmentWriteState.segmentInfo.name,
+                    simdPoolMerge,
+                    mergeState
+                );
                 writeField(fieldInfo, compactRavv, compactPqVectors, compactOrdToDocMap, graph);
             }
         }
@@ -1303,13 +1331,18 @@ public class JVectorWriter extends KnnVectorsWriter {
                         var vv = heapRavv.threadLocalSupplier();
 
                         // parallel graph construction from the merge documents Ids
-                        simdPoolMerge.submit(
-                            () -> IntStream.range(leadingGraph.getIdUpperBound(), heapRavv.size()).parallel().forEach(ord -> {
-                                assert heapToGlobalRavvOrds[ord] != GraphNodeIdToDocMap.NO_VECTOR_OR_DELETED_DOC
-                                    : "Should be a valid graph node / vector";
-                                builder.addGraphNode(ord, vv.get().getVector(ord));
-                            })
-                        ).join();
+                        try {
+                            simdPoolMerge.submit(
+                                () -> IntStream.range(leadingGraph.getIdUpperBound(), heapRavv.size()).parallel().forEach(ord -> {
+                                    assert heapToGlobalRavvOrds[ord] != GraphNodeIdToDocMap.NO_VECTOR_OR_DELETED_DOC
+                                        : "Should be a valid graph node / vector";
+                                    checkMergeAborted(mergeState, ord);
+                                    builder.addGraphNode(ord, vv.get().getVector(ord));
+                                })
+                            ).join();
+                        } catch (UncheckedIOException uncheckedIOException) {
+                            throw uncheckedIOException.getCause();
+                        }
 
                         // mark deleted nodes
                         for (int i = 0; i < numBaseVectors; i++) {
@@ -1370,6 +1403,21 @@ public class JVectorWriter extends KnnVectorsWriter {
     }
 
     /**
+     * Checks whether the merge was aborted and throws if so.
+     * Mergestate is always non-null
+     * Fires every MERGE_ABORT_CHECK_INTERVAL ordinals
+     */
+    static void checkMergeAborted(MergeState mergeState, int ord) throws UncheckedIOException {
+        if ((ord + 1) % MERGE_ABORT_CHECK_NUM_ORDINALS == 0) {
+            try {
+                mergeState.checkAborted();
+            } catch (MergePolicy.MergeAbortedException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+    }
+
+    /**
      * This method will return the graph index for the field
      * @return OnHeapGraphIndex
      */
@@ -1378,8 +1426,9 @@ public class JVectorWriter extends KnnVectorsWriter {
         RandomAccessVectorValues randomAccessVectorValues,
         FieldInfo fieldInfo,
         String segmentName,
-        ForkJoinPool SIMD_POOL
-    ) {
+        ForkJoinPool SIMD_POOL,
+        MergeState mergeState
+    ) throws IOException {
         final GraphIndexBuilder graphIndexBuilder = new GraphIndexBuilder(
             buildScoreProvider,
             fieldInfo.getVectorDimension(),
@@ -1401,10 +1450,22 @@ public class JVectorWriter extends KnnVectorsWriter {
         var vv = randomAccessVectorValues.threadLocalSupplier();
 
         log.info("Building graph from merged float vector");
-        // parallel graph construction from the merge documents Ids
-        SIMD_POOL.submit(() -> IntStream.range(0, randomAccessVectorValues.size()).parallel().forEach(ord -> {
-            graphIndexBuilder.addGraphNode(ord, vv.get().getVector(ord));
-        })).join();
+        try {
+            if (mergeState != null && randomAccessVectorValues.size() > MERGE_ABORT_CHECK_THRESHOLD_FOR_SMALL_GRAPHS) {
+                // merge path
+                SIMD_POOL.submit(() -> IntStream.range(0, randomAccessVectorValues.size()).parallel().forEach(ord -> {
+                    checkMergeAborted(mergeState, ord);
+                    graphIndexBuilder.addGraphNode(ord, vv.get().getVector(ord));
+                })).join();
+            } else {
+                // flush path
+                SIMD_POOL.submit(() -> IntStream.range(0, randomAccessVectorValues.size()).parallel().forEach(ord -> {
+                    graphIndexBuilder.addGraphNode(ord, vv.get().getVector(ord));
+                })).join();
+            }
+        } catch (UncheckedIOException uncheckedIOException) {
+            throw uncheckedIOException.getCause();
+        }
         graphIndexBuilder.cleanup();
 
         graphIndex = (OnHeapGraphIndex) graphIndexBuilder.getGraph();
