@@ -7,14 +7,16 @@ package org.opensearch.knn.index.codec.jvector;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.util.RefCount;
 import org.apache.lucene.util.StringHelper;
+import org.opensearch.common.CheckedSupplier;
 import org.opensearch.knn.index.codec.jvector.JVectorIndexQuantization.LoadedState;
+import org.opensearch.knn.index.codec.jvector.JVectorSegmentQuantizationCache.QuantizationSupplier;
 
 import io.github.jbellis.jvector.graph.disk.OnDiskGraphIndex;
 import io.github.jbellis.jvector.quantization.NVQuantization;
@@ -27,15 +29,26 @@ import lombok.extern.log4j.Log4j2;
  */
 @Log4j2
 class JVectorSegmentQuantizationCache {
-    private ConcurrentMap<String, RefCount<LoadedState>> cache;
+    private final ConcurrentMap<String, QuantizationSupplier> cache;
 
     /**
      * Closeable wrapper over {@link LoadedState}
      */
-    record CloseableLoadedState(RefCount<LoadedState> state) implements Closeable {
+    static final class CloseableLoadedState implements Closeable {
+        private final RefCount<LoadedState> state;
+        private final AtomicBoolean closed = new AtomicBoolean(false);
+
+        CloseableLoadedState(RefCount<LoadedState> state) {
+            this.state = state;
+        }
+
+        RefCount<LoadedState> state() {
+            return state;
+        }
+
         @Override
         public void close() throws IOException {
-            if (state.getRefCount() > 0) {
+            if (closed.compareAndSet(false, true)) {
                 state.decRef();
             }
         }
@@ -47,6 +60,53 @@ class JVectorSegmentQuantizationCache {
         PQVectors pqVectors() {
             return state.get().pqVectors();
         }
+    }
+
+    /**
+     * Lazy thread-safe one-time supplier for quantization state.
+     */
+    static final class QuantizationSupplier {
+        private final String key;
+        private final CheckedSupplier<LoadedState, IOException> supplier;
+        private volatile RefCount<LoadedState> refCount;
+
+        QuantizationSupplier(String key, CheckedSupplier<LoadedState, IOException> supplier) {
+            this.key = key;
+            this.supplier = supplier;
+        }
+
+        RefCount<LoadedState> get(ConcurrentMap<String, QuantizationSupplier> cache) throws IOException {
+            try {
+                return acquireAndGet(cache);
+            } catch (Throwable t) {
+                cache.remove(key, this);
+                throw t;
+            }
+        }
+
+        synchronized private RefCount<LoadedState> acquireAndGet(ConcurrentMap<String, QuantizationSupplier> cache) throws IOException {
+            if (this.refCount == null) {
+                final LoadedState loaded = supplier.get();
+                this.refCount = new RefCount<>(loaded) {
+                    @Override
+                    protected void release() throws IOException {
+                        log.debug("Cleaned cached quantization state for key {}", key);
+                        cache.remove(key, QuantizationSupplier.this);
+                    }
+                };
+            } else {
+                log.debug("Cached quantization state found for key {}", key);
+                this.refCount.incRef();
+            }
+
+            return this.refCount;
+        }
+
+        boolean isClosed() {
+            final RefCount<LoadedState> ref = refCount;
+            return ref != null && ref.getRefCount() == 0;
+        }
+
     }
 
     JVectorSegmentQuantizationCache() {
@@ -85,40 +145,27 @@ class JVectorSegmentQuantizationCache {
             vectorIndexOffset
         );
 
-        try {
-            final RefCount<LoadedState> state = cache.compute(cacheKey, (key, value) -> {
-                try {
-                    if (value == null || value.getRefCount() == 0) {
-                        log.debug("No cached quantization state found for field {}, loaded from disk", vectorIndexFieldDataFileName);
-                        return new RefCount<>(
-                            JVectorIndexQuantization.loadQuantizationState(
-                                quantizationType,
-                                index,
-                                directory,
-                                vectorIndexFieldDataFileName,
-                                compressedVectorsOffset,
-                                compressedVectorsLength,
-                                vectorIndexOffset
-                            )
-                        ) {
-                            protected void release() throws IOException {
-                                log.debug("Cleaned cached quantization state for field {}", vectorIndexFieldDataFileName);
-                                cache.remove(key, this);
-                            }
-                        };
-                    } else {
-                        log.debug("Cached quantization state found for field {}", vectorIndexFieldDataFileName);
-                        value.incRef();
-                        return value;
-                    }
-                } catch (IOException ex) {
-                    throw new UncheckedIOException(ex);
-                }
-            });
-            return new CloseableLoadedState(state);
-        } catch (UncheckedIOException ex) {
-            throw ex.getCause();
-        }
+        final QuantizationSupplier supplier = cache.compute(cacheKey, (key, existing) -> {
+            if (existing == null || existing.isClosed()) {
+                log.debug("No cached quantization state found for field {}, loaded from disk", vectorIndexFieldDataFileName);
+                return new QuantizationSupplier(
+                    key,
+                    () -> JVectorIndexQuantization.loadQuantizationState(
+                        quantizationType,
+                        index,
+                        directory,
+                        vectorIndexFieldDataFileName,
+                        compressedVectorsOffset,
+                        compressedVectorsLength,
+                        vectorIndexOffset
+                    )
+                );
+            }
+            return existing;
+        });
+
+        final RefCount<LoadedState> state = supplier.get(cache);
+        return new CloseableLoadedState(state);
     }
 
     int size() {
