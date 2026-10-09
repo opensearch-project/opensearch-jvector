@@ -15,7 +15,6 @@ import org.opensearch.common.settings.Setting;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.common.xcontent.XContentHelper;
 import org.opensearch.core.common.bytes.BytesReference;
-import org.opensearch.core.concurrency.OpenSearchRejectedExecutionException;
 import org.opensearch.core.xcontent.XContentBuilder;
 import org.opensearch.knn.index.KNNSettings;
 import org.opensearch.knn.index.SpaceType;
@@ -27,15 +26,10 @@ import org.opensearch.knn.index.engine.KNNMethodContext;
 import org.opensearch.knn.index.engine.MethodComponentContext;
 import org.opensearch.knn.index.mapper.KNNMappingConfig;
 import org.opensearch.knn.plugin.stats.KNNCounter;
-import org.opensearch.knn.quantization.models.quantizationState.QuantizationStateCache;
-import org.opensearch.knn.quantization.models.quantizationState.QuantizationStateCacheManager;
 import org.opensearch.test.OpenSearchTestCase;
-import org.opensearch.threadpool.ThreadPool;
 
 import io.github.jbellis.jvector.util.PhysicalCoreExecutor;
 
-import java.io.IOException;
-import java.lang.reflect.Field;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
@@ -94,29 +88,12 @@ public class KNNTestCase extends OpenSearchTestCase {
     }
 
     @SneakyThrows
-    public void resetState() throws IOException {
+    public void resetState() {
         // Reset all of the counters
         for (KNNCounter knnCounter : KNNCounter.values()) {
             knnCounter.set(0L);
         }
         initKNNSettings();
-
-        // Clean up the cache
-        try {
-            QuantizationStateCacheManager.getInstance().close();
-        } catch (OpenSearchRejectedExecutionException e) {
-            // Ignore
-        }
-
-        // Terminate thread pool in QuantizationStateCache
-        final Field f = QuantizationStateCache.class.getDeclaredField("threadPool");
-        f.setAccessible(true);
-        final ThreadPool threadPool = (ThreadPool) f.get(null);
-        if (threadPool != null) {
-            for (int i = 0; i < 10 && terminate(threadPool) == false; ++i) {
-                Thread.sleep(500);
-            }
-        }
     }
 
     private void initKNNSettings() {

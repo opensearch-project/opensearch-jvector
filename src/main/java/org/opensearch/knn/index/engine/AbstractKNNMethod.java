@@ -145,7 +145,6 @@ public abstract class AbstractKNNMethod implements KNNMethod {
         parameterMap.put(KNNConstants.SPACE_TYPE, convertUserToMethodSpaceType(knnMethodContext.getSpaceType()).getValue());
         parameterMap.put(KNNConstants.VECTOR_DATA_TYPE_FIELD, knnMethodConfigContext.getVectorDataType().getValue());
         return KNNLibraryIndexingContextImpl.builder()
-            .quantizationConfig(knnLibraryIndexingContext.getQuantizationConfig())
             .parameters(parameterMap)
             .vectorValidator(doGetVectorValidator(knnMethodContext, knnMethodConfigContext))
             .perDimensionValidator(doGetPerDimensionValidator(knnMethodContext, knnMethodConfigContext))
