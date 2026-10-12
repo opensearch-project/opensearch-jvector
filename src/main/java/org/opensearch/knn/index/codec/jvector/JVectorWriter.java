@@ -1405,7 +1405,7 @@ public class JVectorWriter extends KnnVectorsWriter {
     /**
      * Checks whether the merge was aborted and throws if so.
      * Mergestate is always non-null
-     * Fires every MERGE_ABORT_CHECK_INTERVAL ordinals
+     * Fires every MERGE_ABORT_CHECK_NUM_ORDINALS ordinals
      */
     static void checkMergeAborted(MergeState mergeState, int ord) throws UncheckedIOException {
         if ((ord + 1) % MERGE_ABORT_CHECK_NUM_ORDINALS == 0) {
