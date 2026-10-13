@@ -15,11 +15,6 @@ import org.opensearch.knn.index.SpaceType;
 import org.opensearch.knn.index.VectorDataType;
 import org.opensearch.knn.index.engine.KNNEngine;
 
-import org.opensearch.knn.index.engine.qframe.QuantizationConfig;
-import org.opensearch.knn.index.engine.qframe.QuantizationConfigParser;
-
-import static org.opensearch.knn.common.KNNConstants.QFRAMEWORK_CONFIG;
-
 import static org.opensearch.knn.common.KNNConstants.SPACE_TYPE;
 
 /**
@@ -54,20 +49,6 @@ public class FieldInfoExtractor {
             }
         }
         return StringUtils.isNotEmpty(vectorDataTypeString) ? VectorDataType.get(vectorDataTypeString) : VectorDataType.DEFAULT;
-    }
-
-    /**
-     * Extract quantization config from fieldInfo
-     *
-     * @param fieldInfo {@link FieldInfo}
-     * @return {@link QuantizationConfig}
-     */
-    public static QuantizationConfig extractQuantizationConfig(final FieldInfo fieldInfo) {
-        String quantizationConfigString = fieldInfo.getAttribute(QFRAMEWORK_CONFIG);
-        if (StringUtils.isEmpty(quantizationConfigString)) {
-            return QuantizationConfig.EMPTY;
-        }
-        return QuantizationConfigParser.fromCsv(quantizationConfigString);
     }
 
     /**
