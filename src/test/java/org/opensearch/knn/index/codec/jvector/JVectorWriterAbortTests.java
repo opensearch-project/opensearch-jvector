@@ -189,6 +189,6 @@ public class JVectorWriterAbortTests extends LuceneTestCase {
     @Test
     public void testSmallGraphMergeCompletesWithoutAbortCheck() throws Exception {
         Codec codec = getCodec(Integer.MAX_VALUE, true, false);
-        runAbortTest(codec, 3, 1000, 5000);
+        runAbortTest(codec, 3, 1000, 10000);
     }
 }
