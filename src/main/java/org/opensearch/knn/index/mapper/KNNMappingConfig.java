@@ -7,7 +7,6 @@ package org.opensearch.knn.index.mapper;
 
 import org.opensearch.Version;
 import org.opensearch.knn.index.engine.KNNMethodContext;
-import org.opensearch.knn.index.engine.qframe.QuantizationConfig;
 
 import java.util.Optional;
 
@@ -41,14 +40,6 @@ public interface KNNMappingConfig {
      */
     default CompressionLevel getCompressionLevel() {
         return CompressionLevel.NOT_CONFIGURED;
-    }
-
-    /**
-     * Returns quantization config
-     * @return
-     */
-    default QuantizationConfig getQuantizationConfig() {
-        return QuantizationConfig.EMPTY;
     }
 
     /**
