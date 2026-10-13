@@ -16,7 +16,6 @@ import org.apache.lucene.util.RefCount;
 import org.apache.lucene.util.StringHelper;
 import org.opensearch.common.CheckedSupplier;
 import org.opensearch.knn.index.codec.jvector.JVectorIndexQuantization.LoadedState;
-import org.opensearch.knn.index.codec.jvector.JVectorSegmentQuantizationCache.QuantizationSupplier;
 
 import io.github.jbellis.jvector.graph.disk.OnDiskGraphIndex;
 import io.github.jbellis.jvector.quantization.NVQuantization;
@@ -84,7 +83,7 @@ class JVectorSegmentQuantizationCache {
             }
         }
 
-        synchronized private RefCount<LoadedState> acquireAndGet(ConcurrentMap<String, QuantizationSupplier> cache) throws IOException {
+        private synchronized RefCount<LoadedState> acquireAndGet(ConcurrentMap<String, QuantizationSupplier> cache) throws IOException {
             if (this.refCount == null) {
                 final LoadedState loaded = supplier.get();
                 this.refCount = new RefCount<>(loaded) {
@@ -147,7 +146,11 @@ class JVectorSegmentQuantizationCache {
 
         final QuantizationSupplier supplier = cache.compute(cacheKey, (key, existing) -> {
             if (existing == null || existing.isClosed()) {
-                log.debug("No cached quantization state found for field {}, loaded from disk", vectorIndexFieldDataFileName);
+                log.debug(
+                    "No cached quantization state found for field {}, loading from disk for key {}",
+                    vectorIndexFieldDataFileName,
+                    key
+                );
                 return new QuantizationSupplier(
                     key,
                     () -> JVectorIndexQuantization.loadQuantizationState(
