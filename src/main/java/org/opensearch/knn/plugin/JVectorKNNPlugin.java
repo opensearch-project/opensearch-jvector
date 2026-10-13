@@ -48,7 +48,6 @@ import org.opensearch.env.NodeEnvironment;
 import org.opensearch.index.IndexModule;
 import org.opensearch.index.IndexSettings;
 import org.opensearch.index.mapper.Mapper;
-import org.opensearch.knn.quantization.models.quantizationState.QuantizationStateCache;
 import org.opensearch.plugins.ActionPlugin;
 import org.opensearch.plugins.EnginePlugin;
 import org.opensearch.plugins.ExtensiblePlugin;
@@ -203,7 +202,6 @@ public class JVectorKNNPlugin extends Plugin
     ) {
         KNNSettings.state().initialize(client, clusterService);
         KNNClusterUtil.instance().initialize(clusterService, indexNameExpressionResolver);
-        QuantizationStateCache.setThreadPool(threadPool);
 
         return ImmutableList.of(new KNNStats());
     }

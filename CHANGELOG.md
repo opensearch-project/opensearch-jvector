@@ -20,5 +20,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Point the CI and coverage badges in the README at this repository [752](https://github.com/opensearch-project/opensearch-jvector/pull/752)
 
 ### Maintenance
+- Removed unused public classes, interfaces and enums related with Quantization state and cache [764](https://github.com/opensearch-project/opensearch-jvector/pull/764)
 
 ### Refactoring

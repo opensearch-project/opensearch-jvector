@@ -6,7 +6,6 @@
 package org.opensearch.knn.index.engine;
 
 import lombok.Builder;
-import org.opensearch.knn.index.engine.qframe.QuantizationConfig;
 import org.opensearch.knn.index.mapper.PerDimensionProcessor;
 import org.opensearch.knn.index.mapper.PerDimensionValidator;
 import org.opensearch.knn.index.mapper.VectorTransformer;
@@ -27,17 +26,10 @@ public class KNNLibraryIndexingContextImpl implements KNNLibraryIndexingContext 
     private VectorTransformer vectorTransformer;
     @Builder.Default
     private Map<String, Object> parameters = Collections.emptyMap();
-    @Builder.Default
-    private QuantizationConfig quantizationConfig = QuantizationConfig.EMPTY;
 
     @Override
     public Map<String, Object> getLibraryParameters() {
         return parameters;
-    }
-
-    @Override
-    public QuantizationConfig getQuantizationConfig() {
-        return quantizationConfig;
     }
 
     @Override
