@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased 3.10](https://github.com/opensearch-project/opensearch-jvector/compare/3.9...HEAD)
 ### Features
+- Added abort checking for graph constructions [761](https://github.com/opensearch-project/opensearch-jvector/pull/761)
+
 
 ### Enhancements
 - Incremental insertion to leading segment for PQ quantized graphs [728](https://github.com/opensearch-project/opensearch-jvector/pull/728)
