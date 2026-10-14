@@ -98,7 +98,7 @@ public class RNNQueryFactory extends BaseQueryFactory {
         final float resultSimilarity,
         final Query filterQuery
     ) {
-        return new FloatVectorSimilarityQuery(
+        return new FloatVectorSimilarityQuery.Adaptive(
             fieldName,
             floatVector,
             resultSimilarity,
@@ -117,7 +117,7 @@ public class RNNQueryFactory extends BaseQueryFactory {
         final float resultSimilarity,
         final Query filterQuery
     ) {
-        return new ByteVectorSimilarityQuery(
+        return new ByteVectorSimilarityQuery.Adaptive(
             fieldName,
             byteVector,
             resultSimilarity,
