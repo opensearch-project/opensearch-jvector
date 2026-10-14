@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Use FloatArray to eliminate unnecessary vector copying if possible [747](https://github.com/opensearch-project/opensearch-jvector/pull/747)
 
 ### Bug Fixes
+- Fix RNNQueryFactory issue after lucene upgrade to 10.5.2 [765](https://github.com/opensearch-project/opensearch-jvector/pull/765)
 
 ### Infrastructure
 

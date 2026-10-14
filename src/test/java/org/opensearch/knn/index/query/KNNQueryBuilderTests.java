@@ -181,7 +181,7 @@ public class KNNQueryBuilderTests extends KNNTestCase {
         );
         KNNMethodContext knnMethodContext = new KNNMethodContext(KNNEngine.LUCENE, SpaceType.L2, methodComponentContext);
         when(mockKNNVectorField.getKnnMappingConfig()).thenReturn(getMappingConfigForMethodMapping(knnMethodContext, 4));
-        FloatVectorSimilarityQuery query = (FloatVectorSimilarityQuery) knnQueryBuilder.doToQuery(mockQueryShardContext);
+        FloatVectorSimilarityQuery query = (FloatVectorSimilarityQuery.Adaptive) knnQueryBuilder.doToQuery(mockQueryShardContext);
         float resultSimilarity = KNNEngine.LUCENE.distanceToRadialThreshold(MAX_DISTANCE, SpaceType.L2);
 
         assertTrue(query.toString().contains("resultSimilarity=" + resultSimilarity));
@@ -212,7 +212,7 @@ public class KNNQueryBuilderTests extends KNNTestCase {
         );
         KNNMethodContext knnMethodContext = new KNNMethodContext(KNNEngine.LUCENE, SpaceType.L2, methodComponentContext);
         when(mockKNNVectorField.getKnnMappingConfig()).thenReturn(getMappingConfigForMethodMapping(knnMethodContext, 4));
-        FloatVectorSimilarityQuery query = (FloatVectorSimilarityQuery) knnQueryBuilder.doToQuery(mockQueryShardContext);
+        FloatVectorSimilarityQuery query = (FloatVectorSimilarityQuery.Adaptive) knnQueryBuilder.doToQuery(mockQueryShardContext);
         assertTrue(query.toString().contains("resultSimilarity=" + 0.5f));
     }
 
@@ -241,7 +241,7 @@ public class KNNQueryBuilderTests extends KNNTestCase {
         when(mockQueryShardContext.fieldMapper(anyString())).thenReturn(mockKNNVectorField);
         Query query = knnQueryBuilder.doToQuery(mockQueryShardContext);
         assertNotNull(query);
-        assertTrue(query.getClass().isAssignableFrom(FloatVectorSimilarityQuery.class));
+        assertTrue(query.getClass().isAssignableFrom(FloatVectorSimilarityQuery.Adaptive.class));
     }
 
     @SneakyThrows
@@ -267,7 +267,7 @@ public class KNNQueryBuilderTests extends KNNTestCase {
         when(mockQueryShardContext.fieldMapper(anyString())).thenReturn(mockKNNVectorField);
         Query query = knnQueryBuilder.doToQuery(mockQueryShardContext);
         assertNotNull(query);
-        assertTrue(query.getClass().isAssignableFrom(FloatVectorSimilarityQuery.class));
+        assertTrue(query.getClass().isAssignableFrom(FloatVectorSimilarityQuery.Adaptive.class));
     }
 
     public void testDoToQuery_ThrowsIllegalArgumentExceptionForUnknownMethodParameter() {
