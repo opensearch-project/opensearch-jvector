@@ -36,8 +36,8 @@ import static io.github.jbellis.jvector.quantization.KMeansPlusPlusClusterer.UNW
  * Encapsulates the quantization strategy used when writing a jVector segment.
  * <p>
  * Concrete subclasses are {@link NVQ} for Non-uniform Vector Quantization (stored inline in the
- * graph) and {@link PQ} for Product Quantization, stored as a separate blob or, when
- * {@link PQ#isFused()}, inline per adjacency entry (FusedPQ layout).
+ * graph), {@link PQ} for Product Quantization stored as a separate blob, and {@link FusedPQ} for
+ * Product Quantization stored inline per adjacency entry (FusedPQ layout).
  * Supported combinations today:
  * 1. PQ + full-precision vectors
  * 2. PQ + NVQ
@@ -143,6 +143,25 @@ public sealed interface JVectorIndexQuantization {
             pqVectors.getCompressedSize()
         );
         return pqVectors;
+    }
+
+    // FusedPQ requires a full 256-cluster codebook (see computePqVectors); smaller segments use separate PQ.
+    int FUSED_PQ_REQUIRED_CLUSTERS = 256;
+
+    /** Whether a trained PQ codebook has enough clusters to use the FusedPQ inline layout. */
+    static boolean isFusedPqUsable(PQVectors pqVectors, String fieldName) {
+        final int clusterCount = pqVectors.getCompressor().getClusterCount();
+        if (clusterCount < FUSED_PQ_REQUIRED_CLUSTERS) {
+            log.info(
+                "Field {}: {} clusters < {} required for FusedPQ; using separate PQ blob",
+                fieldName,
+                clusterCount,
+                FUSED_PQ_REQUIRED_CLUSTERS
+            );
+            return false;
+        }
+        log.info("Field {}: {} clusters; using FusedPQ inline layout", fieldName, clusterCount);
+        return true;
     }
 
     private static LoadedState loadNVQState(
@@ -373,55 +392,33 @@ public sealed interface JVectorIndexQuantization {
 
     public static final class PQ implements JVectorIndexQuantization {
         private final Function<Integer, Integer> numSubspacesSupplier;
-        // When true, PQ codes are stored inline per adjacency entry (FusedPQ layout) instead of a separate blob.
-        private final boolean fused;
-
-        public PQ(Function<Integer, Integer> numSubspacesSupplier, boolean fused) {
-            this.numSubspacesSupplier = numSubspacesSupplier;
-            this.fused = fused;
-        }
 
         public PQ(Function<Integer, Integer> numSubspacesSupplier) {
-            this(numSubspacesSupplier, false);
+            this.numSubspacesSupplier = numSubspacesSupplier;
         }
 
         /** PQ with a fixed (dimension-independent) subspace count. */
-        public PQ(int fixedNumSubspaces, boolean fused) {
-            this(ignored -> fixedNumSubspaces, fused);
-        }
-
-        /** PQ with a fixed (dimension-independent) subspace count, not fused. */
         public PQ(int fixedNumSubspaces) {
-            this(fixedNumSubspaces, false);
+            this(ignored -> fixedNumSubspaces);
         }
 
         /** PQ using the default dimension-adaptive subspace count. */
-        public PQ(boolean fused) {
-            this(PQ::defaultNumSubspaces, fused);
-        }
-
-        /** PQ using the default dimension-adaptive subspace count, not fused. */
         public PQ() {
-            this(false);
+            this(PQ::defaultNumSubspaces);
         }
 
         public Function<Integer, Integer> getNumSubspacesSupplier() {
             return numSubspacesSupplier;
         }
 
-        /** Whether PQ codes for graph traversal are stored inline (FusedPQ layout) rather than as a separate blob. */
-        public boolean isFused() {
-            return fused;
-        }
-
         @Override
         public String getType() {
-            return fused ? KNNConstants.QUANTIZATION_TYPE_FUSED_PQ : KNNConstants.QUANTIZATION_TYPE_PQ;
+            return KNNConstants.QUANTIZATION_TYPE_PQ;
         }
 
         @Override
         public byte quantizationType() {
-            return fused ? QUANTIZATION_TYPE_FUSED_PQ : QUANTIZATION_TYPE_PQ;
+            return QUANTIZATION_TYPE_PQ;
         }
 
         @Override
@@ -471,6 +468,61 @@ public sealed interface JVectorIndexQuantization {
                 compressedBytes = (int) (originalDimension * 0.125);
             }
             return compressedBytes;
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // FusedPQ implementation
+    // -----------------------------------------------------------------------
+
+    /** Product Quantization with codes stored inline per adjacency entry (FusedPQ layout) instead of a blob. */
+    public static final class FusedPQ implements JVectorIndexQuantization {
+        private final Function<Integer, Integer> numSubspacesSupplier;
+
+        public FusedPQ(Function<Integer, Integer> numSubspacesSupplier) {
+            this.numSubspacesSupplier = numSubspacesSupplier;
+        }
+
+        /** FusedPQ with a fixed (dimension-independent) subspace count. */
+        public FusedPQ(int fixedNumSubspaces) {
+            this(ignored -> fixedNumSubspaces);
+        }
+
+        /** FusedPQ using the default dimension-adaptive subspace count. */
+        public FusedPQ() {
+            this(PQ::defaultNumSubspaces);
+        }
+
+        public Function<Integer, Integer> getNumSubspacesSupplier() {
+            return numSubspacesSupplier;
+        }
+
+        @Override
+        public String getType() {
+            return KNNConstants.QUANTIZATION_TYPE_FUSED_PQ;
+        }
+
+        @Override
+        public byte quantizationType() {
+            return QUANTIZATION_TYPE_FUSED_PQ;
+        }
+
+        @Override
+        public int numSubspaces(int dimension) {
+            return numSubspacesSupplier.apply(dimension);
+        }
+
+        @Override
+        public QuantizationResult quantize(RandomAccessVectorValues ravv, VectorSimilarityFunction vsf, ForkJoinPool computePool)
+            throws IOException {
+            PQVectors pqVectors = computePqVectors(ravv, vsf, numSubspaces(ravv.dimension()), computePool);
+            return new QuantizationResult(pqVectors, null, BuildScoreProvider.pqBuildScoreProvider(vsf, pqVectors));
+        }
+
+        /** FusedPQ does not quantize the inline graph vectors; they are read back at full precision. */
+        @Override
+        public VectorFloat<?> vectorFloatValue(OnDiskGraphIndex.View view, int ord) {
+            return view.getVector(ord);
         }
     }
 }

@@ -151,23 +151,20 @@ public class JVectorFusedPQTests extends LuceneTestCase {
         int nBase = scenario.rounds.stream().mapToInt(r -> r.segmentSizes.stream().mapToInt(x -> x).sum()).sum();
         var baseVecs = TestUtils.randomlyGenerateStandardVectors(nBase, scenario.dimension, RANDOM_SEED);
         var queryVecs = TestUtils.randomlyGenerateStandardVectors(scenario.nQueries, scenario.dimension, RANDOM_SEED + 1);
-
-        var liveVecs = new FixedBitSet(nBase);
-        liveVecs.clear();
+        // Ground truth is computed from the scenario definition alone, not from indexing-side bookkeeping.
+        var liveVecs = computeFinalLiveVecs(scenario, nBase);
 
         IndexWriterConfig iwc = LuceneTestCase.newIndexWriterConfig();
         iwc.setUseCompoundFile(false);
         iwc.setCodec(
-            getCodec(scenario.minFusedPqThreshold, scenario.leadingSegmentMergeDisabled, mergePool, new JVectorIndexQuantization.PQ(true))
+            getCodec(scenario.minFusedPqThreshold, scenario.leadingSegmentMergeDisabled, mergePool, new JVectorIndexQuantization.FusedPQ())
         );
         iwc.setMergePolicy(new ForceMergesOnlyMergePolicy(false));
         iwc.setMaxBufferedDocs(-1);
 
         try (var fsd = FSDirectory.open(tempDir.getRoot().toPath()); var writer = new IndexWriter(fsd, iwc)) {
             int vectorOffset = 0;
-            for (int roundId = 0; roundId < scenario.rounds.size(); roundId++) {
-                var round = scenario.rounds.get(roundId);
-
+            for (var round : scenario.rounds) {
                 for (int segInRound = 0; segInRound < round.segmentSizes.size(); segInRound++) {
                     var segmentSize = round.segmentSizes.get(segInRound);
 
@@ -177,7 +174,6 @@ public class JVectorFusedPQTests extends LuceneTestCase {
                         doc.add(new KnnFloatVectorField(VECTOR_FIELD, baseVecs[id], scenario.similarityFunction));
                         doc.add(new IntField(ID_FIELD, id, Store.YES));
                         writer.addDocument(doc);
-                        liveVecs.set(id);
                     }
                     writer.flush();
                     writer.commit();
@@ -187,56 +183,63 @@ public class JVectorFusedPQTests extends LuceneTestCase {
                 for (var dl : round.deletionRanges) {
                     var query = IntField.newRangeQuery(ID_FIELD, dl.start, dl.end - 1);
                     writer.deleteDocuments(query);
-                    liveVecs.clear(dl.start, dl.end);
                     writer.commit();
                 }
 
                 writer.forceMerge(1);
                 writer.commit();
+            }
 
-                try (var reader = DirectoryReader.open(writer)) {
-                    Assert.assertTrue("Should have one segment after merge", 1 >= reader.getContext().leaves().size());
-                    assertEquals(liveVecs.cardinality(), reader.numDocs());
+            try (var reader = DirectoryReader.open(writer)) {
+                Assert.assertTrue("Should have one segment after merge", 1 >= reader.getContext().leaves().size());
+                assertEquals(liveVecs.cardinality(), reader.numDocs());
 
-                    var searcher = LuceneTestCase.newSearcher(reader);
-                    int totalCorrect = 0;
+                var searcher = LuceneTestCase.newSearcher(reader);
+                int totalCorrect = 0;
 
-                    for (var queryVec : queryVecs) {
-                        var gt = computeGroundTruth(scenario.similarityFunction, baseVecs, liveVecs, queryVec, scenario.topK);
-                        var query = new JVectorKnnFloatVectorQuery(
-                            VECTOR_FIELD,
-                            queryVec,
-                            scenario.topK,
-                            scenario.overqueryFactor,
-                            0.0f,
-                            0.0f
-                        );
-                        var results = searcher.search(query, scenario.topK).scoreDocs;
+                for (var queryVec : queryVecs) {
+                    var gt = computeGroundTruth(scenario.similarityFunction, baseVecs, liveVecs, queryVec, scenario.topK);
+                    var query = new JVectorKnnFloatVectorQuery(VECTOR_FIELD, queryVec, scenario.topK, scenario.overqueryFactor, 0.0f, 0.0f);
+                    var results = searcher.search(query, scenario.topK).scoreDocs;
 
-                        var pred = Arrays.stream(results).map(r -> {
-                            try {
-                                return reader.storedFields().document(r.doc).getField(ID_FIELD).numericValue().intValue();
-                            } catch (IOException e) {
-                                throw new UncheckedIOException(e);
-                            }
-                        }).collect(Collectors.toSet());
+                    var pred = Arrays.stream(results).map(r -> {
+                        try {
+                            return reader.storedFields().document(r.doc).getField(ID_FIELD).numericValue().intValue();
+                        } catch (IOException e) {
+                            throw new UncheckedIOException(e);
+                        }
+                    }).collect(Collectors.toSet());
 
-                        assertEquals(scenario.topK, pred.size());
-                        for (var doc : pred) {
-                            if (gt.contains(doc)) {
-                                totalCorrect++;
-                            }
+                    assertEquals(scenario.topK, pred.size());
+                    for (var doc : pred) {
+                        if (gt.contains(doc)) {
+                            totalCorrect++;
                         }
                     }
-
-                    double recall = totalCorrect / (double) (scenario.topK * queryVecs.length);
-                    Assert.assertTrue(
-                        String.format("FusedPQ recall too low [round %d]: got %.3f < %.3f", roundId, recall, scenario.minimumRecall),
-                        recall >= scenario.minimumRecall
-                    );
                 }
+
+                double recall = totalCorrect / (double) (scenario.topK * queryVecs.length);
+                Assert.assertTrue(
+                    String.format("FusedPQ recall too low: got %.3f < %.3f", recall, scenario.minimumRecall),
+                    recall >= scenario.minimumRecall
+                );
             }
         }
+    }
+
+    /** Which of the {@code nBase} vector IDs are live after the whole scenario runs, derived from the rounds alone. */
+    FixedBitSet computeFinalLiveVecs(MergeTestScenario scenario, int nBase) {
+        var live = new FixedBitSet(nBase);
+        int vectorOffset = 0;
+        for (var round : scenario.rounds) {
+            int roundSize = round.segmentSizes.stream().mapToInt(x -> x).sum();
+            live.set(vectorOffset, vectorOffset + roundSize);
+            for (var dl : round.deletionRanges) {
+                live.clear(dl.start, dl.end);
+            }
+            vectorOffset += roundSize;
+        }
+        return live;
     }
 
     Set<Integer> computeGroundTruth(VectorSimilarityFunction vsf, float[][] baseVectors, BitSet liveVectors, float[] query, int k) {
@@ -407,7 +410,7 @@ public class JVectorFusedPQTests extends LuceneTestCase {
 
         IndexWriterConfig iwc = LuceneTestCase.newIndexWriterConfig();
         iwc.setUseCompoundFile(false);
-        iwc.setCodec(getCodec(1, KNNConstants.DEFAULT_LEADING_SEGMENT_MERGE_DISABLED, null, new JVectorIndexQuantization.PQ(true)));
+        iwc.setCodec(getCodec(1, KNNConstants.DEFAULT_LEADING_SEGMENT_MERGE_DISABLED, null, new JVectorIndexQuantization.FusedPQ()));
         iwc.setMergePolicy(new ForceMergesOnlyMergePolicy(false));
         iwc.setMaxBufferedDocs(-1);
 
@@ -453,7 +456,7 @@ public class JVectorFusedPQTests extends LuceneTestCase {
 
         IndexWriterConfig iwc = LuceneTestCase.newIndexWriterConfig();
         iwc.setUseCompoundFile(false);
-        iwc.setCodec(getCodec(1, KNNConstants.DEFAULT_LEADING_SEGMENT_MERGE_DISABLED, null, new JVectorIndexQuantization.PQ(true)));
+        iwc.setCodec(getCodec(1, KNNConstants.DEFAULT_LEADING_SEGMENT_MERGE_DISABLED, null, new JVectorIndexQuantization.FusedPQ()));
         iwc.setMergePolicy(new ForceMergesOnlyMergePolicy(false));
         iwc.setMaxBufferedDocs(-1);
 

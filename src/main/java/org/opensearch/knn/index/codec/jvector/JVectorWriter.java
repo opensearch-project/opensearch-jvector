@@ -417,10 +417,9 @@ public class JVectorWriter extends KnnVectorsWriter {
                     startOffset,
                     resultBuilder
                 );
-            } else if (quantization instanceof JVectorIndexQuantization.PQ pq
-                && pq.isFused()
+            } else if (quantization instanceof JVectorIndexQuantization.FusedPQ
                 && compressedVectors instanceof PQVectors pqVectors
-                && fusedPqUsable(pqVectors, fieldInfo)) {
+                && JVectorIndexQuantization.isFusedPqUsable(pqVectors, fieldInfo.name)) {
                     writeFusedPQGraph(
                         graph,
                         randomAccessVectorValues,
@@ -482,30 +481,7 @@ public class JVectorWriter extends KnnVectorsWriter {
         }
     }
 
-    // FusedPQ packs neighbor codes assuming a full 256-entry codebook per subspace. Small segments train fewer
-    // clusters (see computePqVectors: Math.min(256, size)), so FusedPQ is only usable at >= 256 vectors.
-    private static final int FUSED_PQ_REQUIRED_CLUSTERS = 256;
-
-    /** Whether the given PQ codebook can be written in the FusedPQ inline layout; logs and returns false otherwise. */
-    private boolean fusedPqUsable(PQVectors pqVectors, FieldInfo fieldInfo) {
-        final int clusterCount = pqVectors.getCompressor().getClusterCount();
-        if (clusterCount < FUSED_PQ_REQUIRED_CLUSTERS) {
-            log.info(
-                "FusedPQ requires a {}-cluster codebook but field {} trained only {}; falling back to the separate PQ blob layout",
-                FUSED_PQ_REQUIRED_CLUSTERS,
-                fieldInfo.name,
-                clusterCount
-            );
-            return false;
-        }
-        log.info("FusedPQ codebook has {} clusters for field {}; using the FusedPQ inline layout", clusterCount, fieldInfo.name);
-        return true;
-    }
-
-    /**
-     * Writes the graph with full-precision vectors inline for reranking (FeatureId.INLINE_VECTORS) and the PQ
-     * codes for graph traversal inline per adjacency entry (FeatureId.FUSED_PQ) instead of as a separate blob.
-     */
+    /** Writes the graph with inline full-precision vectors (reranking) and inline FusedPQ codes (traversal). */
     private void writeFusedPQGraph(
         OnHeapGraphIndex graph,
         RandomAccessVectorValues randomAccessVectorValues,
@@ -594,8 +570,6 @@ public class JVectorWriter extends KnnVectorsWriter {
         long vectorIndexLength;
         long compressedVectorsOffset;
         long compressedVectorsLength;
-        // QUANTIZATION_TYPE_NONE/PQ/NVQ_INLINE/FUSED_PQ; added in VERSION_WITH_QUANTIZATION_TYPE, extended in
-        // VERSION_WITH_QUANTIZATION_FUSED_PQ
         byte quantizationType;
         float degreeOverflow; // important when leveraging cache
         GraphNodeIdToDocMap graphNodeIdToDocMap;
