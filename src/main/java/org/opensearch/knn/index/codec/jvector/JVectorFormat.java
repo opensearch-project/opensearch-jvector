@@ -164,6 +164,7 @@ public class JVectorFormat extends KnnVectorsFormat {
         this.simdPoolMerge = simdPoolMerge;
         this.simdPoolFlush = simdPoolFlush;
         this.parallelismPool = parallelismPool;
+        // The JVectorFormat instance should be created once (per codec / SPI), so cache is effectively global
         this.cache = new JVectorSegmentQuantizationCache();
     }
 
