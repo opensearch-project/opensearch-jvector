@@ -70,7 +70,7 @@ public class JVectorRandomAccessReader implements RandomAccessReader {
             int off = buffer.arrayOffset() + buffer.position();
             int len = buffer.remaining();
             indexInputDelegate.readBytes(buffer.array(), off, len);
-            buffer.position(buffer.limit());           // advance fully
+            buffer.position(buffer.limit()); // advance fully
             return;
         }
 
@@ -123,10 +123,16 @@ public class JVectorRandomAccessReader implements RandomAccessReader {
 
     /**
      * Supplies readers which are actually slices of the original IndexInput.
-     * We will vend out slices in order for us to easily find the footer of the jVector graph index.
-     * This is useful because our logic that reads the graph that the footer is always at {@link IndexInput#length()} of the slice.
-     * Which is how {@link io.github.jbellis.jvector.graph.disk.OnDiskGraphIndex#load(ReaderSupplier, long)} is working behind the scenes.
-     * The header offset, on the other hand, is flexible because we can provide it as a parameter to {@link io.github.jbellis.jvector.graph.disk.OnDiskGraphIndex#load(ReaderSupplier, long)}
+     * We will vend out slices in order for us to easily find the footer of the
+     * jVector graph index.
+     * This is useful because our logic that reads the graph that the footer is
+     * always at {@link IndexInput#length()} of the slice.
+     * Which is how
+     * {@link io.github.jbellis.jvector.graph.disk.OnDiskGraphIndex#load(ReaderSupplier, long)}
+     * is working behind the scenes.
+     * The header offset, on the other hand, is flexible because we can provide it
+     * as a parameter to
+     * {@link io.github.jbellis.jvector.graph.disk.OnDiskGraphIndex#load(ReaderSupplier, long)}
      */
     public static class Supplier implements ReaderSupplier {
         private final IndexInput currentInput;
@@ -149,6 +155,48 @@ public class JVectorRandomAccessReader implements RandomAccessReader {
                 final IndexInput input = currentInput.slice("Input Slice for the jVector graph or PQ", sliceStartOffset, sliceLength)
                     .clone();
                 return new JVectorRandomAccessReader(input);
+            }
+        }
+
+        /**
+         * Forwards a prefetch hint to the underlying Lucene {@link IndexInput}.
+         * <p>
+         * {@link IndexInput#prefetch(long, long)} issues {@code madvise(MADV_WILLNEED)}
+         * on MMap-backed
+         * directories (Linux/macOS), telling the OS to start loading the byte range
+         * into the page cache
+         * before the next random read. The call is fire-and-forget and best-effort: the
+         * default
+         * implementation in {@link IndexInput} is a no-op, so this is safe on all
+         * directory types.
+         * <p>
+         * Without this override, jVector's
+         * {@link io.github.jbellis.jvector.graph.disk.OnDiskGraphIndex#prefetchL0Records}
+         * always hits the no-op default inherited from
+         * {@link io.github.jbellis.jvector.disk.ReaderSupplier}.
+         *
+         * @param offset byte offset within the slice (0-based, relative to
+         *               {@code sliceStartOffset})
+         * @param length number of bytes to prefetch
+         */
+        @Override
+        public void prefetch(long offset, long length) {
+            // Clamp the range to the slice bounds before delegating.
+            // Both SingleSegmentImpl and MultiSegmentImpl call Objects.checkFromIndexSize
+            // which
+            // throws IndexOutOfBoundsException (not IOException) for out-of-range requests,
+            // so
+            // we must clamp here rather than catch after the fact.
+            long sliceEnd = sliceStartOffset + sliceLength;
+            long absoluteStart = sliceStartOffset + offset;
+            long absoluteEnd = Math.min(absoluteStart + length, sliceEnd);
+            if (absoluteEnd <= absoluteStart) {
+                return;
+            }
+            try {
+                currentInput.prefetch(absoluteStart, absoluteEnd - absoluteStart);
+            } catch (IOException | IndexOutOfBoundsException ignored) {
+                // prefetch is best-effort; errors must not interrupt the search path
             }
         }
 
