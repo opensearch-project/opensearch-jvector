@@ -245,4 +245,9 @@ eval "set -- $(
         tr '\n' ' '
     )" '"$@"'
 
+use_avx=$("$JAVACMD" -XX:+PrintFlagsFinal -version | grep UseAVX)
+if [ -n "$use_avx" ]; then
+  echo "Default value of UseAVX flag: $use_avx"
+fi
+
 exec "$JAVACMD" "$@"
