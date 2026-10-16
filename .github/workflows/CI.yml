@@ -71,6 +71,7 @@ jobs:
         run: |
           ulimit -n 65536
           chown -R 1000:1000 `pwd`
+          lscpu
           if lscpu  | grep -i avx512f | grep -i avx512cd | grep -i avx512vl | grep -i avx512dq | grep -i avx512bw          
           then
             if lscpu | grep -q "GenuineIntel" && lscpu | grep -i avx512_fp16 | grep -i avx512_bf16 | grep -i avx512_vpopcntdq
@@ -134,7 +135,8 @@ jobs:
         # switching the user, as OpenSearch cluster can only be started as root/Administrator on linux-deb/linux-rpm/windows-zip.
         run: |
           ulimit -n 65536
-          chown -R 1000:1000 `pwd`      
+          chown -R 1000:1000 `pwd`
+          lscpu
           su `id -un 1000` -c "whoami && java -version && ./gradlew build -Dnproc.count=`nproc` -Djvector.experimental.enable_native_vectorization=true"
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
@@ -171,6 +173,7 @@ jobs:
 
       - name: Run build
         run: |
+          sysctl -a | grep cpu
           ./gradlew build
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
@@ -214,6 +217,7 @@ jobs:
 
       - name: Run build
         run: |
+          Get-CimInstance -ClassName Win32_Processor
           ./gradlew.bat build
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
