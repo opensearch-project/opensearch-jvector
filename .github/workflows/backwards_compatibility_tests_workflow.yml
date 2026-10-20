@@ -96,7 +96,8 @@ jobs:
       - if: startsWith(matrix.os,'ubuntu')
         name: Run k-NN Restart-Upgrade BWC Tests from BWCVersion-${{ matrix.bwc_version }} to OpenSearch Version-${{ matrix.opensearch_version }} on Ubuntu
         run: |
-          echo "Running restart-upgrade backwards compatibility tests ..." 
+          echo "Running restart-upgrade backwards compatibility tests ..."
+          lscpu
           . scripts/ci_helpers.sh
           AVX_SUPPORT=$(get_avx_support)
           print_avx_support_message "$AVX_SUPPORT"
@@ -171,6 +172,7 @@ jobs:
         name: Run k-NN Rolling-Upgrade BWC Tests from BWCVersion-${{ matrix.bwc_version }} to OpenSearch Version-${{ matrix.opensearch_version }} on Ubuntu
         run: |
           echo "Running rolling-upgrade backwards compatibility tests ..."
+          lscpu
           . scripts/ci_helpers.sh
           AVX_SUPPORT=$(get_avx_support)
           print_avx_support_message "$AVX_SUPPORT"

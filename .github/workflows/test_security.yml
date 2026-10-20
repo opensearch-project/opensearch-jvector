@@ -74,6 +74,7 @@ jobs:
         run: |
           ulimit -n 65536
           chown -R 1000:1000 `pwd`
+          lscpu
           . scripts/ci_helpers.sh
           AVX_SUPPORT=$(get_avx_support)
           print_avx_support_message "$AVX_SUPPORT"
