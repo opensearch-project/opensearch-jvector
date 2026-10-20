@@ -5,8 +5,8 @@
 # avx3_spr partially follows: https://github.com/datastax/jvector/blob/4f13ff42e93f2e7b16020de3aaeefe9372e0dd36/jvector-native/src/main/native/tests/test_x86_cpu_features.cpp#L68-L71
 
 get_avx_support() {
-  if lscpu | grep -i avx512f | grep -i avx512bw | grep -i avx512cd | grep -i avx512dq | grep -i avx512vl; then
-    if lscpu | grep -q "GenuineIntel" && lscpu | grep -i avx512_fp16 | grep -i avx512_bf16 | grep -i avx512_vpopcntdq; then
+  if lscpu | grep -i avx512f | grep -i avx512bw | grep -i avx512cd | grep -i avx512dq | grep -qi avx512vl; then
+    if lscpu | grep -q "GenuineIntel" && lscpu | grep -i avx512_fp16 | grep -i avx512_bf16 | grep -qi avx512_vpopcntdq; then
       echo "AVX3_SPR"
     else
       echo "AVX3"
