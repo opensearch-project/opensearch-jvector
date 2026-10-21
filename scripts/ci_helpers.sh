@@ -4,7 +4,7 @@
 # https://github.com/datastax/jvector/blob/4f13ff42e93f2e7b16020de3aaeefe9372e0dd36/jvector-native/src/main/native/tests/test_x86_cpu_features.cpp#L43-L89
 # https://github.com/datastax/jvector/blob/4f13ff42e93f2e7b16020de3aaeefe9372e0dd36/jvector-native/src/test/java/io/github/jbellis/jvector/vector/DispatcherCpuFlagsTest.java#L239-L271
 #
-# Last grep uses -q
+# Last grep uses -q to not interfere with values "returned" using echo.
 
 get_avx_support() {
   if lscpu | grep -i avx512f | grep -i avx512bw | grep -i avx512cd | grep -i avx512dq | grep -qi avx512vl; then

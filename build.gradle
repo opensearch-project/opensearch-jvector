@@ -395,7 +395,7 @@ test {
     ]
 
     // Disable AVX512 for CPUs older than Intel(R) Ice Lake
-    if ("true".equals(avx512) && !"true".equals(avx512_dl) && !"true".equals(avx512_dl)) {
+    if ("true".equals(avx512) && !"true".equals(avx512_dl) && !"true".equals(avx512_spr)) {
         jvmArgs += [ '-XX:UseAVX=2' /* only AVX2, disable AVX512 */ ]
     }
 
@@ -462,7 +462,7 @@ integTest {
         ]
 
         // Disable AVX512 for CPUs older than Intel(R) Ice Lake
-        if ("true".equals(avx512) && !"true".equals(avx512_dl) && !"true".equals(avx512_dl)) {
+        if ("true".equals(avx512) && !"true".equals(avx512_dl) && !"true".equals(avx512_spr)) {
             jvmArgs += [ '-XX:UseAVX=2' /* only AVX2, disable AVX512 */ ]
         }
 
@@ -558,7 +558,7 @@ testClusters.integTest { cluster ->
     }
 
     // Disable AVX512 for CPUs older than Intel(R) Ice Lake
-    if ("true".equals(avx512) && !"true".equals(avx512_dl) && !"true".equals(avx512_dl)) {
+    if ("true".equals(avx512) && !"true".equals(avx512_dl) && !"true".equals(avx512_spr)) {
         jvmArgs += [ '-XX:UseAVX=2' /* only AVX2, disable AVX512 */ ]
     }
 
