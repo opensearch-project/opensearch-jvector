@@ -41,6 +41,7 @@ jobs:
     name: Run Integration Tests on Linux (Java ${{ matrix.java }})
     needs: Get-CI-Image-Tag
     strategy:
+      fail-fast: false
       matrix:
         java: [21, 25]
     uses: ./.github/workflows/test_security_job.yml
