@@ -59,7 +59,7 @@ public class RNNQueryFactoryTests extends KNNTestCase {
                 testRadius,
                 DEFAULT_VECTOR_DATA_TYPE_FIELD
             );
-            assertEquals(FloatVectorSimilarityQuery.class, query.getClass());
+            assertEquals(FloatVectorSimilarityQuery.Adaptive.class, query.getClass());
         }
     }
 
@@ -85,7 +85,7 @@ public class RNNQueryFactoryTests extends KNNTestCase {
                 .filter(FILTER_QUERY_BUILDER)
                 .build();
             Query query = RNNQueryFactory.create(createQueryRequest);
-            assertEquals(ByteVectorSimilarityQuery.class, query.getClass());
+            assertEquals(ByteVectorSimilarityQuery.Adaptive.class, query.getClass());
         }
     }
 
@@ -108,7 +108,7 @@ public class RNNQueryFactoryTests extends KNNTestCase {
                 .radius(testRadius)
                 .build();
             Query query = RNNQueryFactory.create(createQueryRequest);
-            assertEquals(FloatVectorSimilarityQuery.class, query.getClass());
+            assertEquals(FloatVectorSimilarityQuery.Adaptive.class, query.getClass());
         }
     }
 }

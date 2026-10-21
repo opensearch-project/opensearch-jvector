@@ -51,6 +51,7 @@ public class JVectorFormat extends KnnVectorsFormat {
     private final ForkJoinPool simdPoolMerge;
     private final ForkJoinPool simdPoolFlush;
     private final ForkJoinPool parallelismPool;
+    private final JVectorSegmentQuantizationCache cache;
 
     public JVectorFormat() {
         this(
@@ -165,6 +166,8 @@ public class JVectorFormat extends KnnVectorsFormat {
         this.simdPoolMerge = simdPoolMerge;
         this.simdPoolFlush = simdPoolFlush;
         this.parallelismPool = parallelismPool;
+        // The JVectorFormat instance should be created once (per codec / SPI), so cache is effectively global
+        this.cache = new JVectorSegmentQuantizationCache();
     }
 
     @Override
@@ -187,7 +190,7 @@ public class JVectorFormat extends KnnVectorsFormat {
 
     @Override
     public KnnVectorsReader fieldsReader(SegmentReadState state) throws IOException {
-        return new JVectorReader(state);
+        return new JVectorReader(state, cache);
     }
 
     @Override

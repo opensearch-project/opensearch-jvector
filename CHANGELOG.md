@@ -4,20 +4,25 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). See the [CONTRIBUTING guide](./CONTRIBUTING.md#Changelog) for instructions on how to add changelog entries.
 
-## [Unreleased 3.8](https://github.com/opensearch-project/opensearch-jvector/compare/3.8...HEAD)
+## [Unreleased 3.10](https://github.com/opensearch-project/opensearch-jvector/compare/3.9...HEAD)
 ### Features
 - Add FusedPQ on-disk layout for jVector graph traversal codes [733](https://github.com/opensearch-project/opensearch-jvector/pull/733)
+- Added abort checking for graph constructions [761](https://github.com/opensearch-project/opensearch-jvector/pull/761)
 
 ### Enhancements
-- [Storage perf] Stop writing the redundant binary doc values copy of the vector for jVector fields from 3.9.0 onwards. Preserve existing indices. [715] (https://github.com/opensearch-project/opensearch-jvector/pull/715) 
+- Update datastax/jvector library to 4.0.1 [745](https://github.com/opensearch-project/opensearch-jvector/pull/745)
+- Use FloatArray to eliminate unnecessary vector copying if possible [747](https://github.com/opensearch-project/opensearch-jvector/pull/747)
 
 ### Bug Fixes
-- Fix flaky testJVectorKnnIndex_filter_maxInnerProduct test case [681](https://github.com/opensearch-project/opensearch-jvector/pull/681)
-- Fix flaky testJVectorKnnIndex_simpleCase  test case [692](https://github.com/opensearch-project/opensearch-jvector/pull/692)
+- Excessive heap consumption when using PQ/NVQ vectors with derived sources enabled [754](https://github.com/opensearch-project/opensearch-jvector/pull/754)
+- Fix RNNQueryFactory issue after lucene upgrade to 10.5.2 [769](https://github.com/opensearch-project/opensearch-jvector/pull/769)
 
 ### Infrastructure
+
 ### Documentation
-- Update release procedure [690](https://github.com/opensearch-project/opensearch-jvector/pull/690)
+- Point the CI and coverage badges in the README at this repository [752](https://github.com/opensearch-project/opensearch-jvector/pull/752)
+
 ### Maintenance
-- Remove deprecated use_pruning features [670](https://github.com/opensearch-project/opensearch-jvector/pull/670)
+- Removed unused public classes, interfaces and enums related with Quantization state and cache [764](https://github.com/opensearch-project/opensearch-jvector/pull/764)
+
 ### Refactoring

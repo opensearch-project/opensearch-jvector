@@ -27,7 +27,6 @@ import org.opensearch.index.query.WithFieldName;
 import org.opensearch.knn.index.codec.jvector.JVectorKnnFloatVectorQuery;
 import org.opensearch.knn.index.engine.KNNMethodConfigContext;
 import org.opensearch.knn.index.engine.model.QueryContext;
-import org.opensearch.knn.index.engine.qframe.QuantizationConfig;
 import org.opensearch.knn.index.mapper.KNNMappingConfig;
 import org.opensearch.knn.index.mapper.KNNVectorFieldType;
 import org.opensearch.knn.index.query.parser.RescoreParser;
@@ -444,10 +443,6 @@ public class KNNQueryBuilder extends AbstractQueryBuilder<KNNQueryBuilder> imple
             }
             if (vectorDataType == VectorDataType.BINARY) {
                 throw new UnsupportedOperationException(String.format(Locale.ROOT, "Binary data type does not support radial search"));
-            }
-
-            if (knnMappingConfig.getQuantizationConfig() != QuantizationConfig.EMPTY) {
-                throw new UnsupportedOperationException("Radial search is not supported for indices which have quantization enabled");
             }
         }
 
