@@ -370,6 +370,11 @@ dependencies {
     zipArchive group: 'org.opensearch.plugin', name:'opensearch-custom-codecs', version: "${opensearch_build}"
 }
 
+var avx512_spr = System.getProperty("avx512_spr.enabled")
+var avx512_dl = System.getProperty("avx512_dl.enabled")
+var avx512 = System.getProperty("avx512.enabled")
+var avx2 = System.getProperty("avx2.enabled")
+
 test {
     systemProperty 'tests.security.manager', 'false'
     systemProperty 'opensearch.set.netty.runtime.available.processors', 'false'
@@ -388,6 +393,11 @@ test {
             '--enable-preview',
             "-javaagent:${configurations.mockitoAgent.asPath}"
     ]
+
+    // Disable AVX512 for CPUs older than Intel(R) Ice Lake
+    if ("true".equals(avx512) && !"true".equals(avx512_dl) && !"true".equals(avx512_dl)) {
+        jvmArgs += [ '-XX:UseAVX=2' /* only AVX2, disable AVX512 */ ]
+    }
 
     //this change enables mockito-inline that supports mocking of static classes/calls
     systemProperty "jdk.attach.allowAttachSelf", true
@@ -450,6 +460,11 @@ integTest {
                 '--enable-preview',
                 "-Djvector.enable_native_vectorization=${getNativeVectorizationProviderFlag()}"
         ]
+
+        // Disable AVX512 for CPUs older than Intel(R) Ice Lake
+        if ("true".equals(avx512) && !"true".equals(avx512_dl) && !"true".equals(avx512_dl)) {
+            jvmArgs += [ '-XX:UseAVX=2' /* only AVX2, disable AVX512 */ ]
+        }
 
         // There seems to be an issue when running multi node run or integ tasks with unicast_hosts
         // not being written, the waitForAllConditions ensures it's written
@@ -540,6 +555,11 @@ testClusters.integTest { cluster ->
             node.jvmArgs("-agentlib:jdwp=transport=dt_socket,server=n,suspend=y,address=${debugPort}")
             debugPort += 1
         }
+    }
+
+    // Disable AVX512 for CPUs older than Intel(R) Ice Lake
+    if ("true".equals(avx512) && !"true".equals(avx512_dl) && !"true".equals(avx512_dl)) {
+        jvmArgs += [ '-XX:UseAVX=2' /* only AVX2, disable AVX512 */ ]
     }
 
     systemProperty propertyKeys.breaker.useRealMemory, getBreakerSetting()
