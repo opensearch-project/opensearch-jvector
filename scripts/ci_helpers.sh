@@ -1,6 +1,7 @@
 #!/bin/sh
 
 # Sources:
+# https://github.com/datastax/jvector/blob/4f13ff42e93f2e7b16020de3aaeefe9372e0dd36/jvector-native/src/main/native/src/jvector_cpu_features.h#L50-L97
 # https://github.com/datastax/jvector/blob/4f13ff42e93f2e7b16020de3aaeefe9372e0dd36/jvector-native/src/main/native/tests/test_x86_cpu_features.cpp#L43-L89
 # https://github.com/datastax/jvector/blob/4f13ff42e93f2e7b16020de3aaeefe9372e0dd36/jvector-native/src/test/java/io/github/jbellis/jvector/vector/DispatcherCpuFlagsTest.java#L239-L271
 #
@@ -9,7 +10,7 @@
 get_avx_support() {
   if lscpu | grep -i avx512f | grep -i avx512bw | grep -i avx512cd | grep -i avx512dq | grep -qi avx512vl; then
     if lscpu | grep -i avx512_vnni | grep -i avx512vbmi | grep -i avx512_vbmi2 | grep -i avx512ifma | grep -i avx512_bitalg | grep -i avx512_vpopcntdq | grep -i gfni | grep -i vaes | grep -qi vpclmulqdq; then
-      if lscpu | grep -qi avx512_fp16; then
+      if lscpu | grep -i avx512_bf16 | grep -qi avx512_fp16; then
         echo "AVX3_SPR"
       else
         echo "AVX3_DL"
