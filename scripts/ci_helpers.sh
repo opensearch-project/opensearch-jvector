@@ -8,7 +8,7 @@
 
 get_avx_support() {
   if lscpu | grep -i avx512f | grep -i avx512bw | grep -i avx512cd | grep -i avx512dq | grep -qi avx512vl; then
-    if lscpu | grep -i avx512_vnni | grep -i avx512vbmi | grep -i avx512_vbmi2 | grep -i avx512ifma | grep -i avx512_bitalg | grep -i avx512avx512_vpopcntdq | grep -i gfni | grep -i vaes | grep -qi vpclmulqdq; then
+    if lscpu | grep -i avx512_vnni | grep -i avx512vbmi | grep -i avx512_vbmi2 | grep -i avx512ifma | grep -i avx512_bitalg | grep -i avx512_vpopcntdq | grep -i gfni | grep -i vaes | grep -qi vpclmulqdq; then
       if lscpu | grep -qi avx512_fp16; then
         echo "AVX3_SPR"
       else
