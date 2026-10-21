@@ -53,7 +53,7 @@ public sealed interface JVectorIndexQuantization {
     byte QUANTIZATION_TYPE_NVQ_INLINE = 2;
 
     /** Holds the quantization objects loaded from disk for a single field. */
-    record LoadedState(NVQuantization nvqInlineQuantization, PQVectors pqVectors, ReaderSupplier compressedVectorsReaderSupplier) {
+    record LoadedState(NVQuantization nvqInlineQuantization, PQVectors pqVectors) {
     }
 
     /** Result of quantizing a set of vectors ahead of graph construction. */
@@ -84,7 +84,7 @@ public sealed interface JVectorIndexQuantization {
             );
             default -> compressedVectorsLength > 0
                 ? loadPQState(directory, fieldDataFileName, compressedVectorsOffset, compressedVectorsLength, vectorIndexOffset)
-                : new LoadedState(null, null, null);
+                : new LoadedState(null, null);
         };
     }
 
@@ -148,19 +148,22 @@ public sealed interface JVectorIndexQuantization {
     ) throws IOException {
         NVQuantization nvq = nvqFromGraph(index);
         if (compressedVectorsLength == 0) {
-            return new LoadedState(nvq, null, null);
+            return new LoadedState(nvq, null);
         }
         assert compressedVectorsOffset > 0;
-        ReaderSupplier supplier = new JVectorRandomAccessReader.Supplier(
-            directory.openInput(fieldDataFileName, IOContext.READONCE),
-            compressedVectorsOffset,
-            compressedVectorsLength
-        );
-        PQVectors pqVectors;
-        try (var reader = supplier.get()) {
-            pqVectors = PQVectors.load(reader);
+        try (
+            ReaderSupplier supplier = new JVectorRandomAccessReader.Supplier(
+                directory.openInput(fieldDataFileName, IOContext.READONCE),
+                compressedVectorsOffset,
+                compressedVectorsLength
+            )
+        ) {
+            PQVectors pqVectors;
+            try (var reader = supplier.get()) {
+                pqVectors = PQVectors.load(reader);
+            }
+            return new LoadedState(nvq, pqVectors);
         }
-        return new LoadedState(nvq, pqVectors, supplier);
     }
 
     private static LoadedState loadPQState(
@@ -173,16 +176,20 @@ public sealed interface JVectorIndexQuantization {
         if (compressedVectorsOffset < vectorIndexOffset) {
             throw new IllegalArgumentException("compressedVectorsOffset must be greater than vectorIndexOffset");
         }
-        ReaderSupplier supplier = new JVectorRandomAccessReader.Supplier(
-            directory.openInput(fieldDataFileName, IOContext.READONCE),
-            compressedVectorsOffset,
-            compressedVectorsLength
-        );
-        PQVectors pqVectors;
-        try (var reader = supplier.get()) {
-            pqVectors = PQVectors.load(reader);
+
+        try (
+            ReaderSupplier supplier = new JVectorRandomAccessReader.Supplier(
+                directory.openInput(fieldDataFileName, IOContext.READONCE),
+                compressedVectorsOffset,
+                compressedVectorsLength
+            )
+        ) {
+            PQVectors pqVectors;
+            try (var reader = supplier.get()) {
+                pqVectors = PQVectors.load(reader);
+            }
+            return new LoadedState(null, pqVectors);
         }
-        return new LoadedState(null, pqVectors, supplier);
     }
 
     private static NVQuantization nvqFromGraph(OnDiskGraphIndex index) {
