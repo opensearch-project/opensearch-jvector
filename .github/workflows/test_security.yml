@@ -35,6 +35,7 @@ jobs:
 
   integ-test-with-security-linux:
     strategy:
+      fail-fast: false
       matrix:
         java: [21, 25]
     env:
