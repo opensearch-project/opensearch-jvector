@@ -35,12 +35,14 @@ import static io.github.jbellis.jvector.quantization.KMeansPlusPlusClusterer.UNW
 /**
  * Encapsulates the quantization strategy used when writing a jVector segment.
  * <p>
- * Concrete subclasses are {@link NVQ} for Non-uniform Vector Quantization (stored inline
- * in the graph) and {@link PQ} for Product Quantization (stored as a separate blob).
- * PQ and NVQ quantize different portions of the graph. As a result,
- * the following combinations for quantization are possible today in the disk-ann graph:
+ * Concrete subclasses are {@link NVQ} for Non-uniform Vector Quantization (stored inline in the
+ * graph), {@link PQ} for Product Quantization stored as a separate blob, and {@link FusedPQ} for
+ * Product Quantization stored inline per adjacency entry (FusedPQ layout).
+ * Supported combinations today:
  * 1. PQ + full-precision vectors
  * 2. PQ + NVQ
+ * 3. Fused PQ + full-precision vectors
+ * FusedPQ + NVQ is not yet supported.
  */
 public sealed interface JVectorIndexQuantization {
 
@@ -51,6 +53,8 @@ public sealed interface JVectorIndexQuantization {
     byte QUANTIZATION_TYPE_NONE = 0;
     byte QUANTIZATION_TYPE_PQ = 1;
     byte QUANTIZATION_TYPE_NVQ_INLINE = 2;
+    // PQ codes stored inline per adjacency entry (FeatureId.FUSED_PQ) instead of a separate blob.
+    byte QUANTIZATION_TYPE_FUSED_PQ = 3;
 
     /** Holds the quantization objects loaded from disk for a single field. */
     record LoadedState(NVQuantization nvqInlineQuantization, PQVectors pqVectors) {
@@ -82,6 +86,8 @@ public sealed interface JVectorIndexQuantization {
                 compressedVectorsOffset,
                 compressedVectorsLength
             );
+            // FusedPQ codes live in the graph's FUSED_PQ feature, not a heap-loaded blob.
+            case QUANTIZATION_TYPE_FUSED_PQ -> new LoadedState(null, null);
             default -> compressedVectorsLength > 0
                 ? loadPQState(directory, fieldDataFileName, compressedVectorsOffset, compressedVectorsLength, vectorIndexOffset)
                 : new LoadedState(null, null);
@@ -137,6 +143,25 @@ public sealed interface JVectorIndexQuantization {
             pqVectors.getCompressedSize()
         );
         return pqVectors;
+    }
+
+    // FusedPQ requires a full 256-cluster codebook (see computePqVectors); smaller segments use separate PQ.
+    int FUSED_PQ_REQUIRED_CLUSTERS = 256;
+
+    /** Whether a trained PQ codebook has enough clusters to use the FusedPQ inline layout. */
+    static boolean isFusedPqUsable(PQVectors pqVectors, String fieldName) {
+        final int clusterCount = pqVectors.getCompressor().getClusterCount();
+        if (clusterCount < FUSED_PQ_REQUIRED_CLUSTERS) {
+            log.info(
+                "Field {}: {} clusters < {} required for FusedPQ; using separate PQ blob",
+                fieldName,
+                clusterCount,
+                FUSED_PQ_REQUIRED_CLUSTERS
+            );
+            return false;
+        }
+        log.info("Field {}: {} clusters; using FusedPQ inline layout", fieldName, clusterCount);
+        return true;
     }
 
     private static LoadedState loadNVQState(
@@ -450,6 +475,61 @@ public sealed interface JVectorIndexQuantization {
                 compressedBytes = (int) (originalDimension * 0.125);
             }
             return compressedBytes;
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // FusedPQ implementation
+    // -----------------------------------------------------------------------
+
+    /** Product Quantization with codes stored inline per adjacency entry (FusedPQ layout) instead of a blob. */
+    public static final class FusedPQ implements JVectorIndexQuantization {
+        private final Function<Integer, Integer> numSubspacesSupplier;
+
+        public FusedPQ(Function<Integer, Integer> numSubspacesSupplier) {
+            this.numSubspacesSupplier = numSubspacesSupplier;
+        }
+
+        /** FusedPQ with a fixed (dimension-independent) subspace count. */
+        public FusedPQ(int fixedNumSubspaces) {
+            this(ignored -> fixedNumSubspaces);
+        }
+
+        /** FusedPQ using the default dimension-adaptive subspace count. */
+        public FusedPQ() {
+            this(PQ::defaultNumSubspaces);
+        }
+
+        public Function<Integer, Integer> getNumSubspacesSupplier() {
+            return numSubspacesSupplier;
+        }
+
+        @Override
+        public String getType() {
+            return KNNConstants.QUANTIZATION_TYPE_FUSED_PQ;
+        }
+
+        @Override
+        public byte quantizationType() {
+            return QUANTIZATION_TYPE_FUSED_PQ;
+        }
+
+        @Override
+        public int numSubspaces(int dimension) {
+            return numSubspacesSupplier.apply(dimension);
+        }
+
+        @Override
+        public QuantizationResult quantize(RandomAccessVectorValues ravv, VectorSimilarityFunction vsf, ForkJoinPool computePool)
+            throws IOException {
+            PQVectors pqVectors = computePqVectors(ravv, vsf, numSubspaces(ravv.dimension()), computePool);
+            return new QuantizationResult(pqVectors, null, BuildScoreProvider.pqBuildScoreProvider(vsf, pqVectors));
+        }
+
+        /** FusedPQ does not quantize the inline graph vectors; they are read back at full precision. */
+        @Override
+        public VectorFloat<?> vectorFloatValue(OnDiskGraphIndex.View view, int ord) {
+            return view.getVector(ord);
         }
     }
 }

@@ -11,8 +11,11 @@ import java.io.UnsupportedEncodingException;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ForkJoinPool;
+import java.util.function.IntFunction;
 import java.util.stream.IntStream;
 
 import org.apache.lucene.codecs.CodecUtil;
@@ -50,6 +53,7 @@ import io.github.jbellis.jvector.graph.RemappedRandomAccessVectorValues;
 import io.github.jbellis.jvector.graph.disk.OnDiskSequentialGraphIndexWriter;
 import io.github.jbellis.jvector.graph.disk.feature.Feature;
 import io.github.jbellis.jvector.graph.disk.feature.FeatureId;
+import io.github.jbellis.jvector.graph.disk.feature.FusedPQ;
 import io.github.jbellis.jvector.graph.disk.feature.InlineVectors;
 import io.github.jbellis.jvector.graph.disk.feature.NVQ;
 import io.github.jbellis.jvector.graph.diversity.VamanaDiversityProvider;
@@ -436,18 +440,31 @@ public class JVectorWriter extends KnnVectorsWriter {
                     startOffset,
                     resultBuilder
                 );
-            } else {
-                writeFullPrecisionGraph(
-                    graph,
-                    randomAccessVectorValues,
-                    fieldInfo,
-                    compressedVectors,
-                    jVectorIndexWriter,
-                    indexOutput,
-                    startOffset,
-                    resultBuilder
-                );
-            }
+            } else if (quantization instanceof JVectorIndexQuantization.FusedPQ
+                && compressedVectors instanceof PQVectors pqVectors
+                && JVectorIndexQuantization.isFusedPqUsable(pqVectors, fieldInfo.name)) {
+                    writeFusedPQGraph(
+                        graph,
+                        randomAccessVectorValues,
+                        fieldInfo,
+                        pqVectors,
+                        jVectorIndexWriter,
+                        indexOutput,
+                        startOffset,
+                        resultBuilder
+                    );
+                } else {
+                    writeFullPrecisionGraph(
+                        graph,
+                        randomAccessVectorValues,
+                        fieldInfo,
+                        compressedVectors,
+                        jVectorIndexWriter,
+                        indexOutput,
+                        startOffset,
+                        resultBuilder
+                    );
+                }
 
             return resultBuilder.build();
         }
@@ -466,6 +483,7 @@ public class JVectorWriter extends KnnVectorsWriter {
     ) throws IOException {
         final NVQuantization nvQuantization = nvqVectors.getNVQuantization();
         log.info("Writing NVQ vectors inline with graph nodes for field {}", fieldInfo.name);
+
         try (var writer = new OnDiskSequentialGraphIndexWriter.Builder(graph, jVectorIndexWriter).with(new NVQ(nvQuantization)).build()) {
             var suppliers = Feature.singleStateFactory(FeatureId.NVQ_VECTORS, nodeId -> new NVQ.State(nvqVectors.get(nodeId)));
             writer.write(suppliers);
@@ -482,6 +500,39 @@ public class JVectorWriter extends KnnVectorsWriter {
                 resultBuilder.compressedVectorsLength(0);
             }
             resultBuilder.quantizationType(JVectorIndexQuantization.QUANTIZATION_TYPE_NVQ_INLINE);
+            CodecUtil.writeFooter(indexOutput);
+        }
+    }
+
+    /** Writes the graph with inline full-precision vectors (reranking) and inline FusedPQ codes (traversal). */
+    private void writeFusedPQGraph(
+        OnHeapGraphIndex graph,
+        RandomAccessVectorValues randomAccessVectorValues,
+        FieldInfo fieldInfo,
+        PQVectors pqVectors,
+        JVectorIndexWriter jVectorIndexWriter,
+        IndexOutput indexOutput,
+        long startOffset,
+        VectorIndexFieldMetadata.VectorIndexFieldMetadataBuilder resultBuilder
+    ) throws IOException {
+        log.info("Writing FusedPQ graph with inline PQ codes for field {}", fieldInfo.name);
+        final FusedPQ fusedPQ = new FusedPQ(maxConn, pqVectors.getCompressor());
+        try (
+            var writer = new OnDiskSequentialGraphIndexWriter.Builder(graph, jVectorIndexWriter).with(
+                new InlineVectors(randomAccessVectorValues.dimension())
+            ).with(fusedPQ).build()
+        ) {
+            Map<FeatureId, IntFunction<Feature.State>> suppliers = new EnumMap<>(FeatureId.class);
+            suppliers.put(FeatureId.INLINE_VECTORS, nodeId -> new InlineVectors.State(randomAccessVectorValues.getVector(nodeId)));
+            suppliers.put(FeatureId.FUSED_PQ, nodeId -> new FusedPQ.State(graph.getView(), pqVectors, nodeId));
+            writer.write(suppliers);
+            long endGraphOffset = jVectorIndexWriter.position();
+            resultBuilder.vectorIndexOffset(startOffset);
+            resultBuilder.vectorIndexLength(endGraphOffset - startOffset);
+            // No separate PQ blob is written in the fused layout.
+            resultBuilder.compressedVectorsOffset(0);
+            resultBuilder.compressedVectorsLength(0);
+            resultBuilder.quantizationType(JVectorIndexQuantization.QUANTIZATION_TYPE_FUSED_PQ);
             CodecUtil.writeFooter(indexOutput);
         }
     }
@@ -542,7 +593,7 @@ public class JVectorWriter extends KnnVectorsWriter {
         long vectorIndexLength;
         long compressedVectorsOffset;
         long compressedVectorsLength;
-        byte quantizationType; // QUANTIZATION_TYPE_NONE/PQ/NVQ; added in VERSION_WITH_QUANTIZATION_TYPE
+        byte quantizationType;
         float degreeOverflow; // important when leveraging cache
         GraphNodeIdToDocMap graphNodeIdToDocMap;
 
