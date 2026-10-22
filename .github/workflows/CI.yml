@@ -35,6 +35,7 @@ jobs:
 
   Build-k-NN-Linux:
     strategy:
+      fail-fast: false
       matrix:
         java: [21, 25]
 
@@ -105,6 +106,7 @@ jobs:
 
   Build-k-NN-Linux-Native:
     strategy:
+      fail-fast: false
       matrix:
         java: [21, 25]
 
