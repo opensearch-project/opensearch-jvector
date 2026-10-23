@@ -1029,8 +1029,6 @@ public class JVectorWriter extends KnnVectorsWriter {
          * In the event of no deletes or quantization, the graph construction is done by incrementally adding vectors from smaller segments into the largest segment.
          * For all other cases, we build a new graph from scratch from all the vectors.
          *
-         * TODO: Add support for incremental graph building with quantization see <a href="https://github.com/opensearch-project/opensearch-jvector/issues/166">issue</a>
-         *
          * @throws IOException if there is an issue during reading or writing vector data.
          */
         public void merge() throws IOException {
