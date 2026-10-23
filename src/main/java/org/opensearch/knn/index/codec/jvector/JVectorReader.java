@@ -152,10 +152,13 @@ public class JVectorReader extends KnnVectorsReader {
 
         try (var view = index.getView()) {
             final long graphSearchStart = System.currentTimeMillis();
-            final SearchScoreProvider ssp = fieldEntry.buildScoreFunctionProvider(q, view);
+            final SearchScoreProvider rawSsp = fieldEntry.buildScoreFunctionProvider(q, view);
+            final SearchScoreProvider ssp = PrefetchingSearchScoreProvider.wrap(rawSsp, index);
+
             final GraphNodeIdToDocMap jvectorLuceneDocMap = fieldEntry.graphNodeIdToDocMap;
             // Convert the acceptDocs bitmap from Lucene to jVector ordinal bitmap filter
-            // Logic works as follows: if acceptDocs is null, we accept all ordinals. Otherwise, we check if the jVector ordinal has a
+            // Logic works as follows: if acceptDocs is null, we accept all ordinals.
+            // Otherwise, we check if the jVector ordinal has a
             // corresponding Lucene doc ID accepted by acceptDocs filter.
             io.github.jbellis.jvector.util.Bits compatibleBits;
             if (acceptDocs == null) compatibleBits = ord -> true;
@@ -182,7 +185,8 @@ public class JVectorReader extends KnnVectorsReader {
                 final long searchTime = graphSearchEnd - graphSearchStart;
                 log.debug("Search (including acquiring view) took {} ms", searchTime);
 
-                // Collect the below metrics about the search and somehow wire this back to {@link @KNNStats}
+                // Collect the below metrics about the search and somehow wire this back to
+                // {@link @KNNStats}
                 final int visitedNodesCount = searchResults.getVisitedCount();
                 final int rerankedCount = searchResults.getRerankedCount();
 
@@ -213,12 +217,14 @@ public class JVectorReader extends KnnVectorsReader {
     }
 
     /**
-     * Wraps an ExactScoreFunction to handle score transformation between jVector and Lucene similarity functions for innerproduct.
+     * Wraps an ExactScoreFunction to handle score transformation between jVector
+     * and Lucene similarity functions for innerproduct.
      *
-     * @param delegate the base ExactScoreFunction to wrap
-     * @param luceneSimilarityFunction the Lucene similarity function
+     * @param delegate                  the base ExactScoreFunction to wrap
+     * @param luceneSimilarityFunction  the Lucene similarity function
      * @param jvectorSimilarityFunction the jVector similarity function
-     * @return a wrapped ExactScoreFunction that applies score transformation if needed
+     * @return a wrapped ExactScoreFunction that applies score transformation if
+     *         needed
      */
     private static ScoreFunction.ExactScoreFunction wrapExactScoreFunction(
         ScoreFunction.ExactScoreFunction delegate,
@@ -284,7 +290,8 @@ public class JVectorReader extends KnnVectorsReader {
         private final ReaderSupplier neighborsScoreCacheIndexReaderSupplier;
         private final OnDiskGraphIndex index;
         private final PQVectors pqVectors; // non-null when a PQ blob is present (PQ-only or NVQ+PQ)
-        // NVQuantization extracted from the graph when NVQ is stored inline; null otherwise
+        // NVQuantization extracted from the graph when NVQ is stored inline; null
+        // otherwise
         private final NVQuantization nvqInlineQuantization;
         private final CloseableLoadedState quantizationState;
 
@@ -308,7 +315,8 @@ public class JVectorReader extends KnnVectorsReader {
                 + "."
                 + JVectorFormat.NEIGHBORS_SCORE_CACHE_EXTENSION;
 
-            // For the slice we would like to include the Lucene header, unfortunately, we have to do this because jVector use global
+            // For the slice we would like to include the Lucene header, unfortunately, we
+            // have to do this because jVector use global
             // offsets instead of local offsets
             final long sliceLength = vectorIndexLength + CodecUtil.indexHeaderLength(
                 JVectorFormat.VECTOR_INDEX_CODEC_NAME,
@@ -396,12 +404,15 @@ public class JVectorReader extends KnnVectorsReader {
     }
 
     /**
-     * Utility class to map between Lucene and jVector similarity functions and metadata ordinals.
+     * Utility class to map between Lucene and jVector similarity functions and
+     * metadata ordinals.
      */
     public static class VectorSimilarityMapper {
         /**
-         List of vector similarity functions supported by <a href="https://github.com/jbellis/jvector">jVector library</a>
-         The similarity functions orders matter in this list because it is later used to resolve the similarity function by ordinal.
+         * List of vector similarity functions supported by
+         * <a href="https://github.com/jbellis/jvector">jVector library</a>
+         * The similarity functions orders matter in this list because it is later used
+         * to resolve the similarity function by ordinal.
          */
         public static final List<VectorSimilarityFunction> JVECTOR_SUPPORTED_SIMILARITY_FUNCTIONS = List.of(
             VectorSimilarityFunction.EUCLIDEAN,
