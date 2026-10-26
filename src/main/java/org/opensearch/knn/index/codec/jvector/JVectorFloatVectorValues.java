@@ -20,6 +20,7 @@ public class JVectorFloatVectorValues extends FloatVectorValues {
     public static final int NO_VECTOR = -1;
     static final VectorTypeSupport VECTOR_TYPE_SUPPORT = VectorizationProvider.getInstance().getVectorTypeSupport();
 
+    private final OnDiskGraphIndex index;
     private final OnDiskGraphIndex.View view;
     private final VectorSimilarityFunction similarityFunction;
     private final org.apache.lucene.index.VectorSimilarityFunction luceneSimilarityFunction;
@@ -44,7 +45,8 @@ public class JVectorFloatVectorValues extends FloatVectorValues {
         GraphNodeIdToDocMap graphNodeIdToDocMap,
         JVectorIndexQuantization quantization
     ) throws IOException {
-        this.view = onDiskGraphIndex.getView();
+        this.index = onDiskGraphIndex;
+        this.view = index.getView();
         this.dimension = view.dimension();
         this.size = view.size();
         this.similarityFunction = similarityFunction;
@@ -181,6 +183,29 @@ public class JVectorFloatVectorValues extends FloatVectorValues {
 
     public VectorFloat<?> vectorValueObject(int i) throws IOException {
         return vectorFloatValue(i);
+    }
+
+    /**
+     * Prefetches the graph node L0 records for the
+     * provided ordinals into the OS page cache.
+     *
+     * @param ordsToPrefetch array of graph node ordinals to prefetch
+     * @param numOrds        number of valid entries in {@code ordsToPrefetch}
+     */
+    @Override
+    public void prefetch(int[] ordsToPrefetch, int numOrds) throws IOException {
+        if (ordsToPrefetch == null || numOrds <= 0) {
+            return;
+        }
+        final int count = Math.min(numOrds, ordsToPrefetch.length);
+        int i = 0;
+        while (i < count) {
+            final int runStart = i++;
+            while (i < count && ordsToPrefetch[i] == ordsToPrefetch[i - 1] + 1) {
+                i++;
+            }
+            index.prefetchL0Records(ordsToPrefetch[runStart], ordsToPrefetch[i - 1]);
+        }
     }
 
     @Override

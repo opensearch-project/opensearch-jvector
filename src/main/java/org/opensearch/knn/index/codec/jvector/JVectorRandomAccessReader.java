@@ -144,6 +144,16 @@ public class JVectorRandomAccessReader implements RandomAccessReader {
         }
 
         @Override
+        public void prefetch(long offset, long length) {
+            try {
+                currentInput.prefetch(offset, length);
+            } catch (IOException e) {
+                // no need to throw anything in case of prefetch failure
+                log.debug("prefetch [{}, +{}) failed; continuing without it", offset, length, e);
+            }
+        }
+
+        @Override
         public RandomAccessReader get() throws IOException {
             synchronized (this) {
                 final IndexInput input = currentInput.slice("Input Slice for the jVector graph or PQ", sliceStartOffset, sliceLength)

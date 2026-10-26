@@ -1851,4 +1851,121 @@ public class KNNJVectorTests extends LuceneTestCase {
 
         return groundTruthVectorsIds;
     }
+
+    /**
+     * Verifies that {@link JVectorRandomAccessReader.Supplier#prefetch(long, long)}
+     * delegates each call directly to {@link org.apache.lucene.store.IndexInput#prefetch}.
+     */
+    @Test
+    public void testSupplierPrefetch_delegatesToIndexInput() throws IOException {
+        // Spy IndexInput: records every prefetch(offset, length) call.
+        final List<long[]> prefetchCalls = new ArrayList<>();
+        org.apache.lucene.store.IndexInput spy = new org.apache.lucene.store.IndexInput("spy") {
+            @Override
+            public void close() {}
+
+            @Override
+            public long getFilePointer() {
+                return 0L;
+            }
+
+            @Override
+            public void seek(long p) {}
+
+            @Override
+            public long length() {
+                return 4096L;
+            }
+
+            @Override
+            public byte readByte() {
+                return 0;
+            }
+
+            @Override
+            public void readBytes(byte[] b, int o, int l) {}
+
+            @Override
+            public org.apache.lucene.store.IndexInput clone() {
+                return this;
+            }
+
+            @Override
+            public org.apache.lucene.store.IndexInput slice(String d, long o, long len) {
+                return this;
+            }
+
+            @Override
+            public void prefetch(long offset, long length) {
+                prefetchCalls.add(new long[] { offset, length });
+            }
+        };
+
+        try (JVectorRandomAccessReader.Supplier supplier = new JVectorRandomAccessReader.Supplier(spy, 0L, 4096L)) {
+            supplier.prefetch(100L, 64L);
+            supplier.prefetch(512L, 128L);
+        }
+
+        Assert.assertEquals("Expected two prefetch calls", 2, prefetchCalls.size());
+        Assert.assertArrayEquals(new long[] { 100L, 64L }, prefetchCalls.get(0));
+        Assert.assertArrayEquals(new long[] { 512L, 128L }, prefetchCalls.get(1));
+    }
+
+    /**
+     * Verifies that an {@link java.io.IOException} thrown by
+     * {@link org.apache.lucene.store.IndexInput#prefetch} is swallowed silently
+     */
+    @Test
+    public void testSupplierPrefetch_ioExceptionIsSwallowed() throws IOException {
+        final boolean[] prefetchAttempted = { false };
+
+        org.apache.lucene.store.IndexInput throwing = new org.apache.lucene.store.IndexInput("throwing") {
+            @Override
+            public void close() {}
+
+            @Override
+            public long getFilePointer() {
+                return 0L;
+            }
+
+            @Override
+            public void seek(long p) {}
+
+            @Override
+            public long length() {
+                return 1024L;
+            }
+
+            @Override
+            public byte readByte() {
+                return 0;
+            }
+
+            @Override
+            public void readBytes(byte[] b, int o, int l) {}
+
+            @Override
+            public org.apache.lucene.store.IndexInput clone() {
+                return this;
+            }
+
+            @Override
+            public org.apache.lucene.store.IndexInput slice(String d, long o, long len) {
+                return this;
+            }
+
+            @Override
+            public void prefetch(long offset, long length) throws java.io.IOException {
+                prefetchAttempted[0] = true;
+                throw new java.io.IOException("simulated madvise failure");
+            }
+        };
+
+        try (JVectorRandomAccessReader.Supplier supplier = new JVectorRandomAccessReader.Supplier(throwing, 0L, 1024L)) {
+            // must not propagate
+            supplier.prefetch(0L, 64L);
+        }
+
+        Assert.assertTrue("prefetch must be attempted even if it throws", prefetchAttempted[0]);
+    }
 }

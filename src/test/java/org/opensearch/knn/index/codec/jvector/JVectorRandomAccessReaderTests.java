@@ -12,6 +12,8 @@ import org.junit.Test;
 import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.List;
 
 public class JVectorRandomAccessReaderTests {
 
@@ -153,5 +155,97 @@ public class JVectorRandomAccessReaderTests {
 
         ByteBuffer dst = ByteBuffer.allocate(16);
         Assert.assertThrows(EOFException.class, () -> reader.readFully(dst));
+    }
+
+    private static class CapturingIndexInput extends IndexInput {
+        final List<long[]> calls = new ArrayList<>();
+        private final long size;
+
+        CapturingIndexInput(long size) {
+            super("CapturingIndexInput");
+            this.size = size;
+        }
+
+        @Override
+        public void close() {}
+
+        @Override
+        public long getFilePointer() {
+            return 0L;
+        }
+
+        @Override
+        public void seek(long pos) {}
+
+        @Override
+        public long length() {
+            return size;
+        }
+
+        @Override
+        public byte readByte() {
+            return 0;
+        }
+
+        @Override
+        public void readBytes(byte[] b, int off, int len) {}
+
+        @Override
+        public IndexInput clone() {
+            return this;
+        }
+
+        @Override
+        public IndexInput slice(String d, long o, long l) {
+            return new CapturingIndexInput(l);
+        }
+
+        @Override
+        public void prefetch(long offset, long length) throws IOException {
+            calls.add(new long[] { offset, length });
+        }
+    }
+
+    /** Supplier.prefetch forwards offset and length to IndexInput.prefetch. */
+    @Test
+    public void supplierPrefetch_forwardsToIndexInput() throws IOException {
+        CapturingIndexInput input = new CapturingIndexInput(1024);
+        JVectorRandomAccessReader.Supplier supplier = new JVectorRandomAccessReader.Supplier(input, 0L, 1024L);
+
+        supplier.prefetch(100L, 64L);
+
+        Assert.assertEquals(1, input.calls.size());
+        Assert.assertArrayEquals(new long[] { 100L, 64L }, input.calls.get(0));
+    }
+
+    /** Multiple consecutive calls are each forwarded independently. */
+    @Test
+    public void supplierPrefetch_multipleCallsEachForwarded() throws IOException {
+        CapturingIndexInput input = new CapturingIndexInput(4096);
+        JVectorRandomAccessReader.Supplier supplier = new JVectorRandomAccessReader.Supplier(input, 0L, 4096L);
+
+        supplier.prefetch(0L, 128L);
+        supplier.prefetch(512L, 256L);
+        supplier.prefetch(1024L, 512L);
+
+        Assert.assertEquals(3, input.calls.size());
+        Assert.assertArrayEquals(new long[] { 0L, 128L }, input.calls.get(0));
+        Assert.assertArrayEquals(new long[] { 512L, 256L }, input.calls.get(1));
+        Assert.assertArrayEquals(new long[] { 1024L, 512L }, input.calls.get(2));
+    }
+
+    /** IOException thrown by IndexInput.prefetch must be swallowed silently. */
+    @Test
+    public void supplierPrefetch_ioExceptionSwallowed() throws IOException {
+        CapturingIndexInput input = new CapturingIndexInput(1024) {
+            @Override
+            public void prefetch(long offset, long length) throws IOException {
+                throw new IOException("simulated madvise failure");
+            }
+        };
+        JVectorRandomAccessReader.Supplier supplier = new JVectorRandomAccessReader.Supplier(input, 0L, 1024L);
+
+        // must not propagate
+        supplier.prefetch(0L, 64L);
     }
 }
