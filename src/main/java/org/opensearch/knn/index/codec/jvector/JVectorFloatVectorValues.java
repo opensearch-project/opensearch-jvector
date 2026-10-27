@@ -204,7 +204,11 @@ public class JVectorFloatVectorValues extends FloatVectorValues {
             while (i < count && ordsToPrefetch[i] == ordsToPrefetch[i - 1] + 1) {
                 i++;
             }
-            index.prefetchL0Records(ordsToPrefetch[runStart], ordsToPrefetch[i - 1]);
+            // Skip isolated single ordinals — one node is not worth a syscall.
+            // Only prefetch runs of 2 or more consecutive ordinals.
+            if (i - runStart >= 2) {
+                index.prefetchL0Records(ordsToPrefetch[runStart], ordsToPrefetch[i - 1]);
+            }
         }
     }
 

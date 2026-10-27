@@ -37,6 +37,7 @@ import org.opensearch.knn.common.KNNConstants;
 import static org.opensearch.knn.common.KNNConstants.DEFAULT_LEADING_SEGMENT_MERGE_DISABLED;
 import static org.opensearch.knn.common.KNNConstants.DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION;
 import org.opensearch.knn.index.ThreadLeakFiltersForTests;
+import org.apache.lucene.codecs.perfield.PerFieldKnnVectorsFormat.FieldsReader;
 
 import static org.opensearch.knn.index.engine.CommonTestUtils.getCodec;
 import org.opensearch.knn.plugin.stats.KNNCounter;
@@ -1938,120 +1939,129 @@ public class KNNJVectorTests extends LuceneTestCase {
         return groundTruthVectorsIds;
     }
 
-    /**
-     * Verifies that {@link JVectorRandomAccessReader.Supplier#prefetch(long, long)}
-     * delegates each call directly to {@link org.apache.lucene.store.IndexInput#prefetch}.
-     */
     @Test
-    public void testSupplierPrefetch_delegatesToIndexInput() throws IOException {
-        // Spy IndexInput: records every prefetch(offset, length) call.
-        final List<long[]> prefetchCalls = new ArrayList<>();
-        org.apache.lucene.store.IndexInput spy = new org.apache.lucene.store.IndexInput("spy") {
-            @Override
-            public void close() {}
+    public void testPrefetch_nullAndZeroGuards_doNotThrow() throws IOException {
+        final Path indexPath = createTempDir();
+        final IndexWriterConfig iwc = newIndexWriterConfig();
+        iwc.setUseCompoundFile(false);
+        iwc.setCodec(getCodec(random().nextBoolean()));
+        iwc.setMergePolicy(new ForceMergesOnlyMergePolicy());
 
-            @Override
-            public long getFilePointer() {
-                return 0L;
+        try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter w = new IndexWriter(dir, iwc)) {
+            for (int i = 0; i < 6; i++) {
+                Document doc = new Document();
+                doc.add(new KnnFloatVectorField(TEST_FIELD, new float[] { i, i }, VectorSimilarityFunction.EUCLIDEAN));
+                w.addDocument(doc);
             }
+            w.commit();
 
-            @Override
-            public void seek(long p) {}
+            try (IndexReader reader = DirectoryReader.open(w)) {
+                JVectorFloatVectorValues fvv = getJVectorFloatVectorValues(reader, TEST_FIELD);
 
-            @Override
-            public long length() {
-                return 4096L;
+                // null array — must not throw
+                fvv.prefetch(null, 3);
+                // zero count — must not throw
+                fvv.prefetch(new int[] { 0, 1, 2 }, 0);
+                // negative count — must not throw
+                fvv.prefetch(new int[] { 0, 1, 2 }, -1);
             }
-
-            @Override
-            public byte readByte() {
-                return 0;
-            }
-
-            @Override
-            public void readBytes(byte[] b, int o, int l) {}
-
-            @Override
-            public org.apache.lucene.store.IndexInput clone() {
-                return this;
-            }
-
-            @Override
-            public org.apache.lucene.store.IndexInput slice(String d, long o, long len) {
-                return this;
-            }
-
-            @Override
-            public void prefetch(long offset, long length) {
-                prefetchCalls.add(new long[] { offset, length });
-            }
-        };
-
-        try (JVectorRandomAccessReader.Supplier supplier = new JVectorRandomAccessReader.Supplier(spy, 0L, 4096L)) {
-            supplier.prefetch(100L, 64L);
-            supplier.prefetch(512L, 128L);
         }
-
-        Assert.assertEquals("Expected two prefetch calls", 2, prefetchCalls.size());
-        Assert.assertArrayEquals(new long[] { 100L, 64L }, prefetchCalls.get(0));
-        Assert.assertArrayEquals(new long[] { 512L, 128L }, prefetchCalls.get(1));
     }
 
-    /**
-     * Verifies that an {@link java.io.IOException} thrown by
-     * {@link org.apache.lucene.store.IndexInput#prefetch} is swallowed silently
-     */
     @Test
-    public void testSupplierPrefetch_ioExceptionIsSwallowed() throws IOException {
-        final boolean[] prefetchAttempted = { false };
+    public void testPrefetch_singleIsolatedOrdinal_skippedWithoutException() throws IOException {
+        final Path indexPath = createTempDir();
+        final IndexWriterConfig iwc = newIndexWriterConfig();
+        iwc.setUseCompoundFile(false);
+        iwc.setCodec(getCodec(random().nextBoolean()));
+        iwc.setMergePolicy(new ForceMergesOnlyMergePolicy());
 
-        org.apache.lucene.store.IndexInput throwing = new org.apache.lucene.store.IndexInput("throwing") {
-            @Override
-            public void close() {}
-
-            @Override
-            public long getFilePointer() {
-                return 0L;
+        try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter w = new IndexWriter(dir, iwc)) {
+            for (int i = 0; i < 6; i++) {
+                Document doc = new Document();
+                doc.add(new KnnFloatVectorField(TEST_FIELD, new float[] { i, i }, VectorSimilarityFunction.EUCLIDEAN));
+                w.addDocument(doc);
             }
+            w.commit();
 
-            @Override
-            public void seek(long p) {}
+            try (IndexReader reader = DirectoryReader.open(w)) {
+                JVectorFloatVectorValues fvv = getJVectorFloatVectorValues(reader, TEST_FIELD);
 
-            @Override
-            public long length() {
-                return 1024L;
+                // Single ordinal — run length 1, must be skipped (no prefetchL0Records call)
+                fvv.prefetch(new int[] { 3 }, 1);
+
+                // Vector read after a skipped prefetch must still work correctly
+                float[] v = fvv.vectorValue(3);
+                Assert.assertNotNull(v);
             }
-
-            @Override
-            public byte readByte() {
-                return 0;
-            }
-
-            @Override
-            public void readBytes(byte[] b, int o, int l) {}
-
-            @Override
-            public org.apache.lucene.store.IndexInput clone() {
-                return this;
-            }
-
-            @Override
-            public org.apache.lucene.store.IndexInput slice(String d, long o, long len) {
-                return this;
-            }
-
-            @Override
-            public void prefetch(long offset, long length) throws java.io.IOException {
-                prefetchAttempted[0] = true;
-                throw new java.io.IOException("simulated madvise failure");
-            }
-        };
-
-        try (JVectorRandomAccessReader.Supplier supplier = new JVectorRandomAccessReader.Supplier(throwing, 0L, 1024L)) {
-            // must not propagate
-            supplier.prefetch(0L, 64L);
         }
+    }
 
-        Assert.assertTrue("prefetch must be attempted even if it throws", prefetchAttempted[0]);
+    @Test
+    public void testPrefetch_consecutiveRun_firesWithoutException() throws IOException {
+        final Path indexPath = createTempDir();
+        final IndexWriterConfig iwc = newIndexWriterConfig();
+        iwc.setUseCompoundFile(false);
+        iwc.setCodec(getCodec(random().nextBoolean()));
+        iwc.setMergePolicy(new ForceMergesOnlyMergePolicy());
+
+        try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter w = new IndexWriter(dir, iwc)) {
+            for (int i = 0; i < 6; i++) {
+                Document doc = new Document();
+                doc.add(new KnnFloatVectorField(TEST_FIELD, new float[] { i, i }, VectorSimilarityFunction.EUCLIDEAN));
+                w.addDocument(doc);
+            }
+            w.commit();
+
+            try (IndexReader reader = DirectoryReader.open(w)) {
+                JVectorFloatVectorValues fvv = getJVectorFloatVectorValues(reader, TEST_FIELD);
+
+                // Consecutive run [1, 2, 3] — run length 3, must fire
+                fvv.prefetch(new int[] { 1, 2, 3 }, 3);
+
+                // Reads must be unaffected
+                Assert.assertNotNull(fvv.vectorValue(1));
+                Assert.assertNotNull(fvv.vectorValue(2));
+                Assert.assertNotNull(fvv.vectorValue(3));
+            }
+        }
+    }
+
+    @Test
+    public void testPrefetch_mixedIsolatedAndRun_onlyRunFires() throws IOException {
+        final Path indexPath = createTempDir();
+        final IndexWriterConfig iwc = newIndexWriterConfig();
+        iwc.setUseCompoundFile(false);
+        iwc.setCodec(getCodec(random().nextBoolean()));
+        iwc.setMergePolicy(new ForceMergesOnlyMergePolicy());
+
+        try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter w = new IndexWriter(dir, iwc)) {
+            for (int i = 0; i < 10; i++) {
+                Document doc = new Document();
+                doc.add(new KnnFloatVectorField(TEST_FIELD, new float[] { i, i }, VectorSimilarityFunction.EUCLIDEAN));
+                w.addDocument(doc);
+            }
+            w.commit();
+
+            try (IndexReader reader = DirectoryReader.open(w)) {
+                JVectorFloatVectorValues fvv = getJVectorFloatVectorValues(reader, TEST_FIELD);
+
+                // 0 isolated, then [2,3,4] run, then 6 isolated, then [8,9] run
+                fvv.prefetch(new int[] { 0, 2, 3, 4, 6, 8, 9 }, 7);
+
+                // All vector reads must survive
+                for (int ord = 0; ord < 10; ord++) {
+                    Assert.assertNotNull("vectorValue(" + ord + ") must not be null", fvv.vectorValue(ord));
+                }
+            }
+        }
+    }
+
+    private static JVectorFloatVectorValues getJVectorFloatVectorValues(IndexReader reader, String field) throws IOException {
+        LeafReaderContext ctx = reader.leaves().get(0);
+        LeafReader leaf = ctx.reader();
+        FieldsReader fieldsReader = (FieldsReader) ((org.apache.lucene.index.SegmentReader) leaf).getVectorReader();
+        JVectorReader jvectorReader = (JVectorReader) fieldsReader.getFieldReader(field);
+        return (JVectorFloatVectorValues) jvectorReader.getFloatVectorValues(field);
     }
 }
