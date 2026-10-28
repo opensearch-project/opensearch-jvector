@@ -1939,6 +1939,9 @@ public class KNNJVectorTests extends LuceneTestCase {
         return groundTruthVectorsIds;
     }
 
+    /**
+     * prefetch(null, n) and prefetch(ords, 0) must be no-ops and must not throw.
+     */
     @Test
     public void testPrefetch_nullAndZeroGuards_doNotThrow() throws IOException {
         final Path indexPath = createTempDir();
@@ -1968,8 +1971,12 @@ public class KNNJVectorTests extends LuceneTestCase {
         }
     }
 
+    /**
+     * Single ordinal: count=1, minRunLength=0. Run length 1 >= 0, so it fires.
+     * Must complete without exception and not corrupt subsequent vector reads.
+     */
     @Test
-    public void testPrefetch_singleIsolatedOrdinal_skippedWithoutException() throws IOException {
+    public void testPrefetch_singleOrdinal_firesWithoutException() throws IOException {
         final Path indexPath = createTempDir();
         final IndexWriterConfig iwc = newIndexWriterConfig();
         iwc.setUseCompoundFile(false);
@@ -1987,16 +1994,19 @@ public class KNNJVectorTests extends LuceneTestCase {
             try (IndexReader reader = DirectoryReader.open(w)) {
                 JVectorFloatVectorValues fvv = getJVectorFloatVectorValues(reader, TEST_FIELD);
 
-                // Single ordinal — run length 1, must be skipped (no prefetchL0Records call)
+                // count=1, minRunLength=0 → run of 1 >= 0, fires
                 fvv.prefetch(new int[] { 3 }, 1);
 
-                // Vector read after a skipped prefetch must still work correctly
-                float[] v = fvv.vectorValue(3);
-                Assert.assertNotNull(v);
+                // Vector reads must be unaffected
+                Assert.assertNotNull(fvv.vectorValue(3));
             }
         }
     }
 
+    /**
+     * Full consecutive run: count=3, minRunLength=1.
+     * Run length 3 >= 1 → fires. Must complete without exception.
+     */
     @Test
     public void testPrefetch_consecutiveRun_firesWithoutException() throws IOException {
         final Path indexPath = createTempDir();
@@ -2016,7 +2026,7 @@ public class KNNJVectorTests extends LuceneTestCase {
             try (IndexReader reader = DirectoryReader.open(w)) {
                 JVectorFloatVectorValues fvv = getJVectorFloatVectorValues(reader, TEST_FIELD);
 
-                // Consecutive run [1, 2, 3] — run length 3, must fire
+                // count=3, minRunLength=1 → run of 3 >= 1, fires
                 fvv.prefetch(new int[] { 1, 2, 3 }, 3);
 
                 // Reads must be unaffected
@@ -2027,8 +2037,13 @@ public class KNNJVectorTests extends LuceneTestCase {
         }
     }
 
+    /**
+     * Mixed input: count=7, minRunLength=3.
+     * Runs: {0}=1 (skipped), {2,3,4}=3 (fires), {6}=1 (skipped), {8,9}=2 (skipped).
+     * Only the run of length 3 meets the threshold. No exception, reads unaffected.
+     */
     @Test
-    public void testPrefetch_mixedIsolatedAndRun_onlyRunFires() throws IOException {
+    public void testPrefetch_mixedRuns_onlyLongRunMeetsThreshold() throws IOException {
         final Path indexPath = createTempDir();
         final IndexWriterConfig iwc = newIndexWriterConfig();
         iwc.setUseCompoundFile(false);
@@ -2046,10 +2061,11 @@ public class KNNJVectorTests extends LuceneTestCase {
             try (IndexReader reader = DirectoryReader.open(w)) {
                 JVectorFloatVectorValues fvv = getJVectorFloatVectorValues(reader, TEST_FIELD);
 
-                // 0 isolated, then [2,3,4] run, then 6 isolated, then [8,9] run
+                // count=7, minRunLength=3
+                // {0}=1 < 3 skipped, {2,3,4}=3 >= 3 fires, {6}=1 < 3 skipped, {8,9}=2 < 3 skipped
                 fvv.prefetch(new int[] { 0, 2, 3, 4, 6, 8, 9 }, 7);
 
-                // All vector reads must survive
+                // All vector reads must survive regardless of which runs fired
                 for (int ord = 0; ord < 10; ord++) {
                     Assert.assertNotNull("vectorValue(" + ord + ") must not be null", fvv.vectorValue(ord));
                 }

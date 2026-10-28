@@ -198,15 +198,14 @@ public class JVectorFloatVectorValues extends FloatVectorValues {
             return;
         }
         final int count = Math.min(numOrds, ordsToPrefetch.length);
+        final int minRunLength = count / 2;
         int i = 0;
         while (i < count) {
             final int runStart = i++;
             while (i < count && ordsToPrefetch[i] == ordsToPrefetch[i - 1] + 1) {
                 i++;
             }
-            // Skip isolated single ordinals — one node is not worth a syscall.
-            // Only prefetch runs of 2 or more consecutive ordinals.
-            if (i - runStart >= 2) {
+            if (i - runStart >= minRunLength) {
                 index.prefetchL0Records(ordsToPrefetch[runStart], ordsToPrefetch[i - 1]);
             }
         }
