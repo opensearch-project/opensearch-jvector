@@ -149,7 +149,7 @@ public class JVectorRandomAccessReader implements RandomAccessReader {
                 currentInput.prefetch(offset, length);
             } catch (IOException e) {
                 // no need to throw anything in case of prefetch failure
-                log.debug("prefetch [{}, +{}) failed; continuing without it", offset, length, e);
+                log.warn("prefetch [{}, +{}) failed; continuing without it", offset, length, e);
             }
         }
 
