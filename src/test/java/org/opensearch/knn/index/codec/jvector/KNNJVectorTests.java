@@ -37,6 +37,7 @@ import org.opensearch.knn.common.KNNConstants;
 import static org.opensearch.knn.common.KNNConstants.DEFAULT_LEADING_SEGMENT_MERGE_DISABLED;
 import static org.opensearch.knn.common.KNNConstants.DEFAULT_MINIMUM_BATCH_SIZE_FOR_QUANTIZATION;
 import org.opensearch.knn.index.ThreadLeakFiltersForTests;
+import org.apache.lucene.codecs.perfield.PerFieldKnnVectorsFormat.FieldsReader;
 
 import static org.opensearch.knn.index.engine.CommonTestUtils.getCodec;
 import org.opensearch.knn.plugin.stats.KNNCounter;
@@ -1936,5 +1937,147 @@ public class KNNJVectorTests extends LuceneTestCase {
         }
 
         return groundTruthVectorsIds;
+    }
+
+    /**
+     * prefetch(null, n) and prefetch(ords, 0) must be no-ops and must not throw.
+     */
+    @Test
+    public void testPrefetch_nullAndZeroGuards_doNotThrow() throws IOException {
+        final Path indexPath = createTempDir();
+        final IndexWriterConfig iwc = newIndexWriterConfig();
+        iwc.setUseCompoundFile(false);
+        iwc.setCodec(getCodec(random().nextBoolean()));
+        iwc.setMergePolicy(new ForceMergesOnlyMergePolicy());
+
+        try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter w = new IndexWriter(dir, iwc)) {
+            for (int i = 0; i < 6; i++) {
+                Document doc = new Document();
+                doc.add(new KnnFloatVectorField(TEST_FIELD, new float[] { i, i }, VectorSimilarityFunction.EUCLIDEAN));
+                w.addDocument(doc);
+            }
+            w.commit();
+
+            try (IndexReader reader = DirectoryReader.open(w)) {
+                JVectorFloatVectorValues fvv = getJVectorFloatVectorValues(reader, TEST_FIELD);
+
+                // null array — must not throw
+                fvv.prefetch(null, 3);
+                // zero count — must not throw
+                fvv.prefetch(new int[] { 0, 1, 2 }, 0);
+                // negative count — must not throw
+                fvv.prefetch(new int[] { 0, 1, 2 }, -1);
+            }
+        }
+    }
+
+    /**
+     * Single ordinal: count=1, minRunLength=0. Run length 1 >= 0, so it fires.
+     * Must complete without exception and not corrupt subsequent vector reads.
+     */
+    @Test
+    public void testPrefetch_singleOrdinal_firesWithoutException() throws IOException {
+        final Path indexPath = createTempDir();
+        final IndexWriterConfig iwc = newIndexWriterConfig();
+        iwc.setUseCompoundFile(false);
+        iwc.setCodec(getCodec(random().nextBoolean()));
+        iwc.setMergePolicy(new ForceMergesOnlyMergePolicy());
+
+        try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter w = new IndexWriter(dir, iwc)) {
+            for (int i = 0; i < 6; i++) {
+                Document doc = new Document();
+                doc.add(new KnnFloatVectorField(TEST_FIELD, new float[] { i, i }, VectorSimilarityFunction.EUCLIDEAN));
+                w.addDocument(doc);
+            }
+            w.commit();
+
+            try (IndexReader reader = DirectoryReader.open(w)) {
+                JVectorFloatVectorValues fvv = getJVectorFloatVectorValues(reader, TEST_FIELD);
+
+                // count=1, minRunLength=0 → run of 1 >= 0, fires
+                fvv.prefetch(new int[] { 3 }, 1);
+
+                // Vector reads must be unaffected
+                Assert.assertNotNull(fvv.vectorValue(3));
+            }
+        }
+    }
+
+    /**
+     * Full consecutive run: count=3, minRunLength=1.
+     * Run length 3 >= 1 → fires. Must complete without exception.
+     */
+    @Test
+    public void testPrefetch_consecutiveRun_firesWithoutException() throws IOException {
+        final Path indexPath = createTempDir();
+        final IndexWriterConfig iwc = newIndexWriterConfig();
+        iwc.setUseCompoundFile(false);
+        iwc.setCodec(getCodec(random().nextBoolean()));
+        iwc.setMergePolicy(new ForceMergesOnlyMergePolicy());
+
+        try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter w = new IndexWriter(dir, iwc)) {
+            for (int i = 0; i < 6; i++) {
+                Document doc = new Document();
+                doc.add(new KnnFloatVectorField(TEST_FIELD, new float[] { i, i }, VectorSimilarityFunction.EUCLIDEAN));
+                w.addDocument(doc);
+            }
+            w.commit();
+
+            try (IndexReader reader = DirectoryReader.open(w)) {
+                JVectorFloatVectorValues fvv = getJVectorFloatVectorValues(reader, TEST_FIELD);
+
+                // count=3, minRunLength=1 → run of 3 >= 1, fires
+                fvv.prefetch(new int[] { 1, 2, 3 }, 3);
+
+                // Reads must be unaffected
+                Assert.assertNotNull(fvv.vectorValue(1));
+                Assert.assertNotNull(fvv.vectorValue(2));
+                Assert.assertNotNull(fvv.vectorValue(3));
+            }
+        }
+    }
+
+    /**
+     * Mixed input: count=7, minRunLength=3.
+     * Runs: {0}=1 (skipped), {2,3,4}=3 (fires), {6}=1 (skipped), {8,9}=2 (skipped).
+     * Only the run of length 3 meets the threshold. No exception, reads unaffected.
+     */
+    @Test
+    public void testPrefetch_mixedRuns_onlyLongRunMeetsThreshold() throws IOException {
+        final Path indexPath = createTempDir();
+        final IndexWriterConfig iwc = newIndexWriterConfig();
+        iwc.setUseCompoundFile(false);
+        iwc.setCodec(getCodec(random().nextBoolean()));
+        iwc.setMergePolicy(new ForceMergesOnlyMergePolicy());
+
+        try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter w = new IndexWriter(dir, iwc)) {
+            for (int i = 0; i < 10; i++) {
+                Document doc = new Document();
+                doc.add(new KnnFloatVectorField(TEST_FIELD, new float[] { i, i }, VectorSimilarityFunction.EUCLIDEAN));
+                w.addDocument(doc);
+            }
+            w.commit();
+
+            try (IndexReader reader = DirectoryReader.open(w)) {
+                JVectorFloatVectorValues fvv = getJVectorFloatVectorValues(reader, TEST_FIELD);
+
+                // count=7, minRunLength=3
+                // {0}=1 < 3 skipped, {2,3,4}=3 >= 3 fires, {6}=1 < 3 skipped, {8,9}=2 < 3 skipped
+                fvv.prefetch(new int[] { 0, 2, 3, 4, 6, 8, 9 }, 7);
+
+                // All vector reads must survive regardless of which runs fired
+                for (int ord = 0; ord < 10; ord++) {
+                    Assert.assertNotNull("vectorValue(" + ord + ") must not be null", fvv.vectorValue(ord));
+                }
+            }
+        }
+    }
+
+    private static JVectorFloatVectorValues getJVectorFloatVectorValues(IndexReader reader, String field) throws IOException {
+        LeafReaderContext ctx = reader.leaves().get(0);
+        LeafReader leaf = ctx.reader();
+        FieldsReader fieldsReader = (FieldsReader) ((org.apache.lucene.index.SegmentReader) leaf).getVectorReader();
+        JVectorReader jvectorReader = (JVectorReader) fieldsReader.getFieldReader(field);
+        return (JVectorFloatVectorValues) jvectorReader.getFloatVectorValues(field);
     }
 }
