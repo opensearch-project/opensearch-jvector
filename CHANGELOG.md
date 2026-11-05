@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Update datastax/jvector library to 4.0.1 [745](https://github.com/opensearch-project/opensearch-jvector/pull/745)
 - Use FloatArray to eliminate unnecessary vector copying if possible [747](https://github.com/opensearch-project/opensearch-jvector/pull/747)
 - Update datastax/jvector library to 4.0.2 
+- Warm OS page cache during segment merge via jvector prefetchL0Records[790](https://github.com/opensearch-project/opensearch-jvector/pull/790)
 
 ### Bug Fixes
 - Excessive heap consumption when using PQ/NVQ vectors with derived sources enabled [754](https://github.com/opensearch-project/opensearch-jvector/pull/754)
