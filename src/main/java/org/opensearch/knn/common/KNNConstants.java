@@ -45,6 +45,7 @@ public class KNNConstants {
 
     public static final String RADIAL_SEARCH_KEY = "radial_search";
     public static final String MODEL_VERSION = "model_version";
+    public static final String SIZE = "size";
 
     // MMR (Maximal Marginal Relevance) constants
     public static final String MMR = "mmr";
