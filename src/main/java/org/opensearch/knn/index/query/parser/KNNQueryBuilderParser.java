@@ -6,6 +6,7 @@
 package org.opensearch.knn.index.query.parser;
 
 import lombok.extern.log4j.Log4j2;
+
 import org.opensearch.core.common.ParsingException;
 import org.opensearch.core.common.io.stream.StreamInput;
 import org.opensearch.core.common.io.stream.StreamOutput;
@@ -47,6 +48,7 @@ import static org.opensearch.knn.index.query.KNNQueryBuilder.METHOD_PARAMS_FIELD
 import static org.opensearch.knn.index.query.KNNQueryBuilder.MIN_SCORE_FIELD;
 import static org.opensearch.knn.index.query.KNNQueryBuilder.NAME;
 import static org.opensearch.knn.index.query.KNNQueryBuilder.VECTOR_FIELD;
+import static org.opensearch.knn.common.KNNConstants.SIZE;
 
 /**
  * Helper class responsible for parsing and reverse parsing KNNQueryBuilder's
@@ -150,6 +152,10 @@ public final class KNNQueryBuilderParser {
             builder.expandNested(in.readOptionalBoolean());
         }
 
+        if (minClusterVersionCheck.apply(SIZE)) {
+            builder.size(in.readOptionalVInt());
+        }
+
         return builder;
     }
 
@@ -184,6 +190,9 @@ public final class KNNQueryBuilderParser {
         }
         if (minClusterVersionCheck.apply(EXPAND_NESTED)) {
             out.writeOptionalBoolean(builder.getExpandNested());
+        }
+        if (minClusterVersionCheck.apply(SIZE)) {
+            out.writeOptionalVInt(builder.getSize());
         }
     }
 

@@ -51,6 +51,8 @@ public abstract class BaseQueryFactory {
         private QueryShardContext context;
         private RescoreContext rescoreContext;
         private Boolean expandNested;
+        /** Coordinator-resolved request {@code size}; see {@link KNNQueryBuilder#getSize()}. */
+        private Integer size;
 
         public Optional<QueryBuilder> getFilter() {
             return Optional.ofNullable(filter);
