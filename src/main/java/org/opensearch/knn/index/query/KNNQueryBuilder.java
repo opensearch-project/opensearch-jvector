@@ -686,26 +686,24 @@ public class KNNQueryBuilder extends AbstractQueryBuilder<KNNQueryBuilder> imple
 
     @Override
     protected QueryBuilder doRewrite(QueryRewriteContext queryShardContext) throws IOException {
-        QueryBuilder rewrittenFilter;
-        if (Objects.nonNull(filter)) {
-            rewrittenFilter = filter.rewrite(queryShardContext);
-            if (rewrittenFilter != filter) {
-                final Integer resolvedSize = resolveSize(queryShardContext);
-                KNNQueryBuilder rewrittenQueryBuilder = KNNQueryBuilder.builder()
-                    .fieldName(this.fieldName)
-                    .vector(this.vector)
-                    .k(this.k)
-                    .maxDistance(this.maxDistance)
-                    .minScore(this.minScore)
-                    .methodParameters(this.methodParameters)
-                    .filter(rewrittenFilter)
-                    .ignoreUnmapped(this.ignoreUnmapped)
-                    .rescoreContext(this.rescoreContext)
-                    .expandNested(this.expandNested)
-                    .size(resolvedSize != null ? resolvedSize : this.size)
-                    .build();
-                return rewrittenQueryBuilder;
-            }
+        final QueryBuilder rewrittenFilter = Objects.nonNull(filter) ? filter.rewrite(queryShardContext) : filter;
+        final Integer resolvedSize = resolveSize(queryShardContext);
+
+        if (rewrittenFilter != filter || resolvedSize != null) {
+            KNNQueryBuilder rewrittenQueryBuilder = KNNQueryBuilder.builder()
+                .fieldName(this.fieldName)
+                .vector(this.vector)
+                .k(this.k)
+                .maxDistance(this.maxDistance)
+                .minScore(this.minScore)
+                .methodParameters(this.methodParameters)
+                .filter(rewrittenFilter)
+                .ignoreUnmapped(this.ignoreUnmapped)
+                .rescoreContext(this.rescoreContext)
+                .expandNested(this.expandNested)
+                .size(resolvedSize != null ? resolvedSize : this.size)
+                .build();
+            return rewrittenQueryBuilder;
         }
         return super.doRewrite(queryShardContext);
     }
