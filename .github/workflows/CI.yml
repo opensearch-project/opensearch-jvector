@@ -1,5 +1,6 @@
 name: Build and Test k-NN
 on:
+  workflow_dispatch:
   schedule:
     - cron: '0 0 * * *'  # every night
   push:
@@ -77,7 +78,7 @@ jobs:
           AVX_SUPPORT=$(get_avx_support)
           print_avx_support_message "$AVX_SUPPORT"
           AVX_BUILD_FLAGS=$(get_avx_build_flags $AVX_SUPPORT)
-          su $(id -un 1000) -c "whoami && java -version && ./gradlew build ${AVX_BUILD_FLAGS} -Dnproc.count=$(nproc) -Djvector.enable_native_vectorization=false"
+          su $(id -un 1000) -c "whoami && java -version && ./gradlew test --tests JVectorMergeWithDeletedDocsTests.testMultipleMergesWithVariousDeletionPatterns ${AVX_BUILD_FLAGS} -Dnproc.count=$(nproc) -Djvector.enable_native_vectorization=false"
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
@@ -130,7 +131,7 @@ jobs:
           AVX_SUPPORT=$(get_avx_support)
           print_avx_support_message "$AVX_SUPPORT"
           AVX_BUILD_FLAGS=$(get_avx_build_flags $AVX_SUPPORT)
-          su $(id -un 1000) -c "whoami && java -version && ./gradlew build ${AVX_BUILD_FLAGS} -Dnproc.count=$(nproc) -Djvector.enable_native_vectorization=true"
+          su $(id -un 1000) -c "whoami && java -version && ./gradlew test --tests JVectorMergeWithDeletedDocsTests.testMultipleMergesWithVariousDeletionPatterns ${AVX_BUILD_FLAGS} -Dnproc.count=$(nproc) -Djvector.enable_native_vectorization=true"
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
@@ -166,7 +167,7 @@ jobs:
 
       - name: Run build
         run: |
-          ./gradlew build
+          ./gradlew test --tests JVectorMergeWithDeletedDocsTests.testMultipleMergesWithVariousDeletionPatterns
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
@@ -209,7 +210,7 @@ jobs:
 
       - name: Run build
         run: |
-          ./gradlew.bat build
+          ./gradlew.bat test --tests JVectorMergeWithDeletedDocsTests.testMultipleMergesWithVariousDeletionPatterns
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
