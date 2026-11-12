@@ -22,6 +22,7 @@ import org.opensearch.core.xcontent.XContentBuilder;
 import org.opensearch.index.mapper.MappedFieldType;
 import org.opensearch.index.query.AbstractQueryBuilder;
 import org.opensearch.index.query.QueryBuilder;
+import org.opensearch.index.query.QueryBuilderVisitor;
 import org.opensearch.index.query.QueryCoordinatorContext;
 import org.opensearch.index.query.QueryRewriteContext;
 import org.opensearch.index.query.QueryShardContext;
@@ -645,6 +646,25 @@ public class KNNQueryBuilder extends AbstractQueryBuilder<KNNQueryBuilder> imple
             return byteVector;
         }
         return null;
+    }
+
+    /**
+     * Visits this query builder and its filter clause using the provided visitor.
+     * <p>
+     * This method first accepts the visitor for the current {@link KNNQueryBuilder}, then if a filter
+     * is present, it obtains a child visitor for {@link BooleanClause.Occur#FILTER} and delegates
+     * the filter's visitation to it. This enables traversal of the full query tree including any
+     * nested filter queries.
+     *
+     * @param visitor the {@link QueryBuilderVisitor} used to traverse the query tree
+     */
+    @Override
+    public void visit(QueryBuilderVisitor visitor) {
+        visitor.accept(this);
+        if (filter != null) {
+            final QueryBuilderVisitor subVisitor = visitor.getChildVisitor(BooleanClause.Occur.FILTER);
+            filter.visit(subVisitor);
+        }
     }
 
     @Override
