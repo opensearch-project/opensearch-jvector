@@ -159,11 +159,16 @@ public class IndexingIT extends AbstractRestartUpgradeTestCase {
         }
     }
 
+    // Radial search is only supported by the Lucene engine, so this test cannot use jvector.
     public void testKNNRadialSearchAfterUpgrade() throws Exception {
         waitForClusterHealthGreen(NODES_BWC_CLUSTER);
 
         if (isRunningAgainstOldCluster()) {
-            createKnnIndex(testIndex, getKNNDefaultIndexSettings(), createKnnIndexMapping(TEST_FIELD, DIMENSIONS, DISK_ANN, JVECTOR_NAME));
+            createKnnIndex(
+                testIndex,
+                getKNNDefaultIndexSettings(),
+                createKnnIndexMapping(TEST_FIELD, DIMENSIONS, METHOD_HNSW, LUCENE_NAME)
+            );
             addKNNDocs(testIndex, TEST_FIELD, DIMENSIONS, DOC_ID, NUM_DOCS);
             flush(testIndex, true);
         } else {
