@@ -7,27 +7,43 @@ package org.opensearch.knn.index.query;
 
 import com.google.common.collect.ImmutableMap;
 import lombok.SneakyThrows;
+
+import org.apache.lucene.search.BooleanClause;
 import org.apache.lucene.search.FloatVectorSimilarityQuery;
 import org.apache.lucene.search.MatchNoDocsQuery;
 import org.apache.lucene.search.Query;
 import org.junit.Before;
+import org.opensearch.action.search.SearchRequest;
 import org.opensearch.cluster.ClusterModule;
+import org.opensearch.cluster.metadata.IndexNameExpressionResolver;
+import org.opensearch.cluster.service.ClusterService;
+import org.opensearch.common.io.stream.BytesStreamOutput;
 import org.opensearch.common.settings.ClusterSettings;
+import org.opensearch.core.common.io.stream.NamedWriteableAwareStreamInput;
 import org.opensearch.core.common.io.stream.NamedWriteableRegistry;
+import org.opensearch.core.common.io.stream.StreamInput;
 import org.opensearch.core.index.Index;
 import org.opensearch.index.mapper.NumberFieldMapper;
+import org.opensearch.index.query.BoolQueryBuilder;
+import org.opensearch.index.query.MatchAllQueryBuilder;
 import org.opensearch.index.query.QueryBuilder;
+import org.opensearch.index.query.QueryBuilderVisitor;
 import org.opensearch.index.query.QueryBuilders;
+import org.opensearch.index.query.QueryCoordinatorContext;
 import org.opensearch.index.query.QueryRewriteContext;
 import org.opensearch.index.query.QueryShardContext;
 import org.opensearch.index.query.TermQueryBuilder;
 import org.opensearch.knn.KNNTestCase;
 import org.opensearch.knn.index.mapper.KNNVectorFieldType;
+import org.opensearch.knn.index.util.KNNClusterUtil;
+import org.opensearch.search.SearchService;
+import org.opensearch.search.builder.SearchSourceBuilder;
 import org.opensearch.knn.index.engine.KNNMethodContext;
 import org.opensearch.knn.index.engine.MethodComponentContext;
 import org.opensearch.knn.index.SpaceType;
 import org.opensearch.knn.index.VectorDataType;
 import org.opensearch.knn.index.engine.KNNEngine;
+import org.opensearch.Version;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -37,10 +53,14 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import static org.hamcrest.Matchers.instanceOf;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.opensearch.knn.index.KNNClusterTestUtils.mockClusterService;
 import static org.opensearch.knn.index.engine.KNNEngine.ENGINES_SUPPORTING_RADIAL_SEARCH;
 
 public class KNNQueryBuilderTests extends KNNTestCase {
@@ -476,5 +496,211 @@ public class KNNQueryBuilderTests extends KNNTestCase {
 
         // Then
         assertEquals(expected, actual);
+    }
+
+        // ---------- doRewrite / size stamping ----------
+
+    /**
+     * The coordinating-node rewrite is the only place a query builder can see the enclosing search request,
+     * so it is where the radial window gets stamped.
+     */
+    @SneakyThrows
+    public void testDoRewrite_whenRadialQueryOnCoordinator_thenStampsSize() {
+        final KNNQueryBuilder radial = KNNQueryBuilder.builder()
+            .fieldName(FIELD_NAME)
+            .vector(QUERY_VECTOR)
+            .maxDistance(MAX_DISTANCE)
+            .build();
+
+        final KNNQueryBuilder rewritten = (KNNQueryBuilder) radial.rewrite(coordinatorContext(new SearchSourceBuilder().size(25)));
+
+        assertEquals(Integer.valueOf(25), rewritten.getSize());
+        assertNull("the original builder must not be mutated", radial.getSize());
+    }
+
+    /**
+     * Unlike the shard-side {@code ApproximateScoreQuery} hook, which core only applies to the root query,
+     * the rewrite recurses through compound queries — this is the case that motivated the whole approach.
+     */
+    @SneakyThrows
+    public void testDoRewrite_whenRadialQueryNestedInBool_thenStampsSize() {
+        final KNNQueryBuilder radial = KNNQueryBuilder.builder().fieldName(FIELD_NAME).vector(QUERY_VECTOR).minScore(MIN_SCORE).build();
+        final BoolQueryBuilder bool = new BoolQueryBuilder().must(new MatchAllQueryBuilder()).must(radial);
+
+        final BoolQueryBuilder rewritten = (BoolQueryBuilder) bool.rewrite(coordinatorContext(new SearchSourceBuilder().size(30)));
+
+        final KNNQueryBuilder rewrittenRadial = (KNNQueryBuilder) rewritten.must().get(1);
+        assertEquals(Integer.valueOf(30), rewrittenRadial.getSize());
+    }
+
+    /**
+     * {@code from} is deliberately excluded from the window, matching how top-k treats it: {@code k}
+     * bounds what a shard produces regardless of which page was asked for.
+     */
+    @SneakyThrows
+    public void testDoRewrite_whenFromIsSet_thenFromIsIgnored() {
+        final KNNQueryBuilder radial = KNNQueryBuilder.builder()
+            .fieldName(FIELD_NAME)
+            .vector(QUERY_VECTOR)
+            .maxDistance(MAX_DISTANCE)
+            .build();
+
+        final KNNQueryBuilder rewritten = (KNNQueryBuilder) radial.rewrite(coordinatorContext(new SearchSourceBuilder().from(90).size(10)));
+
+        assertEquals(Integer.valueOf(10), rewritten.getSize());
+    }
+
+    /** An unset size means core will apply its own default, so the window has to match that default. */
+    @SneakyThrows
+    public void testDoRewrite_whenSizeUnset_thenUsesCoreDefaults() {
+        final KNNQueryBuilder radial = KNNQueryBuilder.builder()
+            .fieldName(FIELD_NAME)
+            .vector(QUERY_VECTOR)
+            .maxDistance(MAX_DISTANCE)
+            .build();
+
+        final KNNQueryBuilder rewritten = (KNNQueryBuilder) radial.rewrite(coordinatorContext(new SearchSourceBuilder()));
+
+        assertEquals(Integer.valueOf(SearchService.DEFAULT_SIZE), rewritten.getSize());
+    }
+
+    /** size: 0 is an aggregation-only request, so there is no top-hits window to bound. */
+    @SneakyThrows
+    public void testDoRewrite_whenSizeIsZero_thenLeavesSizeUnset() {
+        final KNNQueryBuilder radial = KNNQueryBuilder.builder()
+            .fieldName(FIELD_NAME)
+            .vector(QUERY_VECTOR)
+            .maxDistance(MAX_DISTANCE)
+            .build();
+
+        final QueryBuilder rewritten = radial.rewrite(coordinatorContext(new SearchSourceBuilder().size(0)));
+
+        assertNull(((KNNQueryBuilder) rewritten).getSize());
+    }
+
+    @SneakyThrows
+    public void testDoRewrite_whenTopKQuery_thenLeavesSizeUnset() {
+        final KNNQueryBuilder topK = KNNQueryBuilder.builder().fieldName(FIELD_NAME).vector(QUERY_VECTOR).k(K).build();
+
+        final QueryBuilder rewritten = topK.rewrite(coordinatorContext(new SearchSourceBuilder().size(25)));
+
+        assertNull(((KNNQueryBuilder) rewritten).getSize());
+    }
+
+    /**
+     * Core rewrites to a fixed point, so a builder that already carries a window must rewrite to itself or
+     * the rewrite loop never terminates.
+     */
+    @SneakyThrows
+    public void testDoRewrite_whenSizeAlreadySet_thenIsIdempotent() {
+        final KNNQueryBuilder radial = KNNQueryBuilder.builder()
+            .fieldName(FIELD_NAME)
+            .vector(QUERY_VECTOR)
+            .maxDistance(MAX_DISTANCE)
+            .size(42)
+            .build();
+
+        final QueryBuilder rewritten = radial.rewrite(coordinatorContext(new SearchSourceBuilder().size(25)));
+
+        assertSame(radial, rewritten);
+        assertEquals(Integer.valueOf(42), ((KNNQueryBuilder) rewritten).getSize());
+    }
+
+    /** Percolate, delete_by_query and _validate/query rewrite without a coordinator context. */
+    @SneakyThrows
+    public void testDoRewrite_whenNoCoordinatorContext_thenLeavesSizeUnset() {
+        final KNNQueryBuilder radial = KNNQueryBuilder.builder()
+            .fieldName(FIELD_NAME)
+            .vector(QUERY_VECTOR)
+            .maxDistance(MAX_DISTANCE)
+            .build();
+
+        final QueryBuilder rewritten = radial.rewrite(mock(QueryRewriteContext.class));
+
+        assertNull(((KNNQueryBuilder) rewritten).getSize());
+    }
+
+    @SneakyThrows
+    public void testDoRewrite_whenNoSource_thenLeavesSizeUnset() {
+        final KNNQueryBuilder radial = KNNQueryBuilder.builder()
+            .fieldName(FIELD_NAME)
+            .vector(QUERY_VECTOR)
+            .maxDistance(MAX_DISTANCE)
+            .build();
+
+        final QueryBuilder rewritten = radial.rewrite(coordinatorContext(null));
+
+        assertNull(((KNNQueryBuilder) rewritten).getSize());
+    }
+
+    private static QueryRewriteContext coordinatorContext(final SearchSourceBuilder source) {
+        final QueryCoordinatorContext context = mock(QueryCoordinatorContext.class);
+        when(context.convertToCoordinatorContext()).thenReturn(context);
+        when(context.getSearchRequest()).thenReturn(source == null ? new SearchRequest() : new SearchRequest().source(source));
+        return context;
+    }
+
+    // ---------- visit ----------
+
+    public void testVisit_whenNoFilter_thenVisitorAcceptsOnlyQueryBuilder() {
+        KNNQueryBuilder knnQueryBuilder = KNNQueryBuilder.builder().fieldName(FIELD_NAME).vector(QUERY_VECTOR).k(K).build();
+        QueryBuilderVisitor visitor = mock(QueryBuilderVisitor.class);
+
+        knnQueryBuilder.visit(visitor);
+
+        verify(visitor).accept(knnQueryBuilder);
+        verify(visitor, never()).getChildVisitor(any());
+    }
+
+    public void testVisit_whenFilterPresent_thenVisitorTraversesFilter() {
+        KNNQueryBuilder knnQueryBuilder = KNNQueryBuilder.builder()
+            .fieldName(FIELD_NAME)
+            .vector(QUERY_VECTOR)
+            .k(K)
+            .filter(TERM_QUERY)
+            .build();
+        QueryBuilderVisitor visitor = mock(QueryBuilderVisitor.class);
+        QueryBuilderVisitor subVisitor = mock(QueryBuilderVisitor.class);
+        when(visitor.getChildVisitor(any())).thenReturn(subVisitor);
+
+        knnQueryBuilder.visit(visitor);
+
+        verify(visitor).accept(knnQueryBuilder);
+        verify(visitor).getChildVisitor(BooleanClause.Occur.FILTER);
+        verify(subVisitor).accept(TERM_QUERY);
+    }
+
+    // ---------- size serialization ----------
+
+    @SneakyThrows
+    public void testSizeSerialization() {
+        assertSizeSerialization(Version.CURRENT, 42, 42);
+        assertSizeSerialization(Version.CURRENT, null, null);
+        assertSizeSerialization(Version.V_3_8_0, 42, null);
+    }
+
+    private void assertSizeSerialization(final Version version, final Integer size, final Integer expectedSize) throws Exception {
+        KNNQueryBuilder knnQueryBuilder = KNNQueryBuilder.builder()
+            .fieldName(FIELD_NAME)
+            .vector(QUERY_VECTOR)
+            .maxDistance(MAX_DISTANCE)
+            .size(size)
+            .build();
+        assertEquals(size, knnQueryBuilder.getSize());
+
+        ClusterService clusterService = mockClusterService(version);
+        KNNClusterUtil.instance().initialize(clusterService, mock(IndexNameExpressionResolver.class));
+
+        try (BytesStreamOutput output = new BytesStreamOutput()) {
+            output.setVersion(version);
+            output.writeNamedWriteable(knnQueryBuilder);
+
+            try (StreamInput in = new NamedWriteableAwareStreamInput(output.bytes().streamInput(), writableRegistry())) {
+                in.setVersion(version);
+                KNNQueryBuilder deserialized = (KNNQueryBuilder) in.readNamedWriteable(QueryBuilder.class);
+                assertEquals(expectedSize, deserialized.getSize());
+                assertEquals(MAX_DISTANCE.floatValue(), deserialized.getMaxDistance(), 0.0f);
+            }
+        }
     }
 }
