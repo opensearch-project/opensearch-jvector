@@ -5,30 +5,42 @@
 
 package org.opensearch.knn.bwc;
 
+import java.util.List;
+import java.util.Map;
+
 import org.apache.hc.core5.http.io.entity.EntityUtils;
+import static org.hamcrest.Matchers.containsString;
 import org.junit.Assert;
 import org.opensearch.client.Response;
 import org.opensearch.client.ResponseException;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.common.xcontent.XContentFactory;
 import org.opensearch.knn.KNNResult;
-import org.opensearch.knn.index.KNNSettings;
-import org.opensearch.knn.index.SpaceType;
-import org.opensearch.knn.index.VectorDataType;
-import org.opensearch.knn.index.engine.KNNEngine;
-import org.opensearch.knn.index.query.KNNQueryBuilder;
-
-import java.util.List;
-import java.util.Map;
-
-import static org.hamcrest.Matchers.containsString;
 import static org.opensearch.knn.TestUtils.KNN_ALGO_PARAM_EF_CONSTRUCTION_MIN_VALUE;
 import static org.opensearch.knn.TestUtils.KNN_ALGO_PARAM_M_MIN_VALUE;
 import static org.opensearch.knn.TestUtils.KNN_VECTOR;
 import static org.opensearch.knn.TestUtils.NODES_BWC_CLUSTER;
 import static org.opensearch.knn.TestUtils.PROPERTIES;
 import static org.opensearch.knn.TestUtils.VECTOR_TYPE;
-import static org.opensearch.knn.common.KNNConstants.*;
+import static org.opensearch.knn.common.KNNConstants.DIMENSION;
+import static org.opensearch.knn.common.KNNConstants.DISK_ANN;
+import static org.opensearch.knn.common.KNNConstants.ENCODER_SQ;
+import static org.opensearch.knn.common.KNNConstants.JVECTOR_NAME;
+import static org.opensearch.knn.common.KNNConstants.KNN_ENGINE;
+import static org.opensearch.knn.common.KNNConstants.KNN_METHOD;
+import static org.opensearch.knn.common.KNNConstants.LUCENE_NAME;
+import static org.opensearch.knn.common.KNNConstants.METHOD_ENCODER_PARAMETER;
+import static org.opensearch.knn.common.KNNConstants.METHOD_HNSW;
+import static org.opensearch.knn.common.KNNConstants.METHOD_PARAMETER_EF_CONSTRUCTION;
+import static org.opensearch.knn.common.KNNConstants.METHOD_PARAMETER_M;
+import static org.opensearch.knn.common.KNNConstants.METHOD_PARAMETER_SPACE_TYPE;
+import static org.opensearch.knn.common.KNNConstants.NAME;
+import static org.opensearch.knn.common.KNNConstants.PARAMETERS;
+import org.opensearch.knn.index.KNNSettings;
+import org.opensearch.knn.index.SpaceType;
+import org.opensearch.knn.index.VectorDataType;
+import org.opensearch.knn.index.engine.KNNEngine;
+import org.opensearch.knn.index.query.KNNQueryBuilder;
 
 public class IndexingIT extends AbstractRestartUpgradeTestCase {
     private static final String TEST_FIELD = "test-field";
@@ -143,6 +155,24 @@ public class IndexingIT extends AbstractRestartUpgradeTestCase {
             validateKNNSearch(testIndex, TEST_FIELD, DIMENSIONS, 50, 5);
             addKNNDocs(testIndex, TEST_FIELD, DIMENSIONS, 50, 25);
             validateKNNSearch(testIndex, TEST_FIELD, DIMENSIONS, 75, 5);
+            deleteKNNIndex(testIndex);
+        }
+    }
+
+    // Radial search is only supported by the Lucene engine, so this test cannot use jvector.
+    public void testKNNRadialSearchAfterUpgrade() throws Exception {
+        waitForClusterHealthGreen(NODES_BWC_CLUSTER);
+
+        if (isRunningAgainstOldCluster()) {
+            createKnnIndex(
+                testIndex,
+                getKNNDefaultIndexSettings(),
+                createKnnIndexMapping(TEST_FIELD, DIMENSIONS, METHOD_HNSW, LUCENE_NAME)
+            );
+            addKNNDocs(testIndex, TEST_FIELD, DIMENSIONS, DOC_ID, NUM_DOCS);
+            flush(testIndex, true);
+        } else {
+            validateKNNSearchDistance(testIndex, TEST_FIELD, DIMENSIONS, NUM_DOCS);
             deleteKNNIndex(testIndex);
         }
     }
