@@ -498,7 +498,7 @@ public class KNNQueryBuilderTests extends KNNTestCase {
         assertEquals(expected, actual);
     }
 
-        // ---------- doRewrite / size stamping ----------
+    // ---------- doRewrite / size stamping ----------
 
     /**
      * The coordinating-node rewrite is the only place a query builder can see the enclosing search request,
