@@ -713,7 +713,7 @@ public class KNNQueryBuilder extends AbstractQueryBuilder<KNNQueryBuilder> imple
             KNNQueryBuilder rewrittenQueryBuilder = KNNQueryBuilder.builder()
                 .fieldName(this.fieldName)
                 .vector(this.vector)
-                .k(this.k == 0 ? null : this.k)
+                .k(this.k)
                 .maxDistance(this.maxDistance)
                 .minScore(this.minScore)
                 .methodParameters(this.methodParameters)
