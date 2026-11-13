@@ -22,6 +22,7 @@ import org.opensearch.core.xcontent.XContentBuilder;
 import org.opensearch.index.mapper.MappedFieldType;
 import org.opensearch.index.query.AbstractQueryBuilder;
 import org.opensearch.index.query.QueryBuilder;
+import org.opensearch.index.query.QueryBuilderVisitor;
 import org.opensearch.index.query.QueryCoordinatorContext;
 import org.opensearch.index.query.QueryRewriteContext;
 import org.opensearch.index.query.QueryShardContext;
@@ -92,7 +93,7 @@ public class KNNQueryBuilder extends AbstractQueryBuilder<KNNQueryBuilder> imple
     private final float[] vector;
     @Getter
     @Setter
-    private int k;
+    private Integer k;
     @Getter
     private Float maxDistance;
     @Getter
@@ -231,7 +232,6 @@ public class KNNQueryBuilder extends AbstractQueryBuilder<KNNQueryBuilder> imple
 
         public KNNQueryBuilder build() {
             validate();
-            int k = this.k == null ? 0 : this.k;
             return new KNNQueryBuilder(
                 fieldName,
                 vector,
@@ -534,7 +534,7 @@ public class KNNQueryBuilder extends AbstractQueryBuilder<KNNQueryBuilder> imple
 
         String indexName = context.index().getName();
 
-        if (k != 0) {
+        if (k != null && k != 0) {
             final Query filterQuery;
             if (this.filter != null) {
                 filterQuery = this.filter.toQuery(context);
@@ -608,14 +608,14 @@ public class KNNQueryBuilder extends AbstractQueryBuilder<KNNQueryBuilder> imple
      * @param maxDistance Maximum distance for the given vector, if maxDistance is set, then the query type is MAX_DISTANCE
      * @param minScore Minimum score for the given vector, if minScore is set, then the query type is MIN_SCORE
      */
-    private VectorQueryType getVectorQueryType(int k, Float maxDistance, Float minScore) {
+    private VectorQueryType getVectorQueryType(Integer k, Float maxDistance, Float minScore) {
         if (maxDistance != null) {
             return VectorQueryType.MAX_DISTANCE;
         }
         if (minScore != null) {
             return VectorQueryType.MIN_SCORE;
         }
-        if (k != 0) {
+        if (k != null && k != 0) {
             return VectorQueryType.K;
         }
         throw new IllegalArgumentException(String.format(Locale.ROOT, "[%s] requires exactly one of k, distance or score to be set", NAME));
@@ -645,6 +645,25 @@ public class KNNQueryBuilder extends AbstractQueryBuilder<KNNQueryBuilder> imple
             return byteVector;
         }
         return null;
+    }
+
+    /**
+     * Visits this query builder and its filter clause using the provided visitor.
+     * <p>
+     * This method first accepts the visitor for the current {@link KNNQueryBuilder}, then if a filter
+     * is present, it obtains a child visitor for {@link BooleanClause.Occur#FILTER} and delegates
+     * the filter's visitation to it. This enables traversal of the full query tree including any
+     * nested filter queries.
+     *
+     * @param visitor the {@link QueryBuilderVisitor} used to traverse the query tree
+     */
+    @Override
+    public void visit(QueryBuilderVisitor visitor) {
+        visitor.accept(this);
+        if (filter != null) {
+            final QueryBuilderVisitor subVisitor = visitor.getChildVisitor(BooleanClause.Occur.FILTER);
+            filter.visit(subVisitor);
+        }
     }
 
     @Override
@@ -686,26 +705,24 @@ public class KNNQueryBuilder extends AbstractQueryBuilder<KNNQueryBuilder> imple
 
     @Override
     protected QueryBuilder doRewrite(QueryRewriteContext queryShardContext) throws IOException {
-        QueryBuilder rewrittenFilter;
-        if (Objects.nonNull(filter)) {
-            rewrittenFilter = filter.rewrite(queryShardContext);
-            if (rewrittenFilter != filter) {
-                final Integer resolvedSize = resolveSize(queryShardContext);
-                KNNQueryBuilder rewrittenQueryBuilder = KNNQueryBuilder.builder()
-                    .fieldName(this.fieldName)
-                    .vector(this.vector)
-                    .k(this.k)
-                    .maxDistance(this.maxDistance)
-                    .minScore(this.minScore)
-                    .methodParameters(this.methodParameters)
-                    .filter(rewrittenFilter)
-                    .ignoreUnmapped(this.ignoreUnmapped)
-                    .rescoreContext(this.rescoreContext)
-                    .expandNested(this.expandNested)
-                    .size(resolvedSize != null ? resolvedSize : this.size)
-                    .build();
-                return rewrittenQueryBuilder;
-            }
+        final QueryBuilder rewrittenFilter = Objects.nonNull(filter) ? filter.rewrite(queryShardContext) : filter;
+        final Integer resolvedSize = resolveSize(queryShardContext);
+
+        if (rewrittenFilter != filter || resolvedSize != null) {
+            KNNQueryBuilder rewrittenQueryBuilder = KNNQueryBuilder.builder()
+                .fieldName(this.fieldName)
+                .vector(this.vector)
+                .k(this.k)
+                .maxDistance(this.maxDistance)
+                .minScore(this.minScore)
+                .methodParameters(this.methodParameters)
+                .filter(rewrittenFilter)
+                .ignoreUnmapped(this.ignoreUnmapped)
+                .rescoreContext(this.rescoreContext)
+                .expandNested(this.expandNested)
+                .size(resolvedSize != null ? resolvedSize : this.size)
+                .build();
+            return rewrittenQueryBuilder;
         }
         return super.doRewrite(queryShardContext);
     }
