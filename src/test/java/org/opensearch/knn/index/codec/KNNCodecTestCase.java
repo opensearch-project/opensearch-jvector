@@ -126,7 +126,6 @@ public class KNNCodecTestCase extends KNNTestCase {
         final Path path = createTempDir();
         try (Directory dir = newFSDirectory(path)) {
             IndexWriterConfig iwc = newIndexWriterConfig();
-            iwc.setUseCompoundFile(false);
             iwc.setMergeScheduler(new SerialMergeScheduler());
             iwc.setCodec(codec);
             // Set merge policy to no merges so that we create a predictable number of segments.
@@ -156,14 +155,14 @@ public class KNNCodecTestCase extends KNNTestCase {
             writer.flush();
             writer.close();
 
-            // RandomIndexWriter randomly switches to compound mode, which was not caught by initial iwc object reference and tests ran
-            // file count assertion against jvector files when segment was packed into .cfs
+            // RandomIndexWriter randomly switches to compound mode
+            // Old check counted jvector files in the directory listing while they were packed inside .cfs
             List<String> jvectorFiles = new ArrayList<>();
             SegmentInfos sis = SegmentInfos.readLatestCommit(dir);
 
             for (SegmentCommitInfo sci : sis) {
                 if (sci.info.getUseCompoundFile()) {
-                    // segment is in packed in .cfs, inspect compound
+                    // segment is packed in .cfs, inspect compound
                     try (CompoundDirectory cfsDir = sci.info.getCodec().compoundFormat().getCompoundReader(dir, sci.info)) {
                         jvectorFiles.addAll(Arrays.stream(cfsDir.listAll()).filter(x -> x.contains("jvector")).toList());
                     }
