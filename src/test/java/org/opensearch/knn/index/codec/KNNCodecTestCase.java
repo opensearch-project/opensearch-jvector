@@ -6,12 +6,10 @@
 package org.opensearch.knn.index.codec;
 
 import com.google.common.collect.ImmutableMap;
+import org.apache.lucene.codecs.CompoundDirectory;
 import org.apache.lucene.codecs.perfield.PerFieldKnnVectorsFormat;
 import org.apache.lucene.document.KnnFloatVectorField;
-import org.apache.lucene.index.DirectoryReader;
-import org.apache.lucene.index.DocValuesType;
-import org.apache.lucene.index.NoMergePolicy;
-import org.apache.lucene.index.VectorSimilarityFunction;
+import org.apache.lucene.index.*;
 import org.apache.lucene.search.Query;
 import org.opensearch.common.settings.ClusterSettings;
 import org.opensearch.common.settings.Setting;
@@ -31,10 +29,7 @@ import org.opensearch.knn.index.mapper.KNNVectorFieldMapper;
 import org.apache.lucene.codecs.Codec;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.FieldType;
-import org.apache.lucene.index.IndexReader;
-import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.tests.index.RandomIndexWriter;
-import org.apache.lucene.index.SerialMergeScheduler;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.KnnFloatVectorQuery;
 import org.apache.lucene.store.Directory;
@@ -46,12 +41,7 @@ import org.mockito.Mockito;
 
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -165,15 +155,29 @@ public class KNNCodecTestCase extends KNNTestCase {
             // ensuring the refresh happens, to create the segment and vector file
             writer.flush();
             writer.close();
-            List<String> jvectorfiles = Arrays.stream(dir.listAll()).filter(x -> x.contains("jvector")).collect(Collectors.toList());
 
-            // The compound setting could be randomly changed by RandomIndexWriter
-            if (iwc.getUseCompoundFile() == false) {
-                // there should be 8 jvector index files created, with metadata 2 for test_vector and 2 for my_vector
-                assertEquals(8, jvectorfiles.size());
-                assertEquals(jvectorfiles.stream().filter(x -> x.contains("test_vector")).collect(Collectors.toList()).size(), 2);
-                assertEquals(jvectorfiles.stream().filter(x -> x.contains("my_vector")).collect(Collectors.toList()).size(), 2);
+            // RandomIndexWriter randomly switches to compound mode, which was not caught by initial iwc object reference and tests ran
+            // file count assertion against jvector files when segment was packed into .cfs
+            List<String> jvectorFiles = new ArrayList<>();
+            SegmentInfos sis = SegmentInfos.readLatestCommit(dir);
+
+            for (SegmentCommitInfo sci : sis) {
+                if (sci.info.getUseCompoundFile()) {
+                    // segment is in packed in .cfs, inspect compound
+                    try (CompoundDirectory cfsDir = sci.info.getCodec().compoundFormat().getCompoundReader(dir, sci.info)) {
+                        jvectorFiles.addAll(Arrays.stream(cfsDir.listAll()).filter(x -> x.contains("jvector")).toList());
+                    }
+                } else {
+                    // loose segment
+                    jvectorFiles.addAll(
+                        Arrays.stream(dir.listAll()).filter(x -> x.startsWith(sci.info.name)).filter(x -> x.contains("jvector")).toList()
+                    );
+                }
             }
+
+            assertEquals(8, jvectorFiles.size());
+            assertEquals(2, jvectorFiles.stream().filter(x -> x.contains("test_vector")).count());
+            assertEquals(2, jvectorFiles.stream().filter(x -> x.contains("my_vector")).count());
         }
 
         try (Directory dir = newFSDirectory(path); IndexReader reader = DirectoryReader.open(dir)) {
