@@ -119,10 +119,9 @@ public class KNN9120PerFieldKnnVectorsFormat extends BasePerFieldKnnVectorsForma
     }
 
     private static String buildFaissDescription(KNNVectorsFormatParams params) {
-        String base = String.format(java.util.Locale.ROOT, "IDMap,HNSW%d", params.getMaxConnections());
         String encoderType = params.getFaissEncoderType();
         if (KNNConstants.ENCODER_SQ.equals(encoderType)) {
-            return base + ",SQ8";
+            return String.format(java.util.Locale.ROOT, "IDMap,HNSW%d_SQ8", params.getMaxConnections());
         }
         if (KNNConstants.ENCODER_PQ.equals(encoderType)) {
             Integer subspaces = params.getFaissPqSubspaces();
@@ -131,9 +130,9 @@ public class KNN9120PerFieldKnnVectorsFormat extends BasePerFieldKnnVectorsForma
                     "faiss.pq_subspaces must be set to a positive integer that divides the vector dimension when faiss.encoder_type is \"pq\""
                 );
             }
-            return base + String.format(java.util.Locale.ROOT, ",PQ%d", subspaces);
+            return String.format(java.util.Locale.ROOT, "IDMap,HNSW%d_PQ%d", params.getMaxConnections(), subspaces);
         }
-        return base;
+        return String.format(java.util.Locale.ROOT, "IDMap,HNSW%d", params.getMaxConnections());
     }
 
     private static Tuple<Integer, ExecutorService> getMergeThreadCountAndExecutorService() {

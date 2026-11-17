@@ -8,6 +8,10 @@ package org.opensearch.knn.index.codec.KNN9120Codec;
 import org.apache.lucene.codecs.KnnVectorsFormat;
 import org.apache.lucene.codecs.KnnVectorsReader;
 import org.apache.lucene.codecs.KnnVectorsWriter;
+import org.apache.lucene.codecs.hnsw.FlatVectorScorerUtil;
+import org.apache.lucene.codecs.hnsw.FlatVectorsFormat;
+import org.apache.lucene.codecs.hnsw.FlatVectorsReader;
+import org.apache.lucene.codecs.lucene99.Lucene99FlatVectorsFormat;
 import org.apache.lucene.index.ByteVectorValues;
 import org.apache.lucene.index.FieldInfo;
 import org.apache.lucene.index.FloatVectorValues;
@@ -18,6 +22,7 @@ import org.apache.lucene.search.AcceptDocs;
 import org.apache.lucene.search.KnnCollector;
 
 import java.io.IOException;
+import java.lang.reflect.Constructor;
 import java.util.Map;
 
 /**
@@ -33,17 +38,31 @@ import java.util.Map;
 public final class FaissKnnVectorsFormatWrapper extends KnnVectorsFormat {
 
     private final FaissKnnVectorsFormat delegate;
+    private final FlatVectorsFormat rawVectorsFormat;
+    private static final Constructor<?> FAISS_READER_CTOR;
+
+    static {
+        try {
+            Class<?> readerClass = Class.forName("org.apache.lucene.sandbox.codecs.faiss.FaissKnnVectorsReader");
+            FAISS_READER_CTOR = readerClass.getConstructor(SegmentReadState.class, FlatVectorsReader.class);
+            FAISS_READER_CTOR.setAccessible(true);
+        } catch (ReflectiveOperationException e) {
+            throw new ExceptionInInitializerError(e);
+        }
+    }
 
     /** No-arg constructor required by Lucene's {@link org.apache.lucene.util.NamedSPILoader} SPI. */
     @SuppressWarnings("unused")
     public FaissKnnVectorsFormatWrapper() {
         super(FaissKnnVectorsFormat.NAME);
         this.delegate = new FaissKnnVectorsFormat();
+        this.rawVectorsFormat = new Lucene99FlatVectorsFormat(FlatVectorScorerUtil.getLucene99FlatVectorsScorer());
     }
 
     FaissKnnVectorsFormatWrapper(String description, String indexParams) {
         super(FaissKnnVectorsFormat.NAME);
         this.delegate = new FaissKnnVectorsFormat(description, indexParams);
+        this.rawVectorsFormat = new Lucene99FlatVectorsFormat(FlatVectorScorerUtil.getLucene99FlatVectorsScorer());
     }
 
     @Override
@@ -53,7 +72,13 @@ public final class FaissKnnVectorsFormatWrapper extends KnnVectorsFormat {
 
     @Override
     public KnnVectorsReader fieldsReader(SegmentReadState state) throws IOException {
-        return new BridgingReader(delegate.fieldsReader(state));
+        FlatVectorsReader rawReader = rawVectorsFormat.fieldsReader(state);
+        try {
+            KnnVectorsReader faissReader = (KnnVectorsReader) FAISS_READER_CTOR.newInstance(state, rawReader);
+            return new BridgingReader(faissReader);
+        } catch (ReflectiveOperationException e) {
+            throw new IOException("Failed to instantiate FaissKnnVectorsReader for segment " + state.segmentInfo.name, e);
+        }
     }
 
     @Override

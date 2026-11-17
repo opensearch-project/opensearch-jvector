@@ -366,8 +366,8 @@ dependencies {
     //api "io.github.jbellis:jvector-native:${jvector_version}"
     implementation 'org.agrona:agrona:1.23.1'
 
-    // Lucene sandbox v11 JAR
-    implementation files("${project.buildDir}/libs/lucene-sandbox-faiss-11.0.0-SNAPSHOT.jar")
+    // Lucene sandbox JAR
+    implementation files("${project.buildDir}/libs/lucene-sandbox-faiss-12.0.0-SNAPSHOT.jar")
 
     // Add this line for SLF4J 2.x compatibility
     implementation "org.apache.logging.log4j:log4j-slf4j2-impl:${versions.log4j}"
@@ -403,10 +403,19 @@ tasks.register('buildLuceneSandbox', Exec) {
 tasks.register('repackageLuceneSandboxFaiss', Jar) {
     dependsOn buildLuceneSandbox
     archiveBaseName = 'lucene-sandbox-faiss'
-    archiveVersion = '11.0.0-SNAPSHOT'
+    archiveVersion = '12.0.0-SNAPSHOT'
     destinationDirectory = file("${project.buildDir}/libs")
 
-    from(zipTree("${project.rootDir}/lucene/lucene/sandbox/build/libs/lucene-sandbox-11.0.0-SNAPSHOT.jar")) {
+    from({
+        def jarFiles = fileTree("${project.rootDir}/lucene/lucene/sandbox/build/libs").matching {
+            include 'lucene-sandbox-*.jar'
+            exclude '*-sources.jar', '*-javadoc.jar'
+        }.files
+        if (!jarFiles.isEmpty()) {
+            return zipTree(jarFiles.first())
+        }
+        return []
+    }) {
         include 'org/apache/lucene/sandbox/codecs/faiss/**'
         exclude 'META-INF/services/**'
     }
@@ -449,6 +458,7 @@ test {
     //this change enables mockito-inline that supports mocking of static classes/calls
     systemProperty "jdk.attach.allowAttachSelf", true
     systemProperty "java.library.path", nativeLibDir
+    systemProperty "lucene.faiss.libname", "faiss_c"
 
     retry {
         maxRetries = 3
@@ -498,6 +508,7 @@ integTest {
 
         systemProperty 'jdk.incubator.vector.VECTOR_ACCESS_OOB_CHECK', "0"
         systemProperty "java.library.path", nativeLibDir
+        systemProperty "lucene.faiss.libname", "faiss_c"
         jvmArgs = [
                 '--add-modules', 'jdk.incubator.vector',
                 '--add-opens', 'java.base/java.nio=ALL-UNNAMED',
@@ -568,6 +579,7 @@ testClusters.integTest { cluster ->
     systemProperty 'log4j.configurationFile', "${project.rootDir}/src/test/resources/log4j2.properties"
     systemProperty 'jvector.experimental.enable_native_vectorization', getNativeVectorizationProviderFlag()
     systemProperty "java.library.path", nativeLibDir
+    systemProperty "lucene.faiss.libname", "faiss_c"
     jvmArgs "--enable-native-access=ALL-UNNAMED", "--enable-preview"
     // Enable gRPC transport module (following neural-search pattern)
     setting("aux.transport.types", "[transport-grpc]")
@@ -656,6 +668,7 @@ run {
     // Set JVM arguments for memory and native library access
     testClusters.integTest.nodes.each { node ->
         node.systemProperty("java.library.path", nativeLibDir)
+        node.systemProperty("lucene.faiss.libname", "faiss_c")
         node.jvmArgs(
                 '-Xms8g',  // Initial heap size
                 '-Xmx8g',  // Maximum heap size
