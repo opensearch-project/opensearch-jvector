@@ -29,5 +29,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Maintenance
 - Removed unused public classes, interfaces and enums related with Quantization state and cache [764](https://github.com/opensearch-project/opensearch-jvector/pull/764)
+* Fix vulnerability due to matplotlib [810] (https://github.com/opensearch-project/opensearch-jvector/pull/810)
 
 ### Refactoring
