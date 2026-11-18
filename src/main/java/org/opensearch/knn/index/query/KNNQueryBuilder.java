@@ -546,7 +546,7 @@ public class KNNQueryBuilder extends AbstractQueryBuilder<KNNQueryBuilder> imple
                 case LUCENE:
                     if (byteVector.length > 0) {
                         byte[] target = getVectorForCreatingQueryRequest(vectorDataType, knnEngine, byteVector);
-                        return  LuceneEngineKnnVectorQuery(new KnnByteVectorQuery(this.fieldName, target, k, filterQuery));
+                        return new LuceneEngineKnnVectorQuery(new KnnByteVectorQuery(this.fieldName, target, k, filterQuery));
                     } else {
                         float[] target = getVectorForCreatingQueryRequest(vectorDataType, knnEngine);
                         assert target != null;
