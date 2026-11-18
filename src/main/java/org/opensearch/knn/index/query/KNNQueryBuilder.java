@@ -41,6 +41,7 @@ import org.opensearch.knn.index.engine.MethodComponentContext;
 import org.opensearch.knn.index.SpaceType;
 import org.opensearch.knn.index.VectorDataType;
 import org.opensearch.knn.index.VectorQueryType;
+import org.opensearch.knn.index.query.lucene.LuceneEngineKnnVectorQuery;
 import org.opensearch.knn.index.query.parser.KNNQueryBuilderParser;
 import org.opensearch.knn.index.engine.KNNLibrarySearchContext;
 import org.opensearch.knn.index.engine.KNNEngine;
@@ -545,11 +546,11 @@ public class KNNQueryBuilder extends AbstractQueryBuilder<KNNQueryBuilder> imple
                 case LUCENE:
                     if (byteVector.length > 0) {
                         byte[] target = getVectorForCreatingQueryRequest(vectorDataType, knnEngine, byteVector);
-                        return new KnnByteVectorQuery(this.fieldName, target, k, filterQuery);
+                        return new LuceneEngineKnnVectorQuery(new KnnByteVectorQuery(this.fieldName, target, k, filterQuery));
                     } else {
                         float[] target = getVectorForCreatingQueryRequest(vectorDataType, knnEngine);
                         assert target != null;
-                        return new KnnFloatVectorQuery(this.fieldName, target, k, filterQuery);
+                        return new LuceneEngineKnnVectorQuery(new KnnFloatVectorQuery(this.fieldName, target, k, filterQuery));
                     }
                 case JVECTOR:
                     final int overQueryFactor;
