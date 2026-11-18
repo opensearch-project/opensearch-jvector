@@ -397,7 +397,7 @@ public class InternalKNNEngineTests extends OpenSearchIntegTestCase {
          * 3.  Execute KNN queries
          * --------------------------------------------------- */
         // We will execute 10 KNN queries to make sure we are not just looking at race conditions or cache effects
-        final Map<String, ?> params = Map.of(KNNConstants.METHOD_PARAMETER_OVERQUERY_FACTOR, 1);
+        final Map<String, ?> params = Map.of(KNNConstants.METHOD_PARAMETER_OVERQUERY_FACTOR, 100);
         for (int i = 0; i < 10; i++) {
             final float[] searchVector = TestUtils.generateRandomVectors(1, dimension)[0];
             int k = 5;
