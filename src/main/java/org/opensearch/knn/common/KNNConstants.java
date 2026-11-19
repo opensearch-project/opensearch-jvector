@@ -44,6 +44,7 @@ public class KNNConstants {
     public static final String TOP_LEVEL_SPACE_TYPE_FEATURE = "top_level_space_type_feature";
 
     public static final String RADIAL_SEARCH_KEY = "radial_search";
+    public static final String NULL_K = "null_k";
     public static final String MODEL_VERSION = "model_version";
     public static final String SIZE = "size";
 

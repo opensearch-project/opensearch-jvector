@@ -20,6 +20,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Bug Fixes
 - Excessive heap consumption when using PQ/NVQ vectors with derived sources enabled [754](https://github.com/opensearch-project/opensearch-jvector/pull/754)
 - Fix RNNQueryFactory issue after lucene upgrade to 10.5.2 [769](https://github.com/opensearch-project/opensearch-jvector/pull/769)
+- Allows k to be nullable to fix filter bug [2836](https://github.com/opensearch-project/k-NN/issues/2836)
+- Wrap Lucene's KnnXxx queries into LuceneEngineKnnVectorQuery (to address neural-search plugin compatibility) [817](https://github.com/opensearch-project/k-NN/issues/817)
 
 ### Infrastructure
 
@@ -28,5 +30,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Maintenance
 - Removed unused public classes, interfaces and enums related with Quantization state and cache [764](https://github.com/opensearch-project/opensearch-jvector/pull/764)
+* Fix vulnerability due to matplotlib [810] (https://github.com/opensearch-project/opensearch-jvector/pull/810)
+* Fix vulnerability due to pyarrow [811] (https://github.com/opensearch-project/opensearch-jvector/pull/811)
 
 ### Refactoring

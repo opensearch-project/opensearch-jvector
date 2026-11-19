@@ -45,4 +45,25 @@ public class QueryANNIT extends AbstractRollingUpgradeTestCase {
                 deleteKNNIndex(testIndex);
         }
     }
+
+    // Radial search is only supported by the Lucene engine, so this test cannot use jvector.
+    public void testKNNRadialSearchRollingUpgrade() throws Exception {
+        waitForClusterHealthGreen(NODES_BWC_CLUSTER);
+        switch (getClusterType()) {
+            case OLD:
+                createKnnIndex(
+                    testIndex,
+                    getKNNDefaultIndexSettings(),
+                    createKnnIndexMapping(TEST_FIELD, DIMENSIONS, METHOD_HNSW, LUCENE_NAME)
+                );
+                addKNNDocs(testIndex, TEST_FIELD, DIMENSIONS, 0, NUM_DOCS);
+                break;
+            case MIXED:
+                validateKNNSearchDistance(testIndex, TEST_FIELD, DIMENSIONS, NUM_DOCS);
+                break;
+            case UPGRADED:
+                validateKNNSearchDistance(testIndex, TEST_FIELD, DIMENSIONS, NUM_DOCS);
+                deleteKNNIndex(testIndex);
+        }
+    }
 }
