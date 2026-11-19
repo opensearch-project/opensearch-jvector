@@ -1017,11 +1017,9 @@ public class JVectorWriter extends KnnVectorsWriter {
          * This process includes handling product quantization (PQ) for vector compression,
          * generating ord-to-doc mappings, and writing the merged index into a new segment file.
          * <p>
-         * The method determines if pre-existing product quantization codebooks are available
-         * from the leading reader. If available, it refines them using remaining vectors
-         * from other readers in the merge. If no pre-existing codebooks are found and
-         * the total vector count meets the required minimum threshold, new codebooks
-         * and compressed vectors are computed. Otherwise, no PQ compression is applied.
+         * When the graph is rebuilt from scratch, new codebooks and compressed vectors are computed
+         * from all live vectors if the leading reader already had codebooks or the total vector count
+         * meets the required minimum threshold. Otherwise, no PQ compression is applied.
          * <p>
          * Also, it generates a mapping of ordinals to document IDs by iterating through
          * the provided vector data, which is further used to write the field data.
@@ -1090,11 +1088,10 @@ public class JVectorWriter extends KnnVectorsWriter {
         }
 
         /**
-         * PQ merge: refines the leading reader's pre-existing codebooks with the remaining vectors when
-         * available, otherwise computes new codebooks from scratch (or falls back to full-precision vectors).
+         * PQ merge: performs a leading segment merge when possible. Otherwise the graph is rebuilt from scratch and the PQ
+         * codebooks are trained from scratch on all live vectors of the merge (or full-precision vectors are used).
          */
         private void mergePQ(RemappedRandomAccessVectorValues compactRavv) throws IOException {
-            final int totalVectorsCount = size;
             final String fieldName = fieldInfo.name;
             final PQVectors compactPqVectors;
             // Get the leading reader
@@ -1111,43 +1108,31 @@ public class JVectorWriter extends KnnVectorsWriter {
 
             boolean ok = tryLeadingSegmentMerge(leadingCompressor);
             if (!ok) {
-                // Check if the leading reader has pre-existing PQ codebooks and if so, refine them with the remaining vectors
-                if (leadingCompressor == null) {
-                    // No pre-existing codebooks, check if we have enough vectors to trigger quantization
+                // The leading reader's codebooks are not reused: they were trained on that segment only and may not represent
+                // the other segments' vectors well. Retrain on all live vectors, since the graph is rebuilt from scratch.
+                if (leadingCompressor != null || totalLiveVectorsCount >= minimumBatchSizeForQuantization) {
                     log.info(
-                        "No Pre-existing PQ codebooks found in this merge for field {} in segment {}, will check if a new codebooks is necessary",
+                        "Calculating new codebooks and compressed vectors for field: {} in segment {}, with totalLiveVectorCount: {}, minimumBatchSizeForQuantization: {}, pre-existing codebooks: {}",
                         fieldName,
-                        mergeState.segmentInfo.name
+                        mergeState.segmentInfo.name,
+                        totalLiveVectorsCount,
+                        minimumBatchSizeForQuantization,
+                        leadingCompressor != null
                     );
-                    if (totalLiveVectorsCount >= minimumBatchSizeForQuantization) {
-                        log.info(
-                            "Calculating new codebooks and compressed vectors for field: {}, with totalVectorCount: {}, above minimumBatchSizeForQuantization: {}",
-                            fieldName,
-                            totalVectorsCount,
-                            minimumBatchSizeForQuantization
-                        );
-                        compactPqVectors = JVectorIndexQuantization.computePqVectors(
-                            compactRavv,
-                            getVectorSimilarityFunction(fieldInfo),
-                            quantization.numSubspaces(compactRavv.dimension()),
-                            simdPoolMerge
-                        );
-                    } else {
-                        log.info(
-                            "Not enough vectors found for field: {}, totalVectorCount: {}, is below minimumBatchSizeForQuantization: {}",
-                            fieldName,
-                            totalVectorsCount,
-                            minimumBatchSizeForQuantization
-                        );
-                        compactPqVectors = null;
-                    }
+                    compactPqVectors = JVectorIndexQuantization.computePqVectors(
+                        compactRavv,
+                        getVectorSimilarityFunction(fieldInfo),
+                        quantization.numSubspaces(compactRavv.dimension()),
+                        simdPoolMerge
+                    );
                 } else {
                     log.info(
-                        "Pre-existing PQ codebooks found in this merge for field {} in segment {}, will refine the codebooks from the leading reader with the remaining vectors",
+                        "Not enough live vectors found for field: {}, totalLiveVectorCount: {}, is below minimumBatchSizeForQuantization: {}",
                         fieldName,
-                        mergeState.segmentInfo.name
+                        totalLiveVectorsCount,
+                        minimumBatchSizeForQuantization
                     );
-                    compactPqVectors = PQVectors.encodeAndBuild(leadingCompressor, compactRavv.size(), compactRavv, simdPoolMerge);
+                    compactPqVectors = null;
                 }
 
                 if (compactPqVectors == null) {
