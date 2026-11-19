@@ -165,7 +165,7 @@ public class JVectorWriterAbortTests extends LuceneTestCase {
 
     /** 4 × 3000 = 12 000 vectors > threshold (5000): checkMergeAborted() fires every 1000 nodes inside getGraph(). */
     @Test
-    public void testAbortDuringScratchGraphBuild() throws Exception {
+    public void testLargeGraphMergeAbortsOnRollbackWithinTimeLimit() throws Exception {
         Codec codec = getCodec(Integer.MAX_VALUE, true, false);
         runAbortTest(codec, 4, 3000, 5000);
     }
@@ -195,7 +195,7 @@ public class JVectorWriterAbortTests extends LuceneTestCase {
 
     /** 3 × 1000 = 3000 vectors <= threshold (5000) - no abort check */
     @Test
-    public void testSmallGraphMergeCompletesWithoutAbortCheck() throws Exception {
+    public void testSmallGraphMergeAbortsOnRollbackWithoutTimeLimit() throws Exception {
         Codec codec = getCodec(Integer.MAX_VALUE, true, false);
         runAbortTest(codec, 3, 1000, NO_ROLLBACK_TIME_LIMIT);
     }
