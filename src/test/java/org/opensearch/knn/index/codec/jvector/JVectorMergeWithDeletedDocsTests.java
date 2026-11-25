@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 
 import lombok.extern.log4j.Log4j2;
@@ -23,6 +24,7 @@ import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.tests.util.LuceneTestCase;
 import org.junit.Assert;
 import org.junit.Test;
+import org.opensearch.knn.TestUtils;
 import org.opensearch.knn.common.KNNConstants;
 import org.opensearch.knn.index.ThreadLeakFiltersForTests;
 
@@ -43,6 +45,7 @@ import org.opensearch.knn.index.ThreadLeakFiltersForTests;
 @LuceneTestCase.SuppressSysoutChecks(bugUrl = "")
 @Log4j2
 public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
+    private static final int RANDOM_SEED = 42;
     private static final String TEST_FIELD_2 = "test_field2";
     private static final String TEST_FIELD = "test_field";
     private static final String TEST_ID_FIELD = "id";
@@ -717,6 +720,10 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
 
         final Path indexPath = createTempDir();
 
+        // One fixed-seed random vector per document added or overwritten below (13500 in total)
+        final Iterator<float[]> vectors = Arrays.asList(TestUtils.randomlyGenerateStandardVectors(13_500, dimension, RANDOM_SEED))
+            .iterator();
+
         try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter writer = new IndexWriter(dir, config)) {
             int docId = 0;
 
@@ -726,8 +733,7 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
             int seg1Start = docId;
             for (int i = 0; i < seg1Size; i++) {
                 Document doc = new Document();
-                float[] vector = new float[dimension];
-                Arrays.fill(vector, docId * 0.01f);
+                float[] vector = vectors.next();
                 doc.add(new KnnFloatVectorField(TEST_FIELD, vector, VectorSimilarityFunction.EUCLIDEAN));
                 doc.add(new StringField(TEST_ID_FIELD, String.valueOf(docId), Field.Store.YES));
                 writer.addDocument(doc);
@@ -747,8 +753,7 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
             int seg2Start = docId;
             for (int i = 0; i < seg2Size; i++) {
                 Document doc = new Document();
-                float[] vector = new float[dimension];
-                Arrays.fill(vector, docId * 0.01f);
+                float[] vector = vectors.next();
                 doc.add(new KnnFloatVectorField(TEST_FIELD, vector, VectorSimilarityFunction.EUCLIDEAN));
                 doc.add(new StringField(TEST_ID_FIELD, String.valueOf(docId), Field.Store.YES));
                 writer.addDocument(doc);
@@ -759,8 +764,7 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
             log.info("Overwriting 300 documents in segment 2");
             for (int i = seg2Start; i < seg2Start + 300; i++) {
                 Document doc = new Document();
-                float[] vector = new float[dimension];
-                Arrays.fill(vector, (i + 1000) * 0.01f); // Different vector values
+                float[] vector = vectors.next();
                 doc.add(new KnnFloatVectorField(TEST_FIELD, vector, VectorSimilarityFunction.EUCLIDEAN));
                 doc.add(new StringField(TEST_ID_FIELD, String.valueOf(i), Field.Store.YES));
                 writer.updateDocument(new Term(TEST_ID_FIELD, String.valueOf(i)), doc);
@@ -779,8 +783,7 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
             int seg3Size = 1200;
             for (int i = 0; i < seg3Size; i++) {
                 Document doc = new Document();
-                float[] vector = new float[dimension];
-                Arrays.fill(vector, docId * 0.01f);
+                float[] vector = vectors.next();
                 doc.add(new KnnFloatVectorField(TEST_FIELD, vector, VectorSimilarityFunction.EUCLIDEAN));
                 doc.add(new StringField(TEST_ID_FIELD, String.valueOf(docId), Field.Store.YES));
                 writer.addDocument(doc);
@@ -794,8 +797,7 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
             int seg4Start = docId;
             for (int i = 0; i < seg4Size; i++) {
                 Document doc = new Document();
-                float[] vector = new float[dimension];
-                Arrays.fill(vector, docId * 0.01f);
+                float[] vector = vectors.next();
                 doc.add(new KnnFloatVectorField(TEST_FIELD, vector, VectorSimilarityFunction.EUCLIDEAN));
                 doc.add(new StringField(TEST_ID_FIELD, String.valueOf(docId), Field.Store.YES));
                 writer.addDocument(doc);
@@ -809,8 +811,7 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
             // Overwrite 200 different documents
             for (int i = seg4Start + 500; i < seg4Start + 700; i++) {
                 Document doc = new Document();
-                float[] vector = new float[dimension];
-                Arrays.fill(vector, (i + 2000) * 0.01f);
+                float[] vector = vectors.next();
                 doc.add(new KnnFloatVectorField(TEST_FIELD, vector, VectorSimilarityFunction.EUCLIDEAN));
                 doc.add(new StringField(TEST_ID_FIELD, String.valueOf(i), Field.Store.YES));
                 writer.updateDocument(new Term(TEST_ID_FIELD, String.valueOf(i)), doc);
@@ -830,8 +831,7 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
             int seg5Start = docId;
             for (int i = 0; i < seg5Size; i++) {
                 Document doc = new Document();
-                float[] vector = new float[dimension];
-                Arrays.fill(vector, docId * 0.01f);
+                float[] vector = vectors.next();
                 doc.add(new KnnFloatVectorField(TEST_FIELD, vector, VectorSimilarityFunction.EUCLIDEAN));
                 doc.add(new StringField(TEST_ID_FIELD, String.valueOf(docId), Field.Store.YES));
                 writer.addDocument(doc);
@@ -842,8 +842,7 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
             log.info("Overwriting all 1000 documents in segment 5");
             for (int i = seg5Start; i < seg5Start + seg5Size; i++) {
                 Document doc = new Document();
-                float[] vector = new float[dimension];
-                Arrays.fill(vector, (i + 3000) * 0.01f);
+                float[] vector = vectors.next();
                 doc.add(new KnnFloatVectorField(TEST_FIELD, vector, VectorSimilarityFunction.EUCLIDEAN));
                 doc.add(new StringField(TEST_ID_FIELD, String.valueOf(i), Field.Store.YES));
                 writer.updateDocument(new Term(TEST_ID_FIELD, String.valueOf(i)), doc);
@@ -857,8 +856,7 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
             int seg6Start = docId;
             for (int i = 0; i < seg6Size; i++) {
                 Document doc = new Document();
-                float[] vector = new float[dimension];
-                Arrays.fill(vector, docId * 0.01f);
+                float[] vector = vectors.next();
                 doc.add(new KnnFloatVectorField(TEST_FIELD, vector, VectorSimilarityFunction.EUCLIDEAN));
                 doc.add(new StringField(TEST_ID_FIELD, String.valueOf(docId), Field.Store.YES));
                 writer.addDocument(doc);
@@ -879,8 +877,7 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
             int seg7Start = docId;
             for (int i = 0; i < seg7Size; i++) {
                 Document doc = new Document();
-                float[] vector = new float[dimension];
-                Arrays.fill(vector, docId * 0.01f);
+                float[] vector = vectors.next();
                 doc.add(new KnnFloatVectorField(TEST_FIELD, vector, VectorSimilarityFunction.EUCLIDEAN));
                 doc.add(new StringField(TEST_ID_FIELD, String.valueOf(docId), Field.Store.YES));
                 writer.addDocument(doc);
@@ -891,8 +888,7 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
             log.info("Overwriting 1000 documents (50%) in segment 7");
             for (int i = seg7Start; i < seg7Start + 1000; i++) {
                 Document doc = new Document();
-                float[] vector = new float[dimension];
-                Arrays.fill(vector, (i + 4000) * 0.01f);
+                float[] vector = vectors.next();
                 doc.add(new KnnFloatVectorField(TEST_FIELD, vector, VectorSimilarityFunction.EUCLIDEAN));
                 doc.add(new StringField(TEST_ID_FIELD, String.valueOf(i), Field.Store.YES));
                 writer.updateDocument(new Term(TEST_ID_FIELD, String.valueOf(i)), doc);
