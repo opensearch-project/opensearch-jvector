@@ -40,6 +40,7 @@ public class JVectorWriterAbortTests extends LuceneTestCase {
     private static final String VECTOR_FIELD = "test_vector";
     private static final int DIMENSION = 64;
     private static final int MERGE_ABORT_CHECK_NUM_ORDINALS = 1000;
+    private static final long NO_ROLLBACK_TIME_LIMIT = -1;
 
     // -----------------------------------------------------------------------
     // checkMergeAborted
@@ -99,6 +100,11 @@ public class JVectorWriterAbortTests extends LuceneTestCase {
         runAbortTest(codec, numSegments, docsPerSegment, maxRollbackMs, 0);
     }
 
+    /**
+     * @param maxRollbackMs rollback must return within this time, or {@link #NO_ROLLBACK_TIME_LIMIT} when the path under test has no
+     *                      abort check (rollback then waits for the in-flight graph build). In both cases the merge thread must
+     *                      terminate and the merge must fail with an IOException.
+     */
     private void runAbortTest(Codec codec, int numSegments, int docsPerSegment, long maxRollbackMs, int leadingDocsCount) throws Exception {
         try (Directory dir = newDirectory()) {
             IndexWriterConfig indexWriterConfig = new IndexWriterConfig();
@@ -140,15 +146,17 @@ public class JVectorWriterAbortTests extends LuceneTestCase {
             // Rollback the writer — internally calls IndexWriter#abortMerges(),
             long startRollback = System.currentTimeMillis();
             writer.rollback();
-            mergeThread.join(10000); // 10 second timeout
+            mergeThread.join(10000);
 
             long rollbackElapsed = System.currentTimeMillis() - startRollback;
 
             assertFalse("Merge thread hung and did not abort", mergeThread.isAlive());
-            assertTrue(
-                "Rollback took too long (" + rollbackElapsed + "ms, limit=" + maxRollbackMs + "ms)",
-                rollbackElapsed < maxRollbackMs
-            );
+            if (maxRollbackMs != NO_ROLLBACK_TIME_LIMIT) {
+                assertTrue(
+                    "Rollback took too long (" + rollbackElapsed + "ms, limit=" + maxRollbackMs + "ms)",
+                    rollbackElapsed < maxRollbackMs
+                );
+            }
             // Verify that the merge was aborted with an IOException
             assertNotNull("Merge should have thrown an exception on abort", mergeError.get());
             assertTrue("Expected IOException on abort but got: " + mergeError.get(), mergeError.get() instanceof IOException);
@@ -157,7 +165,7 @@ public class JVectorWriterAbortTests extends LuceneTestCase {
 
     /** 4 × 3000 = 12 000 vectors > threshold (5000): checkMergeAborted() fires every 1000 nodes inside getGraph(). */
     @Test
-    public void testAbortDuringScratchGraphBuild() throws Exception {
+    public void testLargeGraphMergeAbortsOnRollbackWithinTimeLimit() throws Exception {
         Codec codec = getCodec(Integer.MAX_VALUE, true, false);
         runAbortTest(codec, 4, 3000, 5000);
     }
@@ -187,8 +195,8 @@ public class JVectorWriterAbortTests extends LuceneTestCase {
 
     /** 3 × 1000 = 3000 vectors <= threshold (5000) - no abort check */
     @Test
-    public void testSmallGraphMergeCompletesWithoutAbortCheck() throws Exception {
+    public void testSmallGraphMergeAbortsOnRollbackWithoutTimeLimit() throws Exception {
         Codec codec = getCodec(Integer.MAX_VALUE, true, false);
-        runAbortTest(codec, 3, 1000, 10000);
+        runAbortTest(codec, 3, 1000, NO_ROLLBACK_TIME_LIMIT);
     }
 }
