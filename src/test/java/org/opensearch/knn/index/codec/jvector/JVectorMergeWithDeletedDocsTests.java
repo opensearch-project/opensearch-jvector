@@ -721,8 +721,7 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
 
         // Use standard random vectors instead of non-random ones (like Arrays.fill(vector, docId * 0.01f))
         // to avoid extreme/degenerate distributions across segments.
-        final Iterator<float[]> vectors = Arrays.asList(TestUtils.generateRandomVectors(13_500, dimension))
-            .iterator();
+        final Iterator<float[]> vectors = Arrays.asList(TestUtils.generateRandomVectors(13_500, dimension)).iterator();
 
         try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter writer = new IndexWriter(dir, config)) {
             int docId = 0;
