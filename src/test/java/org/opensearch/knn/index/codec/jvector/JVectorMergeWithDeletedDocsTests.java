@@ -45,7 +45,6 @@ import org.opensearch.knn.index.ThreadLeakFiltersForTests;
 @LuceneTestCase.SuppressSysoutChecks(bugUrl = "")
 @Log4j2
 public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
-    private static final int RANDOM_SEED = 42;
     private static final String TEST_FIELD_2 = "test_field2";
     private static final String TEST_FIELD = "test_field";
     private static final String TEST_ID_FIELD = "id";
@@ -720,8 +719,9 @@ public class JVectorMergeWithDeletedDocsTests extends LuceneTestCase {
 
         final Path indexPath = createTempDir();
 
-        // One fixed-seed random vector per document added or overwritten below (13500 in total)
-        final Iterator<float[]> vectors = Arrays.asList(TestUtils.randomlyGenerateStandardVectors(13_500, dimension, RANDOM_SEED))
+        // Use standard random vectors instead of non-random ones (like Arrays.fill(vector, docId * 0.01f))
+        // to avoid extreme/degenerate distributions across segments.
+        final Iterator<float[]> vectors = Arrays.asList(TestUtils.generateRandomVectors(13_500, dimension))
             .iterator();
 
         try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter writer = new IndexWriter(dir, config)) {
