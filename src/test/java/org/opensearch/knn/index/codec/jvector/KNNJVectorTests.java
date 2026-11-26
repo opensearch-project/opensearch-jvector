@@ -1949,6 +1949,7 @@ public class KNNJVectorTests extends LuceneTestCase {
         iwc.setUseCompoundFile(false);
         iwc.setCodec(getCodec(random().nextBoolean()));
         iwc.setMergePolicy(new ForceMergesOnlyMergePolicy());
+        iwc.setMaxBufferedDocs(10000);
 
         try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter w = new IndexWriter(dir, iwc)) {
             for (int i = 0; i < 6; i++) {
@@ -1982,6 +1983,7 @@ public class KNNJVectorTests extends LuceneTestCase {
         iwc.setUseCompoundFile(false);
         iwc.setCodec(getCodec(random().nextBoolean()));
         iwc.setMergePolicy(new ForceMergesOnlyMergePolicy());
+        iwc.setMaxBufferedDocs(10000);
 
         try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter w = new IndexWriter(dir, iwc)) {
             for (int i = 0; i < 6; i++) {
@@ -2014,6 +2016,7 @@ public class KNNJVectorTests extends LuceneTestCase {
         iwc.setUseCompoundFile(false);
         iwc.setCodec(getCodec(random().nextBoolean()));
         iwc.setMergePolicy(new ForceMergesOnlyMergePolicy());
+        iwc.setMaxBufferedDocs(10000);
 
         try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter w = new IndexWriter(dir, iwc)) {
             for (int i = 0; i < 6; i++) {
@@ -2049,6 +2052,7 @@ public class KNNJVectorTests extends LuceneTestCase {
         iwc.setUseCompoundFile(false);
         iwc.setCodec(getCodec(random().nextBoolean()));
         iwc.setMergePolicy(new ForceMergesOnlyMergePolicy());
+        iwc.setMaxBufferedDocs(10000);
 
         try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter w = new IndexWriter(dir, iwc)) {
             for (int i = 0; i < 10; i++) {
