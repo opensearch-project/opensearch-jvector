@@ -1950,7 +1950,6 @@ public class KNNJVectorTests extends LuceneTestCase {
         iwc.setCodec(getCodec(random().nextBoolean()));
         iwc.setMergePolicy(new ForceMergesOnlyMergePolicy());
         final int numDocs = 6;
-        // flush only once all docs are added, so a single segment holds every vector (tests read leaves().get(0))
         iwc.setMaxBufferedDocs(numDocs);
 
         try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter w = new IndexWriter(dir, iwc)) {
@@ -1986,7 +1985,6 @@ public class KNNJVectorTests extends LuceneTestCase {
         iwc.setCodec(getCodec(random().nextBoolean()));
         iwc.setMergePolicy(new ForceMergesOnlyMergePolicy());
         final int numDocs = 6;
-        // flush only once all docs are added, so a single segment holds every vector (tests read leaves().get(0))
         iwc.setMaxBufferedDocs(numDocs);
 
         try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter w = new IndexWriter(dir, iwc)) {
@@ -2021,7 +2019,6 @@ public class KNNJVectorTests extends LuceneTestCase {
         iwc.setCodec(getCodec(random().nextBoolean()));
         iwc.setMergePolicy(new ForceMergesOnlyMergePolicy());
         final int numDocs = 6;
-        // flush only once all docs are added, so a single segment holds every vector (tests read leaves().get(0))
         iwc.setMaxBufferedDocs(numDocs);
 
         try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter w = new IndexWriter(dir, iwc)) {
@@ -2059,7 +2056,6 @@ public class KNNJVectorTests extends LuceneTestCase {
         iwc.setCodec(getCodec(random().nextBoolean()));
         iwc.setMergePolicy(new ForceMergesOnlyMergePolicy());
         final int numDocs = 10;
-        // flush only once all docs are added, so a single segment holds every vector (tests read leaves().get(0))
         iwc.setMaxBufferedDocs(numDocs);
 
         try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter w = new IndexWriter(dir, iwc)) {
