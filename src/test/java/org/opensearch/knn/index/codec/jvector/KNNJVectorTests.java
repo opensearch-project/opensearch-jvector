@@ -1949,10 +1949,12 @@ public class KNNJVectorTests extends LuceneTestCase {
         iwc.setUseCompoundFile(false);
         iwc.setCodec(getCodec(random().nextBoolean()));
         iwc.setMergePolicy(new ForceMergesOnlyMergePolicy());
-        iwc.setMaxBufferedDocs(10000);
+        final int numDocs = 6;
+        // flush only once all docs are added, so a single segment holds every vector (tests read leaves().get(0))
+        iwc.setMaxBufferedDocs(numDocs);
 
         try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter w = new IndexWriter(dir, iwc)) {
-            for (int i = 0; i < 6; i++) {
+            for (int i = 0; i < numDocs; i++) {
                 Document doc = new Document();
                 doc.add(new KnnFloatVectorField(TEST_FIELD, new float[] { i, i }, VectorSimilarityFunction.EUCLIDEAN));
                 w.addDocument(doc);
@@ -1983,10 +1985,12 @@ public class KNNJVectorTests extends LuceneTestCase {
         iwc.setUseCompoundFile(false);
         iwc.setCodec(getCodec(random().nextBoolean()));
         iwc.setMergePolicy(new ForceMergesOnlyMergePolicy());
-        iwc.setMaxBufferedDocs(10000);
+        final int numDocs = 6;
+        // flush only once all docs are added, so a single segment holds every vector (tests read leaves().get(0))
+        iwc.setMaxBufferedDocs(numDocs);
 
         try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter w = new IndexWriter(dir, iwc)) {
-            for (int i = 0; i < 6; i++) {
+            for (int i = 0; i < numDocs; i++) {
                 Document doc = new Document();
                 doc.add(new KnnFloatVectorField(TEST_FIELD, new float[] { i, i }, VectorSimilarityFunction.EUCLIDEAN));
                 w.addDocument(doc);
@@ -2016,10 +2020,12 @@ public class KNNJVectorTests extends LuceneTestCase {
         iwc.setUseCompoundFile(false);
         iwc.setCodec(getCodec(random().nextBoolean()));
         iwc.setMergePolicy(new ForceMergesOnlyMergePolicy());
-        iwc.setMaxBufferedDocs(10000);
+        final int numDocs = 6;
+        // flush only once all docs are added, so a single segment holds every vector (tests read leaves().get(0))
+        iwc.setMaxBufferedDocs(numDocs);
 
         try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter w = new IndexWriter(dir, iwc)) {
-            for (int i = 0; i < 6; i++) {
+            for (int i = 0; i < numDocs; i++) {
                 Document doc = new Document();
                 doc.add(new KnnFloatVectorField(TEST_FIELD, new float[] { i, i }, VectorSimilarityFunction.EUCLIDEAN));
                 w.addDocument(doc);
@@ -2052,10 +2058,12 @@ public class KNNJVectorTests extends LuceneTestCase {
         iwc.setUseCompoundFile(false);
         iwc.setCodec(getCodec(random().nextBoolean()));
         iwc.setMergePolicy(new ForceMergesOnlyMergePolicy());
-        iwc.setMaxBufferedDocs(10000);
+        final int numDocs = 10;
+        // flush only once all docs are added, so a single segment holds every vector (tests read leaves().get(0))
+        iwc.setMaxBufferedDocs(numDocs);
 
         try (FSDirectory dir = FSDirectory.open(indexPath); IndexWriter w = new IndexWriter(dir, iwc)) {
-            for (int i = 0; i < 10; i++) {
+            for (int i = 0; i < numDocs; i++) {
                 Document doc = new Document();
                 doc.add(new KnnFloatVectorField(TEST_FIELD, new float[] { i, i }, VectorSimilarityFunction.EUCLIDEAN));
                 w.addDocument(doc);
@@ -2070,7 +2078,7 @@ public class KNNJVectorTests extends LuceneTestCase {
                 fvv.prefetch(new int[] { 0, 2, 3, 4, 6, 8, 9 }, 7);
 
                 // All vector reads must survive regardless of which runs fired
-                for (int ord = 0; ord < 10; ord++) {
+                for (int ord = 0; ord < numDocs; ord++) {
                     Assert.assertNotNull("vectorValue(" + ord + ") must not be null", fvv.vectorValue(ord));
                 }
             }
