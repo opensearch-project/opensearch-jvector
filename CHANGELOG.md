@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Enhancements
 
 ### Bug Fixes
+- Fix flaky org.opensearch.knn.index.codec.jvector.KNNJVectorTests.testPrefetch_mixedRuns_onlyLongRunMeetsThreshold [838](https://github.com/opensearch-project/opensearch-jvector/pull/838)
 
 ### Infrastructure
 
